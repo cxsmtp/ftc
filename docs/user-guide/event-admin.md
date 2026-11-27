@@ -268,24 +268,34 @@ though, it is yours to make only while you are not competing in it.
 
 ## Challenges
 
-This tab behaves differently from every other one: the challenge **library** is
-shared by every organiser, while **a challenge added to an event lives in that
-event**. Adding a library challenge to your event gives the event its own copy
-(question, answer, options, hint, tags, attachments); the event uses that copy,
-and you can edit it — its answer included — in your event's **Challenges**
-section without touching the library or any other event. A later change to the
-library challenge does not reach your event's copy. Your event's own challenges
-cannot be added to another event; add the library challenge instead.
+The **Question bank** is shared by every organiser, while **a question added to
+an event lives in that event**. Adding a bank question to your event (**+ Add
+from bank** in its **Questions** section) gives the event its own copy
+(question, answer, options, hint, topic, attachments); the event uses that copy,
+and you can edit it — its answer included — in your event's **Questions**
+section without touching the bank or any other event. A later change to the bank
+question does not reach your event's copy. **+ New question** inside the event
+makes a question that belongs to the event from the start. Your event's own
+questions cannot be added to another event; add the bank question instead — or
+press **Save to bank** in an event question's menu, which copies it into the bank
+as a new bank question of yours (later changes to either do not reach the other).
+
+The bank is organised by **topic**: filter by one with the **Topic** box, and
+file a question under one in its editor's **Topic and sharing** row (**+ New
+topic** makes one). Participants see a question's topic as its category. You can
+rename or delete topics you made yourself (a topic still holding questions must
+be emptied first); an administrator manages the rest. Questions no longer show
+tags.
 
 ### What you can see
 
 Three kinds of challenge, and nothing else:
 
-1. **Challenges you created.** Yours to edit, publish, hide and tag.
+1. **Challenges you created.** Yours to edit, publish, hide and share.
 2. **Challenges used by one of your events** — including ones an administrator
    or a fellow organiser added. You can see them and read them, so you know what
    your participants are being asked, but you cannot change them.
-3. **Challenges tagged `public-domain`.** A shared pool anybody organising an
+3. **Questions shared with all organisers.** A shared pool anybody organising an
    event can pick from.
 
 **If a shared-pool challenge looks missing, it is probably further down the
@@ -299,7 +309,7 @@ workspace), or use the search box, and it comes back into view.
 **A challenge from the shared pool is badged `Shared`** in the Status column,
 beside Published or Draft. That is the quickest way to tell a challenge you can
 see because it is shared from one you can see because an event of yours holds
-it — you do not have to scroll the table sideways to the Tags column to find out.
+it.
 
 **A challenge whose answer has been sealed is badged `Sealed`** in that same
 column. Its author chose to keep the correct answer, the explanation and the hint
@@ -308,10 +318,9 @@ parts of it hidden from you — the rest of the challenge reads as normal. There
 more on this below, from both sides: sealing your own, and meeting somebody
 else's.
 
-**You cannot tag a challenge you did not create**, so on those rows the `+ tag`
-control and the `×` beside each tag are not offered; hovering the Tags cell says
-why. You can still use the challenge in your own events — that is what the shared
-pool is for.
+**You cannot change a challenge you did not create**, sharing included, so on
+those rows Edit is not offered and the menu says why. You can still use the
+challenge in your own events — that is what the shared pool is for.
 
 **The Events column on a challenge row shows only your own events.** If a
 challenge is also in an event somebody else runs, you see a `+1 elsewhere` chip
@@ -328,21 +337,20 @@ event you do not organise, saving an edit asks you to confirm first and says so 
 "in live event(s): 1 event you do not organise" — because your change reaches
 those participants immediately even though the event is not named.
 
-**And check the tag itself.** The shared pool is the tag `public-domain`, spelled
-exactly like that. A tag that differs by a separator — `public domain` with a
-space, `public_domain`, or a dash your word processor substituted — is an
-ordinary label that shares nothing, and one of those can look identical on
-screen. If you see a tag marked with a warning triangle and a **Fix** link, that
-is one: whoever can edit the challenge can click **Fix** to put it right.
+**A look-alike shares nothing.** An older question may carry a label that looks
+like the shared marker (`public domain` with a space, or an invisible character
+pasted in) but shares nothing. Its editor names it beside **Shared with all
+organisers**; turning the switch on shares it and removes the look-alike.
 
 ### What you can do
 
 - **Create** a challenge — freely, as many as you like. It is yours.
-- **Edit / publish / unpublish / hide / tag** — only challenges you created.
+- **Edit / publish / unpublish / hide / share** — only challenges you created
+  (and your events' own questions).
 - **Assign** any challenge you can see to any event you organise.
 - **Remove from an event** — only challenges *you* added to that event. If a
   colleague or an administrator put it there, ask them to take it out. In the
-  **Add Challenges** dialog those rows are ticked, greyed out and outlined with
+  **Add from bank** dialog those rows are ticked, greyed out and outlined with
   dashes, and hovering
   one says who can remove it; the row menu leaves the option off entirely.
 
@@ -358,12 +366,12 @@ a normal admin. Unpublish it or hide it instead — both are yours.
 
 ### Sharing a challenge with other organisers
 
-Tag one of your own challenges **`public-domain`** — from the `+ tag` control,
-which offers it as a one-click chip, rather than typing it — and every event
-admin on the platform can see it and use it in their events. The spelling is
-exact: `public domain` with a space is an ordinary tag and shares nothing. They still cannot edit it — it
-stays yours. Remove the tag and it goes back to being private to you and to the
-events already using it.
+Turn on **Shared with all organisers** in the **Topic and sharing** row of one
+of your own bank questions, and every event admin on the platform can see it and
+use it in their events. They still cannot edit it — it stays yours. Turn it off
+and it goes back to being private to you and to the events already using it. A
+question inside an event has no switch: save it to the bank and share the bank
+question.
 
 ### Sealing an answer
 
@@ -409,10 +417,10 @@ Sealing also makes you the only person who can **edit** that challenge or
 **restore an earlier version** of it — the answer is bound up in both. (A
 superadmin who has revealed the answer can do both as well, and the reveal is on
 the record.) It reaches further than the answer box, so know what you are taking
-on: on everybody else's screen the row loses **Publish**, **Hide** and its tag
-controls as well, and their row menu says the challenge is not theirs to change.
-If a colleague was going to publish it for you, retitle it or tag it into the
-shared pool, that falls to you.
+on: on everybody else's screen the row loses **Publish**, **Hide** and **Edit**
+(and with it the sharing switch) as well, and their row menu says the challenge
+is not theirs to change. If a colleague was going to publish it for you, retitle
+it or share it with all organisers, that falls to you.
 
 What other organisers and administrators keep is the *use* of it. They can still
 read the row, preview it as a participant, assign it to their own events, take

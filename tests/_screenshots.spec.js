@@ -2207,27 +2207,23 @@ test.describe("admin", () => {
   });
 
   test("52-public-domain-tag", async ({ page }) => {
-    // v8.8.2 — the Add Tag dialog, showing the one-click `public-domain` chip.
-    // The reserved tag decides whether every event organiser on the platform can
-    // use a challenge, and it used to be reachable only by typing it exactly —
-    // so the guide's sentence about it had no picture, and the control it now
-    // describes did not exist.
+    // Stage B — the question editor's Topic and sharing row, open: the topic
+    // picker with + New topic, the Shared with all organisers switch (the
+    // public-domain marker; the file keeps its name) and the needs choices.
+    // Referenced from admin.md, Topics > Shared with all organisers.
     await gotoTab(page, "Challenges");
-    const row = page.locator("#admin-task-body tr").first();
-    await row.waitFor({ state: "visible", timeout: 10000 });
-    await row.locator("[data-action='task-tag-add']").click();
-
-    // ASSERT THE STATE BEFORE SHOOTING (v8.3.21): the chip is offered only while
-    // the tag is NOT already applied, so a capture taken against a challenge that
-    // already carries it would illustrate the caption with the dialog's other half.
-    await page.locator("#task-tag-input").waitFor({ state: "visible", timeout: 10000 });
-    const reserved = page.locator("#task-tag-reserved");
-    await expect(reserved, "the reserved-tag chip is offered").toBeVisible();
-    await expect(reserved, "…with its explanation").toContainText(/shared pool/i);
-
+    await page.locator("[data-action='open-task-form']").first().waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("[data-action='open-task-form']").first().click();
+    await page.locator('[aria-controls="tf-org-body"]').click();
+    // ASSERT THE STATE BEFORE SHOOTING (v8.3.21): the row is open and offers
+    // what the caption names.
+    await expect(page.locator("#tf-topic"), "the topic picker").toBeVisible();
+    await expect(page.locator("#tf-shared"), "the shared switch").toBeVisible();
+    await expect(page.locator("#tf-needs-list input[data-need]").first(), "the needs choices").toBeVisible();
+    await page.locator("#tf-org-sec").scrollIntoViewIfNeeded();
     await settle(page, 400);
-    await page.screenshot({ path: shotPath("admin", "52-public-domain-tag") });
-    await page.locator("#task-tag-cancel-btn").click().catch(() => {});
+    await page.locator("#tf-org-sec").screenshot({ path: shotPath("admin", "52-public-domain-tag") });
+    await page.locator("[data-action='close-task-form']").first().click().catch(() => {});
   });
 
   test("40-challenge-table-menu", async ({ page }) => {

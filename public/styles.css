@@ -6352,7 +6352,7 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .topic-filter{display:inline-flex;align-items:center;gap:6px}
 .topic-filter label{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-2)}
 .topic-filter select{max-width:min(260px, 60vw)}
-.topic-chip{display:inline-block;padding:1px 8px;border-radius:var(--pill-radius);font-size:var(--fs-12);font-weight:var(--fw-semibold);background:var(--surface-2);color:var(--text);border:1px solid var(--border);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.topic-chip{display:inline-block;padding:1px 8px;border-radius:var(--r-s);font-size:var(--fs-12);font-weight:var(--fw-semibold);background:var(--surface-2);color:var(--text);border:1px solid var(--border);white-space:normal;overflow-wrap:anywhere;max-width:100%;vertical-align:middle}
 .topics-card{max-width:min(560px, calc(100vw - 32px));width:100%;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto}
 .topics-add{margin:12px 0}
 .topics-add label{display:block;font-size:var(--fs-13);font-weight:var(--fw-semibold);margin-bottom:6px}

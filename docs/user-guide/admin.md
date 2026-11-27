@@ -666,8 +666,13 @@ when they change. Then the event's **sections**, a strip of tabs:
   platform** to list every account, each with **Add to event**; untick it to
   narrow back. On a multi-session event the rows of people in other sessions are
   dimmed. See [Participants](#participants).
-- **Challenges** — the event's challenges first, then the rest of the library
-  dimmed below them, ready to add.
+- **Questions** — the event's own questions first (edit any of them, its answer
+  included, for this event only), then the rest of the Question bank dimmed below
+  them, ready to add. **+ Add from bank** adds bank questions (the event gets its
+  own copy of each), **+ New question** makes a question that belongs to the
+  event from the start, and **Save to bank** in an event question's menu copies
+  it into the bank as a new bank question (never linked: later changes to either
+  do not reach the other).
 
   ![An event's Challenges section — its challenges at the top](../screenshots/admin/18-challenges-scoped.png)
 - **Rankings** — its leaderboard (a single session's, if you picked one), the
@@ -2359,14 +2364,14 @@ cancels it everywhere the moment those browsers next load the site.
 
 ## Challenges
 
-The **Challenges** tab lists the challenge **library** (the bank of questions),
-whatever events use them.
+The **Question bank** (the sidebar item of that name) lists the bank of
+questions, whatever events use them, filed by [topic](#topics).
 
 **A challenge added to an event lives in that event.** Adding a library
 challenge to an event gives the event its **own copy** of it — the question,
 answer, options, hint, explanation, tags, attachments and seal — and the event
 uses that copy from then on. Editing the event's copy (in the event's
-**Challenges** section), its answer included, changes that event only; editing
+**Questions** section), its answer included, changes that event only; editing
 the library challenge changes no event at all, so a later fix to the library is
 not carried into an event that already has its copy. Cloning an event, or
 making one from a template, gives the new event fresh copies of its own. An
@@ -3359,9 +3364,9 @@ depends on the tab:
   invited them — so `staff`, `pending`, or the name of an event all work as
   search terms.
 - **Events** — the name, the event's tags and its sessions' names.
-- **Challenges** — the title, difficulty and tags (`web` finds the category
-  `category:web`), the answer type, the status, the author, who last changed
-  it, and the names of the events it is in.
+- **Question bank** — the title, difficulty, topic and the question's stored
+  tags (shown nowhere, still searched), the answer type, the status, the author,
+  who last changed it, and the names of the events it is in.
 - **Submissions** — participant, challenge, answer text, event/session,
   and **Activity** type (correct / wrong / hint).
 - **Logs** — anything in the entry, including participant names and emails
@@ -3369,7 +3374,7 @@ depends on the tab:
 
 Combine text with the chips under **Filters** beside the box (All / Pending / …
 on People, Status and Type on Events, difficulty tiers and Published / Draft in
-the Challenge library) to narrow by both text and category at once. Submissions
+the Question bank, beside its Topic box) to narrow by both text and category at once. Submissions
 has no chips, only its search box.
 
 ### Editing a profile

@@ -653,7 +653,7 @@ route's own tier guard.
 | Surface | Event admin |
 |---|---|
 | **Events** | Sees only granted events, at any status. Full per-event control equal to a normal admin: edit, sessions, tags, CxOne override, join link, end now, **close late entries now** (a Booth Event whose late-entry window is open — §9.9), export activity — **unless they compete in it** (v8.12.0): an organiser enrolled in an event whose **Staff can compete** switch is on can view that event and not change it, whatever their tier — the reads stay (Open, History, Organisers, Email Delivery, Export Activity, a rival's person export, and the **Join Link** dialog, which opens read-only: link, QR and code shown, the toggle and Regenerate withheld), only the mutating controls go — until they remove themselves, which they can do while the event has not ended (§9.8). **Cannot create an event from scratch**, and cannot delete one (superadmin). Since v8.15.0 they can **clone** an event they organise and **spawn** an event template; either makes them the new event's organiser, and neither copies participants, answers or the join link. Templates themselves are managed by administrators only. The **full event export** and the **person export** are scoped like every other read: their own events only, and a person's export narrowed to rows about those events. |
-| **Challenges** | **Creates** freely. **Sees** challenges they created, challenges used by one of their events, and `public-domain` ones. The per-row events column shows only their events (v8.8.8), with a count of any others holding it. **Edits / publishes / hides / tags** only their own — and on a **sealed** challenge those four are its author's alone whatever the tier (a superadmin who has revealed it aside), because the seal names an account rather than a tier (§9.7). **Assigns** any challenge they can see to any event they manage — but an event where staff compete admits only a **sealed** challenge, and never one its author competes in (§9.8). **Unassigns** only what they themselves assigned. Cannot hard-delete (superadmin), lock, or recalculate. A challenge held by an event they compete in is read-only for them, hint included (§9.8). |
+| **Challenges** | **Creates** freely, topics too (renames or deletes only the topics they made, §9.5b); **Save to bank** copies their events' own questions into the bank. **Sees** challenges they created, challenges used by one of their events, and `public-domain` ones. The per-row events column shows only their events (v8.8.8), with a count of any others holding it. **Edits / publishes / hides / tags** only their own — and on a **sealed** challenge those four are its author's alone whatever the tier (a superadmin who has revealed it aside), because the seal names an account rather than a tier (§9.7). **Assigns** any challenge they can see to any event they manage — but an event where staff compete admits only a **sealed** challenge, and never one its author competes in (§9.8). **Unassigns** only what they themselves assigned. Cannot hard-delete (superadmin), lock, or recalculate. A challenge held by an event they compete in is read-only for them, hint included (§9.8). |
 | **Participants** | Sees only people enrolled in one of their events, plus an account waiting for an administrator's approval whose live invitation names one of their events (signed up through an invitation whose inviter cannot approve accounts, §1): its row names only those of their events it was invited to, so they can ask an administrator to approve it, and they can view it but neither approve it nor take any other row action on it, as it is in none of their events (operator ruling, 23 Nov 2026; their pending count still counts members only). The per-row events column shows only their events, and so does a participant's History (v8.8.4). Invites (including at the desk) only into their events, and an invitation must name at least one of them that is live, upcoming or taking late entries — one naming none is refused. The **Invite Participants** dialog lists exactly those events (one they compete in is listed, marked **You compete here**, and cannot be ticked) and will not send with none ticked; when only one can be ticked it is ticked for them, marked **Always included**, and cannot be unticked; when none can be, the dialog says why — in place of the list when it has no events to show, under the events they compete in otherwise — and **Send Invitations** is disabled. CSV export covers only what they can see. A Booth Event of theirs that has ended but is still inside its **late-entry window** stays open to every door that adds people — invite, assign, **At the desk**, a bound group — and whoever is added joins as a late entrant; only late entrants can then be removed from it (§9.9). Per-participant actions as a normal admin — approve, deny, block, unlock, email or show a sign-in code, tags, impersonate (participants only, in their participant view — read-only, narrowed to your events — §9.5b; viewing a fellow organiser's panel is an administrator's door, §9.5d). An invitation of theirs approves an existing account waiting for approval only as **Approve** would: when the invitation puts it into one of their events as a participant (an organiser's or administrator's waiting account never). One whose every enrolment was skipped stays waiting, and the **Invite Participants** dialog says so and keeps those addresses in the box. **Cannot** change a role, verify or delete. |
 | **Groups** | Creates freely. Sees groups they created or that are bound to one of their events. **Deletes only groups they created.** Cannot edit a group that is also bound to somebody else's event (§9.2), nor change the membership of one bound to an event they **compete in** — a group change reconciles onto that board (§9.8; any tier, and a rename stays open). |
 | **Submissions** | An event's **Activity** section: that event's. Across all their events, the **Audit** page (its submission and hint rows). |
@@ -879,9 +879,10 @@ ordinary task tag with a reserved meaning, declared once in `lib/event-admin.js`
 Anyone who may edit the challenge may apply it, which for an event admin means
 their own challenges only.
 
-**It HAS a client mirror** (`public/js/ui/format.js`), and this section used to say
-it did not — v8.8.2 added one so the Add Tag dialog could apply the exact value
-without anybody typing it, and the sentence denying a mirror survived that release.
+**It HAS a client mirror** (`public/js/ui/format.js`): the question editor's
+**Shared with all organisers** switch (stage B: questions have no tag box any more)
+applies the exact value through the tag route without anybody typing it, and names
+a stored look-alike beside the switch, which removes it when turned on.
 Both the constant and the near-miss predicate beside it are diffed against the
 server by a Docs-hygiene scanner.
 
@@ -896,7 +897,32 @@ platform-wide visibility to a challenge somebody labelled descriptively. The cos
 is stated rather than hidden — `public domain` is no longer available as an
 ordinary descriptive label. The importer and version restore are deliberately NOT
 guarded (a migration must not be sunk, and a snapshot must stay restorable); the
-challenge row marks any near-miss that arrives that way and offers a one-click fix.
+editor names any near-miss that arrives that way beside the shared switch.
+
+### 9.5b Topics and Save to bank (stage B)
+
+**Topics** (`routes/topics.js`, `lib/topics.js`) organise the Question bank: a
+question names at most one topic (`tasks.topic_id`). Topic NAMES are
+platform-wide, not narrowed by scope: any role holding `challenges.edit` may make a
+topic (`POST /api/admin/topics`) and file a question it may edit under any topic.
+The list (`GET /api/admin/topics`, `challenges.view`) shows every topic, with
+`question_count` counting only the bank questions the reader can see
+(`taskVisibilitySql`). **Renaming and deleting are a global admin's, or the topic's
+creator's** (`topics.created_by_id`): any other caller gets 403 `topic_not_yours`,
+and the list's `can_manage` / `manage_refusal` say so per topic. A topic still
+named by any question (bank or event copy) is deleted only after its questions are
+moved (`move_to`), which only an unscoped caller may do (`can_move`); a scoped
+creator deletes only an empty topic. All four routes are `open` in
+`ADMIN_ROUTE_PERMISSIONS` (no event to narrow) and decide in the handler.
+
+**Save to bank** (`POST /api/admin/tasks/:id/save-to-bank`, `challenges.edit`,
+`scoped`) copies an event's own question into the bank as a NEW bank question,
+asked in order: 404; not an event's question (400 `save_to_bank_not_event`); the
+competitor lock (seat and hand); `taskViewDenied` (an event admin: a question of an
+event they organise); the seal (`sealedEditDenied`: a key the caller may not read
+is not theirs to copy); a quick question (400 `save_to_bank_qualifying`). The new
+question belongs to the caller (`created_by_id`), or to the source's author when
+the answer is sealed, so the seal still names that person.
 
 ### 9.5a Scoping the ENTITY is not scoping the ROWS (v8.8.4)
 

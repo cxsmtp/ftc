@@ -384,7 +384,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     // The palette inherits the same gates (Invite and every workspace write).
     await openPalette(page);
     const acts = (await paletteOptions(page, "")).filter((o) => o.section === "Actions").map((o) => o.label);
-    for (const gone of ["Invite people", "Edit settings", "Clone", "Export everything", "Add challenges", "Sign up at the desk", "Join-link settings", "Save as template", "New event", "New challenge"]) {
+    for (const gone of ["Invite people", "Edit settings", "Clone", "Export everything", "Add from bank", "Sign up at the desk", "Join-link settings", "Save as template", "New event", "New question"]) {
       expect(acts, `${gone} is not this role's`).not.toContain(gone);
     }
     expect(acts, "POSITIVE: the read doors are listed").toContain("History");

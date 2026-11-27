@@ -138,11 +138,15 @@ test.describe("v8.12.4 — challenges pane, driven through its own controls", ()
     } finally { await sa.dispose(); }
   });
 
-  test("the × on a challenge's tag chip removes that tag and leaves the others", async ({ page }) => {
+  // Stage B — free tags are no longer shown; what an organiser still sets is the
+  // reserved markers, through the editor's Topic and sharing row. Unticking one
+  // needs choice removes exactly that marker and leaves the others, a free tag
+  // the editor never shows included.
+  test("unticking a needs choice in the editor removes that marker and leaves every other tag", async ({ page }) => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     try {
-      const title = uniq("TagChip"), id = await mkTask(sa, csrf, title);
-      for (const tag of ["keep-me", "drop-me"]) {
+      const title = uniq("NeedsChip"), id = await mkTask(sa, csrf, title);
+      for (const tag of ["keep-me", "needs:desktop", "needs:cxone"]) {
         const r = await sa.post(`/api/admin/tasks/${id}/tags`, { headers: H(csrf), data: { tag } });
         expect(r.ok(), await r.text()).toBeTruthy();
       }
@@ -150,12 +154,18 @@ test.describe("v8.12.4 — challenges pane, driven through its own controls", ()
         const db = new Database(TEST_DB_PATH, { readonly: true });
         try { return db.prepare("SELECT tag FROM task_tags WHERE task_id=? ORDER BY tag").all(id).map(r => r.tag); } finally { db.close(); }
       };
-      expect(tags(), "PRECONDITION: both tags applied").toEqual(["drop-me", "keep-me"]);
+      expect(tags(), "PRECONDITION: three tags applied").toEqual(["keep-me", "needs:cxone", "needs:desktop"]);
       await adminLogin(page); await clickTab(page, "Challenges");
       await narrow(page, title);
-      const row = page.locator(`#admin-task-body tr:has-text("${title}")`).first();
-      await row.locator('[data-action="task-tag-remove"][data-tag="drop-me"]').click();
-      await expect.poll(tags, { timeout: 10000 }).toEqual(["keep-me"]);
+      await expect.poll(() => page.evaluate((tid) => !!(window.adminTasksData || []).find(t => t.id === tid), id), { timeout: 10000 }).toBe(true);
+      await page.evaluate((tid) => window.editTask(tid), id);
+      await page.locator('[aria-controls="tf-org-body"]').click();
+      const desk = page.locator('#tf-needs-list input[data-need="desktop"]');
+      await expect(desk, "the needs choice shows its stored state").toBeChecked();
+      await expect(page.locator('#tf-needs-list input[data-need="cxone"]')).toBeChecked();
+      await desk.uncheck();
+      await page.locator("#save-task-btn").click();
+      await expect.poll(tags, { timeout: 10000 }).toEqual(["keep-me", "needs:cxone"]);
     } finally { await sa.dispose(); }
   });
 });

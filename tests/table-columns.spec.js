@@ -51,6 +51,7 @@ test.describe("v8.17.0 — admin tables fit, choose columns, sort and filter", (
     const { api, csrf } = await apiLogin("superadmin");
     const h = { "x-csrf-token": csrf, "content-type": "application/json" };
     const tags = { a: ["alpha", LONG_TAG, "zeta-tag", "extra-one", "extra-two"], b: ["beta"], c: [] };
+    const topics = { a: `${STAMP} alpha ${"verylongtopic".repeat(2)}`, b: `${STAMP} beta`, c: null };
     for (const [k, t] of Object.entries(titles)) {
       const r = await api.post("/api/admin/tasks", { headers: h, data: {
         title: t, description: "<p>d</p>", difficulty: k === "a" ? "hard" : k === "b" ? "medium" : "easy",
@@ -61,6 +62,14 @@ test.describe("v8.17.0 — admin tables fit, choose columns, sort and filter", (
       for (const tag of tags[k]) {
         const tr = await api.post(`/api/admin/tasks/${id}/tags`, { headers: h, data: { tag } });
         expect(tr.ok(), `tag ${tag}: ${tr.status()} ${await tr.text()}`).toBeTruthy();
+      }
+      // Stage B — the Question bank shows a TOPIC column, not the tags: a long
+      // topic on (a), a short one on (b), none on (c).
+      if (topics[k]) {
+        const tp = await api.post("/api/admin/topics", { headers: h, data: { name: topics[k] } });
+        expect(tp.status(), `topic ${topics[k]}: ${await tp.text()}`).toBe(201);
+        const pr = await api.put(`/api/admin/tasks/${id}`, { headers: h, data: { topic_id: (await tp.json()).id } });
+        expect(pr.ok(), `file under topic: ${await pr.text()}`).toBeTruthy();
       }
     }
     // A participant with a long address and company, so the Participants table
@@ -292,7 +301,7 @@ test.describe("v8.17.0 — admin tables fit, choose columns, sort and filter", (
     await expect(page.locator("#p-columns-btn")).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("Challenge library: heading filter narrows the whole library; a tag heading sorts", async ({ page }) => {
+  test("Question bank: heading filter narrows the whole bank; the topic heading sorts", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await adminLogin(page);
     await clickTab(page, "Challenges");
@@ -330,16 +339,16 @@ test.describe("v8.17.0 — admin tables fit, choose columns, sort and filter", (
     await narrowChallengesTable(page, STAMP);
     await expect(rows).toHaveCount(3, { timeout: 5000 });
 
-    // Tags has no sort of its own: the heading sorts through the component,
+    // Topic has no sort of its own: the heading sorts through the component,
     // blanks last both ways, with aria-sort on the heading.
-    const tagsTh = page.locator("#admin-task-table thead th[data-tcol='tags']");
+    const tagsTh = page.locator("#admin-task-table thead th[data-tcol='topic']");
     // On the heading's label, not its centre (the heading's own sort-and-filter
     // button sits beside the label and a click on it opens the menu instead).
     await tagsTh.click({ position: { x: 8, y: 10 } });
     await expect(tagsTh).toHaveAttribute("aria-sort", "ascending");
     const firstTitle = async () => (await rows.first().innerText());
-    expect(await firstTitle(), "ascending by first tag: alpha… (a) before beta (b)").toContain(titles.a);
-    expect(await rows.last().innerText(), "the tagless challenge sorts last").toContain(titles.c);
+    expect(await firstTitle(), "ascending by topic: alpha… (a) before beta (b)").toContain(titles.a);
+    expect(await rows.last().innerText(), "the topicless question sorts last").toContain(titles.c);
     await tagsTh.press("Enter");
     await expect(tagsTh).toHaveAttribute("aria-sort", "descending");
     expect(await firstTitle(), "descending: beta (b) first").toContain(titles.b);
@@ -382,7 +391,7 @@ test.describe("v8.17.0 — admin tables fit, choose columns, sort and filter", (
     return b;
   };
 
-  test("Phone: Sort & filter above the cards opens each heading's own sort and filter (Challenge library)", async ({ page }) => {
+  test("Phone: Sort & filter above the cards opens each heading's own sort and filter (Question bank)", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await adminLogin(page);
     await clickTab(page, "Challenges");

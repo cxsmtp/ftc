@@ -826,7 +826,7 @@ async function showAllTableColumns(page, table, keys) {
     try { localStorage.setItem(`ha:tcols:${t}`, JSON.stringify(k)); } catch (_) { /* no storage: defaults stay */ }
   }, [table, keys]);
 }
-const CHALLENGE_ALL_COLUMNS = ["_select", "title", "difficulty", "type", "status", "attachments", "feedback", "last_changed", "changed_by", "author", "tags", "events", "actions"];
+const CHALLENGE_ALL_COLUMNS = ["_select", "title", "difficulty", "type", "status", "attachments", "feedback", "last_changed", "changed_by", "author", "topic", "events", "actions"];
 const EVENT_ALL_COLUMNS = ["name", "start", "end", "duration", "status", "tags", "participants", "challenges", "sessions", "actions"];
 
 /** Scope to a competition by clicking its name cell (same as old "View" button) */

@@ -9,7 +9,7 @@ import { setSafeHtml } from "../core/trusted-types.js";
 import { computeCompStatus, compDisplayCategory, COMP_CATEGORY_LABEL } from "./competition-picker.js";
 import { loadAdminCompetitions, compareCompsForPicker } from "./competitions-admin.js";
 import { closeHistoryDialog } from "./history.js";
-import { _fmtBytes, esc, fmtDt, _syncSortAria, formatCorrectAnswer, DRY_RUN_TAG, PUBLIC_DOMAIN_TAG} from "../ui/format.js";
+import { _fmtBytes, esc, fmtDt, _syncSortAria, formatCorrectAnswer, DRY_RUN_TAG, PUBLIC_DOMAIN_TAG, publicDomainNearMiss} from "../ui/format.js";
 import { markFieldError, clearFieldErrors } from "../ui/profile-form.js";
 import { DIFF_PTS, ICO } from "../ui/icons.js";
 import { showSkeletonRows, showLoading, hideLoading } from "../ui/loading.js";
@@ -2596,6 +2596,16 @@ function _tfOrgFill(t){
   const sg=document.getElementById('tf-shared-group');if(sg)sg.hidden=ev;
   const sn=document.getElementById('tf-shared-note');if(sn)sn.hidden=!ev;
   const sh=document.getElementById('tf-shared');if(sh)sh.checked=tags.includes(PUBLIC_DOMAIN_TAG);
+  // v8.8.3, kept — a LOOK-ALIKE of the shared marker (a space, a soft hyphen, a
+  // zero-width space) shares nothing, and on screen can read exactly like it.
+  // Named here, beside the switch that repairs it: turning the switch on adds the
+  // real marker and removes the look-alike.
+  const near=tags.filter(publicDomainNearMiss);
+  const nm=document.getElementById('tf-shared-nearmiss');
+  if(nm){
+    nm.hidden=ev||!near.length||tags.includes(PUBLIC_DOMAIN_TAG);
+    nm.textContent=near.length?`This question carries “${near[0]}”, which looks like the shared marker but shares nothing. Turn on Shared with all organisers to share it; the look-alike is then removed.`:'';
+  }
   const needs=Object.entries(KNOWN_NEEDS);
   for(const tg of tags){if(String(tg).startsWith('needs:')){const k=String(tg).slice(6);if(k&&!needs.some(n=>n[0]===k))needs.push([k,k]);}}
   const list=document.getElementById('tf-needs-list');
@@ -2619,7 +2629,12 @@ async function _tfApplyOrgTags(taskId){
   const ops=[];
   const sg=document.getElementById('tf-shared-group'),sh=document.getElementById('tf-shared');
   if(sg&&!sg.hidden&&sh&&!sh.disabled){
-    if(sh.checked&&!before.has(PUBLIC_DOMAIN_TAG))ops.push(['add',PUBLIC_DOMAIN_TAG]);
+    if(sh.checked&&!before.has(PUBLIC_DOMAIN_TAG)){
+      ops.push(['add',PUBLIC_DOMAIN_TAG]);
+      // Add first, then drop any look-alike (the v8.8.3 Fix's order: a failed
+      // removal leaves the question shared, never unshared).
+      for(const t of before)if(publicDomainNearMiss(t))ops.push(['del',t]);
+    }
     if(!sh.checked&&before.has(PUBLIC_DOMAIN_TAG))ops.push(['del',PUBLIC_DOMAIN_TAG]);
   }
   document.querySelectorAll('#tf-needs-list input[data-need]').forEach(cb=>{
@@ -2633,7 +2648,7 @@ async function _tfApplyOrgTags(taskId){
     const r=op==='add'
       ?await fetch(`/api/admin/tasks/${encodeURIComponent(taskId)}/tags`,{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({tag})})
       :await fetch(`/api/admin/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tag)}`,{method:'DELETE',headers:csrfHeaders()});
-    if(!r.ok){const d=await r.json().catch(()=>({}));failed.push(d.error||'A sharing or needs change was refused.');}
+    if(!r.ok){const d=await r.json().catch(()=>({}));failed.push(d.error||'A sharing or needs change was refused.');break;}
   }
   return failed;
 }
