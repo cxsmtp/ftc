@@ -1094,6 +1094,49 @@ export async function loadAdminLeaderboardPerSlot(comp,timeslots){
   }
 }
 
+/**
+ * Program grades (owner decision, 27 Nov 2026): each learner's grade, under the
+ * Progress card of a graded event (GET /api/admin/competitions/:id/grades).
+ * A list rather than a table: one line per learner, every value the server's.
+ */
+async function _loadProgramGrades(compId, mySeq){
+  const box=document.getElementById('rk-grades');
+  if(!box)return;
+  let d=null;
+  try{
+    const r=await fetch(`/api/admin/competitions/${encodeURIComponent(compId)}/grades`,{headers:{accept:'application/json'}});
+    d=r.ok?await r.json().catch(()=>null):null;
+  }catch{ d=null; }
+  if(mySeq!==S._rkFetchSeq)return;
+  const now=document.getElementById('rk-grades');
+  if(!now)return;
+  if(!d||!Array.isArray(d.rows)){
+    setSafeHtml(now,'<p class="rk-unranked-note" role="alert">The grades could not be loaded. Open Rankings again to retry.</p>');
+    return;
+  }
+  setSafeHtml(now,programGradesHtml(d));
+}
+
+/** The grades list (exported for its spec): every value escaped here. */
+export function programGradesHtml(d){
+  const pass=Number(d.passPercent)||60;
+  const head=`<h4 class="rk-grades-title">Grades</h4>
+    <p class="rk-unranked-note">Points earned out of ${esc(String(d.maxPoints??0))}, after wrong-answer penalties and hints. A grade counts once the learner has finished every challenge; ${esc(String(pass))}% or more earns a certificate (90% Excellent, 80% Very good, 70% Good, 60% Satisfactory). Under it the learner is told to try again.</p>`;
+  if(!d.rows.length)return head+'<p class="rk-unranked-note">Nobody has joined yet.</p>';
+  const items=d.rows.map((r)=>{
+    const who=[r.firstName,r.lastName].filter(Boolean).join(' ')||r.nickname||r.email||r.userId;
+    const g=r.grade;
+    const grade=!g?'No challenges yet'
+      :(r.finished?`${esc(g.percent)} &middot; ${esc(g.label)}`:`${esc(g.percent)} so far &middot; not finished`);
+    const extra=[
+      r.attempt>1?`attempt ${esc(String(r.attempt))}`:'',
+      r.certificate?`certificate issued${r.certificate.grade?` (${esc(r.certificate.grade.label)}, ${esc(r.certificate.grade.percent)})`:''}`:'',
+    ].filter(Boolean).join(' &middot; ');
+    return `<li class="rk-grade-row" data-user-id="${esc(r.userId)}" data-band="${esc(g?g.band:'')}"><span class="rk-grade-who">${esc(who)}</span> <span class="rk-grade-val">${grade}</span>${extra?` <span class="rk-grade-extra">${extra}</span>`:''}</li>`;
+  }).join('');
+  return `${head}<ul class="rk-grade-list">${items}</ul>`;
+}
+
 export async function loadAdminLeaderboard(){
   if(!adminCan('leaderboard.view'))return;   // RBAC — as loadAdminRankingsTab
   const mySeq=++S._rkFetchSeq;        // v7.21.15 — see loadAdminLeaderboardAllLive
@@ -1120,7 +1163,9 @@ export async function loadAdminLeaderboard(){
         <strong>Export Activity (CSV)</strong> item on this event's row gives one line per
         participant per challenge.
       </p>
+      ${policyOrDefault(_rkComp.policy).certificate==='completion'?'<div id="rk-grades" class="rk-grades" aria-live="polite"><p class="rk-unranked-note">Loading grades…</p></div>':''}
     </div>`);
+    if(policyOrDefault(_rkComp.policy).certificate==='completion') await _loadProgramGrades(compId, mySeq);
     return;
   }
   // Restore standard single-table layout if it was replaced by per-slot view —

@@ -1178,7 +1178,8 @@ app.get("/api/admin/competitions/:id/export/full", requireAdmin, exportLimiter, 
     "Every file is UTF-8 CSV; cells beginning = + - @ TAB or CR carry a leading apostrophe so a spreadsheet shows them as text.\r\n" +
     "User ID and Challenge Ref join the files. Answers to sealed challenges are withheld unless you authored the challenge.\r\n" +
     "Staff are left out unless the event lets staff compete; benchmark accounts are included and labelled.\r\n" +
-    "certificates.csv lists every certificate issued in the event, whoever holds it now.\r\n";
+    "certificates.csv lists every certificate issued in the event, whoever holds it now.\r\n" +
+    (data.files["grades.csv"] ? "grades.csv (a Program) lists each learner's attempts: every closed one (Try again) and the current one, which counts once Finished; 60% or more passes.\r\n" : "");
   const zip = await filesToZip(data.files, readme);
   // RE-ASK AFTER THE LAST AWAIT (the top-three ZIP's shape): the deflate is the
   // only await, so nothing is awaited from here to the send. The downloading

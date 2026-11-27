@@ -349,6 +349,8 @@
   "profile-sparse-save.spec.js": 10.4,
   "profile-stale-avatar.spec.js": 2.1,
   "profile-text-control-chars.api.spec.js": 2.6,
+  "program-grades-ui.spec.js": 14,
+  "program-grades.api.spec.js": 9,
   "program-schedule-integrity.spec.js": 7.1,
   "program-schedule.spec.js": 3.5,
   "progress-strip-session.spec.js": 2.8,

@@ -675,7 +675,10 @@ All three start from your events.
   still there, and on your own sealed challenges you read the answers as usual.
 - **Rankings** — an event's **Rankings** section shows that event (or the
   session you picked); **Live rankings** in the sidebar shows the live events
-  you organise.
+  you organise. A **Program** has no leaderboard: its Rankings section lists each
+  learner's **grade** instead (90% Excellent, 80% Very good, 70% Good, 60%
+  Satisfactory; under 60% no certificate, and the learner may try again; the
+  [Admin guide](admin.md#program-grades) explains how a grade is worked out).
 - **Analytics** — pick one of your events or sessions. There is no
   platform-wide option: it would aggregate events that are not yours. The tag
   and group lists you can filter by are likewise drawn only from participants you
@@ -699,7 +702,8 @@ its activity already says it failed).
 ### Exports, cloning and templates
 
 - **Full event export** — a ZIP of CSV files with everything about one of your
-  events (participants, answers, hints, time, rankings, certificates, ratings).
+  events (participants, answers, hints, time, rankings, certificates, ratings;
+  for a Program, each learner's grades).
   Answers to a sealed challenge somebody else wrote stay withheld.
 - **Person export** — a participant's profile, memberships, answers, history
   and invitations, covering **only your events**: anything from somebody else's

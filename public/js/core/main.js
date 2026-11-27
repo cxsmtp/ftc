@@ -22,7 +22,7 @@ import { _helpLoadDoc, closeHelpDrawer, openHelpDrawer } from "./../features/hel
 import { openReleaseNotes } from "./../features/release-notes.js";
 import { _histSort, closeHistoryDialog, loadMoreHistory, renderHistoryDialog, showCompetitionHistory, showTaskHistory, showUserHistory } from "./../features/history.js";
 import { loadLeaderboard, sortLeaderboard, sortLeaderboardGroup, sortLeaderboardLate, forgetCertHeld } from "./../features/leaderboard.js";
-import { openBadgeShare, copyBadgeLink, copyPostAndOpenLinkedIn } from "./../features/badge-share.js";
+import { openBadgeShare, copyBadgeLink, copyPostAndOpenLinkedIn, startProgramRetakeFlow } from "./../features/badge-share.js";
 import { exitImpersonation, impersonateParticipant, renderImpersonationBanner } from "./../features/impersonation.js";
 import { _endedPopupChannel, filterTasks, fireNavigatedAway, fitAnswerArea, handleStarKeydown, hoverStars, loadTasks, openTask, rearmOpenTask, refreshScore, renderTasks, resetStars, revealHint, setSolveFilter, submitAnswer, submitFeedback, tapChoice, tapChoiceToggled } from "./../features/participant-tasks.js";
 import { addGroup, addTag, adminEditProfile, approveUser, grantEventAdmin, revokeEventAdmin, blockUser, bulkApproveUsers, closeKebab, deleteParticipant, denyUser, inviteParticipantsForCompetition, loadAdminParticipants, openInviteDialog, quickInviteToCompetition, removeGroup, removeTag, renderParticipants, emailSignInCodeForUser, saveAdminProfile, setPStatusFilter, setUserRole, sortParticipants, submitInvitations, toggleAllParticipants, toggleKebab, toggleParticipantSelection, uninviteFromCompetition, unlockUser, updateAdpTimezones, verifyUser, showParticipantCode, deskInvite } from "./../features/participants-admin.js";
@@ -522,6 +522,8 @@ function boot() {
     if (document.getElementById('leaderboard-page')?.classList.contains('active')) loadLeaderboard({ silent: true });
   }));
   registerAction('badge-copy-link',            () => copyBadgeLink());
+  // Program grades (27 Nov 2026): Try again, then the challenge list afresh.
+  registerAction('program-retake',             () => startProgramRetakeFlow(S.currentCompetitionId).then((ok) => { if (ok) return loadTasks(); }));
   registerAction('badge-copy-post',            () => copyPostAndOpenLinkedIn());
 
   registerAction('save-profile',               () => saveProfile());

@@ -43,7 +43,13 @@ export const CERT_TIERS = [
   { id: 'silver', label: 'Silver', sub: '2nd place' },
   { id: 'bronze', label: 'Bronze', sub: '3rd place' },
   { id: 'participation', label: 'Participation', sub: 'took part' },
-  { id: 'completion', label: 'Completion', sub: 'solved everything' },
+  { id: 'completion', label: 'Completion', sub: 'finished, no grade' },
+  // Program grades (27 Nov 2026): a graded Program certificate takes its band's
+  // wording (labels.<band>) and the completion tier's colours and seal.
+  { id: 'excellent', label: 'Excellent', sub: 'Program, 90% or more', colour: 'completion' },
+  { id: 'very_good', label: 'Very good', sub: 'Program, 80% or more', colour: 'completion' },
+  { id: 'good', label: 'Good', sub: 'Program, 70% or more', colour: 'completion' },
+  { id: 'satisfactory', label: 'Satisfactory', sub: 'Program, 60% or more', colour: 'completion' },
 ];
 
 // Wording fields, in the order they read on the certificate.
@@ -52,6 +58,7 @@ const TEXT_FIELDS = [
   ['presented_to', '“Presented to” line', 40], ['lead_in', 'Line before the event name', 80],
   ['recognition', 'Recognition sentence', 220], ['footer_tagline', 'Footer tagline', 80],
   ['achievement_heading', 'Achievement heading', 40], ['score_heading', 'Score heading', 24],
+  ['grade_heading', 'Grade heading (Programs)', 24],
   ['date_heading', 'Date heading', 24], ['id_heading', 'Certificate ID heading', 32],
 ];
 const COLOUR_FIELDS = [
@@ -177,7 +184,7 @@ function _render(st) {
     ? (st.overridden ? 'This event has its own certificate design.' : 'This event uses the platform design. Change anything below to give it its own.')
     : 'Every event uses this design unless an administrator changes it for that event.';
   const area = (k, label, rows, max) => `<div class="form-group cw-field"><label for="cw-e-${k}">${label}</label><textarea id="cw-e-${k}" rows="${rows}" maxlength="${max}" data-sec="email" data-key="${k}"${dis}>${esc(String(_val(st, 'email', k)))}</textarea></div>`;
-  const tiers = CERT_TIERS.map(t => `<button type="button" class="cw-tier${t.id === st.tier ? ' active' : ''}" data-tier="${t.id}" aria-pressed="${t.id === st.tier}"><span class="cw-tier-dot cw-tier-${t.id}" aria-hidden="true"></span><span>${esc(t.label)}</span><small>${esc(t.sub)}</small></button>`).join('');
+  const tiers = CERT_TIERS.map(t => `<button type="button" class="cw-tier${t.id === st.tier ? ' active' : ''}" data-tier="${t.id}" aria-pressed="${t.id === st.tier}"><span class="cw-tier-dot cw-tier-${t.colour || t.id}" aria-hidden="true"></span><span>${esc(t.label)}</span><small>${esc(t.sub)}</small></button>`).join('');
   const text = TEXT_FIELDS.map(([k, label, max]) => {
     const v = String(_val(st, 'text', k));
     const long = max > 80;
@@ -255,7 +262,8 @@ function _wireActions(st) {
 
 // The metal an unset frame takes on: the previewed tier's.
 function _frameMetal(st) {
-  const v = String(_val(st, 'colors', st.tier) || '');
+  const t = CERT_TIERS.find(x => x.id === st.tier);
+  const v = String(_val(st, 'colors', (t && t.colour) || st.tier) || '');
   return HEX.test(v) ? v : '#000000';
 }
 
@@ -624,8 +632,8 @@ export async function renderIssuedCertificates(box, { compId, readOnly = false }
       : `<button type="button" class="btn sm secondary" data-ic="pdf" data-i="${i}" data-user="${esc(c.userId)}" aria-label="PDF certificate of ${esc(_holder(c))}">${ICO.download} PDF</button><button type="button" class="btn sm secondary" data-ic="png" data-i="${i}" data-user="${esc(c.userId)}" aria-label="PNG image of ${esc(_holder(c))}'s certificate">PNG</button>${canResend ? `<button type="button" class="btn sm secondary" data-ic="resend" data-i="${i}" data-user="${esc(c.userId)}" aria-label="Re-send the certificate email to ${esc(_holder(c))}">Re-send</button>` : ''}${canRevoke && c.token ? `<button type="button" class="btn sm secondary" data-ic="revoke" data-i="${i}" data-user="${esc(c.userId)}" aria-label="Revoke ${esc(_holder(c))}'s certificate">Revoke</button>` : ''}`;
     return `<tr${c.revoked ? ' class="ic-row-revoked"' : ''}>
       <td data-label="Holder" class="ic-lead"><b>${esc(_holder(c))}</b><small>${esc(c.email || c.nickname || '')}</small></td>
-      <td data-label="Certificate"><span class="ic-tier ic-tier-${esc(c.tier || '')}">${esc(_TIER_LABEL[c.tier] || c.label || c.tier || '')}</span>${c.lateEntrant ? ' <small>late entry</small>' : ''}</td>
-      <td data-label="Score">${c.score != null ? esc(String(c.score)) : '—'}</td>
+      <td data-label="Certificate"><span class="ic-tier ic-tier-${esc(c.tier || '')}">${esc(_TIER_LABEL[c.tier] || c.label || c.tier || '')}</span>${c.lateEntrant ? ' <small>late entry</small>' : ''}${c.grade ? ` <small class="ic-grade">${esc(c.grade.label)}</small>` : ''}</td>
+      <td data-label="Score">${c.score != null ? esc(String(c.score)) : (c.grade ? esc(c.grade.percent) : '—')}</td>
       ${showCode ? `<td data-label="Code"><code class="ic-code">${esc(c.code || '—')}</code></td>` : ''}
       <td data-label="Email" title="${esc((c.emailStatus && c.emailStatus.lastError) || '')}">${esc(mail)}</td>
       <td class="ic-acts">${acts}</td></tr>`;

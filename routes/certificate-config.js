@@ -257,8 +257,9 @@ module.exports = function register(app) {
         return res.status(400).json({ error: `sample.${k} must be text of at most ${max} characters.`, code: "certificate_config_bad_type", field: `sample.${k}` });
       }
     }
-    if (s.tier !== undefined && !CC.TIERS.includes(s.tier)) {
-      return res.status(400).json({ error: `sample.tier must be one of ${CC.TIERS.join(", ")}.`, code: "certificate_config_bad_type", field: "sample.tier" });
+    // A tier, or a Program grade band (previewed as a graded completion certificate).
+    if (s.tier !== undefined && !CC.LABEL_KEYS.includes(s.tier)) {
+      return res.status(400).json({ error: `sample.tier must be one of ${CC.LABEL_KEYS.join(", ")}.`, code: "certificate_config_bad_type", field: "sample.tier" });
     }
     if (s.late_entrant !== undefined && typeof s.late_entrant !== "boolean") {
       return res.status(400).json({ error: "sample.late_entrant must be true or false.", code: "certificate_config_bad_type", field: "sample.late_entrant" });
@@ -279,7 +280,11 @@ module.exports = function register(app) {
     const design = CC.mergeCertificateConfig(CC.readGlobalLayer(db), comp ? CC.readEventLayer(db, comp.id) : {}, layer);
     const tier = s.tier || "gold";
     const rank = { gold: 1, silver: 2, bronze: 3 }[tier] || null;
-    const basis = rank ? "placement" : tier;
+    // Program grades: a band previews as a graded completion certificate, at a
+    // sample percentage inside the band.
+    const gradeBand = CC.GRADE_LABEL_KEYS.includes(tier) ? tier : null;
+    const basis = rank ? "placement" : (gradeBand ? "completion" : tier);
+    const SAMPLE_GRADE = { excellent: "94%", very_good: "85%", good: "75%", satisfactory: "65%" };
     const art = {
       platformName: getPlatformName(),
       rank, basis,
@@ -288,6 +293,7 @@ module.exports = function register(app) {
       dateLabel: s.date !== undefined ? s.date : badgeDateLabel(now()),
       scoreLabel: rank ? (s.score !== undefined ? s.score : "400 pts") : null,
       lateEntrant: !!s.late_entrant,
+      grade: gradeBand ? { band: gradeBand, label: require("../lib/program-grade").gradeLabel(gradeBand), percent: SAMPLE_GRADE[gradeBand] } : null,
       publicCode: SAMPLE_CODE,
       verifyUrl: String(BASE_URL || "").replace(/^https?:\/\//i, "") + "/credential",
       verifyLink: `${BASE_URL}/credential?code=${SAMPLE_CODE}`,

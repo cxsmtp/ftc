@@ -940,8 +940,9 @@ Three type cards, each with a short description of what that type is for:
   session or many. Ranked, with certificates and LinkedIn sharing. This is how
   every competition you already have behaves, and it is marked **Most common**.
 - **Program** — self-paced learning or certification, running to a deadline. No
-  sessions, no leaderboard, no placings. Certificate on full completion only,
-  carrying a public verification code printed on the certificate itself.
+  sessions, no leaderboard, no placings. Every learner is **graded** on their
+  own performance, and a certificate is issued at 60% or more, printed with the
+  grade and a public verification code (see [Program grades](#program-grades)).
 
 Nothing is pre-selected: one click chooses the type **and** opens the form.
 
@@ -3986,7 +3987,53 @@ why and where to look instead. Points still count: a participant sees each
 challenge's points and their total as they answer, but nobody is ranked by
 them. Per-participant progress is on the **Analytics** tab, and **Export
 Activity (CSV)** on that event's row gives one line per participant per
-challenge.
+challenge. Under it, **Grades** lists each learner's grade (see below).
+
+#### Program grades
+
+A Program grades every learner on their own performance (owner decision, 27 Nov
+2026). The grade is the points a learner holds out of the most the Program's
+challenges can give (Easy 50, Medium 100, Hard 150 each): every wrong answer and
+every hint they reveal counts against it, it never goes below 0%, and Quick
+questions are left out of it.
+
+| Grade | Band | Certificate |
+|---|---|---|
+| 90% or more | Excellent | yes |
+| 80% to under 90% | Very good | yes |
+| 70% to under 80% | Good | yes |
+| 60% to under 70% | Satisfactory | yes |
+| under 60% | try the quiz again | **no** |
+
+**When it counts.** A grade counts once the learner has *finished*: every
+challenge solved, or out of attempts on it. A Program has no attempt limit unless
+you set one, so normally that means solved every challenge. The learner sees
+their grade so far at the top of their **Challenges** page all along.
+
+**At 60% or more** the certificate is issued (and emailed) as soon as they
+finish, printed with their band and percentage, which are fixed on it from then
+on. Certificates issued before grades existed keep printing **Completed**, as
+they always did.
+
+**Under 60%** there is no certificate: the learner is told to try the quiz again
+and offered **Try again**, which starts every challenge afresh and grades the new
+attempt alone. Their earlier answers and hints are kept (they move to the
+attempt's record, not deleted), their Quick question answers stay, and the
+retake is recorded on their **History**. Try again is open only while the
+Program is running and only below 60%: a learner who passed does not retake to
+improve.
+
+**Where you see grades.** **Rankings** on a Program shows **Grades**: each
+learner's grade (or grade so far, marked not finished), their attempt number and
+the certificate they hold. The event's **Certificates** list shows each graded
+certificate's band and percentage. The **full export** of a Program adds
+**grades.csv**, one line per attempt (closed ones and the current one).
+
+**Certificate wording.** In the certificate designer, **Medal wording** has an
+entry per grade band (**Excellent**, **Very good**, **Good**, **Satisfactory**)
+beside the tiers, and **Grade heading (Programs)** names the column the
+percentage prints under. A graded certificate keeps the completion seal and
+colours.
 
 Each row carries the participant's **first name**, **last name**, **company**
 and **email** alongside their nickname (first and last name are under

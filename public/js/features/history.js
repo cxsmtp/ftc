@@ -335,6 +335,12 @@ export function formatEventChange(ev){
       if(d.changes)return '<span style="color:var(--muted)">self-edit</span><br>'+Object.entries(d.changes).map(([k,v])=>_fmtDiffLine(k,v.from,v.to)).join('');
       return 'Profile updated';
     case 'password_changed':return 'Password changed';
+    // Program grades (27 Nov 2026): the learner closed an attempt under the pass
+    // mark and started again; the closed attempt's grade is in the details.
+    case 'program_retake_started':{
+      const pct=Number.isFinite(Number(d.grade_permille))?`${(Number(d.grade_permille)/10).toFixed(1).replace(/\.0$/,'')}%`:'';
+      return `Started the program again (attempt ${esc(String(d.attempt||''))})${pct?`<br><span style="color:var(--muted)">attempt ${esc(String(d.closed_attempt||''))} ended on ${esc(pct)}: ${esc(String(d.points??''))} of ${esc(String(d.max_points??''))} points</span>`:''}`;
+    }
     case 'password_reset_requested':return 'Password reset requested';
     case 'password_reset_completed':return 'Password reset completed';
     case 'session_chosen':{const prev=d.previous_timeslot_id?' (switched)':'';return `Session chosen: <strong>${esc(d.timeslot_name||'')}</strong> in ${esc(d.competition_name||'')}${prev}`;}

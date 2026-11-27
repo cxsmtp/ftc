@@ -1036,9 +1036,42 @@ three kinds:
   a challenge doesn't get one. A Gold, Silver or Bronze certificate already
   issued to a top-three place on zero points or fewer keeps its medal: what a
   certificate attests is fixed when it is issued.
-- **Completion certificate** — on a **Program**, you earn a certificate the
-  moment you have solved every challenge assigned to you. You do not wait for
-  the programme's deadline.
+- **Completion certificate** — on a **Program**, your certificate carries your
+  **grade**, and you earn it the moment you have finished every challenge
+  assigned to you (solved it, or used up its attempts) with **60% or more**. You
+  do not wait for the programme's deadline. See *Your grade on a Program* below.
+
+### Your grade on a Program
+
+A Program is not a competition: there is no leaderboard, and everyone is graded
+on their own performance. Your grade is the points you hold out of the most the
+Program's challenges can give (Easy 50, Medium 100, Hard 150 each). Every wrong
+answer (5 points) and every hint you reveal (30% of the challenge's points)
+counts against it, and it never goes below 0%. Quick questions score nothing and
+are left out of it.
+
+| Grade | Band |
+|---|---|
+| 90% or more | **Excellent** |
+| 80% to under 90% | **Very good** |
+| 70% to under 80% | **Good** |
+| 60% to under 70% | **Satisfactory** |
+| under 60% | no certificate: **try the quiz again** |
+
+**The Program tells you where you stand.** The top of the **Challenges** page
+shows your grade so far (*Where you stand: 45%*). It counts once you have
+finished every challenge. At 60% or more your certificate is ready, printed with
+your band and percentage (for example **Very good**, **85%**), and it is emailed
+to you. Under 60% there is no certificate: the page says **try the quiz again**
+and offers **Try again**.
+
+**Try again** starts every challenge afresh and counts your grade again from
+zero; this is attempt 2 (then 3, and so on), and the page tells you what your
+last attempt ended on. Your earlier answers are kept in your history, not
+deleted, and your answers to Quick questions stay as they are. You can try again
+only while the Program is running, and only while your grade is under 60%: once
+you have passed, your certificate is issued with that grade and there is nothing
+to take again.
 
 For a competition or a booth event, open the **Leaderboard** for the finished
 event: if you're eligible, a **Your certificate** card appears with a small
@@ -1050,7 +1083,7 @@ the card says so and offers nothing to download or share. A Program has no
 leaderboard, so its certificate
 is offered at the top of the **Challenges** page instead — **Your certificate is
 ready**, then **Get my certificate**. Either route opens a preview carrying your
-placement (or "took part", or "Completed"), the event name and date, and
+placement (or "took part", or your Program grade), the event name and date, and
 your display name. The **Challenges** page offers it for every other event too,
 and once you hold it shows **Your certificate** with **View certificate**.
 
@@ -1122,9 +1155,9 @@ against is frozen when the certificate is created, so after a rename its
 `/credential` page shows your new name, still expects the old family name, and
 notes that the name has changed. Decide on a **Certificate name** before you
 claim a certificate — an issued one cannot be re-issued under a new spelling.
-The score and the date on one are fixed when it is created and never move. A
-Program's certificate is dated the day you answered your last scored challenge:
-a Quick question you answer or change later does not change it.
+The score, the grade and the date on one are fixed when it is created and never
+move. A Program's certificate is dated the day you finished: your last answer to
+a scored challenge. A Quick question you answer or change later does not change it.
 The certificate prints names
 in Latin, Greek and Cyrillic, and in Arabic, Hebrew, Thai, Chinese, Japanese and
 Korean. When your salutation is all that stops your name being printed — a

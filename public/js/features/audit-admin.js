@@ -173,6 +173,7 @@ export const AUDIT_ACTIVITY_LABELS = Object.freeze({
   lead_contacted: "Lead marked contacted",
   membership_promoted: "Membership made direct",
   profile_updated_self: "Updated own profile",
+  program_retake_started: "Program started again (Try again)",
   protected: "Template protected",
   publish: "Challenge published",
   published: "Published",
