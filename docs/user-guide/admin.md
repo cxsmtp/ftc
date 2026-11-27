@@ -705,14 +705,31 @@ On a phone the sidebar becomes a section bar at the top of the page, the event's
 sections are behind the **Section** button, every table becomes a list of cards,
 and nothing scrolls sideways.
 
-### New event: blank or from a template
+### New event: a recommended setup, blank, or a template
 
 Every event starts on one page: **New event** (in the sidebar, or **+ New
-Event** on the Events page). Under **Start blank** there is one card per event
-type; under **Start from a template** are the built-in templates and your own.
-Either way you get the same create form (see [Creating an event](#creating-an-event)).
+Event** on the Events page). Under **Choose a type** there is one card per event
+type, each with two buttons: **Recommended setup** starts from that type's
+recommended setup (named on the card), and **Start blank** starts empty. Under
+**Your templates** are the templates your organisers saved. Whichever you pick,
+you get the same create form (see [Creating an event](#creating-an-event)).
 
-Picking a **template** opens that form already filled in from it: its type,
+The recommended setups come with the platform and carry no challenges: add those
+to the event you create:
+
+- **Booth day (8 hours)** — a Booth Event for a full conference day, where
+  visitors join by QR code or a short code and play on their phones. **Add the
+  qualifying questions** comes ticked, as for every new Booth Event; you can add
+  more challenges, and questions of your own, after you create it.
+- **Competition (several sessions)** — a ranked two-hour Competition that you
+  can run once or in several sessions.
+- **Learning program (30 days)** — a self-paced Program open for 30 days, where
+  everyone who finishes every challenge earns a completion certificate.
+
+If a type's recommended setup is missing, its card offers **Start blank** only,
+and **Restore built-in templates** at the bottom of the page brings it back.
+
+Picking a **recommended setup** or a **template** opens that form already filled in from it: its type,
 duration, attempts, answers, sign-up fields and the rest, with a note naming the
 template and how many challenges come with it. Change anything you like, then
 **Create event**: the event is made with the template's challenges, tags and
@@ -731,25 +748,23 @@ the event: changes that did arrive are not sent twice, and if someone else
 changed the event in the meantime it stops and says so rather than overwrite
 their change.
 
-An **event admin** cannot start an event from scratch, so they see templates
-only; picking one opens the **Quick spin** panel, which asks just for an
+An **event admin** cannot start an event from scratch, so their type cards offer
+**Recommended setup** only, beside the templates; picking one opens the **Quick spin** panel, which asks just for an
 **Event name**, a **Date** and the time it **Opens** (or tick **Opens now**),
 with **Add the qualifying questions** (ticked for a Booth Event). A start inside
 the hour the clocks skip when they go forward is refused, as the event form
 refuses it.
 
-Three templates come with the platform: **Booth quick-spin** (a one-hour Booth
-Event, join by QR or code), **Tournament (2 h)** and
-**Learning Program (30 days)**. They carry no challenges: add those to the event
-you create from them.
-
 **Making and changing templates is for administrators.** **New template** on the
 New event page opens the template editor; each template row's **⋮** menu has
-**Edit**, **Duplicate**, **Protect** and **Delete**. Templates are hard to lose:
+**Edit**, **Duplicate**, **Protect** and **Delete**. A recommended setup is a
+built-in template, changed from its type card's **⋮** menu: **Edit recommended
+setup**, **Duplicate as a template** and **Reset to default**. Templates are hard
+to lose:
 
-- **A built-in template cannot be deleted.** Its menu offers **Reset to default**
-  instead, which puts back the shipped name, settings and type (and empties its
-  challenge list).
+- **A recommended setup (a built-in template) cannot be deleted.** Its menu
+  offers **Reset to default** instead, which puts back the shipped name,
+  settings and type (and empties its challenge list).
 - **A protected template cannot be deleted by anyone** until an administrator
   chooses **Unprotect**. Protected templates carry a **Protected** badge.
 - **Delete is never final at once.** A deleted template moves to **Recently
@@ -909,14 +924,15 @@ refused with a message rather than handing out a preview in its place.
 ### Creating an event
 
 Click **+ New Event** (or **New event** in the sidebar). The **New event** page
-offers a blank start for each type, and your templates; whichever you pick opens
-**one form** that holds everything about the event.
+offers one card per type, each with its **Recommended setup** and **Start
+blank**, and below them your templates; whichever you pick opens **one form**
+that holds everything about the event.
 
 #### Pick a starting point
 
-![The New event page: a blank start per type, then the templates](../screenshots/admin/44-competition-create-kind.png)
+![The New event page: one card per type, then the templates](../screenshots/admin/44-competition-create-kind.png)
 
-Three blank starters, each with a short description of what that type is for:
+Three type cards, each with a short description of what that type is for:
 
 - **Booth Event** — a few hours, in one room, one session. Phone-solvable
   challenges, no Checkmarx One tenant needed, walk-up sign-up.

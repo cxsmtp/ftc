@@ -16,7 +16,10 @@ test.use({ baseURL: BASE });
 async function openTemplates(page) {
   await page.locator('button.admin-nav-item[data-tab-id="admin-templates-tab"]').click();
   await expect(page.locator("#tpl-list")).toBeVisible({ timeout: 15000 });
-  await expect(page.locator("#tpl-list .tpl-row").first()).toBeVisible({ timeout: 15000 });
+  // Settled: the type cards are drawn and the list has answered (a row, or
+  // the empty sentence: the built-ins are on the cards, never listed twice).
+  await expect(page.locator("#tpl-kind-cards .tpl-kind").first()).toBeVisible({ timeout: 15000 });
+  await expect(page.locator("#tpl-list .tpl-row, #tpl-list-empty").first()).toBeVisible({ timeout: 15000 });
 }
 
 // Read through the BROWSER's own session: a second superadmin sign-in would
@@ -286,18 +289,23 @@ test.describe("Templates — the editor", () => {
   test("an event admin is offered no template doors", async ({ page }) => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     let ea;
+    const own = `EA sees ${Date.now()}`;
     try {
       ea = await makeParticipant(sa, csrf, "tplea");
       const comp = await makeCompetition(sa, csrf, "tplea");
       await grantEventAdmin(sa, csrf, comp.id, ea.id);
+      const t = await sa.post("/api/admin/event-templates", { headers: H(csrf), data: { name: own, event_kind: "tournament", settings: { duration_minutes: 30 } } });
+      expect(t.ok(), `PRECONDITION: a template of an organiser's own: ${await t.text()}`).toBeTruthy();
     } finally { await sa.dispose(); }
     await loginViaApi(page, ea.email, PARTICIPANT_PASS);
     await page.goto("/");
     await expect(page.locator("#admin-page")).toBeVisible({ timeout: 20000 });
     await openTemplates(page);
     await expect(page.locator("#tpl-new-btn"), "no New template").toBeHidden();
+    await expect(page.locator("#tpl-list .tpl-row", { hasText: own }), "CONTROL: the organisers' template is listed").toHaveCount(1);
     await expect(page.locator("#tpl-list .tpl-row-more"), "no row menu").toHaveCount(0);
-    await expect(page.locator("#tpl-list .tpl-row").first(), "CONTROL: the templates are listed").toBeVisible();
+    await expect(page.locator("#tpl-kind-cards .tpl-kind-more"), "no menu on a recommended setup").toHaveCount(0);
+    await expect(page.locator('#tpl-kind-cards button[data-action="tpl-pick"]:enabled'), "CONTROL: the recommended setups are offered").toHaveCount(3);
   });
 
   // THE OPERATOR'S RULING OF 14 NOV 2026: Save as template is withheld from a

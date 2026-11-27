@@ -2,24 +2,29 @@
 
 // ── NEW EVENT: the one place every event starts ─────────────────────────────
 //
-// "New event" (the sidebar item, and + New Event on the Events page). Two ways
-// to start, both ending in the ONE create form (features/competitions-admin.js
-// `openCompetitionForm`), where the kind is a field:
-//   • a BLANK starter per kind (`new-event-start`);
-//   • a TEMPLATE row: the form opens seeded from the template, and saving
-//     spawns it (POST /api/admin/event-templates/:id/spawn — its challenges,
-//     join link and provenance) and applies the form on top.
-// An event admin cannot create from scratch (spawning a template and cloning one
-// of their events are their tier's only ways to make an event),
-// so they get no blank starters and a template opens the QUICK SPIN panel
-// instead (a name and a start). Global admins also manage templates here:
-// edit, duplicate, protect, reset a built-in, delete (a soft delete) and
-// restore from Recently deleted. The server decides every door.
+// "New event" (the sidebar item, and + New Event on the Events page). ONE card
+// per event type, each offering two starts that end in the ONE create form
+// (features/competitions-admin.js `openCompetitionForm`), where the kind is a
+// field:
+//   • RECOMMENDED SETUP: the kind's built-in template (`tpl-pick`): the form
+//     opens seeded from it, and saving spawns it (POST
+//     /api/admin/event-templates/:id/spawn) and applies the form on top. A
+//     kind whose built-in is missing offers Start blank alone (Recently
+//     deleted's "Restore built-in templates" brings it back);
+//   • START BLANK (`new-event-start`).
+// Below, "Your templates" lists only the templates organisers made; a
+// built-in is edited, duplicated or reset from its kind card's ⋮ menu.
+// An event admin cannot create from scratch (spawning a template and cloning
+// one of their events are their tier's only ways to make an event), so their
+// cards offer the recommended setup alone, and a template opens the QUICK
+// SPIN panel instead (a name and a start). Global admins also manage
+// templates here: edit, duplicate, protect, reset a built-in, delete (a soft
+// delete) and restore from Recently deleted. The server decides every door.
 
 import { S } from "../core/state.js";
 import { csrfHeaders, fetchJsonObject } from "../core/api.js";
 import { setSafeHtml } from "../core/trusted-types.js";
-import { esc, fmtDt, eventKindLabel, policyOrDefault, DEFAULT_REGISTRATION_FIELDS } from "../ui/format.js";
+import { esc, fmtDt, eventKindLabel, eventKindPhraseClient, policyOrDefault, DEFAULT_REGISTRATION_FIELDS } from "../ui/format.js";
 import { overlayDismiss } from "../ui/modal.js";
 import { fetchJsonList } from "../core/api.js";
 import { ICO } from "../ui/icons.js";
@@ -32,6 +37,7 @@ import { openEventWorkspace, skippedSummary } from "./event-workspace.js";
 import { adminCan } from "../ui/nav.js"; // RBAC — the one permission predicate (read inside functions only)
 
 let _templates = null;
+let _templatesFailed = false;   // the last list read failed (the cards stop waiting for it)
 let _picked = null;   // the template the quick spin is showing
 let _spinModal = null; // the phone sheet's modal contract (overlayDismiss's cleanup), while open
 let _loadSeq = 0;
@@ -55,23 +61,67 @@ function _kindBullets(k) {
   return `<ul class="tpl-kind-bullets">${lines.map(l => `<li>${ICO.check}<span>${esc(l)}</span></li>`).join('')}</ul>`;
 }
 
-// The blank starters: one per kind, each opening the ONE create form with that
-// kind selected (`new-event-start`). An event admin never creates a blank
-// event (a template or a clone, nothing else), so they get none.
-// A card is never the button (its bullet list is no button content): the
-// control is the `.card-open` in its title, and a click anywhere on the card
-// still starts it (the card keeps the action, as the template rows do).
+// The kind's RECOMMENDED SETUP: its built-in template, or null while the list
+// is unread or when none is listed for the kind (missing, or edited to
+// another type). Matched by type, the wire carrying no key-to-kind table.
+function _builtinFor(kind) {
+  return (_templates || []).find(t => t.is_builtin && t.event_kind === kind) || null;
+}
+
+// ONE CARD PER EVENT TYPE. The card itself is no button (its bullet list is
+// no button content, and it holds two starts): its controls are the buttons
+// in its foot, each named from the words it shows first.
+//   • Recommended setup — the kind's built-in, offered to a role that may read
+//     templates and start from one (`templates.view`, `events.clone`); shown
+//     disabled while the list is read, so the card does not move when it lands.
+//   • Start blank — a role holding `events.create` (the built-in event admin
+//     lacks it: spawning a template or cloning an event is how their tier makes
+//     one).
+// A role that may manage templates gets the built-in's own doors in the card's
+// ⋮ menu (Edit, Duplicate, Reset to default): the list below shows only the
+// templates organisers made.
 function _kindCards() {
   const kinds = Array.isArray(S.eventKinds) ? S.eventKinds : [];
-  // RBAC — a blank starter opens the create form, whose route needs
-  // `events.create` (the built-in event admin lacks it: spawning a template or
-  // cloning an event is how their tier makes one).
-  if (!adminCan('events.create')) return '';
+  const canBlank = adminCan('events.create');
+  const canRec = adminCan('templates.view') && adminCan('events.clone');
+  if (!canBlank && !canRec) return '';
   if (!kinds.length) return '<p class="ws-empty">The event-type list did not load. Reload the page to start a new event.</p>';
-  return kinds.map(k => `<div class="tpl-kind" data-action="new-event-start" data-kind="${esc(k.value)}">
+  const manage = adminCan('templates.manage');
+  return kinds.map(k => {
+    const rec = canRec ? _builtinFor(k.value) : null;
+    const waiting = canRec && !rec && _templates === null && !_templatesFailed;
+    if (!canBlank && !rec && !waiting) return '';
+    const kindName = eventKindPhraseClient(k.value) || k.label;   // "a Booth Event": the table's article
+    const recBtn = rec
+      ? `<button type="button" class="btn sm tpl-kind-rec" data-action="tpl-pick" data-tpl-id="${esc(rec.id)}" aria-label="Recommended setup — start ${esc(kindName)} from ${esc(rec.name)}"${_picked && _picked.id === rec.id ? ' aria-current="true"' : ''}>Recommended setup</button>`
+      : waiting ? '<button type="button" class="btn sm tpl-kind-rec" disabled aria-label="Recommended setup — loading">Recommended setup</button>' : '';
+    const blankBtn = canBlank
+      ? `<button type="button" class="btn sm secondary tpl-kind-blank" data-action="new-event-start" data-kind="${esc(k.value)}" aria-label="Start blank — an empty ${esc(k.label)} with nothing set up">Start blank</button>`
+      : '';
+    const more = rec && manage ? `<button type="button" class="kebab-btn kebab-always tpl-kind-more" data-action="kebab-toggle" aria-label="More actions for the ${esc(k.label)} recommended setup">⋮</button><div class="kebab-menu">
+        <button data-action="tpl-edit" data-tpl-id="${esc(rec.id)}">${ICO.edit} Edit recommended setup</button>
+        <button data-action="tpl-duplicate" data-tpl-id="${esc(rec.id)}">${ICO.copy} Duplicate as a template</button>
+        <button data-action="tpl-reset" data-tpl-id="${esc(rec.id)}">${ICO.refresh} Reset to default</button>
+      </div>` : '';
+    const about = rec ? `<p class="tpl-kind-rec-about"><b>${esc(rec.name)}</b>${rec.description ? ` · ${esc(rec.description)}` : ''}</p>` : '';
+    return `<div class="tpl-kind${_picked && rec && _picked.id === rec.id ? ' active' : ''}" data-kind="${esc(k.value)}">
       <span class="tpl-kind-art">${KIND_ART[k.value] || ''}</span>
-      <div class="tpl-kind-body"><span class="tpl-kind-title"><button type="button" class="card-open" aria-label="${esc(k.label)} — start a blank event of this type">${esc(k.label)}</button></span>${k.isDefault ? '<span class="tpl-kind-default">Most common</span>' : ''}${_kindBullets(k)}</div>
-    </div>`).join('');
+      <div class="tpl-kind-body">
+        <div class="tpl-kind-head"><h4 class="tpl-kind-title">${esc(k.label)}</h4>${more}</div>
+        ${k.isDefault ? '<span class="tpl-kind-default">Most common</span>' : ''}${_kindBullets(k)}
+        ${about}
+        <div class="tpl-kind-actions">${recBtn}${blankBtn}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _renderKindCards() {
+  const kinds = document.getElementById('tpl-kind-cards');
+  if (!kinds) return;
+  setSafeHtml(kinds, _kindCards()); kinds.hidden = !kinds.innerHTML.trim();
+  const head = document.getElementById('tpl-blank-head');
+  if (head) head.hidden = kinds.hidden;
 }
 
 // The row icon, from the kind's wire POLICY (never its stored value): a
@@ -90,9 +140,10 @@ function _tplRow(t) {
   if (t.withheld_task_count) meta.push(`${t.withheld_task_count} not visible to you`);
   if (t.missing_task_count) meta.push(`${t.missing_task_count} deleted`);
   const on = _picked && _picked.id === t.id;
-  // Badges say why a template has no Delete: a built-in never has one, and a
-  // protected one waits for a global admin to unprotect it.
-  const badges = [t.is_builtin ? '<span class="tpl-badge">Built in</span>' : '', t.protected ? `<span class="tpl-badge tpl-badge-protected">${ICO.lock} Protected</span>` : ''].join('');
+  // The badge says why a template has no Delete: a protected one waits for a
+  // global admin to unprotect it. (A built-in is never a row: it is its kind
+  // card's recommended setup, `_kindCards`.)
+  const badges = t.protected ? `<span class="tpl-badge tpl-badge-protected">${ICO.lock} Protected</span>` : '';
   // The delete door and its explanation come from the server's own predicate
   // (`can_delete` / `delete_refused`), never re-derived here.
   const protTo = t.protected ? "0" : "1";
@@ -108,15 +159,13 @@ function _tplRow(t) {
     <div class="tpl-row-main"${canStart ? ` data-action="tpl-pick" data-tpl-id="${esc(t.id)}"` : ''}>
       <span class="tpl-row-ico" aria-hidden="true">${_tplIcon(t.event_kind)}</span>
       <span class="tpl-row-txt"><b>${canStart ? `<button type="button" class="card-open" data-action="tpl-pick" data-tpl-id="${esc(t.id)}" aria-label="${esc(t.name)} — start an event from this template"${on ? ' aria-current="true"' : ''}>${esc(t.name)}</button>` : esc(t.name)}</b>${badges ? `<span class="tpl-badges">${badges}</span>` : ''}<small>${esc(meta.join(' · '))}</small>${t.description ? `<small class="tpl-row-desc">${esc(t.description)}</small>` : ''}</span>
-      <span class="tpl-row-when">${t.is_builtin ? 'Built in' : `Updated ${esc(fmtDt(t.updated_at, 'short'))}`}</span>
+      <span class="tpl-row-when">Updated ${esc(fmtDt(t.updated_at, 'short'))}</span>
       ${canStart ? `<span class="tpl-row-chev" aria-hidden="true">${ICO.chevronRight}</span>` : ''}
     </div>
     ${adminCan('templates.manage') ? `<button type="button" class="kebab-btn kebab-always tpl-row-more" data-action="kebab-toggle" aria-label="More actions for template ${esc(t.name)}">⋮</button><div class="kebab-menu">
       <button data-action="tpl-edit" data-tpl-id="${esc(t.id)}">${ICO.edit} Edit</button>
       <button data-action="tpl-duplicate" data-tpl-id="${esc(t.id)}">${ICO.copy} Duplicate</button>
-      ${t.is_builtin
-        ? `<button data-action="tpl-reset" data-tpl-id="${esc(t.id)}">${ICO.refresh} Reset to default</button>`
-        : `<button data-action="tpl-protect" data-tpl-id="${esc(t.id)}" data-protect="${protTo}">${ICO.lock} ${protLabel}</button>`}
+      <button data-action="tpl-protect" data-tpl-id="${esc(t.id)}" data-protect="${protTo}">${ICO.lock} ${protLabel}</button>
       <div class="km-sep" role="separator"></div>
       ${del}
     </div>` : ''}
@@ -124,12 +173,7 @@ function _tplRow(t) {
 }
 
 export async function loadTemplatesPane() {
-  const kinds = document.getElementById('tpl-kind-cards');
-  if (kinds) {
-    setSafeHtml(kinds, _kindCards()); kinds.hidden = !kinds.innerHTML.trim();
-    const head = document.getElementById('tpl-blank-head');
-    if (head) head.hidden = kinds.hidden;
-  }
+  _renderKindCards();
   // Making and changing templates needs `templates.manage` (held server-side).
   const nb = document.getElementById('tpl-new-btn');
   if (nb) nb.hidden = !adminCan('templates.manage');
@@ -150,9 +194,13 @@ export async function loadTemplatesPane() {
   const d = await fetchJsonObject('/api/admin/event-templates');
   if (seq !== _loadSeq) return;
   if (!d || !Array.isArray(d.templates)) {
+    // The kind cards drop their waiting Recommended setup and keep Start blank.
+    _templatesFailed = true;
+    _renderKindCards();
     setSafeHtml(list, `<div class="load-failure" role="alert">Could not load the templates. <button type="button" class="btn sm secondary" data-action="tpl-reload">Try again</button></div>`);
     return;
   }
+  _templatesFailed = false;
   _templates = d.templates;
   _renderList();
   if (_picked) { const again = _templates.find(t => t.id === _picked.id); if (again) _picked = again; else _closeSpin(); }
@@ -233,19 +281,24 @@ export async function resetTemplate(id) {
   loadTemplatesPane();
 }
 
+// "Your templates": the templates organisers made. The built-ins are each
+// kind's recommended setup, on the cards above (`_kindCards`), never listed
+// twice.
 function _renderList() {
+  _renderKindCards();
   const list = document.getElementById('tpl-list');
   const count = document.getElementById('tpl-list-count');
   if (!list) return;
-  if (count) count.textContent = _templates && _templates.length ? `${_templates.length} template${_templates.length === 1 ? '' : 's'}` : '';
-  if (!_templates || !_templates.length) {
-    setSafeHtml(list, `<p class="ws-empty">No templates yet.${!adminCan('templates.manage') ? '' : ' Choose <strong>New template</strong>, or open an event and choose <strong>Save as template</strong> from its ⋯ menu.'}</p>`);
+  const own = (_templates || []).filter(t => !t.is_builtin);
+  if (count) count.textContent = own.length ? `${own.length} template${own.length === 1 ? '' : 's'}` : '';
+  if (!own.length) {
+    setSafeHtml(list, `<p class="ws-empty" id="tpl-list-empty">No templates of your own yet.${!adminCan('templates.manage') ? '' : ' Choose <strong>New template</strong>, or open an event and choose <strong>Save as template</strong> from its ⋯ menu.'}</p>`);
     return;
   }
   // A role that may see templates but not start events from them is told so
   // once, above the list, rather than meeting rows that do nothing.
   const why = adminCan('events.clone') ? '' : '<p class="ws-empty" id="tpl-no-start">Your role can see templates, not start events from them.</p>';
-  setSafeHtml(list, why + _templates.map(_tplRow).join(''));
+  setSafeHtml(list, why + own.map(_tplRow).join(''));
 }
 
 /** Open the quick spin for one template. */
@@ -340,8 +393,9 @@ function _closeSpin() {
   _renderList();
 }
 // Focus goes back to the template's own button: the row's first tpl-pick match
-// is its (unfocusable) card body, and the list re-render replaced the opener.
-export function closeTemplateSpin() { const id = _picked && _picked.id; _closeSpin(); if (id) document.querySelector(`button.card-open[data-action="tpl-pick"][data-tpl-id="${CSS.escape(id)}"]`)?.focus(); }
+// is its (unfocusable) card body, and the re-render replaced the opener.
+// A built-in's opener is its kind card's Recommended setup, also a tpl-pick button.
+export function closeTemplateSpin() { const id = _picked && _picked.id; _closeSpin(); if (id) document.querySelector(`button[data-action="tpl-pick"][data-tpl-id="${CSS.escape(id)}"]`)?.focus(); }
 
 async function _spin(t) {
   const panel = document.getElementById('tpl-spin');

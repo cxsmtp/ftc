@@ -322,10 +322,10 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     };
     await scan("#admin-templates-tab", "New event page");
 
-    // Every starter's control is a real, focusable button: the title button of
-    // its card (the card itself holds a list, which no button may).
+    // Every starter's control is a real, focusable button in its card's foot
+    // (the card itself holds a list, which no button may).
     for (const k of KINDS) {
-      const ctl = page.locator(`#tpl-kind-cards [data-action="new-event-start"][data-kind="${k}"] button.card-open`);
+      const ctl = page.locator(`#tpl-kind-cards .tpl-kind[data-kind="${k}"] button[data-action="new-event-start"][data-kind="${k}"]`);
       await ctl.focus();
       expect(await ctl.evaluate((el) => el === document.activeElement),
         `${k}: the starter takes keyboard focus`).toBe(true);
@@ -346,36 +346,45 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
   // backgrounds… those tints are alpha composites, so you must composite them
   // against the actual surface before measuring").
   //
-  // So the rule is asserted directly: hovering a card must not change its
-  // background. Emphasis comes from the border and the tier-2 shadow instead,
-  // which is what §5 prescribes for an interactive picker tile anyway.
-  test("hovering a blank starter changes border and elevation, never the background", async ({ page }) => {
+  // A type card now holds TWO starts (Recommended setup, Start blank), so the
+  // card itself is no control: hovering it must not change its background or
+  // fade it, and must not lift it either (an affordance on something a press
+  // does nothing to). Its buttons carry the hover.
+  test("hovering a type card changes nothing on the card, never the background; its Start blank button answers the hover", async ({ page }) => {
     await adminLogin(page);
     await clickTab(page, "Events");
     await page.click('[data-action="open-competition-form"]');
     await page.locator("#admin-templates-tab").waitFor({ state: "visible", timeout: 15000 });
 
-    const card = page.locator('#tpl-kind-cards [data-action="new-event-start"][data-kind="program"]');
+    const card = page.locator('#tpl-kind-cards .tpl-kind[data-kind="program"]');
     await card.waitFor({ state: "visible", timeout: 5000 });
-    const read = () => card.evaluate((el) => {
+    const read = (loc) => loc.evaluate((el) => {
       const c = getComputedStyle(el);
-      return { bg: c.backgroundColor, border: c.borderTopColor, shadow: c.boxShadow, opacity: c.opacity };
+      return { bg: c.backgroundColor, border: c.borderTopColor, shadow: c.boxShadow, opacity: c.opacity, transform: c.transform };
     });
 
-    const rest = await read();
-    await card.hover();
-    // The transition is --duration-fast (150ms); wait past it before sampling,
-    // or this reads a frame mid-way and compares nothing meaningful.
+    const rest = await read(card);
+    await card.locator(".tpl-kind-art").hover();
+    // Wait past any transition before sampling, or this reads a frame mid-way
+    // and compares nothing meaningful.
     await page.waitForTimeout(400);
-    const hovered = await read();
+    const hovered = await read(card);
 
     expect(hovered.bg, "a hover tint would composite under the blurb and drop it below AA")
       .toBe(rest.bg);
-    expect(hovered.border, "hover is signalled by the border").not.toBe(rest.border);
-    expect(hovered.shadow, "and by tier-2 elevation").not.toBe(rest.shadow);
+    expect({ border: hovered.border, shadow: hovered.shadow, transform: hovered.transform },
+      "a card that is no control does not lift or light up under the pointer").toEqual({ border: rest.border, shadow: rest.shadow, transform: rest.transform });
     // The other way to silently break contrast (DESIGN_SYSTEM anti-pattern #1).
     expect(rest.opacity, "never dim a text-bearing surface with opacity").toBe("1");
     expect(hovered.opacity).toBe("1");
+    // CONTROL: the control on the card does answer the pointer.
+    const btn = card.locator('button[data-action="new-event-start"]');
+    const btnRest = await read(btn);
+    await btn.hover();
+    await page.waitForTimeout(400);
+    const btnHover = await read(btn);
+    expect(btnHover, "CONTROL: Start blank answers the hover").not.toEqual(btnRest);
+    expect(btnHover.opacity, "and is never faded").toBe("1");
   });
 
   // Every token this dialog uses must EXIST. A var() naming an undefined custom

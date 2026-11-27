@@ -54,7 +54,7 @@ test.describe("v8.17.0 — event template protection", () => {
     const rs = await sa.post(`/api/admin/event-templates/${bi.id}/reset`, { headers: H(saCsrf) });
     expect(rs.status(), await rs.text()).toBe(200);
     const after = (await rs.json()).template;
-    expect(after.name).toBe("Tournament (2 h)");
+    expect(after.name).toBe("Competition (several sessions)");
     expect(after.settings.duration_minutes).toBe(120);
     // CONTROL: reset is refused on an administrator's template.
     const own = await makeTpl(`Own ${uniq("o")}`);
@@ -133,7 +133,7 @@ test.describe("v8.17.0 — event template protection", () => {
       db.prepare("DELETE FROM event_templates WHERE id=?").run(removed.id);
     } finally { db.close(); }
     const before = await (await sa.get("/api/admin/event-templates/deleted")).json();
-    expect(before.missing_builtins).toContain("Booth quick-spin");
+    expect(before.missing_builtins).toContain("Booth day (8 hours)");
     const r = await sa.post("/api/admin/event-templates/restore-builtins", { headers: H(saCsrf) });
     expect(r.status(), await r.text()).toBe(200);
     const body = await r.json();

@@ -5726,8 +5726,10 @@ paths:
         tier, event admins included; for an event admin, challenge ids they may
         not view (not theirs, not used by one of their events, not public-domain)
         are withheld and counted in `withheld_task_count`. Three built-in
-        templates are seeded once on a new platform — "Booth quick-spin",
-        "Tournament (2 h)" and "Learning Program (30 days)" — with no challenges.
+        templates are seeded once on a new platform, one per kind and shown as
+        that kind's recommended setup on the New event page — "Booth day (8
+        hours)", "Competition (several sessions)" and "Learning program (30
+        days)" — with no challenges.
       responses:
         default: { $ref: '#/components/responses/UnexpectedError' }
         "500": { $ref: '#/components/responses/InternalError' }
@@ -5940,8 +5942,8 @@ paths:
       tags: [Admin - Competitions]
       summary: Recreate any missing built-in template
       description: >-
-        Admin or superadmin only. Recreates each built-in template (Booth
-        quick-spin, Tournament (2 h), Learning Program (30 days)) that no longer
+        Admin or superadmin only. Recreates each built-in template (Booth day
+        (8 hours), Competition (several sessions), Learning program (30 days)) that no longer
         exists, with its shipped settings; a name another template now holds gets
         " (built-in)" appended. Audited per row as `event_template` /
         `builtin_restored`.

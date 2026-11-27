@@ -2912,7 +2912,9 @@ try {
     const { BUILTIN_TEMPLATES } = require("./lib/event-template-builtins");
     db.transaction(() => {
       for (const b of BUILTIN_TEMPLATES) {
-        db.prepare("UPDATE event_templates SET builtin_key=? WHERE is_builtin=1 AND builtin_key IS NULL AND name=? AND event_kind=?").run(b.key, b.name, b.kind);
+        // A row this old carries the first name (`previous`), which the rename
+        // below (marker `event_templates_renamed_at`) then moves on.
+        db.prepare("UPDATE event_templates SET builtin_key=? WHERE is_builtin=1 AND builtin_key IS NULL AND name IN (?, ?) AND event_kind=?").run(b.key, b.name, (b.previous && b.previous.name) || b.name, b.kind);
       }
       db.prepare("INSERT INTO settings (key, value) VALUES ('event_templates_builtin_key_at', ?) ON CONFLICT(key) DO NOTHING").run(new Date().toISOString());
     }).immediate();
@@ -3189,6 +3191,52 @@ try {
   }
 } catch (e) {
   console.error("[migration] could not seed the built-in event templates (retrying next boot):", e.message);
+}
+
+// v9.3 — THE RECOMMENDED SETUPS. The built-ins became each kind's recommended
+// setup on the New event page, renamed and re-described (the booth one also
+// runs a full day, 480 minutes). A stored built-in moves to the current
+// definition (lib/event-template-builtins.js) only while it still equals the
+// definition it replaced (`previous`) field for field, with no challenges: an
+// administrator's edit is never overwritten. A new name another template holds
+// (the NOCASE unique index) leaves that row as it is, logged. One-shot behind
+// `event_templates_renamed_at`, written even when nothing moved; non-fatal,
+// retried at the next boot.
+try {
+  const done = db.prepare("SELECT value FROM settings WHERE key='event_templates_renamed_at'").get();
+  if (!done) {
+    const { BUILTIN_TEMPLATES } = require("./lib/event-template-builtins");
+    const canon = (v) => {
+      if (Array.isArray(v)) return v.map(canon);
+      if (v && typeof v === "object") return Object.keys(v).sort().reduce((o, k) => { o[k] = canon(v[k]); return o; }, {});
+      return v;
+    };
+    const sameSettings = (stored, want) => {
+      try { return JSON.stringify(canon(JSON.parse(stored))) === JSON.stringify(canon(want)); } catch (_) { return false; }
+    };
+    const at = new Date().toISOString();
+    db.transaction(() => {
+      for (const b of BUILTIN_TEMPLATES) {
+        const prev = b.previous;
+        if (!prev) continue;
+        const row = db.prepare("SELECT id, name, description, event_kind, settings, task_ids FROM event_templates WHERE is_builtin=1 AND builtin_key=? AND deleted_at IS NULL").get(b.key);
+        if (!row) continue;
+        let tasks = null; try { tasks = JSON.parse(row.task_ids); } catch (_) { tasks = null; }
+        const untouched = row.name === prev.name && row.description === prev.description && row.event_kind === b.kind
+          && sameSettings(row.settings, prev.settings) && Array.isArray(tasks) && tasks.length === 0;
+        if (!untouched) continue;
+        if (db.prepare("SELECT 1 FROM event_templates WHERE name = ? COLLATE NOCASE AND id <> ?").get(b.name, row.id)) {
+          console.error(`[migration] built-in template "${prev.name}" kept its name: another template is already called "${b.name}"`);
+          continue;
+        }
+        db.prepare("UPDATE event_templates SET name=?, description=?, settings=?, updated_at=? WHERE id=?")
+          .run(b.name, b.description, JSON.stringify(b.settings), at, row.id);
+      }
+      db.prepare("INSERT INTO settings (key, value) VALUES ('event_templates_renamed_at', ?) ON CONFLICT(key) DO NOTHING").run(at);
+    }).immediate();
+  }
+} catch (e) {
+  console.error("[migration] could not move the built-in event templates to their recommended setups (retrying next boot):", e.message);
 }
 
 // ROLES (lib/rbac.js). `users.role` stays the role KEY; the four built-in ids

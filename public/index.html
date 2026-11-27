@@ -680,23 +680,25 @@
       </div>
 
       <!-- NEW EVENT: the one place every event starts (features/templates-admin.js).
-           A blank starter per kind, or a template; both open the one create form
-           (the kind is a field there). Templates are managed here too, with a
-           Recently deleted list that restores one in a click. An event admin
-           gets templates only, through the quick-start panel (a sheet on phones). -->
+           One card per event type, each offering its recommended setup (the
+           kind's built-in template) and Start blank; both open the one create
+           form (the kind is a field there). Below, the templates organisers
+           made, managed here too, with a Recently deleted list that restores one
+           in a click. An event admin gets the recommended setups and templates
+           only, through the quick-start panel (a sheet on phones). -->
       <div id="admin-templates-tab" class="admin-tab-pane" style="display:none">
         <div class="ev-home-head">
           <div class="ev-home-titles">
             <p class="eyebrow ink">Create</p>
             <h2 class="admin-pane-title ev-home-title">New event</h2>
-            <p class="ev-home-lede">Start blank or from a template. Either way you get one form with everything in it, and you can change any of it later.</p>
+            <p class="ev-home-lede">Pick the type of event. Start from its recommended setup or blank; either way you get one form with everything in it, and you can change any of it later.</p>
           </div>
         </div>
         <div class="tpl-layout">
           <div class="tpl-main">
-            <div class="tpl-list-head" id="tpl-blank-head"><h3 class="tpl-list-title">Start blank</h3><span data-help="newevent.blank" data-help-label="Start blank"></span></div>
-            <div id="tpl-kind-cards" class="tpl-kinds" role="group" aria-label="Start a blank event"></div>
-            <div class="tpl-list-head"><h3 class="tpl-list-title">Start from a template</h3><span data-help="templates.list" data-help-label="Templates"></span><span id="tpl-list-count" class="list-count" role="status" aria-live="polite"></span><span class="p-toolbar-gap" aria-hidden="true"></span><button type="button" class="btn sm secondary" id="tpl-new-btn" data-action="tpl-new" hidden>+ New template</button></div>
+            <div class="tpl-list-head" id="tpl-blank-head"><h3 class="tpl-list-title">Choose a type</h3><span data-help="newevent.types" data-help-label="Event types"></span></div>
+            <div id="tpl-kind-cards" class="tpl-kinds" role="group" aria-label="Event types"></div>
+            <div class="tpl-list-head"><h3 class="tpl-list-title">Your templates</h3><span data-help="templates.list" data-help-label="Templates"></span><span id="tpl-list-count" class="list-count" role="status" aria-live="polite"></span><span class="p-toolbar-gap" aria-hidden="true"></span><button type="button" class="btn sm secondary" id="tpl-new-btn" data-action="tpl-new" hidden>+ New template</button></div>
             <div id="tpl-list" class="tpl-list"></div>
             <section id="tpl-deleted" class="tpl-deleted" aria-label="Recently deleted templates" hidden></section>
           </div>
