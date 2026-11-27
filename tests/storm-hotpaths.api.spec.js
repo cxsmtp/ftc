@@ -123,6 +123,10 @@ test("entrant coalescing: a new entrant reaches the board within the window, and
   const t = uniq();
   const compId = (await (await sa.post("/api/admin/competitions", { headers: H(csrf), data: {
     name: `SH ${t}`, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240,
+    // The ENTRY clock: the entrant this test follows reaches the board by
+    // ENTERING (the stamp whose bust is coalesced); on the first-open clock the
+    // same stamp waits for a first opened challenge.
+    clock_start: "entry",
   }})).json()).competition.id;
   // Two challenges, so one solve cannot finish the event (fixture checklist 1).
   const mkTask = async (n) => (await (await sa.post("/api/admin/tasks", { headers: H(csrf), data: {

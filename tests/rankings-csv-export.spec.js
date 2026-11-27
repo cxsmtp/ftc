@@ -120,6 +120,11 @@ test.beforeAll(async () => {
     const compName = `Rankings CSV ${t}`;
     const comp = await sa.post("/api/admin/competitions", { headers: H(csrf), data: {
       name: compName, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240,
+      // The ENTRY clock: one participant here enters and does nothing, and is
+      // still on the board with zeros; on the first-open clock nobody is on the
+      // board before opening a challenge. The columns, not the clock, are this
+      // file's subject.
+      clock_start: "entry",
     }});
     expect(comp.status(), await comp.text()).toBe(200);
     const compId = (await comp.json()).competition.id;

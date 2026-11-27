@@ -5784,9 +5784,9 @@ body.mcf #qa-playbar{display:none!important}
 .tpl-ed-tasks,.tpl-ed-task-results{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .tpl-ed-task,.tpl-ed-task-results li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tpl-ed-task-title,.tpl-ed-task-results li>.tpl-ed-hit-title{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
-.tpl-ed-hit-tags{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 100%;min-width:0}
-.tpl-ed-hit-tags .tag{font-size:var(--fs-12);overflow-wrap:anywhere}
-.tpl-ed-hit-tags .tag.is-hit{border:1px solid var(--accent-ink);color:var(--accent-ink);font-weight:var(--fw-semibold)}
+.tpl-ed-hit-topic{overflow-wrap:anywhere}
+.tpl-ed-task-find{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tpl-ed-task-find .search-wrap{flex:1 1 220px;min-width:0}
 .tpl-ed-task-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .tpl-ed-task-bar .list-count{margin:0}
 .tpl-ed-summary{position:sticky;top:0;padding:14px 16px}
@@ -6143,6 +6143,7 @@ html.app-shell-hint #app #app-header:not(.is-app) #main-nav{display:flex;align-i
 .pm-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .pm-foot .pm-item{width:auto;color:var(--danger)}
 .pm-foot .pm-item .pm-ico{color:var(--danger)}
+.pm-ver{margin:0 0 0 10px;font-size:var(--fs-12);color:var(--muted)}
 /* The platform look card (Settings) and the event look card (workspace). */
 .pl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .pl-grid .form-group{margin:0}

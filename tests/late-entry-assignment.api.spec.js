@@ -524,6 +524,65 @@ test.describe("v8.12.6 — somebody who played the event cannot rejoin it as a l
     } finally { await api.dispose(); }
   });
 
+  test("the ABSENCE clause on the FIRST-OPEN clock: entered and never opened a challenge, then removed or left before the end → refused; never entered → admitted", async () => {
+    // Owner decision (27 Nov 2026): on the first-open clock entering stamps no
+    // anchor, yet entering is still taking part. The removal and the leave record
+    // the absence as under the entry clock (with no anchor to carry), and the
+    // late-entry check reads it. The test above is the entry-clock CONTROL.
+    const { api, csrf } = await sa();
+    try {
+      const b = await liveBooth(api, csrf, { tasks: 1, create: { clock_start: "first_open" } });
+      expect(rawGetComp(b.comp.id).clock_start, "PRECONDITION: the event runs on the first-open clock").toBe("first_open");
+      const token = await selfEnrollToken(api, b.comp.id);
+      // x: assigned, ENTERS, opens nothing, removed by an organiser while live.
+      const x = await makeParticipant(api, csrf, uniq());
+      await enrol(api, csrf, b.comp.id, x.id);
+      await (await participantCtx(x.email, b.comp.id)).api.dispose();
+      const xr = cuRow(b.comp.id, x.id);
+      expect(xr.login_time, "PRECONDITION: no clock started (no challenge opened)").toBeNull();
+      expect(xr.last_login_time, "PRECONDITION: but x entered").toBeTruthy();
+      expect((await removeFromEvent(api, csrf, b.comp.id, x.id)).status).toBe(200);
+      // w: joins through the link, ENTERS, opens nothing, LEAVES while live.
+      const w = await makeParticipant(api, csrf, uniq());
+      expect((await joinAs(w.email, token)).status).toBe(200);
+      const wc = await participantCtx(w.email, b.comp.id);
+      try {
+        expect(cuRow(b.comp.id, w.id).login_time, "PRECONDITION: no clock for w either").toBeNull();
+        const leave = await wc.api.post(`/api/competitions/${b.comp.id}/leave`, { headers: H(wc.csrf) });
+        expect(leave.ok(), `leave while live: ${await leave.text()}`).toBeTruthy();
+      } finally { await wc.api.dispose(); }
+      // n: assigned and removed without ever entering.
+      const n = await makeParticipant(api, csrf, uniq());
+      await enrol(api, csrf, b.comp.id, n.id);
+      expect((await removeFromEvent(api, csrf, b.comp.id, n.id)).status).toBe(200);
+
+      // By value: an absence with NO anchor for each who entered, none for n.
+      for (const p of [x, w]) {
+        const rows = absenceRows(b.comp.id, p.id);
+        expect(rows.length, `${p.nickname} entered, so the removal records an absence`).toBe(1);
+        expect(rows[0].login_time, "carrying no anchor (no clock was started)").toBeNull();
+      }
+      expect(absenceRows(b.comp.id, n.id), "never entered: nothing recorded").toEqual([]);
+
+      const effEnd = await expireEvent(b.comp.id, { agoMinutes: 30 });
+      // The fixture trap: the removals happened "now"; put them before the moved end.
+      for (const p of [x, w]) rawBackdate("competition_user_absences", "removed_at", b.comp.id, p.id, new Date(effEnd.getTime() - 40 * MIN).toISOString());
+      expect(rawGet("SELECT COUNT(*) AS n FROM submissions WHERE competition_id=? AND user_id IN (?,?)", [b.comp.id, x.id, w.id]).n,
+        "PRECONDITION: nothing on record but the entries").toBe(0);
+
+      for (const p of [x, w]) {
+        const j = await joinAs(p.email, token);
+        expect(j.status, `${p.nickname} entered before the end → refused: ${JSON.stringify(j.body)}`).toBe(409);
+        expect(j.body.code).toBe("late_entry_took_part");
+        expect(cuRow(b.comp.id, p.id), "and no row").toBeFalsy();
+      }
+      // CONTROL — never entered: admitted as a late entrant.
+      const jn = await joinAs(n.email, token);
+      expect(jn.status, `never entered → admitted: ${JSON.stringify(jn.body)}`).toBe(200);
+      expect(cuRow(b.comp.id, n.id), "n now holds a row").toBeTruthy();
+    } finally { await api.dispose(); }
+  });
+
   test("assigned_at survives a remove-and-re-add, so a re-add never turns an ordinary member whose join time was recorded into a late entrant", async () => {
     const { api, csrf } = await sa();
     try {

@@ -43,6 +43,11 @@ async function makeEvent(api, csrf, extra = {}) {
     headers: H(csrf),
     data: {
       name: `${uniq()} Ev`, timezone: "UTC",
+      // The ENTRY clock: these tests count presence from entering the event, and
+      // presence waits for the solve clock, which on the first-open clock (the
+      // default) starts only at a first opened challenge. When a clock starts
+      // is not this file's subject.
+      clock_start: "entry",
       start_time: new Date(Date.now() - 3600e3).toISOString(), duration_minutes: 600,
       ...extra,
     },

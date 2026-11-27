@@ -30,26 +30,38 @@ export async function loadTopics(){
 /** The topic filter's values: '' every topic, '__none__' no topic, else a topic id. */
 export const NO_TOPIC='__none__';
 
-/** Does question `t` pass the bank's Topic filter? */
-export function taskInTopicFilter(t){
-  const f=S.tTopicFilter||'';
+/** Does question `t` pass Topic filter value `f` ('' every topic, NO_TOPIC, a topic id)?
+ *  One definition for every topic filter: the bank's and the template editor's. */
+export function taskInTopic(t,f){
   if(!f)return true;
   if(f===NO_TOPIC)return !t.topic_id;
   return t.topic_id===f;
 }
 
-/** Paint the Topic filter's options (counts are the reader's own bank questions). */
-export function renderTopicFilter(){
-  const sel=document.getElementById('task-topic-filter');
-  if(!sel)return;
+/** Does question `t` pass the bank's Topic filter? */
+export function taskInTopicFilter(t){ return taskInTopic(t,S.tTopicFilter||''); }
+
+/**
+ * Paint a Topic filter `<select>` (the bank's, the template editor's): All topics,
+ * No topic, then every topic with its count (the reader's own bank questions).
+ * A value naming a topic that is gone falls back to every topic; returns the
+ * value it shows. Repaints only when the options changed (focus and the open
+ * list survive a poll).
+ */
+export function paintTopicFilter(sel,value){
+  if(!sel)return '';
   const topics=Array.isArray(S.adminTopics)?S.adminTopics:[];
-  // A filter naming a topic that is gone falls back to every topic.
-  if(S.tTopicFilter&&S.tTopicFilter!==NO_TOPIC&&!topics.some(x=>x.id===S.tTopicFilter))S.tTopicFilter='';
-  const cur=S.tTopicFilter||'';
+  const cur=(value&&value!==NO_TOPIC&&!topics.some(x=>x.id===value))?'':(value||'');
   const html=`<option value="">All topics</option><option value="${NO_TOPIC}">No topic</option>`
     +topics.map(x=>`<option value="${esc(x.id)}">${esc(x.name)} (${Number(x.question_count)||0})</option>`).join('');
   if(sel.dataset.painted!==html){setSafeHtml(sel,html);sel.dataset.painted=html;}
   sel.value=cur;
+  return cur;
+}
+
+/** Paint the bank's Topic filter's options. */
+export function renderTopicFilter(){
+  S.tTopicFilter=paintTopicFilter(document.getElementById('task-topic-filter'),S.tTopicFilter||'');
 }
 
 /** The editor's picker: every topic, the question's own selected. */

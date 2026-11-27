@@ -469,13 +469,13 @@ test.describe("Picker dialog action row (v7.23.3)", () => {
       if (await burger.isVisible().catch(() => false) && !(await page.locator("#admin-sidebar.mobile-open").count())) await burger.click();
       await page.locator("button.admin-nav-item[data-tab-id=\"admin-competitions-tab\"]").first().evaluate((el) => el.click());
       await page.locator("#admin-comp-body tr").first().waitFor({ state: "visible", timeout: 20000 });
-      // The event's ⋯ menu (its workspace; the Events-row menu keeps only Delete event).
+      // The event's one door into the bank: its Questions section's + Add from
+      // bank (Stage B, owner ruling, 27 Nov 2026; neither event menu offers one).
       await page.locator("#admin-comp-body tr").first().locator('[data-action="comp-open"]').first().click();
       await page.locator("#ws-record").waitFor({ state: "visible", timeout: 20000 });
-      await page.locator("#ws-quick .ws-more-btn").click();
-      await page.locator("#kebab-portal.open").waitFor({ state: "visible", timeout: 10000 });
-      const item = page.locator("#kebab-portal [data-action=comp-assign-challenges]");
-      expect(await item.count(), "the Add challenges item must exist, or this test is vacuous").toBeGreaterThan(0);
+      await page.locator('#ws-tabs [data-section="admin-tasks-tab"]').first().evaluate((el) => el.click());
+      const item = page.locator("#add-tasks-to-comp-btn");
+      await expect(item, "the + Add from bank door must be offered, or this test is vacuous").toBeVisible({ timeout: 15000 });
       await item.click();
       await page.locator(".picker-modal").waitFor({ state: "visible", timeout: 15000 });
 

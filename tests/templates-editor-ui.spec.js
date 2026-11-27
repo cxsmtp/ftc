@@ -131,19 +131,29 @@ test.describe("Templates — the editor", () => {
     }
   });
 
-  test("the challenge picker finds challenges by TAG, shows their tags, and adds several at once", async ({ page }) => {
+  // Owner decision (27 Nov 2026): the template editor picks questions by TOPIC,
+  // as the Question bank filters them (Stage B gave questions topics and took
+  // their tags out of the organiser's lists). The filter is the bank's own
+  // (topics-admin.js `paintTopicFilter` / `taskInTopic`).
+  test("the question picker filters by TOPIC as the bank does, names each result's topic, and adds several at once", async ({ page }) => {
     const { makeTask } = require("./event-admin-helpers");
     const { api: sa, csrf } = await apiLogin("superadmin");
-    const tag = `tagq${Date.now().toString(36)}`;
-    let a, b, decoy;
+    const stamp = Date.now().toString(36);
+    let a, b, decoy, loose, topic, other;
     try {
-      a = await makeTask(sa, csrf, "tagsearch-a");
-      b = await makeTask(sa, csrf, "tagsearch-b");
-      decoy = await makeTask(sa, csrf, "tagsearch-decoy");
-      for (const t of [a, b]) {
-        const r = await sa.post(`/api/admin/tasks/${t.id}/tags`, { headers: { "x-csrf-token": csrf, "content-type": "application/json" }, data: { tag } });
-        expect(r.ok(), `tag ${t.title}: ${await r.text()}`).toBeTruthy();
-      }
+      const mkTopic = async (name) => {
+        const r = await sa.post("/api/admin/topics", { headers: H(csrf), data: { name } });
+        expect(r.ok(), `topic ${name}: ${await r.text()}`).toBeTruthy();
+        return (await r.json()).id;
+      };
+      topic = { name: `Picked ${stamp}`, id: null };
+      other = { name: `Other ${stamp}`, id: null };
+      topic.id = await mkTopic(topic.name);
+      other.id = await mkTopic(other.name);
+      a = await makeTask(sa, csrf, `topicpick-a-${stamp}`, { topic_id: topic.id });
+      b = await makeTask(sa, csrf, `topicpick-b-${stamp}`, { topic_id: topic.id });
+      decoy = await makeTask(sa, csrf, `topicpick-decoy-${stamp}`, { topic_id: other.id });
+      loose = await makeTask(sa, csrf, `topicpick-loose-${stamp}`);
     } finally { await sa.dispose(); }
     _page = page;
     await adminLogin(page);
@@ -152,25 +162,42 @@ test.describe("Templates — the editor", () => {
     await page.locator("#tpl-new-btn").click();
     const ed = page.locator("#tpl-editor");
     await expect(ed).toBeVisible();
-    // A tag is not in either title, so a title-only search finds nothing: the
-    // two hits prove the tag was searched; the decoy (same title prefix, no
-    // tag) proves it is the tag and not the title doing it.
-    await ed.locator("#tpl-ed-task-search").fill(tag);
+    const pickTopic = (v) => ed.locator("#tpl-ed-task-topic").selectOption(v);
+    const search = ed.locator("#tpl-ed-task-search");
     const rows = ed.locator("#tpl-ed-task-results li");
-    await expect(rows).toHaveCount(2);
+    // The filter offers what the bank's does: All topics, No topic, each topic.
+    await expect(ed.locator("#tpl-ed-task-topic option").first()).toHaveText("All topics");
+    await expect(ed.locator(`#tpl-ed-task-topic option[value="__none__"]`)).toHaveText("No topic");
+    await expect(ed.locator(`#tpl-ed-task-topic option[value="${topic.id}"]`)).toHaveText(new RegExp(`^${topic.name} \\(\\d+\\)$`));
+    // A topic alone lists its questions, and only them.
+    await pickTopic(topic.id);
     await expect(rows.filter({ hasText: a.title })).toHaveCount(1);
     await expect(rows.filter({ hasText: b.title })).toHaveCount(1);
+    await expect(rows.filter({ hasText: decoy.title }), "another topic's question is not listed").toHaveCount(0);
+    await expect(rows.filter({ hasText: loose.title }), "nor one with no topic").toHaveCount(0);
+    await expect(rows.filter({ hasText: a.title }).locator(".tpl-ed-hit-topic"), "each result names its topic").toHaveText(topic.name);
+    await expect(rows.locator(".tag"), "no tag chips").toHaveCount(0);
+    // The search narrows within the topic: the decoy's title finds nothing here…
+    await search.fill(decoy.title);
     await expect(rows.filter({ hasText: decoy.title })).toHaveCount(0);
-    await expect(rows.first().locator(".tag.is-hit"), "the matched tag is shown as a chip").toHaveText(tag);
-    // CONTROL: the title still matches.
-    await ed.locator("#tpl-ed-task-search").fill(decoy.title);
+    // …and finds it with every topic (CONTROL: it is a published, listable question).
+    await pickTopic("");
     await expect(rows.filter({ hasText: decoy.title })).toHaveCount(1);
-    // Several at once.
-    await ed.locator("#tpl-ed-task-search").fill(tag);
+    await expect(rows.filter({ hasText: decoy.title }).locator(".tpl-ed-hit-topic")).toHaveText(other.name);
+    // No topic: the question without one, and not the topic's.
+    await search.fill("");
+    await pickTopic("__none__");
+    await search.fill(`topicpick-`);
+    await expect(rows.filter({ hasText: loose.title })).toHaveCount(1);
+    await expect(rows.filter({ hasText: loose.title }).locator(".tpl-ed-hit-topic")).toHaveText("No topic");
+    await expect(rows.filter({ hasText: a.title })).toHaveCount(0);
+    // Several at once: the topic's two.
+    await search.fill("");
+    await pickTopic(topic.id);
     await expect(rows).toHaveCount(2);
     await ed.locator("#tpl-ed-task-addall").click();
     await expect(ed.locator("#tpl-ed-tasks .tpl-ed-task")).toHaveCount(2);
-    await expect(rows.filter({ hasText: a.title }), "an added challenge leaves the results").toHaveCount(0);
+    await expect(rows.filter({ hasText: a.title }), "an added question leaves the results").toHaveCount(0);
   });
 
   // Operator ruling, 14 Nov 2026: an event numbers its challenges by difficulty,

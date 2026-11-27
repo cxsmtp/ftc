@@ -47,7 +47,7 @@ const OVERVIEW = "admin-event-overview-tab";
 const PEOPLE = "admin-participants-tab";
 const TASKS = "admin-tasks-tab";
 const SEARCH = { [PEOPLE]: "#participants-search", [TASKS]: "#task-search" };
-const LABEL = { [PEOPLE]: "Participants", [TASKS]: "Challenges" };
+const LABEL = { [PEOPLE]: "Participants", [TASKS]: "Questions" };   // Stage B named the workspace section Questions (owner ruling, 27 Nov 2026)
 const F = {};   // this file's own events, challenges and people
 
 test.beforeAll(async () => {

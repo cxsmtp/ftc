@@ -59,12 +59,14 @@ function runChild(script, args, extraEnv = {}) {
 const ctx = (r) => `status=${r.status} signal=${r.signal}\nSTDOUT:\n${r.stdout}\nSTDERR:\n${r.stderr}\nAPP LOG:\n${r.appLog}`;
 
 test("a FATAL at boot reaches stderr and the app log in production (no SMTP_HOST)", () => {
-  // The real FATAL site: lib/email.js refuses to load without SMTP_HOST.
+  // The real FATAL site: lib/email.js refuses to load with no relay (no SMTP_HOST
+  // and none saved in Settings → Email (SMTP), whose sentence names both: owner
+  // decision, 27 Nov 2026).
   const r = runChild("require(process.argv[1]);", [EMAIL_MODULE]);
   expect(r.status, `the module must refuse to load: ${ctx(r)}`).toBe(1);
   expect(r.logDirExists, `anti-vacuity: the logger opened its directory: ${ctx(r)}`).toBe(true);
-  expect(r.stderr, `stderr says why the process stopped: ${ctx(r)}`).toMatch(/FATAL: SMTP_HOST environment variable is required/);
-  expect(r.appLog, `the app log has the line too: ${ctx(r)}`).toMatch(/FATAL: SMTP_HOST environment variable is required/);
+  expect(r.stderr, `stderr says why the process stopped: ${ctx(r)}`).toMatch(/FATAL: no mail relay is configured\. Set SMTP_HOST/);
+  expect(r.appLog, `the app log has the line too: ${ctx(r)}`).toMatch(/FATAL: no mail relay is configured\. Set SMTP_HOST/);
 });
 
 test("a crash after the log file opened replays its error to stderr on a non-zero exit", () => {

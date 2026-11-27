@@ -368,6 +368,9 @@ test.describe("The editor's Options box", () => {
     expect(first.map(c => c.text), "one option per non-empty line, trimmed").toEqual(["Red", "Green"]);
 
     // Edit: the box shows the options; a new line is added, the others kept.
+    // The list reloads after the save; open the row only once it is in the model
+    // (an edit of a row the list has not drawn yet closes the form instead).
+    await expect.poll(() => page.evaluate((tid) => (window.S.adminTasksData || []).some(t => t.id === tid), id), { timeout: 15000 }).toBe(true);
     await page.evaluate((tid) => window.editTask(tid), id);
     await expect(page.locator("#tf-any-options")).toHaveValue("Red\nGreen", { timeout: 10000 });
     await page.locator("#tf-any-options").fill("Red\nGreen\nBlue");

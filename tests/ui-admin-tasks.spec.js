@@ -133,9 +133,10 @@ test.describe("Admin — Competitions", () => {
     await expect(page.locator("text=Viewing").first()).toBeVisible({ timeout: 3000 });
   });
 
-  // The event's doors are its workspace ⋯ menu's (owner's decision, 27 Nov
-  // 2026: the Events-row menu keeps only Delete event).
-  test("Add challenges is in the event's menu while live, absent once ended; neither row menu offers it", async ({ page }) => {
+  // The event's one door into the bank is its Questions section's + Add from bank
+  // (Stage B, owner ruling, 27 Nov 2026), and the Events-row menu keeps only
+  // Delete event (owner's decision, 27 Nov 2026): neither menu offers it.
+  test("+ Add from bank is the Questions section's while live, absent once ended; neither menu offers it", async ({ page }) => {
     await adminLogin(page);
     await clickTab(page, "Events");
     await expect(page.locator(".status-badge.live").first()).toBeVisible({ timeout: 10000 });
@@ -143,9 +144,11 @@ test.describe("Admin — Competitions", () => {
     const liveRow = page.locator("#admin-comp-body tr:has-text('Test Live')");
     await expect(liveRow.locator(".kebab-menu [data-action='comp-assign-challenges']"), "not on the row").toHaveCount(0);
     let portal = await openRowEventMenu(page, liveRow);
-    await expect(portal.locator("[data-action='comp-assign-challenges']")).toHaveCount(1);
-    await expect(portal.locator("[data-action='comp-edit']")).toHaveCount(1);
+    await expect(portal.locator("[data-action='comp-edit']"), "CONTROL: the ⋯ menu is open with its doors").toHaveCount(1);
+    await expect(portal.locator("[data-action='comp-assign-challenges']"), "not in the ⋯ menu").toHaveCount(0);
     await page.keyboard.press("Escape");
+    await page.locator('#ws-tabs [data-section="admin-tasks-tab"]').first().evaluate((el) => el.click());
+    await expect(page.locator("#add-tasks-to-comp-btn"), "the Questions section's door, while live").toBeVisible({ timeout: 15000 });
     // Show ended competitions — wait for the filter re-render, not a fixed delay.
     await clickTab(page, "Events");
     await page.locator("#comp-status-filters button[data-status='all']").click();
@@ -154,6 +157,10 @@ test.describe("Admin — Competitions", () => {
     await expect(endedRow).toBeVisible({ timeout: 5000 });
     portal = await openRowEventMenu(page, endedRow);
     await expect(portal.locator("[data-action='comp-assign-challenges']")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await page.locator('#ws-tabs [data-section="admin-tasks-tab"]').first().evaluate((el) => el.click());
+    await expect(page.locator("#admin-tasks-tab"), "PRECONDITION: the ended event's Questions section is open").toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#add-tasks-to-comp-btn"), "an ended event's questions are frozen: no door").toBeHidden();
   });
 
   test("opening a second row's kebab while one is open keeps the new menu open (no flash-close)", async ({ page }) => {

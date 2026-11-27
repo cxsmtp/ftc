@@ -13,7 +13,7 @@ const { isGlobalClassRole: _isGlobalRole, roleClass: _roleClass, isBuiltinRole: 
 const { getAdminIdentity, recordCompetitionEvent, recordOrphanedAuditEvent, recordTimeslotEvent, recordUserEvent, reqContext, runTxnWithMirrorBuffer } = require("../lib/audit");
 const { swallowed } = require("../lib/best-effort");
 const { eventPolicy } = require("../lib/event-policy");
-const { scheduledEnd, _invalidateCompetitionCache, competitionStatus, competitionEffectiveEnd, getCompetition, getCompetitionTimeslots, getTimeslot, closeAbsenceAndRestoreAnchor, lateEntryWindowOpen, lateEntryJoinCutoff, lateEntryStateFor, competitionAdmission, lateWindowAdmissionDenied, lateWindowRemovalDenied, lateEntryMailLineFor, eventEndMailText } = require("../lib/competitions");
+const { scheduledEnd, _invalidateCompetitionCache, competitionStatus, competitionEffectiveEnd, getCompetition, getCompetitionTimeslots, getTimeslot, closeAbsenceAndRestoreAnchor, recordRemovalAbsence, lateEntryWindowOpen, lateEntryJoinCutoff, lateEntryStateFor, competitionAdmission, lateWindowAdmissionDenied, lateWindowRemovalDenied, lateEntryMailLineFor, eventEndMailText } = require("../lib/competitions");
 const { BASE_URL, BULK_ADMIN_MAX, PERF_SPAN_SLOW_MS } = require("../lib/config");
 const { enqueueCxOneProvision, requeueDeferredCxOneProvision } = require("../lib/cxone");
 const { emailIsTaken } = require("../lib/email-identity");
@@ -874,7 +874,7 @@ app.delete("/api/admin/competitions/:id/users/:uid", requireAdmin, csrfProtectio
   // change whether a member who had entered is a late entrant (one removed
   // before entering has no absence row, so a re-add through the late-entry
   // window makes them one).
-  const cuRow = db.prepare("SELECT timeslot_id, login_time, assigned_at FROM competition_users WHERE competition_id=? AND user_id=?").get(req.params.id, req.params.uid);
+  const cuRow = db.prepare("SELECT timeslot_id, login_time, last_login_time, assigned_at FROM competition_users WHERE competition_id=? AND user_id=?").get(req.params.id, req.params.uid);
   const chosenTs = cuRow?.timeslot_id ? getTimeslot(cuRow.timeslot_id) : null;
   const adminId = getAdminIdentity(req);
   // v6.20.0: if the participant is ALSO in a group bound to this competition,
@@ -889,17 +889,14 @@ app.delete("/api/admin/competitions/:id/users/:uid", requireAdmin, csrfProtectio
     // v6.12.0: open an absence row BEFORE the DELETE so the row's
     // timeslot_id survives (DELETE wipes it). Scope absence to the
     // user's slot so per_slot leaderboards subtract correctly.
-    if (cuRow && cuRow.login_time) {
-      // v8.1.0: the row also CARRIES the solve-clock anchor, because the DELETE
-      // below is what destroys `competition_users.login_time` and this is the
-      // only chance to record it. The re-add restores it
-      // (closeAbsenceAndRestoreAnchor); without it the lazy stamp re-anchors the
-      // clock to the re-add moment, which for a finisher clamps solveTimeMs to 0
-      // — the best possible value on the sole score tie-break.
-      db.prepare(
-        "INSERT INTO competition_user_absences (user_id, competition_id, timeslot_id, removed_at, returned_at, login_time, assigned_at) VALUES (?,?,?,?,NULL,?,?)"
-      ).run(req.params.uid, comp.id, cuRow.timeslot_id || null, now().toISOString(), cuRow.login_time, cuRow.assigned_at || null);
-    }
+    // v8.1.0: the row also CARRIES the solve-clock anchor, because the DELETE
+    // below is what destroys `competition_users.login_time` and this is the
+    // only chance to record it. The re-add restores it
+    // (closeAbsenceAndRestoreAnchor); without it the lazy stamp re-anchors the
+    // clock to the re-add moment, which for a finisher clamps solveTimeMs to 0
+    // — the best possible value on the sole score tie-break. Written for anybody
+    // who ENTERED, on either clock (lib/competitions.js `recordRemovalAbsence`).
+    recordRemovalAbsence(req.params.uid, comp.id, cuRow, now().toISOString());
     const r = db.prepare("DELETE FROM competition_users WHERE competition_id=? AND user_id=?").run(req.params.id, req.params.uid);
     didRemove = r.changes > 0;
     if (r.changes > 0) {

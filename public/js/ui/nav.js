@@ -528,6 +528,11 @@ function _helpItems(){
 }
 function _profileMenuBody(){
   const u=S.currentUser||{};
+  // The running version: in Admin View it is at the sidebar's foot (owner
+  // decision, 27 Nov 2026, #admin-sidebar-version), so the menu does not repeat
+  // it; the participant view has no sidebar, so it stays here, small, beside
+  // Sign out (every signed-in person can still see what they run).
+  const ver=S.isAdmin?'':(document.getElementById('platform-version')?.textContent||'').trim();
   return `<div class="pm-panel" role="dialog" aria-modal="true" aria-labelledby="pm-name">
     <div class="pm-head">
       <span class="pm-avatar" aria-hidden="true">${_avatarFace()}</span>
@@ -536,7 +541,7 @@ function _profileMenuBody(){
     <div class="pm-group">${_viewItem()}</div>
     <div class="pm-group">${_accountItems()}</div>
     <div class="pm-group">${_helpItems()}</div>
-    <div class="pm-group pm-foot">${_menuItem('do-logout','Sign out',{icon:ICO.logOut,cls:'pm-out'})}</div>
+    <div class="pm-group pm-foot">${ver?`<p class="pm-ver">${esc(ver)}</p>`:''}${_menuItem('do-logout','Sign out',{icon:ICO.logOut,cls:'pm-out'})}</div>
   </div>`;
 }
 

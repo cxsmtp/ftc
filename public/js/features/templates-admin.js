@@ -29,7 +29,8 @@ import { overlayDismiss } from "../ui/modal.js";
 import { fetchJsonList } from "../core/api.js";
 import { ICO } from "../ui/icons.js";
 import { showModal } from "../ui/modal.js";
-import { taskMatchesQuery, taskTagHit, isQualifyingTask, isBankTask } from "../ui/task-search.js";   // the one qualifying test
+import { taskMatchesQuery, isQualifyingTask, isBankTask } from "../ui/task-search.js";   // the one qualifying test
+import { loadTopics, paintTopicFilter, taskInTopic, topicName } from "./topics-admin.js";   // stage B — questions are picked by topic, as in the bank
 import { showToast } from "../ui/toast.js";
 import { wallClockToUtcChecked, dstGapMessage } from "../data/country-tz.js";
 import { loadAdminCompetitions, openCompetitionForm } from "./competitions-admin.js";
@@ -545,7 +546,7 @@ async function _openEditor(id, mode) {
   // towards the address's scanner block): without challenges.view the editor
   // shows the template's own challenges, read-only, and says why no picker.
   const canLib = adminCan('challenges.view');
-  const lib = canLib ? await fetchJsonList('/api/admin/tasks') : null;
+  const [lib] = canLib ? await Promise.all([fetchJsonList('/api/admin/tasks'), loadTopics()]) : [null];
   if (seq !== _edSeq) return;
   _libTasks = lib;
   const kinds = Array.isArray(S.eventKinds) ? S.eventKinds : [];
@@ -615,7 +616,8 @@ async function _openEditor(id, mode) {
         <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Challenges</legend>
           <p class="t-small t-muted tpl-ed-task-order">Events number their challenges by difficulty, then title.</p>
           <ul class="tpl-ed-tasks" id="tpl-ed-tasks"></ul>
-          ${canLib ? `<div class="search-wrap"><input id="tpl-ed-task-search" type="text" autocomplete="off" placeholder="Find a published challenge by title or tag…" aria-label="Find a published challenge by title or tag"/></div>
+          ${canLib ? `<div class="tpl-ed-task-find"><span class="topic-filter"><label for="tpl-ed-task-topic">Topic</label><select id="tpl-ed-task-topic"><option value="">All topics</option></select></span>
+          <div class="search-wrap"><input id="tpl-ed-task-search" type="text" autocomplete="off" placeholder="Find a published question by title or topic…" aria-label="Find a published question by title or topic"/></div></div>
           <div class="tpl-ed-task-bar"><p class="settings-help list-count" id="tpl-ed-task-count" role="status" aria-live="polite" aria-atomic="true"></p><button type="button" class="btn sm secondary" id="tpl-ed-task-addall" hidden>Add all shown</button></div>
           <ul class="tpl-ed-task-results" id="tpl-ed-task-results"></ul>`
           : '<p class="t-small t-muted" id="tpl-ed-task-unseen">Your role cannot view the challenge library, so it cannot add challenges here. The template keeps the challenges listed above unless you remove them.</p>'}
@@ -662,6 +664,13 @@ async function _openEditor(id, mode) {
   form.addEventListener('change', sync);
   const _taskSearch = ov.querySelector('#tpl-ed-task-search');
   _taskSearch?.addEventListener('input', () => _renderTaskResults(ov, state));
+  // The Topic filter: the bank's own options and test (topics-admin.js), a sibling
+  // of the results it narrows, as the search box is.
+  const _taskTopic = ov.querySelector('#tpl-ed-task-topic');
+  if (_taskTopic) {
+    paintTopicFilter(_taskTopic, '');
+    _taskTopic.addEventListener('change', () => _renderTaskResults(ov, state));
+  }
   // Enter in the search box must not submit the whole form.
   _taskSearch?.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
   // Pick several at once: every challenge the search currently shows.
@@ -755,9 +764,12 @@ const TASK_RESULTS_SHOWN = 12;
  *  through "Add the qualifying questions", as on the create form. */
 function _taskMatches(ov, state) {
   const q = ov.querySelector('#tpl-ed-task-search')?.value || '';
-  if (!Array.isArray(_libTasks) || !q.trim()) return [];
+  const topic = ov.querySelector('#tpl-ed-task-topic')?.value || '';
+  // A topic alone lists that topic's questions; with neither, nothing is listed.
+  if (!Array.isArray(_libTasks) || (!q.trim() && !topic)) return [];
   const have = new Set(state.tasks.map(t => t.id));
-  return _libTasks.filter(t => isBankTask(t) && t.status === 'published' && !have.has(t.id) && !isQualifyingTask(t) && taskMatchesQuery(t, q));
+  return _libTasks.filter(t => isBankTask(t) && t.status === 'published' && !have.has(t.id) && !isQualifyingTask(t)
+    && taskInTopic(t, topic) && (!q.trim() || taskMatchesQuery(t, q)));
 }
 /** The matches the list is showing. */
 function _taskHits(ov, state) { return _taskMatches(ov, state).slice(0, TASK_RESULTS_SHOWN); }
@@ -773,17 +785,18 @@ function _renderTaskResults(ov, state) {
   };
   if (!Array.isArray(_libTasks)) { setSafeHtml(ul, '<li class="ws-empty">Could not load the challenge library.</li>'); paint('', 0); return; }
   const q = ov.querySelector('#tpl-ed-task-search')?.value || '';
-  if (!q.trim()) { setSafeHtml(ul, ''); paint('', 0); return; }
+  const topic = ov.querySelector('#tpl-ed-task-topic')?.value || '';
+  if (!q.trim() && !topic) { setSafeHtml(ul, ''); paint('', 0); return; }
   const all = _taskMatches(ov, state);
   const hits = all.slice(0, TASK_RESULTS_SHOWN);
-  // Each result shows its tags as chips; a tag the query matched is marked, so
-  // the reason a challenge is listed is visible.
-  const chips = (t) => (t.tags || []).map(tg => `<span class="tag${taskTagHit(tg, q) ? ' is-hit' : ''}">${esc(tg)}</span>`).join('');
-  setSafeHtml(ul, hits.length ? hits.map(t => `<li><span class="tpl-ed-hit-title">${esc(t.title)}</span><small class="t-muted">${esc(t.difficulty || '')}</small><span class="tpl-ed-hit-tags">${chips(t)}</span>${_competingIn(t).length
+  // Each result names its topic (stage B: questions are organised by topic, and
+  // their tags are no longer shown to organisers), so why it is listed is visible.
+  const topicOf = (t) => (t.topic_id ? (t.topic_name || topicName(t.topic_id)) : '') || 'No topic';
+  setSafeHtml(ul, hits.length ? hits.map(t => `<li><span class="tpl-ed-hit-title">${esc(t.title)}</span><small class="t-muted">${esc(t.difficulty || '')}</small><small class="tpl-ed-hit-topic t-muted">${esc(topicOf(t))}</small>${_competingIn(t).length
       ? `<small class="tpl-ed-why">${esc(_competingWhy(t, 'Cannot be added: '))}</small>`
       : `<button type="button" class="btn sm" data-tpl-task="${esc(t.id)}" data-op="add" aria-label="Add ${esc(t.title)}">Add</button>`}</li>`).join('')
-    : '<li class="ws-empty">No published challenge matches that title or tag.</li>');
-  paint(all.length > hits.length ? `${hits.length} of ${all.length} matches shown; type more to narrow.` : `${all.length} match${all.length === 1 ? '' : 'es'}.`, hits.filter(t => !_competingIn(t).length).length);
+    : `<li class="ws-empty">${topic && !q.trim() ? 'No published question in that topic that is not already listed.' : 'No published question matches.'}</li>`);
+  paint(all.length > hits.length ? `${hits.length} of ${all.length} matches shown; type or pick a topic to narrow.` : `${all.length} match${all.length === 1 ? '' : 'es'}.`, hits.filter(t => !_competingIn(t).length).length);
 }
 
 function _syncEditor(ov, state) {

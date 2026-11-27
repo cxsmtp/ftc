@@ -80,10 +80,3 @@ export function taskMatchesQuery(t, q, extra) {
   return terms.every(term => fields.some(f => f.includes(term)));
 }
 
-/** True when the query matched this challenge through a tag (not its title). */
-export function taskTagHit(tag, q) {
-  const terms = taskQueryTerms(q);
-  if (!terms.length) return false;
-  const low = String(tag || "").toLowerCase();
-  return terms.some(term => low.includes(term));
-}

@@ -779,7 +779,9 @@ The editor groups the settings as **Basics** (name, description,
 event type, tags), **Joining** (join link and QR, late entries,
 and the sign-up fields), **Play** (how long it runs, attempts per challenge,
 staff compete, Checkmarx One accounts), **Scoring & boards**, **Challenges**
-(find published challenges and add them; they are listed in the order an event
+(pick a **Topic**, as the Question bank's filter does, or **No topic**, and
+narrow it by title; each result names its topic; **Add all shown** adds every
+question listed; they are listed in the order an event
 numbers them, by difficulty and then title, which is the order participants
 meet them in) and **Certificates**, with a live **Summary** beside them.
 **New template** opens with no event type chosen: pick one, as **Create
@@ -1612,7 +1614,8 @@ the late-entry deadline rather than a start and an end that have already passed.
 
 **Somebody who took part before the end cannot come back as a late entrant.**
 If a person submitted an answer, revealed a hint or entered the event while it
-was running — even if they have left it or been removed since — adding them now
+was running (whether or not they opened a challenge, on either way of starting
+the clock) — even if they have left it or been removed since — adding them now
 is skipped, and the confirmation says why: *they took part before the event
 ended, so they cannot rejoin it as late entrants*. Letting them back in would let
 them play on after the official results were settled. The join link refuses them

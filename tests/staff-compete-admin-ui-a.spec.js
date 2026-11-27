@@ -649,7 +649,9 @@ test.describe("v8.12.0 — a competing admin's Events row", () => {
     // upcoming-event arm below. JOIN LINK STAYS (the operator's ruling, 19 Sep
     // 2026): the reveal is a read, and the dialog it opens is read-only for a
     // competitor — its own describe below.
-    for (const action of ["comp-edit", "comp-end-now", "comp-assign-challenges", "comp-delete", "comp-start-now", "ws-clone"]) {
+    // (No Add from bank in the list: neither event menu offers it to anybody, Stage
+    // B, owner ruling, 27 Nov 2026; tests/menu-door-parity.spec.js.)
+    for (const action of ["comp-edit", "comp-end-now", "comp-delete", "comp-start-now", "ws-clone"]) {
       await expect(portal.locator(`[data-action="${action}"]`), `${action} reaches a door the server refuses a competitor`).toHaveCount(0);
     }
     for (const action of ["comp-history", "comp-self-enroll"]) {
@@ -734,7 +736,6 @@ test.describe("v8.12.0 — a competing admin's Events row", () => {
     const portal = await openEventMenu(page, plainLive.name);
     await expect(portal.locator('[data-action="comp-edit"]'), "Edit is offered").toHaveCount(1);
     await expect(portal.locator('[data-action="comp-end-now"]'), "End Now is offered on a live event").toHaveCount(1);
-    await expect(portal.locator('[data-action="comp-assign-challenges"]')).toHaveCount(1);
     await expect(portal.locator('[data-action="comp-self-enroll"]')).toHaveCount(1);
     await expect(portal.locator(".kebab-note"), "nothing is withheld, so nothing is explained").toHaveCount(0);
     await page.keyboard.press("Escape");

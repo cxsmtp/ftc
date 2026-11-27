@@ -3022,7 +3022,13 @@ test.describe("admin", () => {
     await page.locator("#admin-comp-body tr").first().waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
     // Find the Test Upcoming row (non-ended so Assign Challenges is
     // enabled).
-    await (await openEventWsMenu(page, "Test Upcoming")).locator('[data-action="comp-assign-challenges"]').click();
+    // The event's one door into the bank: its Questions section's + Add from bank
+    // (Stage B, owner ruling, 27 Nov 2026; neither event menu offers it).
+    await filterComps(page, "Test Upcoming");
+    await page.locator("#admin-comp-body tr", { hasText: "Test Upcoming" }).first().locator('[data-action="comp-open"]').first().click();
+    await page.locator("#ws-record").waitFor({ state: "visible", timeout: 10000 });
+    await page.locator('#ws-tabs [data-section="admin-tasks-tab"]').first().click();
+    await page.locator("#add-tasks-to-comp-btn").click();
     await page.locator("#task-picker-overlay").waitFor({ state: "visible", timeout: 5000 });
     await settle(page, 500);
     // Type a partial query so the search bar shows active state in the screenshot.

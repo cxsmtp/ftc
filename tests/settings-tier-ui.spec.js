@@ -107,6 +107,7 @@ test.describe("the Settings tab: offered to a regular admin, its superadmin-only
 
     await expect(settingsNavItem(page), "Settings IS shown for a superadmin").toBeVisible();
     await page.locator("[data-action='admin-tab'][data-tab-id='admin-settings-tab']").first().click();
+    await openSettingsSection(page, "branding");   // the platform name is under Branding (owner decision, 27 Nov 2026)
     await expect(page.locator("#platform-name-card")).toBeVisible();
     await expect(page.locator("#settings-platform-name")).toBeVisible();
     // v7.14.2 — gate the affordance and the EXPLANATION together. The card had

@@ -191,7 +191,7 @@ test("Settings lists the allowed domains; the create form seeds the tick from th
   const { ctx, page } = await superCtx(browser);
   await page.goto(`${BASE}/`);
   await clickTab(page, "settings");
-  await openSettingsSection(page, "email");
+  await openSettingsSection(page, "general");   // the team report domains are under General (owner decision, 27 Nov 2026)
   await expect(page.locator("#team-domains-card")).toBeVisible();
   await page.locator("#team-domains-input").fill("Example.org\nfoo.example.org");
   await page.locator('[data-action="team-domains-save"]').click();

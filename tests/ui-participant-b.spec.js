@@ -305,8 +305,10 @@ test.describe("Mobile responsive", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   test("version visible on mobile", async ({ page }) => {
-    await adminLogin(page);
-    // The version moved into the account menu (small, above Sign out).
+    // A participant has no admin sidebar, so the version stays in the account
+    // menu (small, beside Sign out). An admin's is at the sidebar's foot (owner
+    // decision, 27 Nov 2026; tests/settings-about-health-ui.spec.js).
+    await participantLogin(page);
     const ver = (await require("./chrome-helpers").openAccountMenu(page)).locator(".pm-ver");
     await expect(ver).toBeVisible({ timeout: 3000 });
     expect(await ver.textContent()).toMatch(/^v\./);
@@ -331,11 +333,26 @@ test.describe("Mobile responsive", () => {
 
 test.describe("Version display", () => {
   test("version visible on desktop", async ({ page }) => {
+    // Admin View: at the sidebar's foot (owner decision, 27 Nov 2026), and the
+    // account menu does not repeat it.
     await adminLogin(page);
-    // The version moved into the account menu (small, above Sign out).
-    const ver = (await require("./chrome-helpers").openAccountMenu(page)).locator(".pm-ver");
-    await expect(ver).toBeVisible({ timeout: 3000 });
-    expect(await ver.textContent()).toMatch(/^v\.\d+\.\d+\.\d+$/);
+    const foot = page.locator("#admin-sidebar-version .asv-long");
+    await expect(foot).toBeVisible({ timeout: 5000 });
+    expect(await foot.textContent()).toMatch(/^Version \d+\.\d+\.\d+$/);
+    await require("./chrome-helpers").openAccountMenu(page);
+    await expect(page.locator("#profile-menu-overlay [data-action='do-logout']"), "CONTROL: the menu is open").toBeVisible();
+    await expect(page.locator("#profile-menu-overlay .pm-ver"), "not repeated in Admin View").toHaveCount(0);
+  });
+
+  test("version visible on desktop in the participant view: the account menu", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE, viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+    try {
+      await participantLogin(page);
+      const ver = (await require("./chrome-helpers").openAccountMenu(page)).locator(".pm-ver");
+      await expect(ver).toBeVisible({ timeout: 3000 });
+      expect(await ver.textContent()).toMatch(/^v\.\d+\.\d+\.\d+$/);
+    } finally { await ctx.close(); }
   });
 });
 

@@ -82,6 +82,37 @@ test.describe("first-open solve clock", () => {
     } finally { await api.dispose(); }
   });
 
+  // Owner decision (27 Nov 2026): a clone keeps the source's clock, whichever it
+  // is (each value against its own source, so a clone that took the kind's seed
+  // instead could not pass both); a clone into a Program reads entry and says
+  // it changed (`forced_settings`), since a Program refuses the first-open clock.
+  test("a clone keeps the source event's clock: first open stays first open, entry stays entry; into a Program it is entry, named as forced", async () => {
+    const { api, csrf } = await sa();
+    try {
+      const clone = async (srcId, extra = {}) => {
+        const r = await api.post(`/api/admin/competitions/${srcId}/clone`, { headers: H(csrf), data: { name: `FO clone ${uniq()}`, ...extra } });
+        expect(r.status(), await r.text()).toBe(200);
+        return r.json();
+      };
+      const stored = (id) => rawGet("SELECT clock_start FROM competitions WHERE id=?", [id]).clock_start;
+      for (const kind of ["booth", "tournament"]) {
+        for (const clock of ["first_open", "entry"]) {
+          const { comp } = await liveEvent(api, csrf, kind, { n: 1, create: { clock_start: clock } });
+          expect(stored(comp.id), `PRECONDITION: the ${kind} source runs on ${clock}`).toBe(clock);
+          const b = await clone(comp.id);
+          expect(stored(b.competition.id), `a ${kind} clone of a ${clock} source keeps ${clock}`).toBe(clock);
+          expect(b.forced_settings || [], "nothing forced").not.toContain("clock_start");
+        }
+      }
+      // Into a Program: the kind refuses the first-open clock, so the copy reads entry.
+      const { comp: src } = await liveEvent(api, csrf, "tournament", { n: 1, create: { clock_start: "first_open" } });
+      const p = await clone(src.id, { event_kind: "program" });
+      expect(p.competition.event_kind).toBe("program");
+      expect(stored(p.competition.id), "a Program clone runs on entry").toBe("entry");
+      expect(p.forced_settings, "and says it changed the clock").toContain("clock_start");
+    } finally { await api.dispose(); }
+  });
+
   test("two participants who enter together: the one who opens the first question later gets the shorter solve time and ranks first", async () => {
     const { api, csrf } = await sa();
     try {
@@ -309,8 +340,13 @@ test.describe("first-open solve clock", () => {
         const del = await api.delete(`/api/admin/competitions/${comp.id}/users/${u.id}`, { headers: H(csrf) });
         expect(del.ok(), await del.text()).toBeTruthy();
       }
-      expect(rawAll("SELECT user_id, login_time FROM competition_user_absences WHERE competition_id=?", [comp.id]),
-        "only the participant whose clock had started leaves an anchor to restore").toEqual([{ user_id: p.id, login_time: anchor }]);
+      // Both ENTERED, so both removals record an absence (owner decision, 27 Nov
+      // 2026: entering is taking part on either clock); only the participant
+      // whose clock had started leaves an anchor to restore.
+      const abs = rawAll("SELECT user_id, login_time FROM competition_user_absences WHERE competition_id=?", [comp.id]);
+      expect(abs.find(r => r.user_id === p.id), "p's absence carries the anchor").toEqual({ user_id: p.id, login_time: anchor });
+      expect(abs.find(r => r.user_id === q.id), "q's absence records the entry, with no anchor").toEqual({ user_id: q.id, login_time: null });
+      expect(abs.length).toBe(2);
       await sleep(300);
       await enrol(api, csrf, comp.id, p.id);
       await enrol(api, csrf, comp.id, q.id);

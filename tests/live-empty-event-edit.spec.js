@@ -174,7 +174,8 @@ test.describe("v8.3.10 — editing a LIVE event that nobody has touched", () => 
     // COUNT of competition_users, this test is what goes red.
     //
     // THE PARTICIPANT MUST ACTUALLY ENTER, and that is not ceremony: the absence
-    // row is written `if (cuRow.login_time)` (lib/group-sync.js), so an
+    // row is written only for somebody who ENTERED (lib/competitions.js
+    // `recordRemovalAbsence`: an anchor, or an entry on a first-open clock), so an
     // assigned-but-never-entered participant who is then removed leaves NOTHING
     // — correctly, because nothing happened. Selecting the competition is what
     // stamps the anchor and makes the removal leave a mark.
