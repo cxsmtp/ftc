@@ -10,8 +10,8 @@ redone for a later release. Every
 figure below is either **measured** or marked as a **recommendation**; nothing is
 extrapolated without saying so. Full method and raw tables:
 [perf/RESULTS.md](perf/RESULTS.md); what changed in this release:
-[docs/release-notes.md](docs/release-notes.md); scan results:
-[SECURITY-STATUS.md](SECURITY-STATUS.md).
+[docs/release-notes.md](docs/release-notes.md). Scan results are kept outside this
+repository.
 
 ### Fast: measured
 
@@ -114,9 +114,8 @@ sign-ups otherwise apply.
   log, a new database file (and a data folder the server creates) with default permissions, SQL
   id lists (each now bound as one parameter; a test fails any list built one
   placeholder per id), and a hardened API
-  description. The per-engine table and the reasons are in
-  [SECURITY-STATUS.md](SECURITY-STATUS.md); the per-result ledgers are not in this
-  repository.
+  description. The per-engine table, the reasons and the per-result ledgers are kept outside
+  this repository.
 - **Held by tests, not by memory.** The full suite runs on every change in the
   pinned CI image (4753 tests passed with 0 failures for 8.17.0). Security rules that can be
   enumerated (route permissions, CSRF and body checks, log scrubbing, rate-limit
@@ -505,7 +504,7 @@ sudo docker builder prune -f                  # optional: reclaims the old image
 
 **A failed build stops nothing.** A build without the cache re-runs the build stage too (the toolchain and `npm ci`, about half a minute) and needs Docker Hub, Alpine's package mirror and the npm registry reachable. An outage of any of them fails the `build` line while the old container keeps serving; run the recipe again once it ends. Building first costs a short restart gap at `up` (the old container's shutdown, normally well under a second and at most Compose's 10-second stop timeout, then the new one's boot) and disk for two images at once.
 
-**The build also fails closed.** If a dependency update changes which binary a native module loads, or a package ships a native binary or a C source the prune has no rule for, the build stops and names the package rather than ship an image that cannot start or still carries build residue. That refusal is the point, and with the build first it leaves the old version serving. The redeploy does not, by itself, boot the new image before the swap, so when `package-lock.json`, the `Dockerfile` or `scripts/prune-runtime-deps.cjs` changes, build the image and boot a check container from it — scratch `DATA_DIR`/`UPLOADS_DIR` volumes and `BASE_URL`/`SMTP_HOST` set, waiting for `/readyz` (CONTRIBUTING.md has the recipe) — before swapping. No CI job builds the image.
+**The build also fails closed.** If a dependency update changes which binary a native module loads, or a package ships a native binary or a C source the prune has no rule for, the build stops and names the package rather than ship an image that cannot start or still carries build residue. That refusal is the point, and with the build first it leaves the old version serving. The redeploy does not, by itself, boot the new image before the swap, so when `package-lock.json`, the `Dockerfile` or `scripts/prune-runtime-deps.cjs` changes, build the image and boot a check container from it — scratch `DATA_DIR`/`UPLOADS_DIR` volumes and `BASE_URL`/`SMTP_HOST` set, waiting for `/readyz` (the release-image workflow's boot step is the recipe) — before swapping. No CI job builds the image.
 
 **When the build stops at `apk add`.** `node:<major>-alpine` follows the newest Alpine branch, and the build stage pins its toolchain (python3, make and g++) to one branch's versions with `~=`, which keeps a scanner's "unpinned package" finding closed. When the base moves to a branch with a new python3, make or g++, the build fails at that line (`unable to select packages: … breaks: world[python3~3.14]`) and the old container keeps serving. Read the new versions with `sudo docker run --rm node:<major>-alpine sh -c 'cat /etc/alpine-release; apk update -q && apk policy python3 make g++'`, set the `~=` versions on the Dockerfile's `apk add` line (and in its comment) to the new major.minor, and redeploy. Do not drop the pin.
 
@@ -1711,5 +1710,6 @@ npm run check-version       # Fails if the four files disagree — suitable for 
 ## License
 
 See [LICENSE](LICENSE) for details.
-#   f t c  
+#   f t c 
+ 
  

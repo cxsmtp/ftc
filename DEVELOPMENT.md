@@ -338,7 +338,6 @@ There's a `CLAUDE.md` at the repo root that is the LLM-facing brief: architectur
 
 ## Submitting a PR
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the human-facing contribution workflow (scope, testing, versioning, what's in scope vs not).
 
 <!-- DOC-REGISTRY
 # v8.3.24 — see AUTH_PATHS.md's registry for the design. The repository map
