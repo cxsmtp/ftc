@@ -60,10 +60,10 @@ async function openSettingsAs(page, who) {
   await expect(page.locator("#settings-section-list li:not([hidden])").first()).toBeAttached({ timeout: 15000 });
 }
 
-test("ops.alerts alone: Settings opens with the Alerts card and only the two cards that read no route (Updates, About), and no read is refused", async ({ page }) => {
+test("ops.alerts alone: Settings opens with the Alerts card and the release notes (an admin-shaped session's), and no read is refused", async ({ page }) => {
   const refused = recordRefusals(page);
   await openSettingsAs(page, U.alerts);
-  await expect.poll(() => shownCardHeadings(page), { timeout: 15000 }).toEqual(["Blocked-address alerts", "Updates", "About"]);
+  await expect.poll(() => shownCardHeadings(page), { timeout: 15000 }).toEqual(["Blocked-address alerts", "Release notes"]);
   await expect(page.locator("#alerts-body"), "the card read its alerts").toContainText(/open alert/i);
   expect(refused, "no request the gate refuses").toEqual([]);
 });
@@ -73,7 +73,7 @@ test("ops.email alone: the two email cards; the relay status is not read without
   const alertsReads = [];
   page.on("request", (r) => { if (r.url().includes("/api/admin/alerts")) alertsReads.push(r.url()); });
   await openSettingsAs(page, U.mail);
-  await expect.poll(() => shownCardHeadings(page), { timeout: 15000 }).toEqual(["Outbound email", "Unsubscribe List", "Updates", "About"]);
+  await expect.poll(() => shownCardHeadings(page), { timeout: 15000 }).toEqual(["Outbound email", "Unsubscribe list", "Release notes"]);
   await expect(page.locator("#email-relay-status"), "the card says how to check the relay instead").toHaveText("Send a test to check that email arrives.");
   await expect(page.locator("#unsubscribe-list-body"), "the list was read").not.toBeEmpty();
   expect(alertsReads, "no alerts read without ops.alerts").toEqual([]);
@@ -84,9 +84,9 @@ test("settings.view + settings.edit: the platform cards it may change, and none 
   const refused = recordRefusals(page);
   await openSettingsAs(page, U.editor);
   await expect.poll(() => shownCardHeadings(page), { timeout: 15000 })
-    .toEqual(expect.arrayContaining(["Platform name", "Platform look", "New accounts", "Event team report domains", "Platform health"]));
+    .toEqual(expect.arrayContaining(["Platform name", "Platform look", "New accounts", "Event team report domains", "Mail server (SMTP)", "This server"]));
   const shown = await shownCardHeadings(page);
-  for (const h of ["Outbound email", "Unsubscribe List", "Global Default CheckmarxOne Integration", "Event history retention", "Blocked-address alerts", "Checkmarx One account removals"]) {
+  for (const h of ["Outbound email", "Unsubscribe list", "Default Checkmarx One integration", "Event history retention", "Blocked-address alerts", "Checkmarx One account removals"]) {
     expect(shown, `no "${h}" card without its permission`).not.toContain(h);
   }
   // The platform name card is filled from the settings read, by value.

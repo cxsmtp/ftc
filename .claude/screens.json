@@ -1699,9 +1699,9 @@
       "screen": "settings-platform",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=general]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=branding]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings general ; waitFor #platform-name-card",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings branding ; waitFor #platform-name-card",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1716,7 +1716,7 @@
           "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|row)\\b"
         }
       },
-      "note": "Settings → General (platform name card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step."
+      "note": "Settings → Branding (platform name card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings branding` step."
     },
     {
       "screen": "settings-look",
@@ -1770,25 +1770,22 @@
       "route": "/",
       "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=email]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings email ; waitFor #unsubscribe-card",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings email ; waitFor #smtp-settings-body .smtp-facts",
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "email-test-card|email-relay-status|unsubscribe-card|unsubscribe-list-body|team-domains-card"
+          "grep": "smtp-settings-(card|body)|email-test-card|email-relay-status|unsubscribe-card|unsubscribe-list-body"
         },
         "behaviour": {
           "path": "public/js/features/settings-admin.js",
-          "grep": "function (loadEmailCard|sendTestEmail|loadUnsubscribeList|removeUnsubscribedEmail)\\b|email-relay-status|unsubscribe-list-body",
-          "also": [
-            "public/js/features/event-team.js"
-          ]
+          "grep": "function (loadSmtpCard|_renderSmtpCard|smtpTest|smtpSave|smtpRemove|loadEmailCard|sendTestEmail|loadUnsubscribeList|removeUnsubscribedEmail)\\b|email-relay-status|unsubscribe-list-body"
         },
         "styles": {
           "path": "public/styles.css",
-          "grep": "#admin-settings-tab \\.settings-(card|row|relay-ok|relay-bad|scroll|help)\\b"
+          "grep": "#admin-settings-tab \\.(settings-(card|row|relay-ok|relay-bad|scroll|help|facts-list|source|warning)|smtp-change)\\b"
         }
       },
-      "note": "Settings → Email: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings email` step. Three cards: outbound email (relay status, test send), the unsubscribe list and the event-team report domains (event-team.js). The relay status reads 'not been checked since the last restart' on a test server (the SMTP probe never runs under NODE_ENV=test)."
+      "note": "Settings → Email (SMTP): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings email` step. Three cards: the mail server in use (its facts with where each comes from, and a superadmin's form behind Change the mail server), outbound email (relay status, test send) and the unsubscribe list. The relay is never checked on a test server (no SMTP probe under NODE_ENV=test)."
     },
     {
       "screen": "settings-certificates",
@@ -1823,18 +1820,21 @@
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "cxone-card|cxone-api-key|cxone-group-name|cxone-withdrawals-card"
+          "grep": "cxone-card|cxone-api-key|cxone-group-name|cxone-withdrawals-card|team-domains-card"
         },
         "behaviour": {
           "path": "public/js/features/settings-admin.js",
-          "grep": "function (loadCxOneSettings|saveCxOneSettings|removeCxOneSettings|loadCxoneWithdrawals)\\b|cxone-status"
+          "grep": "function (loadCxOneSettings|saveCxOneSettings|removeCxOneSettings|loadCxoneWithdrawals)\\b|cxone-status",
+          "also": [
+            "public/js/features/event-team.js"
+          ]
         },
         "styles": {
           "path": "public/styles.css",
           "grep": "#admin-settings-tab \\.settings-(card|row|status|hint|actions)\\b|\\.cxone-wd"
         }
       },
-      "note": "Settings → General (Checkmarx One integration card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step. The global default Checkmarx One integration (no key on a test server). The removals card beside it stays hidden while nothing is listed, which on a test server is always (see cxone-withdrawal-banner)."
+      "note": "Settings → General (Checkmarx One integration card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step. The global default Checkmarx One integration (no key on a test server). The removals card beside it stays hidden while nothing is listed, which on a test server is always (see cxone-withdrawal-banner). The event team report domains card (event-team.js) is in the same section."
     },
     {
       "screen": "settings-data",
@@ -1906,27 +1906,27 @@
       "note": "Settings → Sign-in (break-glass account card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings signin` step. Listed only in the break-glass session itself, which is how the harness signs in."
     },
     {
-      "screen": "settings-updates",
+      "screen": "settings-cxone-audit",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=updates]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=cxone-audit]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings updates ; waitFor #settings-updates-version",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings cxone-audit ; waitFor #cxone-audit-body tr",
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "updates-card|settings-updates-(version|actions)"
+          "grep": "cxone-audit-(card|body|pagination)"
         },
         "behaviour": {
           "path": "public/js/features/settings-admin.js",
-          "grep": "function loadUpdatesCard\\b|settings-updates-"
+          "grep": "function (loadCxoneAuditCard|cxoneAuditPage|cxoneAuditPageSize|_cxResult|_cxDetail)\\b|cxone-audit-"
         },
         "styles": {
           "path": "public/styles.css",
-          "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|facts|actions)\\b"
+          "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help)\\b"
         }
       },
-      "note": "Settings → Updates: the running version and What's new. Reads no route."
+      "note": "Settings → CxOne API audit: the Checkmarx One API activity table (the audit trail narrowed to the Checkmarx One activity, scoped as the Audit page). Empty on a fresh test server ('No Checkmarx One activity is recorded yet.')."
     },
     {
       "screen": "settings-health",
@@ -1934,45 +1934,22 @@
       "route": "/",
       "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=health]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings health ; waitFor #system-health-body .settings-facts",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings health ; waitFor #system-health-body .settings-facts-list",
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "system-health-(card|body)"
+          "grep": "system-health-(card|body)|release-notes-(card|body)|admin-sidebar-version"
         },
         "behaviour": {
           "path": "public/js/features/settings-admin.js",
-          "grep": "function loadSystemHealthCard\\b|system-health-"
+          "grep": "function (loadSystemHealthCard|loadReleaseNotesCard|showSidebarVersion|_backupRows|_uptimeText)\\b|system-health-|release-notes-"
         },
         "styles": {
           "path": "public/styles.css",
-          "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|facts|actions)\\b"
+          "grep": "#admin-settings-tab \\.(settings-(card|card-head|heading|help|facts-list|facts-title|actions)|release-notes-inline)\\b|\\.admin-sidebar-version"
         }
       },
-      "note": "Settings → Backups & health: GET /api/admin/system-health, the start-up checks and the server's own figures."
-    },
-    {
-      "screen": "settings-about",
-      "status": "pending",
-      "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=about]",
-      "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings about ; waitFor #settings-about-version",
-      "files": {
-        "markup": {
-          "path": "public/index.html",
-          "grep": "about-card|settings-about-(version|started)"
-        },
-        "behaviour": {
-          "path": "public/js/features/settings-admin.js",
-          "grep": "function loadAboutCard\\b|settings-about-"
-        },
-        "styles": {
-          "path": "public/styles.css",
-          "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|facts|actions)\\b"
-        }
-      },
-      "note": "Settings → About: the version and the typefaces certificates use. Reads no route."
+      "note": "Settings → About & health: This server (GET /api/admin/system-health: what is running, the start-up checks, the mail relay, disk, the backups it can see) and the newest release notes; the version at the sidebar's foot."
     },
     {
       "screen": "analytics-scope-picker",

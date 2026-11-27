@@ -528,7 +528,6 @@ function _helpItems(){
 }
 function _profileMenuBody(){
   const u=S.currentUser||{};
-  const ver=(document.getElementById('platform-version')?.textContent||'').trim();
   return `<div class="pm-panel" role="dialog" aria-modal="true" aria-labelledby="pm-name">
     <div class="pm-head">
       <span class="pm-avatar" aria-hidden="true">${_avatarFace()}</span>
@@ -537,7 +536,7 @@ function _profileMenuBody(){
     <div class="pm-group">${_viewItem()}</div>
     <div class="pm-group">${_accountItems()}</div>
     <div class="pm-group">${_helpItems()}</div>
-    <div class="pm-group pm-foot">${ver?`<p class="pm-ver">${esc(ver)}</p>`:''}${_menuItem('do-logout','Sign out',{icon:ICO.logOut,cls:'pm-out'})}</div>
+    <div class="pm-group pm-foot">${_menuItem('do-logout','Sign out',{icon:ICO.logOut,cls:'pm-out'})}</div>
   </div>`;
 }
 
@@ -936,7 +935,7 @@ export const SETTINGS_CARD_PERMISSIONS={
   'retention-card':['ops.retention_view'],                   // GET /api/admin/retention
   'alerts-card':['ops.alerts'],                              // GET /api/admin/alerts
   'system-health-card':['settings.view'],                    // GET /api/admin/system-health
-  'cxone-audit-card':['audit.view'],                         // GET /api/admin/audit (the page it opens)
+  'cxone-audit-card':['audit.view'],                         // GET /api/admin/audit (its rows: the Checkmarx One activity)
 };
 // Is this Settings card offered to the signed-in role? Fails closed until
 // /api/admin/me has said what the role holds (a superadmin holds every card),

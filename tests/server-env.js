@@ -92,6 +92,13 @@ function serverEnv(i) {
     SMTP_POOL_MAX_CONNECTIONS: "16",
     SMTP_POOL_MAX_MESSAGES: "100",
     EMAIL_FROM: "Hack Arena Test <no-reply@test.invalid>",
+    // Settings → About & health: no backups folder mounted and no release build,
+    // whatever the developer's shell holds (tests/about-health.spec.js spawns
+    // its own server with them set).
+    BACKUP_DIR: "",
+    BUILD_COMMIT: "",
+    BUILD_TIME: "",
+    RELEASE_CHANNEL: "",
     HSTS: "1",
     LOG_LEVEL: "info",
     LOG_SKIP_IPS: "",

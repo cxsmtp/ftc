@@ -47,11 +47,14 @@ const ROOT = path.join(__dirname, "..");
 // "belonging to another event" skip line); then gzip 350960 -> 353400 and
 // brotli 306820 -> 308900 (the mail server card in Settings → Email (SMTP): its
 // facts with their sources, its form, test, save and remove; about +2.4 KB gzip
-// and +2.2 KB brotli on the bundle).
+// and +2.2 KB brotli on the bundle); then gzip 353400 -> 354600 and brotli
+// 308900 -> 310100 (Settings regrouped: the CxOne API audit table with its
+// pager, About & health from the route, the newest release notes inline, the
+// version at the sidebar's foot; the link items removed; about +1.2 KB each).
 const AT_RULING = {
   stylesheet: { gzip: 56241, br: 52368 },
   page: { gzip: 33262, br: 31062 },
-  script: { gzip: 353400, br: 308900 },
+  script: { gzip: 354600, br: 310100 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));

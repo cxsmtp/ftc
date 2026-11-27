@@ -554,6 +554,11 @@
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-users-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Roles &amp; permissions</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-settings-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Settings</span></button></li>
         </ul>
+        <!-- The running version, at the foot of the sidebar (owner decision,
+             27 Nov 2026): in full while the sidebar is open, short while it is
+             collapsed (the full text stays for screen readers). Filled from
+             /api/config by settings-admin.js loadPlatformName. -->
+        <p id="admin-sidebar-version" class="admin-sidebar-version" hidden><span class="asv-long"></span><span class="asv-short" aria-hidden="true"></span></p>
       </nav>
       <div id="admin-sidebar-overlay" class="admin-sidebar-overlay" aria-hidden="true"></div>
       <div class="admin-content">
@@ -1275,12 +1280,11 @@
              listed, in order, while it holds a card that is not display:none, so
              a card added to a section renders with no list edit. Each names its
              group (data-settings-group: people, records, system), captioned in
-             the list. A .settings-link is a list item that opens another page
-             (data-settings-tab, only while that page is offered to the role) or
-             runs an action (data-settings-action); it holds no card. A
+             the list. The pages the sidebar opens (People, Teams, Roles &amp;
+             permissions, Audit, the guides) are never repeated here. A
              .settings-card dropped straight into .settings-bento (outside any
              section) is adopted into the section its data-settings-section
-             names, else Platform. The chosen section is remembered per browser
+             names, else General. The chosen section is remembered per browser
              (localStorage "ha:settings-section"). Every card keeps its id,
              data-action and loader. -->
         <div class="settings-shell">
@@ -1296,9 +1300,6 @@
                  sits above every section, so it shows whichever is chosen. -->
             <div id="settings-load-failure" class="card settings-card" style="display:none"></div>
 
-            <div class="settings-link" data-settings-link="people" data-settings-group="people" data-settings-label="People" data-settings-tab="admin-participants-tab" hidden></div>
-            <div class="settings-link" data-settings-link="teams" data-settings-group="people" data-settings-label="Teams" data-settings-tab="admin-groups-tab" hidden></div>
-            <div class="settings-link" data-settings-link="roles" data-settings-group="people" data-settings-label="Roles &amp; permissions" data-settings-tab="admin-users-tab" hidden></div>
             <div class="settings-section" data-settings-section="signin" data-settings-group="people" data-settings-label="Sign-in">
               <div class="card settings-card" id="account-approval-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">New accounts</h3><span data-help="settings.approval" data-help-label="New accounts"></span></div>
@@ -1325,14 +1326,20 @@
               </div>
             </div>
 
-            <div class="settings-link" data-settings-link="audit" data-settings-group="records" data-settings-label="Audit log" data-settings-tab="admin-audit-tab" hidden></div>
             <div class="settings-section" data-settings-section="cxone-audit" data-settings-group="records" data-settings-label="CxOne API audit">
-              <!-- The Checkmarx One record: the Audit page narrowed to its
-                   activity (audit.view, the Audit page's own read). -->
+              <!-- Every call the platform made to Checkmarx One (settings-admin.js
+                   loadCxoneAuditCard): the audit trail's own read, narrowed to the
+                   Checkmarx One activity and scoped per row as the Audit page is. -->
               <div class="card settings-card" id="cxone-audit-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Checkmarx One activity</h3><span data-help="settings.cxone-audit" data-help-label="Checkmarx One activity"></span></div>
-                <p class="settings-help">Every Checkmarx One account the platform set up, linked or removed, and every change to its settings, is recorded in the Audit log.</p>
-                <div class="settings-actions"><button class="btn secondary" data-action="settings-open-cxone-audit">Open Checkmarx One activity in the Audit log</button></div>
+                <div class="settings-card-head"><h3 class="settings-heading">Checkmarx One API activity</h3><span data-help="settings.cxone-audit" data-help-label="Checkmarx One API activity"></span></div>
+                <p class="settings-help">Each account the platform set up, linked, refused or gave up on, each group grant and each removal, with its outcome, newest first. You see the rows your role may see on the Audit page.</p>
+                <!-- Scrolls in its own box, keeping its headings on a phone, as the
+                     removals table below it does (the same wrapper). -->
+                <div class="cxone-wd-scroll"><table class="dense cxone-wd-table" data-tcols="cxone-audit">
+                  <thead><tr><th scope="col" data-col="at">Time</th><th scope="col" data-col="activity">Activity</th><th scope="col" data-col="event">Event</th><th scope="col" data-col="person">Person</th><th scope="col" data-col="result">Result</th><th scope="col" data-col="detail">Details</th></tr></thead>
+                  <tbody id="cxone-audit-body"></tbody>
+                </table></div>
+                <div id="cxone-audit-pagination" class="pagination"><span id="cxone-audit-pagination-bar" class="pagination-bar"></span></div>
               </div>
               <!-- v8.12.7 — Checkmarx One account removals. Superadmin-only, and
                    hidden too while Checkmarx One is not in use and nothing is
@@ -1346,19 +1353,8 @@
             </div>
 
             <div class="settings-section" data-settings-section="general" data-settings-group="system" data-settings-label="General">
-              <div class="card settings-card" id="platform-name-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Platform name</h3><span data-help="settings.platform-name" data-help-label="Platform name"></span></div>
-                <!-- v7.26.0 — the card says what the name reaches; maxlength
-                     matches the server's and swagger's 120. -->
-                <p class="settings-help">Shown in the header, in every email subject and as the <strong>sender name</strong> on all outbound email.</p>
-                <div class="settings-row">
-                  <label for="settings-platform-name">Platform Name</label>
-                  <input type="text" id="settings-platform-name" placeholder="e.g. HackArena" maxlength="120"/>
-                  <button class="btn" data-action="save-platform-name">Save Name</button>
-                </div>
-              </div>
               <div class="card settings-card" id="cxone-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Global Default CheckmarxOne Integration</h3><span data-help="settings.cxone" data-help-label="Checkmarx One integration"></span></div>
+                <div class="settings-card-head"><h3 class="settings-heading">Default Checkmarx One integration</h3><span data-help="settings.cxone" data-help-label="Checkmarx One integration"></span></div>
                 <p class="settings-help">Used by every event without its own Checkmarx One settings.</p>
                 <div id="cxone-status" class="settings-status"></div>
                 <div class="settings-row">
@@ -1385,9 +1381,28 @@
                 <div class="settings-card-head"><h3 class="settings-heading">Blocked-address alerts</h3><span data-help="settings.alerts" data-help-label="Blocked-address alerts"></span></div>
                 <div id="alerts-body"></div>
               </div>
+              <!-- Event team reports — the domains a team member's address may be at
+                   (features/event-team.js loads it; superadmin edits, global admins read). -->
+              <div class="card settings-card" id="team-domains-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Event team report domains</h3><span data-help="settings.team-domains" data-help-label="Event team report domains"></span></div>
+                <p class="settings-help">Event team reports (lead lists, scorecards) go only to addresses at these domains. One per line, for example company.com; a subdomain counts.</p>
+                <textarea id="team-domains-input" rows="4" maxlength="4000" aria-label="Allowed domains, one per line"></textarea>
+                <div class="settings-row"><button class="btn secondary" id="team-domains-save" data-action="team-domains-save">Save domains</button><span id="team-domains-note" class="settings-help" role="status"></span></div>
+              </div>
             </div>
 
             <div class="settings-section" data-settings-section="branding" data-settings-group="system" data-settings-label="Branding">
+              <div class="card settings-card" id="platform-name-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Platform name</h3><span data-help="settings.platform-name" data-help-label="Platform name"></span></div>
+                <!-- v7.26.0 — the card says what the name reaches; maxlength
+                     matches the server's and swagger's 120. -->
+                <p class="settings-help">Shown in the header, in every email subject and as the <strong>sender name</strong> on all outbound email.</p>
+                <div class="settings-row">
+                  <label for="settings-platform-name">Platform Name</label>
+                  <input type="text" id="settings-platform-name" placeholder="e.g. HackArena" maxlength="120"/>
+                  <button class="btn" data-action="save-platform-name">Save Name</button>
+                </div>
+              </div>
               <!-- THE PLATFORM LOOK: filled by features/look-admin.js
                    renderPlatformLookCard from GET /api/admin/settings. -->
               <div class="card settings-card" id="platform-look-card" style="display:none"></div>
@@ -1419,50 +1434,28 @@
                 </div>
               </div>
               <div class="card settings-card" id="unsubscribe-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Unsubscribe List</h3><span data-help="settings.unsubscribe" data-help-label="Unsubscribe list"></span></div>
+                <div class="settings-card-head"><h3 class="settings-heading">Unsubscribe list</h3><span data-help="settings.unsubscribe" data-help-label="Unsubscribe list"></span></div>
                 <p class="settings-help">People who opted out of bulk email. Transactional email still reaches them.</p>
                 <!-- v7.20.7 — static search, so the term survives the re-render
                      that follows every Remove. -->
                 <div class="search-wrap"><input id="unsub-search" placeholder="Search addresses..." aria-label="Search unsubscribed addresses" data-input-action="unsub-search"/><button class="search-clear hidden" id="unsub-search-clear" data-action="unsub-search-clear" aria-label="Clear unsubscribed search"><span aria-hidden="true">×</span> Clear</button></div>
                 <div id="unsubscribe-list-body" class="settings-scroll"></div>
               </div>
-              <!-- Event team reports — the domains a team member's address may be at
-                   (features/event-team.js loads it; superadmin edits, global admins read). -->
-              <div class="card settings-card" id="team-domains-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Event team report domains</h3><span data-help="settings.team-domains" data-help-label="Event team report domains"></span></div>
-                <p class="settings-help">Event team reports (lead lists, scorecards) go only to addresses at these domains. One per line, for example company.com; a subdomain counts.</p>
-                <textarea id="team-domains-input" rows="4" maxlength="4000" aria-label="Allowed domains, one per line"></textarea>
-                <div class="settings-row"><button class="btn secondary" id="team-domains-save" data-action="team-domains-save">Save domains</button><span id="team-domains-note" class="settings-help" role="status"></span></div>
-              </div>
             </div>
 
-            <div class="settings-section" data-settings-section="updates" data-settings-group="system" data-settings-label="Updates">
-              <!-- Updates (features/settings-admin.js loadUpdatesCard): what is
-                   running and where What's new is. Reads no route. -->
-              <div class="card settings-card" id="updates-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Updates</h3><span data-help="settings.updates" data-help-label="Updates"></span></div>
-                <p class="settings-help">Running version <strong id="settings-updates-version">—</strong>.</p>
-                <p class="settings-help">Updates are not installed from this page. A server set up with the Podman installer checks daily for a new signed release image and restarts on it; any other deployment updates however its operator set it up (see the operator guide). This page cannot check what will be installed next.</p>
-                <div class="settings-actions" id="settings-updates-actions" hidden><button class="btn secondary" data-action="release-notes-open">What's new</button></div>
-              </div>
-            </div>
-
-            <div class="settings-section" data-settings-section="health" data-settings-group="system" data-settings-label="Backups &amp; health">
-              <!-- Backups & health (loadSystemHealthCard, GET /api/admin/system-health). -->
+            <div class="settings-section" data-settings-section="health" data-settings-group="system" data-settings-label="About &amp; health">
+              <!-- About & health (loadSystemHealthCard, GET /api/admin/system-health):
+                   what is running and how it is, every figure from the route. -->
               <div class="card settings-card" id="system-health-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Platform health</h3><span data-help="settings.health" data-help-label="Platform health"></span></div>
+                <div class="settings-card-head"><h3 class="settings-heading">This server</h3><span data-help="settings.health" data-help-label="This server"></span></div>
                 <div id="system-health-body" role="status"></div>
-                <p class="settings-help">A server set up with the Podman installer tries to back up its database before each start, into its backup folder (a failed backup does not stop the start). Any other deployment has whatever backups its operator set up (see the operator guide). This page cannot list backups; the server's operator restores them.</p>
               </div>
-            </div>
-
-            <div class="settings-link" data-settings-link="help" data-settings-group="system" data-settings-label="Get help" data-settings-action="help-open" hidden></div>
-            <div class="settings-section" data-settings-section="about" data-settings-group="system" data-settings-label="About">
-              <!-- About (loadAboutCard): reads no route. -->
-              <div class="card settings-card" id="about-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">About</h3><span data-help="settings.about" data-help-label="About"></span></div>
-                <p class="settings-help">Version <strong id="settings-about-version">—</strong><span id="settings-about-started" hidden></span></p>
-                <p class="settings-help">Certificates are set in the open-source Inter and Noto typefaces, under the SIL Open Font License 1.1.</p>
+              <!-- The newest release notes (loadReleaseNotesCard: docs/release-notes.md,
+                   admins only, as the document is). -->
+              <div class="card settings-card" id="release-notes-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Release notes</h3><span data-help="settings.release-notes" data-help-label="Release notes"></span></div>
+                <div id="release-notes-body" class="release-notes-inline"></div>
+                <div class="settings-actions"><button class="btn secondary" data-action="release-notes-open">All release notes</button></div>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use strict";
 
 import { S } from "../core/state.js";
-import { setListCount, countText, renderLoadFailure, colspanFor, paginationHtml, segmentParams, segmentExact, segmentAbsorb, segmentStepTarget, segmentLastTarget, segmentGoTo, segmentBarOptions, syncPageJump } from "../ui/list-controls.js"; // v7.20.10 — shared match count; v7.25.0 — Logs joins the shared pager; the segment pager, shared with the Audit page
+import { setListCount, countText, renderLoadFailure, colspanFor, paginationHtml, newSegmentPager, segmentParams, segmentExact, segmentAbsorb, segmentStepTarget, segmentLastTarget, segmentGoTo, segmentBarOptions, syncPageJump } from "../ui/list-controls.js"; // v7.20.10 — shared match count; v7.25.0 — Logs joins the shared pager; the segment pager, shared with the Audit page and the CxOne API audit
 import { csrfHeaders, loadCsrfToken, fetchJsonList, fetchJsonObject } from "../core/api.js";
 import { html, setSafeHtml } from "../core/trusted-types.js";
 import { _sessionMon } from "./session-monitor.js";
@@ -15,10 +15,10 @@ import { loadPlatformCertificateCard } from "./certificate-wizard.js"; // the pl
 import { refreshAdminBanners, _showIpBanAlert } from "./admin-alerts.js"; // v8.12.7 — repaint the removals banner after an action; the Alerts section re-opens an open alert
 import { registerHelpTips } from "../ui/help-tips.js"; // the Settings rows' "?" texts
 import { renderPlatformLookCard } from "./look-admin.js"; // the platform look card (superadmin)
-import { adminCan, settingsCardOffered, adminPageOffered } from "../ui/nav.js"; // RBAC — the one permission predicate; each Settings card's own; the link items' pages (read inside functions only)
-import { openHelpDrawer } from "./help-drawer.js"; // Settings → Get help
-import { releaseNotesVisible } from "./release-notes.js"; // Settings → Updates: What's new, where it is offered
-import { openAuditNarrowed } from "./audit-admin.js"; // Settings → CxOne API audit
+import { adminCan, settingsCardOffered } from "../ui/nav.js"; // RBAC — the one permission predicate; each Settings card's own (read inside functions only)
+import { renderDocMarkdown } from "./help-drawer.js"; // About & health: the newest release notes, through the drawer's own pipeline
+import { releaseNotesVisible, RELEASE_NOTES_DOC } from "./release-notes.js"; // About & health: the release notes, where they are offered
+import { AUDIT_ACTIVITY_LABELS, auditActivityLabel } from "./audit-admin.js"; // CxOne API audit: the Audit page's own wording and keys
 
 export function applyPlatformName(name){
   S.currentPlatformName=name;
@@ -27,11 +27,21 @@ export function applyPlatformName(name){
   document.title=`${name} | Checkmarx`;
 }
 
+/** The admin sidebar's foot: "Version 9.2.18", and "v9.2" while it is collapsed. */
+export function showSidebarVersion(v){
+  const el=document.getElementById('admin-sidebar-version');
+  if(!el||!v)return;
+  const long=el.querySelector('.asv-long'), short=el.querySelector('.asv-short');
+  if(long)long.textContent=`Version ${v}`;
+  if(short)short.textContent=`v${v.split('.').slice(0,2).join('.')}`;
+  el.hidden=false;
+}
+
 export async function loadPlatformName(){
   const d=await fetch('/api/config').then(r=>r.json()).catch(()=>null);
   if(d?.platform_name)applyPlatformName(d.platform_name);
   else if(d?.competition_name)applyPlatformName(d.competition_name);
-  if(d?.version){const ve=document.getElementById('platform-version');if(ve)ve.textContent='v.'+d.version;}
+  if(d?.version){const ve=document.getElementById('platform-version');if(ve)ve.textContent='v.'+d.version; showSidebarVersion(String(d.version));}
   if(d?.server_started_at)_sessionMon.serverStartedAt=d.server_started_at;
   // The emailed sign-in code's lifetime (features/auth.js reads it): unknown
   // until this answer arrives, never a copy of the server's default.
@@ -792,7 +802,7 @@ export async function loadAdminSettings(){
 // each loaded by its own loader. Every one is gated by SETTINGS_CARD_PERMISSIONS
 // (ui/nav.js). Hoisted: function bodies read them at call time.
 const _SETTINGS_READ_CARDS=['platform-name-card','account-approval-card','cxone-card'];
-const _OWN_ROUTE_CARDS=['smtp-settings-card','email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card','system-health-card','cxone-audit-card','updates-card','about-card'];
+const _OWN_ROUTE_CARDS=['smtp-settings-card','email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card','system-health-card','cxone-audit-card','release-notes-card'];
 function _loadOwnRouteCards(){
   for(const id of _OWN_ROUTE_CARDS){
     const el=document.getElementById(id);
@@ -805,72 +815,173 @@ function _loadOwnRouteCards(){
   if(settingsCardOffered('retention-card')){ document.getElementById('retention-card').style.display=''; loadRetentionCard(); }
   if(settingsCardOffered('alerts-card')){ document.getElementById('alerts-card').style.display=''; loadAlertsCard(); }
   if(settingsCardOffered('system-health-card')){ document.getElementById('system-health-card').style.display=''; loadSystemHealthCard(); }
-  if(settingsCardOffered('cxone-audit-card'))document.getElementById('cxone-audit-card').style.display='';
-  loadUpdatesCard();        // read no route: shown to everyone who opens Settings
-  loadAboutCard();
+  if(settingsCardOffered('cxone-audit-card')){ document.getElementById('cxone-audit-card').style.display=''; loadCxoneAuditCard(1); }
+  loadReleaseNotesCard();   // admins only (releaseNotesVisible), as the document is
   loadCxoneWithdrawals();   // shows itself only while Checkmarx One is in use or a removal is listed
 }
 
-// ─── Updates, Backups & health, About ────────────────────────────────────────
-function _runningVersion(){
-  const t=(document.getElementById('platform-version')?.textContent||'').trim();
-  return t.replace(/^v\.?\s*/i,'')||'unknown';
-}
-/** Updates: the running version, and What's new where it is offered. */
-export function loadUpdatesCard(){
-  const card=document.getElementById('updates-card');
-  if(!card)return;
-  const v=document.getElementById('settings-updates-version');
-  if(v)v.textContent=_runningVersion();
-  const acts=document.getElementById('settings-updates-actions');
-  if(acts)acts.hidden=!releaseNotesVisible();
-  card.style.display='';
-}
-/** About: the version, and for a superadmin when this server process started. */
-export function loadAboutCard(){
-  const card=document.getElementById('about-card');
-  if(!card)return;
-  const v=document.getElementById('settings-about-version');
-  if(v)v.textContent=_runningVersion();
-  const st=document.getElementById('settings-about-started');
-  if(st){
-    const at=S.isSuperAdmin?_sessionMon.serverStartedAt:null;
-    st.hidden=!at;
-    st.textContent=at?` · server started ${fmtDt(at,'long')}`:'';
-  }
-  card.style.display='';
-}
+// ─── About & health ──────────────────────────────────────────────────────────
+//
+// "This server": every figure from GET /api/admin/system-health (settings.view):
+// what is running (version, build commit and time, release channel), how long
+// it has run, whether its database passed its checks, the mail relay's last
+// check, free disk, the backups the app can see, and how long history is kept.
+// A superadmin also gets the database size, the Node.js version, when the server
+// started and the newest backup's size. Nothing here is typed in the client.
 let _healthSeq=0;
 // The mail relay is null until its first probe (never under test); the boot's
 // database checks run before the server listens, so they are always booleans.
 const _yesNo=(ok,yes,no)=>ok===true?yes:ok===false?no:'Not checked yet';
-/** Backups & health: GET /api/admin/system-health (settings.view). */
+function _uptimeText(sec){
+  const up=Number(sec)||0;
+  return up>=86400?`${Math.floor(up/86400)} d ${Math.floor(up%86400/3600)} h`:up>=3600?`${Math.floor(up/3600)} h ${Math.floor(up%3600/60)} min`:`${Math.floor(up/60)} min`;
+}
+function _backupRows(b,su){
+  if(!b||b.visible!==true){
+    return [['Backups',b&&b.reason==='unreadable'
+      ?'The backups folder is mounted but cannot be read by the app.'
+      :'Not visible to the app. The server’s operator mounts the backups folder read-only and names it in BACKUP_DIR (the Podman installer does).']];
+  }
+  if(!b.count)return [['Backups','None yet in the backups folder']];
+  const rows=[['Backups',`${b.count} in the backups folder`],
+    ['Newest backup',`${b.newest_at?fmtDt(b.newest_at,'long'):'Unknown time'}${b.newest_complete===true?'':b.newest_complete===false?' — not finished (no BACKUP_COMPLETE)':' — cannot be looked into'}`]];
+  if(su&&'newest_size_mib' in b)rows.push(['Newest backup size',typeof b.newest_size_mib==='number'?`${b.newest_size_exact===false?'At least ':''}${b.newest_size_mib} MiB`:'Could not be read']);
+  return rows;
+}
+/** This server: GET /api/admin/system-health (settings.view). */
 export async function loadSystemHealthCard(){
   const body=document.getElementById('system-health-body');
   if(!body)return;
   const seq=++_healthSeq;
   const d=await fetchJsonObject('/api/admin/system-health');
   if(seq!==_healthSeq)return;
-  if(!d){ renderLoadFailure('system-health-body',{noun:'platform health',retryAction:'settings-health-retry'}); return; }
+  if(!d){ renderLoadFailure('system-health-body',{noun:'the server’s details',retryAction:'settings-health-retry'}); return; }
   const gib=(n)=>typeof n==='number'?`${n} GiB free`:'Could not be read';
-  const up=Number(d.uptime_seconds)||0;
-  const upText=up>=86400?`${Math.floor(up/86400)} d ${Math.floor(up%86400/3600)} h`:up>=3600?`${Math.floor(up/3600)} h ${Math.floor(up%3600/60)} min`:`${Math.floor(up/60)} min`;
-  const rows=[
-    ['Database check',d.database_integrity_ok===true?'Passed at start-up':'Failed at start-up — restore from a backup'],
-    ['Database tables',d.database_schema_ok===true?'Complete':'Incomplete — see the server log'],
-    ['Maintenance mode',d.maintenance===true?'On':'Off'],
-    ['Mail relay',_yesNo(d.smtp_healthy,'Answering','Not answering')],
-    ['Running for',upText],
-    ['Version',String(d.version||'')],
-    ['Data volume',gib(d.data_free_gib)],
-    ['Uploads volume',gib(d.uploads_free_gib)],
-    ['Event history kept',`${Number(d.event_retention_days)||0} days`],
+  const b=d.build||{};
+  const su='database_size_mib' in d;
+  const groups=[
+    ['Running',[
+      ['Version',String(d.version||'unknown')],
+      ['Build',b.commit?`${String(b.commit).slice(0,12)}${b.built_at?`, built ${fmtDt(b.built_at,'long')}`:''}`:'Unknown (not a release image)'],
+      ['Release channel',b.channel?String(b.channel):'Unknown (not a release image)'],
+      ...(d.started_at?[['Server started',fmtDt(d.started_at,'long')]]:[]),
+      ['Running for',_uptimeText(d.uptime_seconds)],
+      ...(d.node_version?[['Node.js',String(d.node_version)]]:[]),
+    ]],
+    ['Health',[
+      ['Database check',d.database_integrity_ok===true?'Passed at start-up':'Failed at start-up — restore from a backup'],
+      ['Database tables',d.database_schema_ok===true?'Complete':'Incomplete — see the server log'],
+      ...(su?[['Database size',typeof d.database_size_mib==='number'?`${d.database_size_mib} MiB (with its write-ahead log)`:'Could not be read']]:[]),
+      ['Maintenance mode',d.maintenance===true?'On':'Off'],
+      ['Mail relay',`${_yesNo(d.smtp_healthy,'Answering','Not answering')}${d.smtp_checked_at?` (checked ${fmtDt(d.smtp_checked_at,'long')})`:''}`],
+    ]],
+    ['Storage and backups',[
+      ['Data volume',gib(d.data_free_gib)],
+      ['Uploads volume',gib(d.uploads_free_gib)],
+      ..._backupRows(d.backups,su),
+      ['Event history kept',`${Number(d.event_retention_days)||0} days`],
+    ]],
   ];
-  if('database_size_mib' in d)rows.push(['Database size',typeof d.database_size_mib==='number'?`${d.database_size_mib} MiB`:'Could not be read']);
-  if(d.node_version)rows.push(['Node.js',String(d.node_version)]);
-  if(d.started_at)rows.push(['Server started',fmtDt(d.started_at,'long')]);
-  setSafeHtml(body,`<dl class="settings-facts">${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`);
+  setSafeHtml(body,groups.map(([title,rows])=>`<h4 class="settings-facts-title">${esc(title)}</h4><dl class="settings-facts-list">${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`).join('')
+    +'<p class="settings-hint">A server set up with the Podman installer checks daily for a new signed release on its channel and restarts on it, after backing up its database. Certificates are set in the open-source Inter and Noto typefaces (SIL Open Font License 1.1).</p>');
 }
+
+// Release notes: the newest version of docs/release-notes.md, rendered by
+// the help drawer's own pipeline (the document is admins' only, as the drawer's
+// door is: releaseNotesVisible); All release notes opens the drawer.
+let _notesSeq=0;
+const _NOTES_SHOWN=1;
+export async function loadReleaseNotesCard(){
+  const card=document.getElementById('release-notes-card');
+  const body=document.getElementById('release-notes-body');
+  if(!card||!body)return;
+  if(!releaseNotesVisible()){ card.style.display='none'; return; }
+  card.style.display='';
+  const seq=++_notesSeq;
+  let md=null;
+  try{ const r=await fetch(RELEASE_NOTES_DOC); if(r.ok)md=await r.text(); }
+  catch(e){ md=null; }
+  if(seq!==_notesSeq)return;
+  if(md===null){ renderLoadFailure('release-notes-body',{noun:'the release notes',retryAction:'settings-notes-retry'}); return; }
+  // The newest versions only: each starts at a "## " heading.
+  // Their headings move under the card's own (h3): a version is h4, its parts h5.
+  const parts=md.split(/^(?=## )/m).filter(p=>/^## /.test(p)).slice(0,_NOTES_SHOWN)
+    .map(p=>p.replace(/^### /gm,'##### ').replace(/^## /gm,'#### '));
+  setSafeHtml(body,parts.length?renderDocMarkdown(parts.join('\n'),RELEASE_NOTES_DOC):'<p class="settings-help">No release notes yet.</p>');
+}
+
+// ─── CxOne API audit: every Checkmarx One call the platform made ─────────────
+//
+// The audit trail's own read (GET /api/admin/audit, audit.view), narrowed to the
+// Checkmarx One activity by `event_type`, so each row is scoped exactly as the
+// Audit page scopes it (a person's set-up as their History, a removal of a
+// deleted participant as a logged event) and nothing is re-derived here. Paged
+// by the shared segment pager (ui/list-controls.js), filtered and sorted on the
+// page by the table component (PLAIN_TABLES['cxone-audit']). The activity keys
+// are the Audit page's own Checkmarx One wording, less the settings change
+// (`cxone_config_changed`, not a call to Checkmarx One).
+export const CXONE_AUDIT_EVENT_TYPES=Object.freeze(Object.keys(AUDIT_ACTIVITY_LABELS).filter(k=>k.startsWith('cxone_')&&k!=='cxone_config_changed').sort());
+const _cx={pager:newSegmentPager(30),seq:0};
+function _cxResult(r){
+  const d=r.details&&typeof r.details==='object'?r.details:{};
+  if(r.event_type==='cxone_provisioned'){
+    if(d.deferred)return 'Deferred';
+    if(d.success===true){
+      let t=d.already_existed===true?'Linked to an existing account':'Account created';
+      if(typeof d.group_name==='string'&&d.group_name)t+=d.group_assigned===true?`, added to group ${d.group_name}`:`, not added to group ${d.group_name}`;
+      return t;
+    }
+    return 'Failed';
+  }
+  return r.outcome==='success'?'Done':r.outcome==='failure'?'Failed':'Recorded';
+}
+function _cxDetail(r){
+  const d=r.details&&typeof r.details==='object'?r.details:{};
+  const bits=[];
+  for(const k of ['error','deferred','held_reason','reason','code','matched_by','stopped']){
+    if(typeof d[k]==='string'&&d[k])bits.push(k==='matched_by'?`matched by ${d[k]}`:d[k]);
+  }
+  if(d.retry_scheduled===true)bits.push(Number.isInteger(d.retry_attempt)?`retry ${d.retry_attempt} scheduled`:'retry scheduled');
+  if(d.details_unreadable===true)bits.push('details could not be read');
+  return bits.join('; ')||'—';
+}
+export async function loadCxoneAuditCard(pageN=1){
+  const body=document.getElementById('cxone-audit-body');
+  if(!body)return;
+  const st=_cx.pager;
+  const pos=segmentParams(st,pageN);
+  if(pageN>1&&!pos)return;
+  const seq=++_cx.seq;
+  const qs=new URLSearchParams({event_type:CXONE_AUDIT_EVENT_TYPES.join(','),limit:String(st.pageSize),...(pos||{})});
+  const d=await fetchJsonObject(`/api/admin/audit?${qs}`);
+  if(seq!==_cx.seq)return;
+  const bar=document.getElementById('cxone-audit-pagination-bar');
+  if(!d||!Array.isArray(d.rows)){
+    renderLoadFailure('cxone-audit-body',{noun:'the Checkmarx One activity',retryAction:'cxone-audit-retry',colspan:colspanFor('cxone-audit-body')});
+    if(bar)setSafeHtml(bar,'');
+    return;
+  }
+  segmentAbsorb(st,pageN,{total:d.total,totalExact:d.total_exact,anchor:d.anchor,nextCursor:d.next_cursor,hasMore:d.has_more,searchedTo:d.searched_to,offsetMax:d.offset_max});
+  setSafeHtml(body,d.rows.length?d.rows.map(r=>{
+    const who=r.subject&&r.subject.label?String(r.subject.label):r.subject&&r.subject.id?'Deleted participant':'—';
+    return `<tr><td data-sort-value="${esc(String(r.at||''))}">${esc(r.at?fmtDt(r.at,'full'):'')}</td><td>${esc(auditActivityLabel(r.event_type,r.details))}</td><td>${esc(r.competition_name?String(r.competition_name):'—')}</td><td>${esc(who)}</td><td>${esc(_cxResult(r))}</td><td>${esc(_cxDetail(r))}</td></tr>`;
+  }).join(''):`<tr><td colspan="${colspanFor('cxone-audit-body')}" class="table-empty-row">No Checkmarx One activity is recorded${pageN>1?' on this page.':' yet.'}</td></tr>`);
+  const o=segmentBarOptions(st);
+  if(bar)setSafeHtml(bar,paginationHtml('cxone-audit',{page:o.page,totalPages:o.totalPages,pagesLabel:o.pagesLabel,totalLabel:o.totalLabel,
+    hasPrev:o.hasPrev,hasNext:o.hasNext,lastEnabled:o.lastEnabled,pageSize:st.pageSize}));
+}
+export function cxoneAuditPage(how){
+  const st=_cx.pager;
+  const to=how==='first'?1:how==='last'?segmentLastTarget(st):segmentStepTarget(st,how==='next'?1:-1);
+  if(to)loadCxoneAuditCard(to);
+}
+export function cxoneAuditPageSize(v){
+  const n=parseInt(v,10);
+  if(!Number.isInteger(n)||n<1)return;
+  _cx.pager=newSegmentPager(n);
+  loadCxoneAuditCard(1);
+}
+
 const _SECTION_KEY='ha:settings-section';
 const _DEFAULT_SECTION='general';
 let _settingsPref=null;
@@ -909,34 +1020,19 @@ export function settingsSections(){
   }));
 }
 
-// The list's group captions (each item's `data-settings-group`), in the order
-// the markup first names them.
+// The list's group captions (each section's `data-settings-group`), in the
+// order the markup first names them. The pages the sidebar opens (People,
+// Teams, Roles & permissions, Audit, the guides) are the sidebar's, never
+// repeated here (owner decision, 27 Nov 2026).
 const _GROUP_LABELS={people:'People',records:'Records',system:'System'};
 
-// A LINK item opens another admin page (`data-settings-tab`), offered only while
-// that page is (adminPageOffered: its sidebar item as the nav builder left it),
-// or runs an action (`data-settings-action`, e.g. Get help). It holds no card.
-function _linkAvailable(el){
-  const tab=el.getAttribute('data-settings-tab');
-  if(tab)return adminPageOffered(tab);
-  return !!el.getAttribute('data-settings-action');
-}
-
-/** Every list item, sections and links, in markup order. */
+/** Every list item (a section), in markup order. */
 function _navItems(){
-  const sections=new Map(settingsSections().map(s=>[s.el,s]));
-  return [...document.querySelectorAll('#admin-settings-tab .settings-bento > .settings-section[data-settings-section], #admin-settings-tab .settings-bento > .settings-link[data-settings-link]')].map(el=>{
-    if(sections.has(el))return {kind:'section',...sections.get(el)};
-    return {kind:'link',key:el.getAttribute('data-settings-link'),label:el.getAttribute('data-settings-label')||el.getAttribute('data-settings-link'),
-      group:el.getAttribute('data-settings-group')||'system',el,available:_linkAvailable(el)};
-  });
+  return settingsSections().map(s=>({kind:'section',...s}));
 }
 
 function _itemHtml(it){
-  if(it.kind==='section')return `<li data-settings-item="${esc(it.key)}"><button type="button" class="settings-nav-item" data-action="settings-section" data-section="${esc(it.key)}">${esc(it.label)}</button></li>`;
-  // A link says where it goes, after its words (WCAG 2.5.3: the name opens with them).
-  const goes=it.el.getAttribute('data-settings-tab')?' — opens that page':' — opens the help';
-  return `<li data-settings-item="link:${esc(it.key)}"><button type="button" class="settings-nav-item settings-nav-link" data-action="settings-link" data-settings-link="${esc(it.key)}">${esc(it.label)}<span class="sr-only">${goes}</span><span class="settings-nav-link-ic" aria-hidden="true">${ICO.chevronRight}</span></button></li>`;
+  return `<li data-settings-item="${esc(it.key)}"><button type="button" class="settings-nav-item" data-action="settings-section" data-section="${esc(it.key)}">${esc(it.label)}</button></li>`;
 }
 
 /** Repaint the list, the phone picker and which section shows. Idempotent. */
@@ -955,7 +1051,7 @@ export function syncSettingsNav(){
     const hide=s.key!==shownKey;
     if(s.el.hidden!==hide)s.el.hidden=hide;
   }
-  // The list holds one item per section or link in the MARKUP, grouped under
+  // The list holds one item per section in the MARKUP, grouped under
   // its caption, built only when that set changes; availability only toggles
   // each item's `hidden` (and a group's, when none of its items is listed).
   // Rebuilding on every card show/hide replaced the buttons while the loaders
@@ -977,7 +1073,7 @@ export function syncSettingsNav(){
   }
   for(const li of list.querySelectorAll('li[data-settings-item]')){
     const k=li.dataset.settingsItem;
-    const it=k.startsWith('link:')?items.find(i=>i.kind==='link'&&`link:${i.key}`===k):items.find(i=>i.kind==='section'&&i.key===k);
+    const it=items.find(i=>i.key===k);
     const hide=!(it&&it.available);
     if(li.hidden!==hide)li.hidden=hide;
   }
@@ -985,16 +1081,13 @@ export function syncSettingsNav(){
     const hide=!grp.querySelector('li[data-settings-item]:not([hidden])');
     if(grp.hidden!==hide)grp.hidden=hide;
   }
-  // The phone picker: the same groups as <optgroup>s; a link option runs its
-  // link and the picker returns to the section on screen.
+  // The phone picker: the same groups as <optgroup>s.
   const availItems=items.filter(i=>i.available);
   const availSig=availItems.map(i=>`${i.kind}:${i.group}:${i.key}`).join('|');
   if(pick.dataset.sig!==availSig){
     pick.dataset.sig=availSig;
     setSafeHtml(pick,groups.map(g=>{
-      const opts=g.items.filter(i=>i.available).map(i=>i.kind==='section'
-        ?`<option value="${esc(i.key)}">${esc(i.label)}</option>`
-        :`<option value="link:${esc(i.key)}">${esc(i.label)} (opens)</option>`).join('');
+      const opts=g.items.filter(i=>i.available).map(i=>`<option value="${esc(i.key)}">${esc(i.label)}</option>`).join('');
       return opts?`<optgroup label="${esc(g.label)}">${opts}</optgroup>`:'';
     }).join(''));
   }
@@ -1006,36 +1099,10 @@ export function syncSettingsNav(){
   if(shownKey&&pick.value!==shownKey)pick.value=shownKey;
 }
 
-/** A link item: open its page through the sidebar's own door, or run its action. */
-export function openSettingsLink(key){
-  const el=document.querySelector(`#admin-settings-tab .settings-link[data-settings-link="${CSS.escape(String(key||''))}"]`);
-  if(!el||!_linkAvailable(el))return;
-  const tab=el.getAttribute('data-settings-tab');
-  if(tab){
-    const btn=document.querySelector(`#admin-sidebar .admin-nav-item[data-tab-id="${CSS.escape(tab)}"]`);
-    if(btn)btn.click();
-    return;
-  }
-  const action=el.getAttribute('data-settings-action');
-  if(action==='help-open')openHelpDrawer();
-}
-
-/** The phone picker's change: a section, or a link (which leaves the picker on the section shown). */
+/** The phone picker's change: a section. */
 export function settingsPick(value){
   if(typeof value!=='string')return;
-  if(value.startsWith('link:')){
-    const pick=document.getElementById('settings-section-pick');
-    const shown=settingsSections().find(s=>!s.el.hidden);
-    if(pick&&shown)pick.value=shown.key;
-    openSettingsLink(value.slice(5));
-    return;
-  }
   selectSettingsSection(value);
-}
-
-/** CxOne API audit: the Audit page narrowed to Checkmarx One activity. */
-export function openCxoneAudit(){
-  openAuditNarrowed('Checkmarx One');
 }
 
 /** Choose a section (a list press, the phone picker, or a deep link). */
@@ -1096,10 +1163,9 @@ export const SETTINGS_HELP_TIPS={
   'settings.cxone-removals':'When a participant is deleted, the platform removes the Checkmarx One accounts it created for them. Anything it could not remove, or will not remove without your say-so, is listed with what to do.',
   'settings.retention':'Audit and activity history older than this is deleted by a daily sweep. Submissions, scores and certificates are not affected.',
   'settings.alerts':'When a blocked address could be a busy shared network such as a venue, every superadmin is emailed and an alert opens here until the block lapses or someone dismisses it. An unmistakable scanner is blocked without an alert; every block is recorded in Audit.',
-  'settings.cxone-audit':'Opens the Audit log searching for Checkmarx One activity: accounts set up, linked and removed, and changes to the integration.',
-  'settings.updates':'On a server set up with the Podman installer, new signed releases are checked for daily and installed with a restart; otherwise updates are whatever the deployment’s operator set up. What’s new lists what each version changed.',
-  'settings.health':'What the server found at its last start and sees now. Superadmins also see the database size and the server’s Node.js version.',
-  'settings.about':'The running version and the typefaces the certificates use.',
+  'settings.cxone-audit':'Every call the platform made to Checkmarx One, newest first: an account set up or linked to an existing one, a set-up refused, deferred or given up, a group grant, and each removal of a deleted participant’s account with its outcome. A row shows only where your role may see that person’s or event’s history.',
+  'settings.health':'What is running (the version, and the commit, build time and release channel a release image was built with) and how the server is: its start-up database checks, the mail relay’s last check, free disk and the backups it can see. Superadmins also see the database and backup sizes, the Node.js version and when the server started.',
+  'settings.release-notes':'What changed in the newest versions, for the people who run events. All release notes opens every version.',
   'settings.breakglass':'The boot-generated password is in the data folder. Changing the username keeps you signed in; the new one is needed from the next sign-in, and the old one then signs nobody in.',
 };
 
@@ -1151,7 +1217,7 @@ function _renderSmtpCard(d){
   if(d.password_unreadable){
     h+=`<p class="settings-warning" role="alert">The password saved in the app cannot be read on this server (its key file is not part of backups, so a restore or a move to another server loses it). ${d.in_use&&d.in_use.source==='environment'?'Email is going through the server’s environment settings meanwhile.':'Email is being sent without it and will likely fail.'} ${d.can_edit?'Enter the password again below and save.':'Ask a superadmin to enter it again.'}</p>`;
   }
-  h+=u?`<dl class="settings-facts smtp-facts">${rows.map(([k,v,s])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)} ${_smtpSourceTag(s)}</dd></div>`).join('')}<div><dt>Last check</dt><dd class="${health}">${esc(_smtpHealthText(d.health))}</dd></div></dl>`
+  h+=u?`<dl class="settings-facts-list smtp-facts">${rows.map(([k,v,s])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)} ${_smtpSourceTag(s)}</dd></div>`).join('')}<div><dt>Last check</dt><dd class="${health}">${esc(_smtpHealthText(d.health))}</dd></div></dl>`
        :'<p class="settings-warning">No mail server is configured.</p>';
   if(!d.can_edit){
     h+='<p class="settings-hint">Only a superadmin can change this.</p>';

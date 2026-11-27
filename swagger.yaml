@@ -17313,7 +17313,8 @@ paths:
       summary: Platform health for Settings, Backups and health
       security: [{ sessionAuth: [] }]
       description: >
-        What the Settings page's Backups and health section shows: the boot
+        What the Settings page's About and health section shows: the build the
+        image was made from, the boot
         database integrity and schema checks, maintenance mode, the last mail-relay
         probe, uptime, the version, the free space on the data and uploads volumes
         (GiB, one decimal) and the event-history retention window. Coarse values
@@ -17332,13 +17333,34 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [version, database_integrity_ok, database_schema_ok, maintenance, smtp_healthy, uptime_seconds, data_free_gib, uploads_free_gib, event_retention_days]
+                required: [version, database_integrity_ok, database_schema_ok, maintenance, smtp_healthy, smtp_checked_at, build, backups, uptime_seconds, data_free_gib, uploads_free_gib, event_retention_days]
                 properties:
                   version: { type: string }
                   database_integrity_ok: { type: boolean, description: "The boot integrity check passed" }
                   database_schema_ok: { type: boolean, description: "Every column and index the app needs was there at boot" }
                   maintenance: { type: boolean }
                   smtp_healthy: { type: boolean, nullable: true, description: "The last mail-relay probe's answer; null until it has run" }
+                  smtp_checked_at: { type: string, format: date-time, nullable: true, description: "When the mail relay was last checked; null until a check ran (none under NODE_ENV=test)" }
+                  build:
+                    type: object
+                    additionalProperties: false
+                    description: "What the image was built from (the release workflow's build arguments, BUILD_COMMIT, BUILD_TIME, RELEASE_CHANNEL); each null when the build did not say or the value is malformed"
+                    properties:
+                      commit: { type: string, nullable: true, pattern: '^[0-9a-f]{7,40}$' }
+                      built_at: { type: string, format: date-time, nullable: true }
+                      channel: { type: string, nullable: true, description: "stable for main and v* tags, else dev" }
+                  backups:
+                    type: object
+                    additionalProperties: false
+                    description: "The host's backups as the app sees them: only a folder the operator mounts and names in BACKUP_DIR (the Podman installer does). `reason` when not visible: not_configured (no BACKUP_DIR) or unreadable. The newest backup's size is a superadmin's only. Never a path."
+                    properties:
+                      visible: { type: boolean }
+                      reason: { type: string, enum: [not_configured, unreadable] }
+                      count: { type: integer, minimum: 0, maximum: 9007199254740991 }
+                      newest_at: { type: string, format: date-time, nullable: true, description: "When the newest finished (its BACKUP_COMPLETE), else when its folder last changed" }
+                      newest_complete: { type: boolean, nullable: true, description: "false: no BACKUP_COMPLETE; null: the backup cannot be looked into" }
+                      newest_size_mib: { type: number, nullable: true, description: "Superadmin only" }
+                      newest_size_exact: { type: boolean, nullable: true, description: "Superadmin only: false when the size walk stopped at its bound (a floor)" }
                   uptime_seconds: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
                   data_free_gib: { type: number, nullable: true, description: "Free space on the data volume in GiB, one decimal; null when it cannot be read" }
                   uploads_free_gib: { type: number, nullable: true, description: "Free space on the uploads volume in GiB, one decimal; null when it cannot be read" }

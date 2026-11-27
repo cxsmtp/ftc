@@ -113,7 +113,12 @@ printf 'docker:\n  %s:\n    use-sigstore-attachments: true\n' "$IMAGE_REPO" > "/
 
 echo "== data folders"
 install -d -m 700 -o 1000 -g 1000 "$ROOT/data" "$ROOT/uploads"
-install -d -m 700 "$ROOT/backups"
+# The app reads its backups (Settings → About & health: how many, when the newest
+# finished): mounted read-only below, so the folder and each backup are the app
+# user's group's to list, never to write.
+install -d -m 750 -g 1000 "$ROOT/backups"
+# Backups an earlier install wrote owner-only: the same group, read-only.
+find "$ROOT/backups" -mindepth 1 -maxdepth 1 -type d -exec chgrp 1000 {} + -exec chmod 750 {} +
 
 echo "== backup script"
 cat > "/usr/local/sbin/$APP-backup" <<EOF
@@ -124,7 +129,7 @@ set -eu
 D=$ROOT/data; B=$ROOT/backups; KEEP=\${KEEP:-14}
 [ -s "\$D/hackathon.db" ] || { echo "no database yet, nothing to back up"; exit 0; }
 T="\$B/\$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "\$T"; chmod 700 "\$T"
+mkdir -p "\$T"; chmod 750 "\$T"; chgrp 1000 "\$T"
 sqlite3 -init /dev/null -batch "\$D/hackathon.db" ".backup '\$T/hackathon.db'"
 [ "\$(sqlite3 -init /dev/null -batch -noheader -list "\$T/hackathon.db" 'PRAGMA integrity_check')" = ok ] \\
   || { echo "backup failed its integrity check" >&2; exit 1; }
@@ -160,6 +165,8 @@ Label=io.containers.autoupdate.authfile=$ETC/auth.json
 PublishPort=$BIND:$HOST_PORT:3000
 Volume=$ROOT/data:/app/data:Z
 Volume=$ROOT/uploads:/app/uploads:Z
+Volume=$ROOT/backups:/app/backups:ro,Z
+Environment=BACKUP_DIR=/app/backups
 EnvironmentFile=$ETC/$APP.env
 $SECRET_LINE
 ReadOnly=true

@@ -52,7 +52,14 @@ jobs:
         run: |
           set -euo pipefail
           podman --version
-          podman build --format docker --pull=always --no-cache -t localhost/release:ci .
+          # What the image was built from, shown under Settings → About & health.
+          channel=dev
+          if [ "$GITHUB_REF" = "refs/heads/main" ] || [[ "$GITHUB_REF" == refs/tags/v* ]]; then channel=stable; fi
+          podman build --format docker --pull=always --no-cache \
+            --build-arg BUILD_COMMIT="$GITHUB_SHA" \
+            --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg RELEASE_CHANNEL="$channel" \
+            -t localhost/release:ci .
 
       - name: Boot it hardened and wait for /readyz
         run: |

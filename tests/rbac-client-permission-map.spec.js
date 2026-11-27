@@ -62,8 +62,8 @@ const SETTINGS_CARD_ROUTES = {
   "retention-card": ["GET /api/admin/retention"],
   "alerts-card": ["GET /api/admin/alerts"],
   "system-health-card": ["GET /api/admin/system-health"],
-  // A button opening the Audit page narrowed to Checkmarx One activity: the
-  // page's own first read is its route.
+  // The Checkmarx One API activity table: the audit trail's own read, narrowed
+  // to the Checkmarx One activity.
   "cxone-audit-card": ["GET /api/admin/audit"],
 };
 const SELF_GATED_CARDS = {
@@ -71,8 +71,7 @@ const SELF_GATED_CARDS = {
   "team-domains-card": "features/event-team.js (settings.view)",
   "breakglass-account-card": "the break-glass session itself",
   "settings-load-failure": "the pane's own failure state",
-  "updates-card": "reads no route: the running version and What's new (releaseNotesVisible), for everyone who opens Settings",
-  "about-card": "reads no route: the running version and the font licences, for everyone who opens Settings",
+  "release-notes-card": "docs/release-notes.md, offered by releaseNotesVisible (an admin-shaped session), as the server's docs gate serves it",
 };
 
 // The route each workspace SECTION reads first (Settings renders the event's

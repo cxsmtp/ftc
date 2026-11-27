@@ -350,7 +350,7 @@ want these numbers is the night before, while people are still registering.
 An event's **Team & reports** section names the people its reports go to: one or
 more Solutions Engineers, Marketing, Sales and SDRs, plus an SE, Marketing and
 Sales manager. They need no account; a name and an address are enough, and the
-address must be at a domain a superadmin allowed under **Settings**, **Email (SMTP)**.
+address must be at a domain a superadmin allowed under **Settings**, **General**.
 You can change the team of any event, and an event admin of their own events;
 nobody competing in the event can. A team member is emailed participants' details,
 so a custom role adds members and uses **Send now** only if it may also see
@@ -4543,17 +4543,19 @@ beside them: press it for a one- or two-sentence explanation, or turn on
 
 An administrator's **Settings** tab holds the platform **certificate design**,
 the **mail server** email goes through (read-only: only a superadmin can change
-it), the **event history retention**, the open **blocked-address alerts**, **Backups &
-health** (without the details only a superadmin sees), **Updates** and **About**
-(and, read-only, the domains event team reports may go to); everything else on it is
+it), the **event history retention**, the open **blocked-address alerts**, the
+**CxOne API audit** (every call the platform made to Checkmarx One, with its
+outcome), **About & health** (what is running and how the server is, without the
+details only a superadmin sees, and the newest release notes) and, read-only,
+the domains event team reports may go to; everything else on it is
 for superadmins and is not shown to you. Each card shows to whoever may use it,
 so a custom role sees the cards for the permissions it was given. An event admin
 has no Settings tab.
 Everything on it is platform-wide rather than event-specific, in a list down its
-left side (a **Section** picker on a phone) grouped under **People** (links to
-People, Teams and Roles & permissions, and Sign-in), **Records** (a link to the
-Audit log, and CxOne API audit) and **System** (General, Branding, Email (SMTP),
-Updates, Backups & health, Get help and About).
+left side (a **Section** picker on a phone) grouped under **People** (Sign-in),
+**Records** (CxOne API audit) and **System** (General, Branding, Email (SMTP) and
+About & health). The pages the sidebar opens are not repeated there, and the
+running version is at the foot of the sidebar.
 
 The one worth knowing about as an organiser is the **platform name**. It is not
 just a label — it is what recipients see as the **sender name** on every email

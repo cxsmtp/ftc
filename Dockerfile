@@ -186,6 +186,16 @@ RUN set -eu; \
 USER node
 EXPOSE 3000
 ENV NODE_ENV=production
+# WHAT THIS IMAGE WAS BUILT FROM, shown under Settings → About & health
+# (lib/build-info.js): the release workflow passes the commit, the build time
+# and the release channel its tags put the image on. A build that passes none
+# (a local `docker build`) reports each as unknown. Declared last, so a new
+# commit rebuilds only these layers.
+ARG BUILD_COMMIT=unknown
+ARG BUILD_TIME=unknown
+ARG RELEASE_CHANNEL=unknown
+ENV BUILD_COMMIT=$BUILD_COMMIT BUILD_TIME=$BUILD_TIME RELEASE_CHANNEL=$RELEASE_CHANNEL
+LABEL org.opencontainers.image.revision=$BUILD_COMMIT org.opencontainers.image.created=$BUILD_TIME
 # ext-audit v7.15.12: probe /readyz, matching docker-compose.yml. v7.15.11 added
 # the DB-aware readiness endpoint and wired compose to it but left THIS baked-in
 # healthcheck on /healthz, so anyone running the image directly (or any

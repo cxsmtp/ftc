@@ -66,6 +66,12 @@ function _helpSubstitutePlatformName(md){
   return md.replace(/\{\{platformName\}\}/g, esc((typeof S.currentPlatformName !== 'undefined' && S.currentPlatformName) || 'Tournament'));
 }
 
+/** A guide's markdown rendered as the drawer renders it, `{{platformName}}`
+ *  filled first (Settings → About & health shows the newest release notes). */
+export function renderDocMarkdown(md, path){
+  return _helpRenderMarkdown(_helpSubstitutePlatformName(md), path);
+}
+
 /**
  * The headings of one guide, as the drawer renders them: [{id, text, level}].
  * Used by the command palette's Help section (features/command-palette.js).

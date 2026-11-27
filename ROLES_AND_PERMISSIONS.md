@@ -230,12 +230,15 @@ platform name, sign-in and platform look cards need `settings.view` and
 `settings.edit`, the mail server in use `settings.view` (its form `ops.smtp`,
 superadmin only; everyone else reads "Only a superadmin can change this."),
 outbound email and the unsubscribe list `ops.email`, the
-Checkmarx One cards `ops.cxone` (superadmin only), retention
-`ops.retention_view`, alerts `ops.alerts`, the team-report domains
-`settings.view` (its Save `settings.edit`), and the break-glass card its own
-session. So a built-in admin sees the certificate designer, the team-report
-domains, retention and alerts, and a custom role sees the cards for the
-permissions it holds. The Appearance page's Organisation default section,
+Checkmarx One key and removals cards `ops.cxone` (superadmin only), the
+CxOne API audit table `audit.view` (its rows scoped as the Audit page scopes
+them), retention `ops.retention_view`, alerts `ops.alerts`, the team-report
+domains `settings.view` (its Save `settings.edit`), About & health's server card
+`settings.view` and its release notes any admin-shaped session (as the document
+is served), and the break-glass card its own session. So a built-in admin sees
+the certificate designer, the mail server, the team-report domains, retention,
+alerts, the CxOne API audit and About & health, and a custom role sees the cards
+for the permissions it holds. The Appearance page's Organisation default section,
 which writes the same platform look, follows the platform look card's
 permissions. The designer's Save is offered on `certificates.design`
 (`certificateDesignOffered`), the predicate its routes enforce; an event admin

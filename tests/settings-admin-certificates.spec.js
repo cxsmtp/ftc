@@ -35,10 +35,10 @@ const shownCardHeadings = (page) => page.evaluate(() =>
 
 // Every card heading only a superadmin may see among the built-in roles (its
 // route is settings.edit, ops.email, ops.cxone or the built-in session).
-const SUPERADMIN_ONLY = ["Platform name", "New accounts", "Outbound email", "Unsubscribe List",
-  "Global Default CheckmarxOne Integration"];
+const SUPERADMIN_ONLY = ["Platform name", "New accounts", "Outbound email", "Unsubscribe list",
+  "Default Checkmarx One integration"];
 // The cards a regular admin may read (ops.retention_view, ops.alerts, settings.view).
-const ADMIN_READS = ["Event history retention", "Blocked-address alerts", "Platform health"];
+const ADMIN_READS = ["Event history retention", "Blocked-address alerts", "Mail server (SMTP)", "This server"];
 
 async function panelLogin(page, email) {
   await loginViaApi(page, email, PARTICIPANT_PASS);
@@ -93,7 +93,7 @@ test("a REGULAR admin opens the platform certificate designer from Settings, sav
     for (const h of SUPERADMIN_ONLY) expect(txt, `section ${key} shows no "${h}"`).not.toContain(h);
     expect(await page.locator("#settings-platform-name").isVisible(), `section ${key}: the platform name input is not on screen`).toBe(false);
   }
-  expect(listed, "only the sections this admin may use are listed").toEqual(["cxone-audit", "general", "branding", "email", "updates", "health", "about"]);
+  expect(listed, "only the sections this admin may use are listed").toEqual(["cxone-audit", "general", "branding", "email", "health"]);
 
   // Open the designer and save a design.
   const title = `ADMIN DESIGN ${Date.now() % 100000}`;
@@ -130,7 +130,7 @@ test("a REGULAR admin opens the platform certificate designer from Settings, sav
 test("CONTROL — a SUPERADMIN is shown the superadmin-only cards", async ({ page }) => {
   await adminLogin(page);
   await openSettings(page);
-  await expect.poll(() => shownCardHeadings(page), { timeout: 15000 }).toEqual(expect.arrayContaining(["Platform name", "Global Default CheckmarxOne Integration", "Unsubscribe List", "Certificate design"]));
+  await expect.poll(() => shownCardHeadings(page), { timeout: 15000 }).toEqual(expect.arrayContaining(["Platform name", "Default Checkmarx One integration", "Unsubscribe list", "Certificate design"]));
   const listed = await page.locator("#settings-section-list li:not([hidden]) [data-section]").evaluateAll((els) => els.map((e) => e.getAttribute("data-section")));
   expect(listed, "a superadmin's list holds the superadmin sections").toEqual(expect.arrayContaining(["general", "signin", "cxone-audit", "branding"]));
 });

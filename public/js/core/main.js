@@ -867,11 +867,16 @@ function boot() {
   registerAction('cxone-withdrawal-override',  (e, el) => retryCxoneWithdrawal(el.dataset.id, true));
   registerAction('cxone-withdrawal-dismiss',   (e, el) => dismissCxoneWithdrawal(el.dataset.id));
   // The Settings two-pane shell: the section list, its phone picker, and the
-  // sections' own controls (Email, retention, alerts, link items, health).
+  // sections' own controls (Email, retention, alerts, CxOne API audit, health).
   registerAction('settings-section',           (e, el) => _ns22.selectSettingsSection(el.dataset.section, { focus: true }));
   registerChange('settings-section-pick',      (e, el) => _ns22.settingsPick(el.value));
-  registerAction('settings-link',              (e, el) => _ns22.openSettingsLink(el.dataset.settingsLink));
-  registerAction('settings-open-cxone-audit',  () => _ns22.openCxoneAudit());
+  registerAction('cxone-audit-retry',          () => _ns22.loadCxoneAuditCard(1));   // one caller, no poll
+  registerAction('cxone-audit-page-first',     () => _ns22.cxoneAuditPage('first'));
+  registerAction('cxone-audit-page-prev',      () => _ns22.cxoneAuditPage('prev'));
+  registerAction('cxone-audit-page-next',      () => _ns22.cxoneAuditPage('next'));
+  registerAction('cxone-audit-page-last',      () => _ns22.cxoneAuditPage('last'));
+  registerChange('cxone-audit-page-size',      (e, el) => _ns22.cxoneAuditPageSize(el.value));
+  registerAction('settings-notes-retry',       () => _ns22.loadReleaseNotesCard()); // one caller, no poll
   registerAction('settings-health-retry',      () => _ns22.loadSystemHealthCard());
   registerAction('send-test-email',            () => _ns22.sendTestEmail());
   registerAction('smtp-reload',                () => _ns22.loadSmtpCard());        // one caller, no poll

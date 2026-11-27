@@ -14,8 +14,8 @@ const { H, makeParticipant, makeCompetition, grantEventAdmin } = require("./even
 
 test.use({ baseURL: BASE });
 
-const SHARED = ["version", "database_integrity_ok", "database_schema_ok", "maintenance", "smtp_healthy",
-  "uptime_seconds", "data_free_gib", "uploads_free_gib", "event_retention_days"];
+const SHARED = ["version", "database_integrity_ok", "database_schema_ok", "maintenance", "smtp_healthy", "smtp_checked_at",
+  "build", "backups", "uptime_seconds", "data_free_gib", "uploads_free_gib", "event_retention_days"];
 const SUPERADMIN_ONLY = ["database_size_mib", "node_version", "started_at"];
 
 /** Every string value anywhere in the body. */
@@ -64,6 +64,11 @@ test("a superadmin sees every fact, the details included, and no path", async ()
   expect(Number.isNaN(Date.parse(d.started_at)), "started_at is a time").toBe(false);
   expect(typeof d.database_size_mib === "number" || d.database_size_mib === null).toBe(true);
   expect(d.version, "the running version").toBe(require("../version.json").version);
+  // The shared test server is no release image and mounts no backups: each fact
+  // says so (built from a release image and a mounted folder: tests/about-health.spec.js).
+  expect(d.build, "no build arguments: every part unknown").toEqual({ commit: null, built_at: null, channel: null });
+  expect(d.backups, "no BACKUP_DIR: not visible, and why").toEqual({ visible: false, reason: "not_configured" });
+  expect(d.smtp_checked_at, "no relay check runs under NODE_ENV=test").toBeNull();
   expectNoPath(d, "superadmin");
 });
 

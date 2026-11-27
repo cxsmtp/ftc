@@ -889,6 +889,10 @@ export const PLAIN_TABLES = {
   // bar; these sort and filter the page shown ("on this page"). Its When
   // cells carry the instant as data-sort-value (ISO 8601), so When sorts in time
   // order and filters by a date range. Details is a row's only door, so fixed.
+  // Settings → CxOne API audit (features/settings-admin.js loadCxoneAuditCard):
+  // the audit trail narrowed to Checkmarx One; Time carries the instant as
+  // data-sort-value. Sorts and filters the page shown, as the Audit pane does.
+  'cxone-audit': { noun: 'record', cols: { at: { filter: 'date' }, activity: { grow: true, filter: 'enum' }, event: { filter: 'enum' }, result: { filter: 'enum' }, detail: { grow: true } } },
   audit: { noun: 'record', cols: { when: { filter: 'date' }, activity: { grow: true }, type: { filter: 'enum' }, outcome: { filter: 'enum' }, details: { sort: false, filter: null, fixed: true } } },
   // An event's Team & reports section (features/event-team.js): every row is on
   // screen. Where a lead came from and whether they are new are under Columns,

@@ -14,7 +14,9 @@ const { swallowed } = require("../lib/best-effort");
 const fs = require("fs");
 const { PLATFORM_VERSION, SERVER_STARTED_AT, DATA_DIR, UPLOADS_DIR } = require("../lib/config");
 const { decodeCxOneApiKey } = require("../lib/cxone");
-const { transporter, resolveSender, smtpHealthy, withSmtpSlot } = require("../lib/email");
+const { transporter, resolveSender, smtpHealthy, smtpLastCheck, withSmtpSlot } = require("../lib/email");
+const { BUILD_INFO } = require("../lib/build-info");
+const { backupStatus } = require("../lib/backup-status");
 const { getPlatformName } = require("../lib/settings");
 const { normaliseEmail, canonicaliseIp, ipAddressRange } = require("../lib/util");
 const { listOpenAlerts, ackAlert } = require("../lib/admin-alerts"); // v7.16.0 — operator alerts
@@ -208,13 +210,18 @@ app.get("/api/admin/retention", requireAdmin, (req, res) => {
   });
 });
 
-// SETTINGS → BACKUPS & HEALTH. Coarse facts only (booleans, whole numbers,
-// rounded sizes, the version), never a path, a driver message or a secret: the
-// boot integrity and schema checks and maintenance mode come from server.js's
-// own state (`healthState`, the facts `_instanceInService` reads), never
-// re-derived here. A superadmin also gets the database's size, the Node version
-// and the process start time; every other reader gets the redacted shape, those
-// keys absent. `settings.view` at the gate (lib/rbac.js).
+// SETTINGS → ABOUT & HEALTH. Coarse facts only (booleans, whole numbers,
+// rounded sizes, the version, times), never a path, a driver message or a
+// secret: the boot integrity and schema checks and maintenance mode come from
+// server.js's own state (`healthState`, the facts `_instanceInService` reads),
+// never re-derived here. `build` is what the image was built from
+// (lib/build-info.js; null parts when the build did not say), `backups` what the
+// app can see of the host's backups (lib/backup-status.js: nothing unless the
+// operator mounts them and names them in BACKUP_DIR), `smtp_checked_at` the
+// mail relay's last check. A superadmin also gets the database's size, the Node
+// version, the process start time and the newest backup's size; every other
+// reader gets the redacted shape, those keys absent. `settings.view` at the gate
+// (lib/rbac.js).
 const _GIB = 1024 * 1024 * 1024;
 function _freeGib(dir) {
   try {
@@ -232,12 +239,19 @@ app.get("/api/admin/system-health", requireAdmin, (req, res) => {
     database_schema_ok: h.schema === true,
     maintenance: h.maintenance === true,
     smtp_healthy: smtp === true ? true : smtp === false ? false : null,
+    smtp_checked_at: (smtpLastCheck() || {}).at || null,
+    build: { commit: BUILD_INFO.commit, built_at: BUILD_INFO.built_at, channel: BUILD_INFO.channel },
     uptime_seconds: Math.floor(process.uptime()),
     data_free_gib: _freeGib(DATA_DIR),
     uploads_free_gib: _freeGib(UPLOADS_DIR),
     event_retention_days: EVENT_RETENTION_DAYS,
   };
+  const bk = backupStatus();
+  body.backups = bk.visible
+    ? { visible: true, count: bk.count, newest_at: bk.newest_at, newest_complete: bk.newest_complete }
+    : { visible: false, reason: bk.reason };
   if (req.session.isSuperAdmin) {
+    if (bk.visible) { body.backups.newest_size_mib = bk.newest_size_mib; body.backups.newest_size_exact = bk.newest_size_exact; }
     let size = null;
     // The main file plus its write-ahead log, which holds every commit since the
     // last checkpoint (the -shm index is a few KiB and left out).

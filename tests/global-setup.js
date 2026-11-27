@@ -56,7 +56,7 @@ function portInUse(port) {
 // Kept deliberately as a flat list rather than derived from the specs: this file
 // runs before Playwright has loaded anything, and the source scanner in
 // `functional-core-b.api.spec.js` is what keeps it in step with the code.
-const SPAWNER_OFFSETS = [100, 101, 102, 103, 104, 106, 110, 111, 113, 114, 115, 117, 120, 130, 131, 140, 141, 142, 150, 151, 160, 161, 170, 171, 174, 175, 180, 181, 186, 191, 192, 195, 196, 197, 198, 199];
+const SPAWNER_OFFSETS = [100, 101, 102, 103, 104, 106, 110, 111, 113, 114, 115, 117, 120, 130, 131, 140, 141, 142, 150, 151, 160, 161, 170, 171, 174, 175, 176, 180, 181, 186, 191, 192, 195, 196, 197, 198, 199];
 
 module.exports = async function globalSetup(config) {
   const N = config.workers;

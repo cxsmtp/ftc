@@ -1205,29 +1205,37 @@ Settings is two panes: the list on the left, grouped under **People**,
 **Records** and **System**, and the chosen section on the right (on a phone, a
 **Section** picker above it).
 
-- **People**: **People**, **Teams** and **Roles & permissions** open those
-  pages; **Sign-in** holds approval for new accounts and, only in the built-in
-  account's own session, the **Break-glass account**.
-- **Records**: **Audit log** opens the Audit page; **CxOne API audit** opens the
-  Audit log searching for Checkmarx One activity, and lists the Checkmarx One
-  accounts waiting to be removed for deleted participants.
-- **System**: **General** (the platform name, the default Checkmarx One
-  integration, how long event history is kept and when it was last swept, and
-  open blocked-address alerts, each with **Review**), **Branding** (the platform
-  look and the certificate design), **Email (SMTP)** (the [mail
-  server](#the-mail-server-smtp) in use and its form, **Send test email**, the
-  unsubscribe list and the [event team report
-  domains](#event-team-report-domains)), **Updates** (the running version and
-  **What's new**; a server set up with the Podman installer checks daily for
-  a new signed release image and restarts on it, any other deployment updates
-  however its operator set it up), **Backups & health** (the database's start-up checks,
-  maintenance mode, the mail relay, free disk space and how long the server has
-  run; a superadmin also sees the database's size, the Node.js version and when
-  the server started; a server set up with the Podman installer tries to back
-  up its database before each start (a failed backup does not stop it), any
-  other deployment has whatever backups its operator set up, and this page
-  cannot list them), **Get help** (opens the guides) and
-  **About** (the version and the typefaces certificates use).
+- **People**: **Sign-in** holds approval for new accounts and, only in the
+  built-in account's own session, the **Break-glass account**.
+- **Records**: **CxOne API audit** is a table of every call the platform made
+  to Checkmarx One, newest first: an account set up, linked to an existing one,
+  refused, deferred or given up, a group grant, and each removal of a deleted
+  participant's account, with its time, event, person, result and the error it
+  met. Filter and sort it by its column headings and page through it; a row
+  shows only where your role may see that person's or event's history, as on the
+  Audit page. Below it, the Checkmarx One accounts waiting to be removed for
+  deleted participants.
+- **System**: **General** (the default Checkmarx One integration, how long
+  event history is kept and when it was last swept, open blocked-address alerts,
+  each with **Review**, and the [event team report
+  domains](#event-team-report-domains)), **Branding** (the platform name, the
+  platform look and the certificate design), **Email (SMTP)** (the [mail
+  server](#the-mail-server-smtp) in use and its form, **Send test email** and the
+  unsubscribe list) and **About & health**: **This server** (the version, and the
+  commit, build time and release channel a release image was built with; when
+  the server started and how long it has run; the database's start-up checks
+  and size; maintenance mode; the mail relay and its last check; free disk space;
+  the backups the server can see, how many and when the newest finished; and how
+  long event history is kept) and the newest **Release notes**, with **All
+  release notes**. A server set up with the Podman installer checks daily for a
+  new signed release image on its channel and restarts on it, after backing up
+  its database; the backups show here because the installer mounts its backups
+  folder into the app, read-only. Any other deployment shows "not visible" unless
+  its operator does the same (`BACKUP_DIR`).
+
+The pages the sidebar opens (People, Teams, Roles & permissions, Audit and the
+guides) are not repeated in Settings. The running version is at the foot of the
+sidebar (its short form while the sidebar is collapsed).
 
 The history sweep also reports how many unused pictures it removed, or that it
 held their clean-up because the database failed a start-up check or maintenance
@@ -1241,11 +1249,13 @@ Save. The section you last opened is remembered in this browser.
 
 Each card shows to whoever may use it: a regular admin sees the **Certificate
 design**, the mail server in use (read-only), the event team report domains (read-only), event history retention,
-the blocked-address alerts and **Backups & health**; a custom role sees the cards for the permissions you gave it.
+the blocked-address alerts, the **CxOne API audit** and **About & health** (without the details only a superadmin
+sees: the database and backup sizes, the Node.js version and when the server started); a custom role sees the cards
+for the permissions you gave it.
 
 ## Platform name
 
-**Settings → General** is where the platform is named, and **only a superadmin (or a
+**Settings → Branding** is where the platform is named, and **only a superadmin (or a
 custom role you give both *See platform settings* and *Change platform settings*)
 can change it** — a regular admin does not see that section at all.
 

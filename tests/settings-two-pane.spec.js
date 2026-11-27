@@ -19,23 +19,24 @@
 //     scrolls sideways;
 //   • the remembered section survives a reload;
 //   • the list is grouped under PEOPLE, RECORDS and SYSTEM captions (not
-//     buttons), its link items open the page they name (People, Teams, Roles &
-//     permissions, Audit log) or the guides (Get help), and a link to a page the
-//     role is not offered is not listed (CONTROL: a role with settings.view
-//     alone);
-//   • CxOne API audit opens the Audit page searching for Checkmarx One.
+//     buttons), and holds sections only: the pages the sidebar opens (People,
+//     Teams, Roles & permissions, Audit, the guides) are not repeated in it
+//     (owner decision, 27 Nov 2026), and a section a role has no card for is not
+//     listed (CONTROL: a role with settings.view alone);
+//   • the platform name is under Branding, the event team report domains under
+//     General (owner decision, 27 Nov 2026).
 const { test, expect } = require("./isolated-test");
 const { BASE, apiLogin } = require("./helpers");
 const { adminLogin, clickTab, openSettingsSection } = require("./ui-admin-helpers");
 
 test.use({ baseURL: BASE });
 
-const EXPECTED = ["signin", "cxone-audit", "general", "branding", "email", "updates", "health", "about"];
-// The whole list as rendered, captions and link items included, in order.
+const EXPECTED = ["signin", "cxone-audit", "general", "branding", "email", "health"];
+// The whole list as rendered, captions included, in order.
 const EXPECTED_MENU = [
-  "PEOPLE", "People", "Teams", "Roles & permissions", "Sign-in",
-  "RECORDS", "Audit log", "CxOne API audit",
-  "SYSTEM", "General", "Branding", "Email (SMTP)", "Updates", "Backups & health", "Get help", "About",
+  "PEOPLE", "Sign-in",
+  "RECORDS", "CxOne API audit",
+  "SYSTEM", "General", "Branding", "Email (SMTP)", "About & health",
 ];
 
 async function openSettings(page) {
@@ -94,12 +95,12 @@ test("a card added to the content column outside any section is adopted and list
   await expect(page.locator("#probe-look-card")).toBeVisible();
 });
 
-test("Save Name still saves from its section; the default is restored afterwards", async ({ page }) => {
+test("Save Name still saves from its section, Branding; the default is restored afterwards", async ({ page }) => {
   const name = `Two Pane ${Date.now().toString(36).slice(-6)}`;
   try {
     await adminLogin(page);
     await openSettings(page);
-    await openSettingsSection(page, "general");
+    await openSettingsSection(page, "branding");
     await page.locator("#settings-platform-name").fill(name);
     const saved = page.waitForResponse((x) => x.url().includes("/api/admin/settings") && x.request().method() === "PATCH");
     await page.locator('[data-action="save-platform-name"]').click();
@@ -150,7 +151,7 @@ const menuText = (page) => page.evaluate(() => [...document.querySelectorAll("#s
   ...[...g.querySelectorAll("li:not([hidden]) > button")].map((b) => (b.firstChild?.textContent || "").trim()),
 ]));
 
-test("the list is grouped under People, Records and System, with link items in place", async ({ page }) => {
+test("the list is grouped under People, Records and System, sections only", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await adminLogin(page);
   await openSettings(page);
@@ -163,34 +164,20 @@ test("the list is grouped under People, Records and System, with link items in p
   expect(shape.captions, "three captions").toBe(3);
   expect(shape.captionsAreButtons, "a caption is not a button").toBe(0);
   expect(shape.listsNamed, "each group's list is named by its caption").toBe(true);
-});
-
-test("a link item opens its page through the sidebar's door; Get help opens the guides", async ({ page }) => {
-  await adminLogin(page);
-  for (const [key, pane] of [["teams", "#admin-groups-tab"], ["roles", "#admin-users-tab"], ["people", "#admin-participants-tab"], ["audit", "#admin-audit-tab"]]) {
-    await openSettings(page);
-    await page.locator(`#settings-section-list [data-action="settings-link"][data-settings-link="${key}"]`).click();
-    await expect(page.locator(pane), `${key} opens its page`).toBeVisible({ timeout: 15000 });
-    await expect(page.locator("#admin-settings-tab"), `CONTROL: ${key} left Settings`).toBeHidden();
+  // Every item is a section, every section holds a card; the sidebar's pages are
+  // not repeated (CONTROL: the sidebar itself still offers them).
+  const items = await page.evaluate(() => [...document.querySelectorAll("#settings-section-list li > button")].map((b) => b.getAttribute("data-action")));
+  expect(new Set(items), "every list item chooses a section").toEqual(new Set(["settings-section"]));
+  for (const tab of ["admin-participants-tab", "admin-groups-tab", "admin-users-tab", "admin-audit-tab"]) {
+    await expect(page.locator(`#admin-sidebar [data-tab-id="${tab}"]`), `CONTROL: the sidebar keeps ${tab}`).toBeVisible();
   }
-  await openSettings(page);
-  await page.locator('#settings-section-list [data-action="settings-link"][data-settings-link="help"]').click();
-  await expect(page.locator("#help-drawer-overlay"), "Get help opens the help drawer").toBeVisible({ timeout: 15000 });
+  // Moved cards (owner decision, 27 Nov 2026).
+  const where = await page.evaluate(() => Object.fromEntries(["platform-name-card", "team-domains-card", "cxone-card", "cert-config-card", "smtp-settings-card"]
+    .map((id) => [id, document.getElementById(id)?.closest(".settings-section")?.dataset.settingsSection || null])));
+  expect(where).toEqual({ "platform-name-card": "branding", "team-domains-card": "general", "cxone-card": "general", "cert-config-card": "branding", "smtp-settings-card": "email" });
 });
 
-test("CxOne API audit opens the Audit page searching for Checkmarx One activity", async ({ page }) => {
-  await adminLogin(page);
-  await openSettings(page);
-  await openSettingsSection(page, "cxone-audit");
-  const read = page.waitForRequest((r) => r.url().includes("/api/admin/audit?") && new URL(r.url()).searchParams.get("q") === "Checkmarx One");
-  await page.locator('[data-action="settings-open-cxone-audit"]').click();
-  await expect(page.locator("#admin-audit-tab")).toBeVisible({ timeout: 15000 });
-  await expect(page.locator("#audit-search")).toHaveValue("Checkmarx One");
-  const q = new URL((await read).url()).searchParams;
-  expect(q.get("q_event_types") || "", "the search names the Checkmarx One activity keys").toContain("cxone_provisioned");
-});
-
-test("CONTROL — a role holding settings.view alone is offered no link to a page it cannot open", async ({ page }) => {
+test("CONTROL — a role holding settings.view alone is offered only the sections it has a card in", async ({ page }) => {
   const { PARTICIPANT_PASS } = require("./helpers");
   const { loginViaApi } = require("./ui-admin-helpers");
   const { H, makeParticipant } = require("./event-admin-helpers");
@@ -207,8 +194,9 @@ test("CONTROL — a role holding settings.view alone is offered no link to a pag
   await page.goto("/");
   await page.locator("#admin-page").waitFor({ state: "visible", timeout: 30000 });
   await page.locator("[data-action='admin-tab'][data-tab-id='admin-settings-tab']").first().click();
-  // POSITIVE: its own section (Backups & health reads settings.view) and Get help.
-  await expect.poll(() => menuText(page), { timeout: 15000 }).toEqual(expect.arrayContaining(["Backups & health", "Get help"]));
+  // POSITIVE: the sections it has a card for (About & health reads
+  // settings.view, the mail server too).
+  await expect.poll(() => menuText(page), { timeout: 15000 }).toEqual(expect.arrayContaining(["About & health", "Email (SMTP)"]));
   const menu = await menuText(page);
-  for (const gone of ["People", "Teams", "Roles & permissions", "Audit log", "CxOne API audit", "RECORDS"]) expect(menu, `no "${gone}" for a role that cannot open it`).not.toContain(gone);
+  for (const gone of ["CxOne API audit", "RECORDS", "Sign-in"]) expect(menu, `no "${gone}" for a role with no card there`).not.toContain(gone);
 });
