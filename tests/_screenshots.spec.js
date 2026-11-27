@@ -3025,7 +3025,8 @@ test.describe("admin", () => {
     // The event's one door into the bank: its Questions section's + Add from bank
     // (Stage B, owner ruling, 27 Nov 2026; neither event menu offers it).
     await filterComps(page, "Test Upcoming");
-    await page.locator("#admin-comp-body tr", { hasText: "Test Upcoming" }).first().locator('[data-action="comp-open"]').first().click();
+    const upcomingRow = page.locator("#admin-comp-body tr", { hasText: "Test Upcoming" }).first();
+    await upcomingRow.locator('[data-action="comp-open"]').first().click();
     await page.locator("#ws-record").waitFor({ state: "visible", timeout: 10000 });
     await page.locator('#ws-tabs [data-section="admin-tasks-tab"]').first().click();
     await page.locator("#add-tasks-to-comp-btn").click();

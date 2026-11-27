@@ -19,7 +19,7 @@
 //      is beside the name, vertically inside the row body, the name is not the
 //      muted token and not caption-sized, the row has no 6px gap. Light, plus a
 //      dark colour pass.
-//   2. The Create Event form: `Staff can compete`, `Mark as test / dry run` and
+//   2. The Create Event form: `Staff can compete`, `Dry run` (the box was renamed: owner decision, 27 Nov 2026) and
 //      `Reveal correct answers…` (`label.checkbox-row`), plus a sweep over every
 //      visible checkbox row in the form.
 //   3. The challenge editor: `Seal the answer` (`label.checkbox-row`).
@@ -287,16 +287,17 @@ test.describe("v8.13.8 — a classed label inside a form group keeps its own lay
   // Two kinds, because each carries rows the other withholds: a Competition has
   // Reveal answers, the group board, time on platform and its tie-break; a
   // Booth Event has Allow late entries. Staff
-  // can compete, the dry-run tag and the CxOne opt-out are on both.
+  // can compete and the dry-run tag are on both; the CxOne opt-out is the
+  // Competition's alone (a Booth Event never creates accounts).
   const KIND_ROWS = {
     tournament: { label: "Competition", floor: 7, named: [
       ["Staff can compete", /^\s*Staff can compete\s*$/],
-      ["Mark as test / dry run", /^\s*Mark as test \/ dry run\s*$/],
+      ["Dry run", /^\s*Dry run\s*$/],
       ["Reveal correct answers", /^\s*Reveal correct answers/],
     ] },
     booth: { label: "Booth Event", floor: 4, named: [
       ["Allow late entries", /^\s*Allow late entries\s*$/],
-      ["Mark as test / dry run", /^\s*Mark as test \/ dry run\s*$/],
+      ["Dry run", /^\s*Dry run\s*$/],
     ] },
   };
 

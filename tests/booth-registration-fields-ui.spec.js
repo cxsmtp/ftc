@@ -32,7 +32,7 @@ const { freshCtx, getSuperadminPass, PARTICIPANT_PASS, BASE } = require("./helpe
 // session, at which point its own interceptor logs that session out), asserts
 // the session is live, and waits for `#admin-page` rather than an either-or that
 // `#login-page`'s painted-on-every-load `active` class would answer wrongly.
-const { adminLogin, awaitCompModel, clickTab, signUpViaUi } = require("./ui-admin-helpers");
+const { adminLogin, awaitCompModel, clickTab, signUpViaUi, openCompAdvanced } = require("./ui-admin-helpers");
 const { REGISTRATION_FIELD_KEYS } = require("../lib/registration-fields");
 
 test.use({ baseURL: BASE });
@@ -367,6 +367,9 @@ test.describe("v8.4.0 — the admin's two controls per field", () => {
     await page.waitForFunction((id) => (window.S?.adminCompetitionsData || []).some(c => c.id === id), compId, { timeout: 20000 });
     await page.evaluate((id) => window.editCompetition(id), compId);
     await expect(page.locator("#comp-form-overlay")).toBeVisible({ timeout: 15000 });
+    // The sign-up form is under Advanced settings, folded on an edit too (owner's
+    // decision, 27 Nov 2026): opened as a person would.
+    await openCompAdvanced(page);
   }
 
   test("every kind's editor shows one row per sign-up field", async ({ page }) => {
@@ -436,6 +439,7 @@ test.describe("v8.4.0 — the admin's two controls per field", () => {
     const reopen = async () => {
       await page.evaluate((id) => window.editCompetition(id), ev.comp.id);
       await expect(page.locator("#comp-form-overlay")).toBeVisible({ timeout: 15000 });
+      await openCompAdvanced(page);   // folded on an edit too (owner's decision, 27 Nov 2026)
     };
     const close = async () => {
       await page.locator('[data-action="overlay-close"][data-overlay-id="comp-form-overlay"]').first().click();

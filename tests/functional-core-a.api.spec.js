@@ -5468,8 +5468,11 @@ test.describe("Per-competition CxOne opt-out (v7.13.0)", () => {
       .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, " "))
       .split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
 
-    // Both halves of the gate, in order: the opt-out, then the missing row.
-    const optOutAt = src.search(/if\s*\(\s*_comp\?\.cxone_disabled\s*\)\s*return\s*;/);
+    // Both halves of the gate, in order: the opt-out, then the missing row. The
+    // opt-out is asked through the policy since a Booth Event never creates
+    // accounts (owner's decision, 27 Nov 2026): `cxoneProvisioningApplies` asks
+    // the kind first, then the event's own `cxone_disabled`.
+    const optOutAt = src.search(/if\s*\(\s*_comp\s*&&\s*!cxoneProvisioningApplies\(\s*_comp\s*\)\s*\)\s*return\s*;/);
     expect(optOutAt, "the cxone_disabled opt-out gate is gone").toBeGreaterThan(-1);
     const closedAt = src.search(/if\s*\(\s*competitionId\s*&&\s*!_comp\s*\)\s*return\s*;/);
     expect(closedAt,
@@ -7036,8 +7039,10 @@ test.describe("audit v7.7.33 batch 8 — a11y LOWs", () => {
   test("AL12: participant-action confirms name the target (via _pLabel)", () => {
     const f = read("public/js/features/participants-admin.js");
     expect(f).toMatch(/function _pLabel/);
-    // Each confirm interpolates the target label.
-    for (const anchor of ["Marks ${_pLabel(id)}", "change ${_pLabel(userId)}", "approve ${_pLabel(id)}", "delete ${_pLabel(id)}"])
+    // Each confirm interpolates the target label. (The role change's confirm left
+    // with the row's role control: roles are changed on Roles & permissions,
+    // owner's decision, 27 Nov 2026; the block confirm stands in its place.)
+    for (const anchor of ["Marks ${_pLabel(id)}", "${_pLabel(id)} will be immediately logged out", "approve ${_pLabel(id)}", "delete ${_pLabel(id)}"])
       expect(f, anchor).toContain(anchor);
   });
 
