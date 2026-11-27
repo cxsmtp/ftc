@@ -47,7 +47,8 @@ test.describe("a participant whose session ends under them", () => {
     const comp = await makeCompetition(sa, saCsrf, label);
     const t1 = (await makeTask(sa, saCsrf, `${label}1`, fileTask ? { answer_type: "file", correct_answer: "win" } : {})).id;
     const t2 = (await makeTask(sa, saCsrf, `${label}2`)).id;   // one solve must not end the event
-    await assignTask(sa, saCsrf, t1, [comp.id]);
+    // The event's own copies (lib/event-copies.js): the cards its participant opens.
+    const c1 = (await assignTask(sa, saCsrf, t1, [comp.id])).copies[0].task_id;
     await assignTask(sa, saCsrf, t2, [comp.id]);
     const p = await makeParticipant(sa, saCsrf, label);
     await enrol(sa, saCsrf, comp.id, [p.id]);
@@ -55,7 +56,7 @@ test.describe("a participant whose session ends under them", () => {
     await page.goto(BASE + "/");
     // Exactly one event: the sole-event landing takes them straight in.
     await expect(page.locator("#nav-challenges:not([aria-disabled=true])")).toBeVisible({ timeout: 20_000 });
-    return { p, comp, t1 };
+    return { p, comp, t1: c1 };
   }
 
   /**

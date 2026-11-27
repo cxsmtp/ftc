@@ -18,6 +18,7 @@ const { test, expect } = require("./isolated-test");
 const { registerPost } = require("./helpers");
 const { freshCtx, getSuperadminPass, BASE, PARTICIPANT_PASS, codeLogin } = require("./helpers");
 const { adminLogin, clickTab, findSeededTaskRow, openKebab } = require("./ui-admin-helpers");
+const { withLegacySharedAssign } = require("./event-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -96,9 +97,25 @@ async function makeTask(api, csrf, { cap = null, answer_type = "text", correct =
   return { id, title };
 }
 
+/** Assign; answers the questions the events now hold — each its OWN copy of a bank question (lib/event-copies.js). */
 async function assignTask(api, csrf, taskId, compIds) {
   const r = await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(csrf), data: { competitionIds: compIds } });
   expect(r.ok(), `assign challenge: ${await r.text()}`).toBeTruthy();
+  return (await r.json()).copies.map(c => c.task_id);
+}
+/**
+ * The event's own copy of `bankId`, given a version in its OWN history taken by
+ * `edit` while it is out of the event (an assigned copy can only be edited within
+ * what the event admits): assign, take out, edit, put back (the same copy).
+ */
+async function eventCopyWithVersion(api, csrf, bankId, compId, edit) {
+  const [copyId] = await assignTask(api, csrf, bankId, [compId]);
+  const out = await api.delete(`/api/admin/tasks/${bankId}/competitions/${compId}`, { headers: H(csrf) });
+  expect(out.ok(), `take the copy out: ${await out.text()}`).toBeTruthy();
+  await edit(copyId);
+  const [back] = await assignTask(api, csrf, bankId, [compId]);
+  expect(back, "re-adding puts the SAME copy back").toBe(copyId);
+  return copyId;
 }
 
 async function enrol(api, csrf, users, compId) {
@@ -262,7 +279,7 @@ test.describe("v8.1.4 — the attempt-cap remedy is reachable", () => {
 
     const comp = await makeEvent(api, csrf, { cap: null });
     const task = await makeTask(api, csrf, { cap: 2 });
-    await assignTask(api, csrf, task.id, [comp.id]);
+    const [held] = await assignTask(api, csrf, task.id, [comp.id]);   // the event's own copy: its cap is the one that binds
     const p1 = await makeParticipant(api, csrf, uniq());
     const p2 = await makeParticipant(api, csrf, uniq());
     await enrol(api, csrf, [p1, p2], comp.id);
@@ -279,7 +296,7 @@ test.describe("v8.1.4 — the attempt-cap remedy is reachable", () => {
 
     // …and NOW the cap goes away. Neither level carries one afterwards, so the
     // server answers 409 `not_capped`.
-    const clear = await api.put(`/api/admin/tasks/${task.id}`, { headers: H(csrf), data: { attempt_cap: null } });
+    const clear = await api.put(`/api/admin/tasks/${held}`, { headers: H(csrf), data: { attempt_cap: null } });
     expect(clear.ok(), `clearing the cap: ${await clear.text()}`).toBeTruthy();
 
     await overlay.locator("#ag-save").click();
@@ -357,7 +374,10 @@ test.describe("v8.1.4 — the attempt-cap remedy is reachable", () => {
       // participant is exhausted-and-unsolved in exactly the same way, and must
       // NOT be reported: its submissions are frozen and were not touched.
       const doomed = await makeEvent(api, csrf, { cap: null });
-      await assignTask(api, csrf, task.id, [live.id, doomed.id]);
+      // ONE row in both events — the shape a database from before event-owned
+      // copies holds (the previous model's mode, through the test hook): the
+      // only way one recalculate reaches a frozen and a live event at once.
+      await withLegacySharedAssign(api, csrf, () => assignTask(api, csrf, task.id, [live.id, doomed.id]));
 
       // THE TWO DECOYS ARE WHAT MAKE THIS DISCRIMINATING, and both are
       // exhausted-and-unsolved on a capped challenge — i.e. exactly what the old
@@ -439,16 +459,18 @@ test.describe("v8.1.4 — the attempt-cap remedy is reachable", () => {
     // cover disjoint lifecycles and a LIVE Booth Event was protected by neither.
     const { api, csrf } = await sa();
     try {
-      // v1 is a FILE challenge; v2 converts it to text so the assign is allowed.
-      const task = await makeTask(api, csrf, { answer_type: "file", correct: "right" });
-      const put = await api.put(`/api/admin/tasks/${task.id}`, {
-        headers: H(csrf), data: { answer_type: "text", correct_answer: "right" },
-      });
-      expect(put.ok(), `convert to text: ${await put.text()}`).toBeTruthy();
-
+      // The event's own copy (lib/event-copies.js), given a FILE version in its
+      // own history and then converted back to text so it is allowed back in.
+      const toFileAndBack = async (id) => {
+        for (const data of [{ answer_type: "file", correct_answer: "right" }, { answer_type: "text", correct_answer: "right" }]) {
+          const put = await api.put(`/api/admin/tasks/${id}`, { headers: H(csrf), data });
+          expect(put.ok(), `${data.answer_type}: ${await put.text()}`).toBeTruthy();
+        }
+      };
+      const bank = await makeTask(api, csrf, { correct: "right" });
       const booth = await makeEvent(api, csrf, { kind: "booth", minutes: 120 });
       const ordinary = await makeEvent(api, csrf, { kind: "tournament" });
-      await assignTask(api, csrf, task.id, [booth.id]);
+      const task = { id: await eventCopyWithVersion(api, csrf, bank.id, booth.id, toFileAndBack) };
 
       const versions = await (await api.get(`/api/admin/tasks/${task.id}/versions`)).json();
       const fileVer = versions.find(v => { try { return JSON.parse(v.snapshot).answer_type === "file"; } catch { return false; } });
@@ -467,12 +489,8 @@ test.describe("v8.1.4 — the attempt-cap remedy is reachable", () => {
       // The SAME restore onto an ordinary Competition still succeeds — without
       // this, "the restore was refused" is equally satisfied by a build that
       // broke version restore for everybody.
-      const twin = await makeTask(api, csrf, { answer_type: "file", correct: "right" });
-      const put2 = await api.put(`/api/admin/tasks/${twin.id}`, {
-        headers: H(csrf), data: { answer_type: "text", correct_answer: "right" },
-      });
-      expect(put2.ok(), await put2.text()).toBeTruthy();
-      await assignTask(api, csrf, twin.id, [ordinary.id]);
+      const twinBank = await makeTask(api, csrf, { correct: "right" });
+      const twin = { id: await eventCopyWithVersion(api, csrf, twinBank.id, ordinary.id, toFileAndBack) };
       const tv = await (await api.get(`/api/admin/tasks/${twin.id}/versions`)).json();
       const twinFileVer = tv.find(v => { try { return JSON.parse(v.snapshot).answer_type === "file"; } catch { return false; } });
       const ok = await api.post(`/api/admin/tasks/${twin.id}/restore`, { headers: H(csrf), data: { versionId: twinFileVer.id } });
@@ -489,12 +507,16 @@ test.describe("v8.1.4 — the attempt-cap remedy is reachable", () => {
     // the tag path are two different reads of the prospective state.
     const { api, csrf } = await sa();
     try {
-      const task = await makeTask(api, csrf, { tags: ["needs:desktop"] });   // v2 snapshot carries the tag
-      const del = await api.delete(`/api/admin/tasks/${task.id}/tags/${encodeURIComponent("needs:desktop")}`, { headers: H(csrf) });
-      expect(del.ok(), `remove the tag: ${await del.text()}`).toBeTruthy();
-
+      // The event's own copy (lib/event-copies.js), given a version carrying the
+      // tag in its own history and then untagged so it is allowed back in.
+      const bank = await makeTask(api, csrf, {});
       const booth = await makeEvent(api, csrf, { kind: "booth", minutes: 120 });
-      await assignTask(api, csrf, task.id, [booth.id]);   // allowed: no needs: tag right now
+      const task = { id: await eventCopyWithVersion(api, csrf, bank.id, booth.id, async (id) => {
+        const add = await api.post(`/api/admin/tasks/${id}/tags`, { headers: H(csrf), data: { tag: "needs:desktop" } });
+        expect(add.ok(), `tag it: ${await add.text()}`).toBeTruthy();
+        const del = await api.delete(`/api/admin/tasks/${id}/tags/${encodeURIComponent("needs:desktop")}`, { headers: H(csrf) });
+        expect(del.ok(), `remove the tag: ${await del.text()}`).toBeTruthy();
+      }) };   // allowed back in: no needs: tag right now
 
       const versions = await (await api.get(`/api/admin/tasks/${task.id}/versions`)).json();
       const tagVer = versions.find(v => {
@@ -527,8 +549,8 @@ test.describe("v8.1.4 — the attempt-cap remedy is reachable", () => {
     const { api, csrf } = await sa();
     try {
       const comp = await makeEvent(api, csrf, { cap: null });
-      const task = await makeTask(api, csrf, { cap: 5, correct: "the-answer" });
-      await assignTask(api, csrf, task.id, [comp.id]);
+      const taskBank = await makeTask(api, csrf, { cap: 5, correct: "the-answer" });
+      const task = { ...taskBank, id: (await assignTask(api, csrf, taskBank.id, [comp.id]))[0] };   // the event's own copy: its cap is the one lowered
       const p1 = await makeParticipant(api, csrf, uniq());
       const p2 = await makeParticipant(api, csrf, uniq());   // never submits — no auto-end
       await enrol(api, csrf, [p1, p2], comp.id);

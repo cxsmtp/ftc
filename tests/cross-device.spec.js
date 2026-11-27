@@ -135,7 +135,7 @@ async function liveFixture() {
     const { id } = await tr.json();
     const asg = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign challenge: ${await asg.text()}`).toBeTruthy();
-    tasks.push({ id });
+    tasks.push({ id: (await asg.json()).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what its participants open and answer
   }
   const users = [await makeParticipant(api, csrf, uniq()), await makeParticipant(api, csrf, uniq())];
   const en = await api.post("/api/admin/competitions/assign", { headers: H(csrf), data: { userIds: users.map((u) => u.id), competitionIds: [comp.id] } });

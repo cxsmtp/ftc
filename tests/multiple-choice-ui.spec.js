@@ -267,11 +267,12 @@ test.describe("Participant: answering a multiple-choice challenge (v7.19.0)", ()
         description: "<p>Choose</p>", choices },
     });
     expect(r.ok(), `seed: ${r.status()} ${await r.text()}`).toBeTruthy();
-    const taskId = (await r.json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, {
+    const bankId = (await r.json()).id;
+    const ar = await sa.post(`/api/admin/tasks/${bankId}/competitions`, {
       headers: GUH(saCsrf), data: { competitionIds: [live.id] },
     });
-    return { sa, saCsrf, taskId, title, compId: live.id };
+    expect(ar.ok(), await ar.text()).toBeTruthy();
+    return { sa, saCsrf, taskId: (await ar.json()).copies[0].task_id, title, compId: live.id };   // the event's own copy (lib/event-copies.js): what its participants open and answer
   }
 
   // NOTE: call this at most ONCE per test. Logging in again while the previous
@@ -393,12 +394,12 @@ test.describe("Participant: answering a multiple-choice challenge (v7.19.0)", ()
       name: `Rev ${t}`, start_time: new Date(t - 30 * 60_000).toISOString(),
       duration_minutes: 120, reveal_answers_on_end: !!reveal } })).json()).competition.id;
     const title = `Rev task ${t}`;
-    const taskId = (await (await sa.post("/api/admin/tasks", { headers: H, data: {
+    const bankId = (await (await sa.post("/api/admin/tasks", { headers: H, data: {
       title, difficulty: "easy", answer_type: "choice", status: "published",
       description: "<p>Which repository deserves attention first?</p>",
       choices: [{ text: "CustomerAPI", correct: true }, { text: "ReportingJob" }, { text: "TestHarness" }],
     } })).json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H, data: { competitionIds: [comp] } });
+    const taskId = (await (await sa.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H, data: { competitionIds: [comp] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
     const ps = await (await sa.get("/api/admin/participants?limit=5000")).json();
     const alice = (ps.participants || ps).find((p) => p.email === "alice@acme.com");
     await sa.post("/api/admin/competitions/assign", { headers: H, data: { userIds: [alice.id], competitionIds: [comp] } });
@@ -525,7 +526,7 @@ test.describe("Participant: answering a multiple-choice challenge (v7.19.0)", ()
       name: `MCReveal ${t}`, start_time: new Date(t - 30 * 60_000).toISOString(),
       duration_minutes: 120, reveal_answers_on_end: true } })).json()).competition.id;
     const title = `MCReveal task ${t}`;
-    const taskId = (await (await sa.post("/api/admin/tasks", { headers: H, data: {
+    const bankId = (await (await sa.post("/api/admin/tasks", { headers: H, data: {
       title, difficulty: "easy", answer_type: "choice", status: "published",
       description: "<p>Which repository deserves attention first?</p>",
       explanation: "<p>Public + Production + Exploitable + Fix Available.</p>",
@@ -534,7 +535,7 @@ test.describe("Participant: answering a multiple-choice challenge (v7.19.0)", ()
         { text: "ReportingJob" },
         { text: "TestHarness" },
       ] } })).json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H, data: { competitionIds: [comp] } });
+    const taskId = (await (await sa.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H, data: { competitionIds: [comp] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
     const ps = await (await sa.get("/api/admin/participants?limit=5000")).json();
     const alice = (ps.participants || ps).find((p) => p.email === "alice@acme.com");
     await sa.post("/api/admin/competitions/assign", { headers: H, data: { userIds: [alice.id], competitionIds: [comp] } });

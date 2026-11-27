@@ -567,7 +567,8 @@ test.describe("v7.12.0 — bulk assign challenges to competitions (UI)", () => {
 
     const Database = require("better-sqlite3");
     const db = new Database(TEST_DB_PATH, { readonly: true });
-    let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks WHERE competition_id=? AND task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
+    // Each landed as the event's OWN copy of it (lib/event-copies.js).
+    let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=? AND t.owner_competition_id=ct.competition_id AND t.copied_from_task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
     expect(count, "both selected challenges landed in the competition").toBe(2);
   });
 
@@ -626,7 +627,8 @@ test.describe("v7.12.0 — bulk assign challenges to competitions (UI)", () => {
     await expect(topBtn, "selection cleared → top button hidden again").toBeHidden({ timeout: 8000 });
     const Database = require("better-sqlite3");
     const db = new Database(TEST_DB_PATH, { readonly: true });
-    let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks WHERE competition_id=? AND task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
+    // Each landed as the event's OWN copy of it (lib/event-copies.js).
+    let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=? AND t.owner_competition_id=ct.competition_id AND t.copied_from_task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
     expect(count).toBe(2);
   });
 

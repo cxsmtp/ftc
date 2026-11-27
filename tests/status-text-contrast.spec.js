@@ -240,9 +240,9 @@ test.describe("v8.13.8 — small status text reads at AA in the light theme", ()
       answer_type: "choice", correct_answer: undefined,
       choices: [{ text: mcRightText, correct: true }, { text: mcWrongText }],
     });
-    await assignTask(sa, saCsrf, tAssign.id, [comp.id]);
-    await assignTask(sa, saCsrf, tPts.id, [comp.id]);
-    await assignTask(sa, saCsrf, tMc.id, [comp.id]);
+    Object.assign(tAssign, { bankId: tAssign.id, id: (await assignTask(sa, saCsrf, tAssign.id, [comp.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
+    Object.assign(tPts, { bankId: tPts.id, id: (await assignTask(sa, saCsrf, tPts.id, [comp.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
+    Object.assign(tMc, { bankId: tMc.id, id: (await assignTask(sa, saCsrf, tMc.id, [comp.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
 
     // tHist: v1 created; attachment uploaded, then a tag added (v2: attachments
     // +1); attachment deleted, then the tag removed (v3: attachments −1). The

@@ -84,13 +84,15 @@ test.describe("Request-scoped log context (item #14)", () => {
     expect(tr.ok(), `create task: ${await tr.text()}`).toBeTruthy();
     // Take the id the create RETURNS — resolving by title matches a challenge an
     // earlier test in the same file made (the v8.1.0 fixture trap).
-    const { id: taskId } = await tr.json();
-    expect(taskId, "the create returns the new challenge's id").toBeTruthy();
+    const { id: bankId } = await tr.json();
+    expect(bankId, "the create returns the new challenge's id").toBeTruthy();
 
-    const ar = await api.post(`/api/admin/tasks/${taskId}/competitions`, {
+    const ar = await api.post(`/api/admin/tasks/${bankId}/competitions`, {
       headers: H(csrf), data: { competitionIds: [comp.id] },
     });
     expect(ar.ok(), `assign challenge: ${await ar.text()}`).toBeTruthy();
+    // The event's own copy (lib/event-copies.js): what the event's export carries.
+    const taskId = (await ar.json()).copies[0].task_id;
 
     // Plant an attachment row whose file is not on disk. `size_bytes` is 1 so the
     // export's 96 MB total cap cannot fire and turn this into a 413 instead.

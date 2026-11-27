@@ -93,8 +93,9 @@ test.describe("v8.14.5 — the option order a participant sees", () => {
     // the card dropping esc() around an option's text (participant-tasks.js).
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("card");
-    const id = await mkChoice(sa, csrf, markupOptions(T));
-    const ev = await liveEvent(sa, csrf, "card", [id]);
+    const idBank = await mkChoice(sa, csrf, markupOptions(T));
+    const ev = await liveEvent(sa, csrf, "card", [idBank]);
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "card", [ev.id]);
     await sa.dispose();
 
@@ -118,10 +119,11 @@ test.describe("v8.14.5 — the option order a participant sees", () => {
     // its markers (the correct row drawn empty, the others filled).
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("rev");
-    const single = await mkChoice(sa, csrf, markupOptions(T));
-    const multi = await mkChoice(sa, csrf, [
+    const singleBank = await mkChoice(sa, csrf, markupOptions(T));
+    const multiBank = await mkChoice(sa, csrf, [
       { text: `M1_${T}`, correct: true }, { text: `M2_${T}` }, { text: `M3_${T}`, correct: true }, { text: `M4_${T}` }]);
-    const ev = await liveEvent(sa, csrf, "rev", [single, multi]);
+    const ev = await liveEvent(sa, csrf, "rev", [singleBank, multiBank]);
+    const [single, multi] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "rev", [ev.id]);
     await sa.dispose();
 
@@ -159,9 +161,10 @@ test.describe("v8.14.5 — the option order a participant sees", () => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("mode");
     const opts = (k) => [{ text: `${k}1_${T}`, correct: true }, { text: `${k}2_${T}`, correct: true }, { text: `${k}3_${T}` }];
-    const control = await mkChoice(sa, csrf, opts("C"));
-    const stripped = await mkChoice(sa, csrf, opts("S"));
-    const ev = await liveEvent(sa, csrf, "mode", [control, stripped]);
+    const controlBank = await mkChoice(sa, csrf, opts("C"));
+    const strippedBank = await mkChoice(sa, csrf, opts("S"));
+    const ev = await liveEvent(sa, csrf, "mode", [controlBank, strippedBank]);
+    const [control, stripped] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "mode", [ev.id]);
     await sa.dispose();
 
@@ -194,8 +197,9 @@ test.describe("v8.14.5 — the option order a participant sees", () => {
     // screen with task_changed.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("tok");
-    const id = await mkChoice(sa, csrf, [{ text: `Pick me ${T}`, correct: true }, { text: `Not me ${T}` }, { text: `Other ${T}` }]);
-    const ev = await liveEvent(sa, csrf, "tok", [id]);
+    const idBank = await mkChoice(sa, csrf, [{ text: `Pick me ${T}`, correct: true }, { text: `Not me ${T}` }, { text: `Other ${T}` }]);
+    const ev = await liveEvent(sa, csrf, "tok", [idBank]);
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "tok", [ev.id]);
 
     await signInTo(page, p.email, ev.id);

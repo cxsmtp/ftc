@@ -80,9 +80,12 @@ async function fixture(api, csrf, label) {
     headers: H(csrf), data: { taskIds: [taskId], competitionIds: [prog, comp] },
   });
   expect(at.ok(), `assign task: ${await at.text()}`).toBeTruthy();
-  expect((await at.json()).assigned, "the challenge reached BOTH events").toBe(2);
+  const ab = await at.json();
+  expect(ab.assigned, "the challenge reached BOTH events").toBe(2);
+  // Each event holds its OWN copy (lib/event-copies.js): the card shown in it.
+  const held = Object.fromEntries(ab.copies.map(c => [c.competition_id, c.task_id]));
 
-  return { prog, comp, email, taskId };
+  return { prog, comp, email, taskId, held };
 }
 
 /** Sign in as the fixture participant, enter `compId`, open the challenge. */
@@ -97,7 +100,7 @@ async function openChallenge(page, f, compId) {
   // Wait for the challenge's OWN card — `#main-nav` goes visible for any main
   // page, so it is true before boot has finished routing (the v8.1.0 rule).
   await page.locator("#tasks-page.active").waitFor({ state: "visible", timeout: 20000 });
-  const card = page.locator(`#task-grid [data-task-id="${f.taskId}"]`);
+  const card = page.locator(`#task-grid [data-task-id="${f.held[compId]}"]`);
   await card.waitFor({ state: "visible", timeout: 20000 });
   await card.click();
   await page.locator("#task-detail-page.active").waitFor({ state: "visible", timeout: 15000 });

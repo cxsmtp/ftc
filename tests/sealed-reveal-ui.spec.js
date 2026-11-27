@@ -466,8 +466,9 @@ test.describe("v8.12.2 pre-release review — what a human meets after the fixes
     let payer;
     try {
       const comp = await makeCompetition(sa2, sa2c, "uiehint", { duration_minutes: 120 });
-      await assignTask(sa2, sa2c, P.sealedId, [comp.id]);
-      await assignTask(sa2, sa2c, P.plainId, [comp.id]);
+      // The event's own copies (lib/event-copies.js): what is paid for and shown there.
+      P.sealedId = (await assignTask(sa2, sa2c, P.sealedId, [comp.id])).copies[0].task_id;
+      P.plainId = (await assignTask(sa2, sa2c, P.plainId, [comp.id])).copies[0].task_id;
       payer = await makeParticipant(sa2, sa2c, "uiepayer");
       const stander = await makeParticipant(sa2, sa2c, "uiestander");
       await enrol(sa2, sa2c, comp.id, [payer.id, stander.id]);
@@ -599,7 +600,7 @@ test.describe("v8.12.2 second review — the client follows the fixes", () => {
     let part;
     try {
       const comp = await makeCompetition(sa2, sa2c, "uihhint", { duration_minutes: 120 });
-      await assignTask(sa2, sa2c, P.sealedId, [comp.id]);
+      P.sealedId = (await assignTask(sa2, sa2c, P.sealedId, [comp.id])).copies[0].task_id;   // the event's own copy
       part = await makeParticipant(sa2, sa2c, "uihpart");
       const stander = await makeParticipant(sa2, sa2c, "uihstander");
       await enrol(sa2, sa2c, comp.id, [part.id, stander.id]);

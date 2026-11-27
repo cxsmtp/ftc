@@ -157,8 +157,8 @@ test("the live attention row: what needs you, then 'Nothing needs you'; a failed
     ev = await createEvent(sa.api, sa.csrf, { event_kind: "tournament", start_time: new Date(Date.now() - 600_000).toISOString(), duration_minutes: 240 });
     t1 = await makeTask(sa.api, sa.csrf, "wsoattn1", { correct_answer: "right" });
     t2 = await makeTask(sa.api, sa.csrf, "wsoattn2", { correct_answer: "right" });
-    await assignTask(sa.api, sa.csrf, t1.id, [ev.id]);
-    await assignTask(sa.api, sa.csrf, t2.id, [ev.id]);
+    Object.assign(t1, { bankId: t1.id, id: (await assignTask(sa.api, sa.csrf, t1.id, [ev.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
+    Object.assign(t2, { bankId: t2.id, id: (await assignTask(sa.api, sa.csrf, t2.id, [ev.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
     const hide = await sa.api.patch(`/api/admin/tasks/${t2.id}/visibility`, { headers: H(sa.csrf), data: { active: false } });
     expect(hide.ok(), `hide: ${await hide.text()}`).toBeTruthy();
     p = await makeParticipant(sa.api, sa.csrf, "wsoattnp");

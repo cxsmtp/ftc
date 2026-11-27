@@ -150,8 +150,8 @@ test.describe("v8.12.4 — participant controls", () => {
       const comp = await makeCompetition(sa, csrf, "diff-ui");
       easy = await makeTask(sa, csrf, "diff-easy", { difficulty: "easy" });
       hard = await makeTask(sa, csrf, "diff-hard", { difficulty: "hard" });
-      await assignTask(sa, csrf, easy.id, [comp.id]);
-      await assignTask(sa, csrf, hard.id, [comp.id]);
+      Object.assign(easy, { bankId: easy.id, id: (await assignTask(sa, csrf, easy.id, [comp.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
+      Object.assign(hard, { bankId: hard.id, id: (await assignTask(sa, csrf, hard.id, [comp.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
       p = await makeParticipant(sa, csrf, "diff-ui");
       await enrol(sa, csrf, comp.id, [p.id]);
     } finally { await sa.dispose(); }
@@ -173,7 +173,7 @@ test.describe("v8.12.4 — participant controls", () => {
     try {
       const comp = await makeCompetition(sa, csrf, "stars-ui");
       task = await makeTask(sa, csrf, "stars-ui");
-      await assignTask(sa, csrf, task.id, [comp.id]);
+      Object.assign(task, { bankId: task.id, id: (await assignTask(sa, csrf, task.id, [comp.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
       p = await makeParticipant(sa, csrf, "stars-ui");
       await enrol(sa, csrf, comp.id, [p.id]);
     } finally { await sa.dispose(); }

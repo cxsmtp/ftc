@@ -143,10 +143,11 @@ test.describe("v8.12.6 (F1) — the editor's XHR upload and the commit-time refu
     const { api: sa, csrf } = await apiLogin("superadmin");
     try {
       const comp = await makeCompetition(sa, csrf, label);
-      const t1 = await makeTask(sa, csrf, `${label}1`, { correct_answer: "right" });
-      const t2 = await makeTask(sa, csrf, `${label}2`, { correct_answer: "right" });   // one solve must not end the event
-      await assignTask(sa, csrf, t1.id, [comp.id]);
-      await assignTask(sa, csrf, t2.id, [comp.id]);
+      const b1 = await makeTask(sa, csrf, `${label}1`, { correct_answer: "right" });
+      const b2 = await makeTask(sa, csrf, `${label}2`, { correct_answer: "right" });   // one solve must not end the event
+      // The event's own copies (lib/event-copies.js): the cards its participants open.
+      const t1 = { ...b1, id: (await assignTask(sa, csrf, b1.id, [comp.id])).copies[0].task_id };
+      await assignTask(sa, csrf, b2.id, [comp.id]);
       const p = await makeParticipant(sa, csrf, label);
       await enrol(sa, csrf, comp.id, [p.id]);
       await loginViaApi(page, p.email, PARTICIPANT_PASS);

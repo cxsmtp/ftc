@@ -63,10 +63,11 @@ async function fixture(api, csrf, cap) {
             correct_answer: "correct-one", hint: HINT_TEXT, status: "published", attempt_cap: cap },
   });
   expect(tr.ok(), `create task: ${await tr.text()}`).toBeTruthy();
-  const taskId = (await tr.json()).id;
-  expect(taskId, "the create returns the new challenge's id").toBeTruthy();
-  const asg = await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+  const bankId = (await tr.json()).id;
+  expect(bankId, "the create returns the new challenge's id").toBeTruthy();
+  const asg = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
   expect(asg.ok(), `assign task: ${await asg.text()}`).toBeTruthy();
+  const taskId = (await asg.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
 
   const users = [];
   for (let i = 0; i < 2; i++) {

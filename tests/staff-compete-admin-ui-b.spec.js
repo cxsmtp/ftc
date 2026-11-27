@@ -114,8 +114,8 @@ test.describe("v8.12.0 — the Assign Challenges picker on a switch-on event", (
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("v8.12.0 — the per-challenge Assign to Events dialog", () => {
 
-  async function openAssignDialog(page, title) {
-    const row = await challengeRow(page, title);
+  async function openAssignDialog(page, title, id) {
+    const row = await challengeRow(page, title, id);
     await openKebab(page, row);
     await page.locator('#kebab-portal [data-action="task-assign-to-comps"]').click();
     await expect(page.locator("#assign-task-overlay"), "the dialog opened").toBeVisible({ timeout: 15000 });
@@ -213,7 +213,8 @@ test.describe("v8.12.0 — the per-challenge Assign to Events dialog", () => {
     // name, and a save that changed only an unrelated event would fail. The
     // realistic wrong implementation is `:not(:disabled):checked`.
     await adminPanel(page, competitor.email);
-    await openAssignDialog(page, sealedHinted.title);
+    // The LIBRARY question: its Assign to Events dialog lists every event using it.
+    await openAssignDialog(page, sealedHinted.title, sealedHinted.bankId);
     const mine = dialogRow(page, competeLive.name);
     await expect(mine.locator("input"), "the event they compete in is CHECKED — the challenge is in it").toBeChecked();
     await expect(mine.locator("input"), "…and DISABLED — not theirs to take it out of").toBeDisabled();
@@ -227,7 +228,7 @@ test.describe("v8.12.0 — the per-challenge Assign to Events dialog", () => {
     await expect(page.locator("#assign-task-overlay"), "the dialog closed on success").toBeHidden({ timeout: 15000 });
     await expect(page.locator("#toast-stack")).toContainText(/Challenge assignments updated/, { timeout: 15000 });
     await expect(page.locator("#modal-title")).not.toHaveText(/Some challenges were not added/);
-    await expect.poll(async () => ((await taskRow(sealedHinted.id)).competitions || []).map(c => c.id).sort(),
+    await expect.poll(async () => ((await taskRow(sealedHinted.bankId)).competitions || []).map(c => c.id).sort(),
       { message: "the challenge is in BOTH the compete event and the added one", timeout: 10000 })
       .toEqual(expect.arrayContaining([competeLive.id, hUpOff.id]));
   });

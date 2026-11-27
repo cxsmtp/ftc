@@ -351,7 +351,7 @@ async function linkAtRest(page, loc, what, theme) {
 let sa, saCsrf;
 let p1, p2, u, sa2;
 let comp, pend, task, sessComp, slot;
-let p3, dlComp, dlTask, dlAttach;
+let p3, dlComp, dlTask, dlAttach, dlCopy, dlCopyAttach;
 const LINK_HREF = "https://example.com/x";
 const AUTHOR_NAME = "Ada Hover";
 const AUTHOR_LINKEDIN = "https://www.linkedin.com/in/example";
@@ -409,7 +409,7 @@ test.describe("v8.13.9 — a hover or a pulse never fades text", () => {
       expect(t && t.author_name, "PRECONDITION: the challenge stored its author").toBe(AUTHOR_NAME);
       expect(t && t.author_linkedin, "PRECONDITION: the challenge stored its author's LinkedIn URL").toBe(AUTHOR_LINKEDIN);
     }
-    await assignTask(sa, saCsrf, task.id, [comp.id]);
+    task = { ...task, id: (await assignTask(sa, saCsrf, task.id, [comp.id])).copies[0].task_id };   // the event's own copy (lib/event-copies.js): what its participants open and answer
     await enrol(sa, saCsrf, comp.id, [p1.id]);
 
     // ── the upcoming tournament whose session the scope banner offers to Start Now ──
@@ -482,7 +482,11 @@ test.describe("v8.13.9 — a hover or a pulse never fades text", () => {
       expect((Array.isArray(listed) ? listed : []).map(a => a.id), "PRECONDITION: the challenge holds exactly that one attachment")
         .toEqual([dlAttach.id]);
     }
-    await assignTask(sa, saCsrf, dlTask.id, [dlComp.id]);
+    // The event's own copy (lib/event-copies.js), with its own row for the same file:
+    // the participant's card names those; the library preview names the bank's.
+    dlCopy = { ...dlTask, id: (await assignTask(sa, saCsrf, dlTask.id, [dlComp.id])).copies[0].task_id };
+    dlCopyAttach = (await (await sa.get(`/api/admin/tasks/${dlCopy.id}/attachments`)).json())[0];
+    expect(dlCopyAttach && dlCopyAttach.display_name, "PRECONDITION: the copy carries the attachment").toBe(DL_NAME);
     await enrol(sa, saCsrf, dlComp.id, [p3.id]);
     const all = await (await sa.get("/api/admin/competitions")).json();
     const live = (Array.isArray(all) ? all : all.competitions || []).find(c => c.id === dlComp.id);
@@ -623,15 +627,15 @@ test.describe("v8.13.9 — a hover or a pulse never fades text", () => {
     await page.goto("/");
     expect(await themeOf(page), "PRECONDITION: the default theme is light").toBe("light");
     await clickChallengesNav(page);
-    const open = page.locator(`[data-action="task-open"][data-task-id="${dlTask.id}"]`);
+    const open = page.locator(`[data-action="task-open"][data-task-id="${dlCopy.id}"]`);
     await open.waitFor({ state: "visible", timeout: 20000 });
     await open.click();
     await expect(page.locator("#task-detail-card .qa-title"), "the challenge's card is open").toHaveText(dlTask.title, { timeout: 15000 });
 
     const card = page.locator("#task-detail-card");
-    const uploaded = card.locator(`a.task-detail-attachment-link[href="/api/tasks/${dlTask.id}/attachments/${dlAttach.id}"]`);
+    const uploaded = card.locator(`a.task-detail-attachment-link[href="/api/tasks/${dlCopy.id}/attachments/${dlCopyAttach.id}"]`);
     const legacy = card.locator(`a[href="${LEGACY_URL}"]`);
-    const twin = card.locator(`[data-action="task-reveal-hint"][data-task-id="${dlTask.id}"]`);
+    const twin = card.locator(`[data-action="task-reveal-hint"][data-task-id="${dlCopy.id}"]`);
     const desc = card.locator(`.task-desc a[href="${LINK_HREF}"]`);
     const byline = card.locator(`a[href="${AUTHOR_LINKEDIN}"]`);
     await expect(uploaded, "the card offers the uploaded attachment").toContainText(DL_NAME);

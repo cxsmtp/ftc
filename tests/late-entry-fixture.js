@@ -151,7 +151,7 @@ async function liveBooth(api, csrf, opts = {}) {
     const id = (await t.json()).id;
     const asg = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign task: ${await asg.text()}`).toBeTruthy();
-    taskIds.push(id);
+    taskIds.push((await asg.json()).copies[0].task_id);   // the event's own copy (lib/event-copies.js): what is opened and answered there
   }
   return { comp, taskIds };
 }

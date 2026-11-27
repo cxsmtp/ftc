@@ -61,7 +61,7 @@ test.beforeAll(async () => {
     F.tasks = [];
     for (const l of ["a", "b", "c"]) {
       const t = await makeTask(sa, csrf, `sticky-${l}`);
-      await assignTask(sa, csrf, t.id, [F.play.id]);
+      Object.assign(t, { bankId: t.id, id: (await assignTask(sa, csrf, t.id, [F.play.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
       F.tasks.push(t);
     }
     F.p = await makeParticipant(sa, csrf, "sticky-p");

@@ -37,7 +37,9 @@ const uniq = (p) => `${p} ${Date.now().toString(36)}${Math.random().toString(36)
 const ro = () => new Database(TEST_DB_PATH, { readonly: true });
 const dbAll = (sql, ...a) => { const db = ro(); try { return db.prepare(sql).all(...a); } finally { db.close(); } };
 const dbGet = (sql, ...a) => { const db = ro(); try { return db.prepare(sql).get(...a); } finally { db.close(); } };
-const eventsOfTask = (taskId) => dbAll("SELECT competition_id FROM competition_tasks WHERE task_id=?", taskId).map((r) => r.competition_id);
+// The events holding a challenge: itself, or (a bank question) the event's own copy
+// of it, which is what a tick puts in (lib/event-copies.js).
+const eventsOfTask = (taskId) => dbAll("SELECT ct.competition_id FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE t.id=? OR (t.copied_from_task_id=? AND t.owner_competition_id=ct.competition_id)", taskId, taskId).map((r) => r.competition_id);
 const eventsNamed = (name) => dbAll("SELECT id FROM competitions WHERE name=?", name).map((r) => r.id);
 const dateIn = (days) => new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
 

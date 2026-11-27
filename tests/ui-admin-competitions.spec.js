@@ -1074,8 +1074,8 @@ test.describe("v7.15.0 — admin rankings columns + sorting", () => {
         title: `RkSortTask ${tag} ${n}`, description: "<p>x</p>", difficulty: n === 1 ? "easy" : "medium",
         answer_type: "text", correct_answer: `a${n}`, status: "published",
       }})).json()).id;
-      await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: jsonH, data: { competitionIds: [compId] } });
-      taskIds.push(id);
+      const ar = await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: jsonH, data: { competitionIds: [compId] } });
+      taskIds.push((await ar.json()).copies[0].task_id);   // the event's own copy (lib/event-copies.js): the row its submissions name
     }
     const ids = [];
     const dbW = new Database(TEST_DB_PATH);

@@ -71,9 +71,11 @@ async function makeTask(api, csrf, { answer_type = "text", tags = [] } = {}) {
   return { id, title };
 }
 
+/** `copy`: the question the event now holds — its OWN copy of a bank question (lib/event-copies.js). */
 async function assign(api, csrf, taskId, compId) {
   const r = await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
-  return { status: r.status(), body: await r.json().catch(() => ({})) };
+  const body = await r.json().catch(() => ({}));
+  return { status: r.status(), body, copy: body.copies && body.copies[0] ? body.copies[0].task_id : null };
 }
 
 async function makeParticipant(api, csrf) {
@@ -223,8 +225,10 @@ test.describe("v8.1.0 — a Booth Event only holds answerable challenges", () =>
   test("REORDERING is closed: a challenge already at a live Booth Event cannot be edited into an unanswerable one", async () => {
     const { api, csrf } = await sa();
     const booth = await makeEvent(api, csrf, "booth");
-    const task = await makeTask(api, csrf);
-    expect((await assign(api, csrf, task.id, booth.id)).status, "precondition: it assigns while answerable").toBe(200);
+    const bank = await makeTask(api, csrf);
+    const asg = await assign(api, csrf, bank.id, booth.id);
+    expect(asg.status, "precondition: it assigns while answerable").toBe(200);
+    const task = { ...bank, id: asg.copy };   // the Booth Event's own copy: the challenge "already at" it
 
     // (a) change the answer type
     const cur = await taskRow(api, task.id);
@@ -348,10 +352,13 @@ test.describe("v8.1.0 — a Booth Event only holds answerable challenges", () =>
     // belongs.
     const { api, csrf } = await sa();
     const booth = await makeEvent(api, csrf, "booth", { self_enroll_enabled: true });
-    const t1 = await makeTask(api, csrf);
-    const t2 = await makeTask(api, csrf, { tags: ["category:web"] });
-    expect((await assign(api, csrf, t1.id, booth.id)).status).toBe(200);
-    expect((await assign(api, csrf, t2.id, booth.id)).status).toBe(200);
+    const b1 = await makeTask(api, csrf);
+    const b2 = await makeTask(api, csrf, { tags: ["category:web"] });
+    const a1 = await assign(api, csrf, b1.id, booth.id), a2 = await assign(api, csrf, b2.id, booth.id);
+    expect(a1.status).toBe(200);
+    expect(a2.status).toBe(200);
+    // The event's own copies are what its participants are served.
+    const t1 = { ...b1, id: a1.copy }, t2 = { ...b2, id: a2.copy };
 
     const p = await makeParticipant(api, csrf);
     const ctx = await signIn(p.email);

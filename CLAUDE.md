@@ -1919,6 +1919,7 @@ Known, not yet fixed and not accepted. Listed so an audit does not file them as 
 
 #### Admin flows
 
+- **Event-owned questions (stage A) leave three things undecided:** the challenge import's overwrite reaches only library (bank) rows, never an event's same-titled copy; platform-wide analytics lists each event's copy as a row of its own (no grouping by origin); and the competitor lock follows LINEAGE (`competitorEventsForTask`: a question, its bank question and every copy), which refuses a competitor more than the event they compete in strictly needs.
 - **An existing waiting account invited by a role that cannot approve** is skipped and reported in that invitation's result (`skippedUnapproved`), and nothing records the invitation afterwards: its organiser is not shown it waiting.
 - **The competition save is not one transaction.** Session bulk-delete commits before the PUT (a refused PUT leaves them gone; the toast appends `_seam`), `validate_only` misses in-transaction refusals, and the dry-run tag sync after it is best-effort. The fix is one save endpoint shaped like the form.
 - Not re-checked at commit: admin reads that disclose after an await (`GET /api/admin/export/tasks`, `GET /api/admin/logs`, the single admin certificate PDF and image downloads; the top-three ZIP and the full event and person exports do, through `{read:true}`), and an event admin's scope at the badge mint (only the hand's lifecycle and tier).

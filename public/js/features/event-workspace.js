@@ -1638,7 +1638,10 @@ function _renderOverviewTasks(c) {
   // hiding the pressed toggle would drop focus to <body>.
   if (more && document.activeElement !== more) more.hidden = true;
   const status = computeCompStatus(c);
-  const tasks = (S.adminTasksData || []).filter(t => (t.competitions || []).some(x => x.id === c.id));
+  // The questions the event holds: its own copies (and a row it holds itself). A
+  // bank question's entry naming the event's copy (`copy_id`) stands for that copy,
+  // which is listed in its own right (lib/event-copies.js): never list both.
+  const tasks = (S.adminTasksData || []).filter(t => (t.competitions || []).some(x => x.id === c.id && !x.copy_id));
   const focusKey = a => { const id = a.closest('[data-task-id]')?.dataset.taskId; return id ? `[data-action="ws-task-facts"][data-task-id="${CSS.escape(id)}"]` : null; };
   if (!tasks.length && (c.task_count || 0) > 0) { _paintKeepingFocus(el, '<p class="ws-empty">Loading…</p>', focusKey); return; }
   if (!tasks.length) {

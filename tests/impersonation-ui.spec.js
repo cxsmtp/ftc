@@ -137,11 +137,11 @@ async function ensureCertFixture() {
     const compId = (await (await api.post("/api/admin/competitions", { headers: H, data: {
       name: `ImpUI Cert ${stamp}`, start_time: new Date(Date.now() - 20 * 60_000).toISOString(), duration_minutes: 300,
     }})).json()).competition.id;
-    const taskId = (await (await api.post("/api/admin/tasks", { headers: H, data: {
+    const bankId = (await (await api.post("/api/admin/tasks", { headers: H, data: {
       title: `ImpUI Cert Task ${stamp}`, description: "<p>solve me</p>", difficulty: "easy",
       answer_type: "text", correct_answer: "cert-answer", explanation: "<p>e</p>", status: "published",
     }})).json()).id;
-    await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H, data: { competitionIds: [compId] } });
+    const taskId = (await (await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
     const tgtEmail = `impui-cert-${stamp}@acme.com`;
     const tgtId = await mkParticipant(api, H, tgtEmail, `impui_cert_${stamp}`.slice(0, 30));
     const asg = await api.post("/api/admin/competitions/assign", { headers: H, data: { userIds: [tgtId], competitionIds: [compId] } });
@@ -206,8 +206,7 @@ test.beforeAll(async () => {
       title: `ImpUI ${slug} ${stamp}`, description: "<p>solve me</p>", difficulty: "easy",
       answer_type: "text", correct_answer: "impui-answer", explanation: "<p>e</p>", hint: "a hint", status: "published",
     }})).json()).id;
-    await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H, data: { competitionIds: [compId] } });
-    return id;
+    return (await (await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
   };
   const taskSubmit = await mkTask("Submit");
   const taskCancel = await mkTask("Cancel");

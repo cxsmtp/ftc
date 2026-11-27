@@ -1277,7 +1277,7 @@ test.describe("Participant core flows (v6.20.x)", () => {
         title: `SubmitFlow ${stamp}`, description: "<p>Answer me.</p>", difficulty: "easy",
         answer_type: "text", correct_answer: "the-right-answer", explanation: "—", status: "published",
       }})).json()).id;
-      await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [liveComp.id] } });
+      taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [liveComp.id] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
       me = await createAssignedParticipant(sa, h, liveComp.id);
 
       await enterCompAsParticipant(page, me.email, liveComp.id);
@@ -1553,8 +1553,8 @@ test.describe("v7.11.0 — participant team/group leaderboard", () => {
     // v7.11.7 — the board is opt-in AND needs >=2 non-empty teams, so enable it and
     // bind the viewer's Squad + a Rivals team.
     const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: `PTeam ${t}`, start_time: new Date(t - 60_000).toISOString(), duration_minutes: 240, group_leaderboard_enabled: true } })).json()).competition.id;
-    const taskId = (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title: `PTeam-T ${t}`, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [compId] } });
+    let taskId = (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title: `PTeam-T ${t}`, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
+    taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     // Fresh verified+approved participants with a known password.
     const mkParticipant = async (nick) => {
       const em = `pteam_${nick}_${t}@acme.com`;

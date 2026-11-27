@@ -44,9 +44,11 @@ test.beforeAll(async () => {
       title: `Which transport encrypts the session? ${uniq()}`, description: "<p>Pick one.</p>", difficulty: "easy",
       status: "published", answer_type: "choice", choices: SHORT } });
     expect(r.ok(), `create challenge: ${await r.text()}`).toBeTruthy();
-    const taskId = (await r.json()).id;
-    const a = await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
-    expect((await a.json()).assigned, "the challenge is really assigned").toBe(1);
+    const bankId = (await r.json()).id;
+    const a = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+    const ab = await a.json();
+    expect(ab.assigned, "the challenge is really assigned").toBe(1);
+    const taskId = ab.copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
     const p = await participantIn(api, csrf, comp.id, `fc${uniq()}`);
     await participantIn(api, csrf, comp.id, `fcidle${uniq()}`);
     fx = { comp, taskId, p };

@@ -116,6 +116,8 @@ test.describe("The admin preview renders code like the participant view (v7.20.4
     const asg = await page.request.post(`/api/admin/tasks/${taskId}/competitions`, {
       headers: GUH(csrf), data: { competitionIds: [live.id] } });
     expect(asg.ok(), `assign: ${await asg.text()}`).toBeTruthy();
+    // The event's own copy (lib/event-copies.js): the card its participant opens.
+    const heldId = (await asg.json()).copies[0].task_id;
     const reader = await makeParticipant(page.request, csrf, "codeblk");
     await enrol(page.request, csrf, live.id, [reader.id]);
 
@@ -153,7 +155,7 @@ test.describe("The admin preview renders code like the participant view (v7.20.4
     await page.locator("#main-nav").waitFor({ state: "visible", timeout: 20000 });
     await page.locator("#nav-challenges:not([aria-disabled=true])").waitFor({ state: "visible", timeout: 20000 });
     await page.locator("#nav-challenges:not([aria-disabled=true])").click();
-    await page.locator(`[data-action="task-open"][data-task-id="${taskId}"]`).click();
+    await page.locator(`[data-action="task-open"][data-task-id="${heldId}"]`).click();
     await page.locator("#task-detail-card pre code").first().waitFor({ state: "visible", timeout: 15000 });
     const partStyle = await page.locator("#task-detail-card pre code").first().evaluate((el) => {
       const cs = getComputedStyle(el);

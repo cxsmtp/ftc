@@ -172,8 +172,9 @@ test.describe("v8.11.11 — a failed read never claims the thing is empty", () =
           title: `DegSub T${n} ${Date.now()}`, description: "d", difficulty: "easy",
           answer_type: "text", correct_answer: "right", status: "published" } });
         const tid = (await tr.json()).id;
-        tids.push(tid);
-        await sa.post(`/api/admin/tasks/${tid}/competitions`, { headers: { "x-csrf-token": csrf }, data: { competitionIds: [comp.id] } });
+        const ar = await sa.post(`/api/admin/tasks/${tid}/competitions`, { headers: { "x-csrf-token": csrf }, data: { competitionIds: [comp.id] } });
+        expect(ar.ok(), await ar.text()).toBeTruthy();
+        tids.push((await ar.json()).copies[0].task_id);   // the event's own copy (lib/event-copies.js): the card its participant opens
       }
       const asg = await sa.post("/api/admin/competitions/assign",
         { headers: { "x-csrf-token": csrf }, data: { competitionIds: [comp.id], userIds: [me.id] } });

@@ -77,7 +77,7 @@ async function fixture(api, csrf) {
     expect(id, "the create returns the new challenge's id").toBeTruthy();
     const asg = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign ${data.title}: ${await asg.text()}`).toBeTruthy();
-    return { id, title: data.title };
+    return { id: (await asg.json()).copies[0].task_id, title: data.title };   // the event's own copy (lib/event-copies.js): what its participants open and answer
   };
   const anyTask = await mkTask({
     title: `${uniq()} Any`, description: "<p>Say anything.</p>", difficulty: "easy",

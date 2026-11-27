@@ -65,7 +65,7 @@ async function eventWithChoices(api, csrf, { kind = "booth", cap = 3, tasks = [{
     const id = (await r.json()).id;
     const a = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(a.ok(), `assign: ${await a.text()}`).toBeTruthy();
-    ids.push(id);
+    ids.push((await a.json()).copies[0].task_id);   // the event's own copy (lib/event-copies.js): what is opened and answered there
   }
   return { comp, ids };
 }

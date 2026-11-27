@@ -90,10 +90,11 @@ test.beforeAll(async () => {
             answer_type: "text", correct_answer: "k", status: "published" },
   });
   expect(tr.ok(), `challenge: ${tr.status()} ${await tr.text()}`).toBeTruthy();
-  taskId = (await tr.json()).id;
-  const asn = await sa.post(`/api/admin/tasks/${taskId}/competitions`,
+  const bankId = (await tr.json()).id;
+  const asn = await sa.post(`/api/admin/tasks/${bankId}/competitions`,
     { headers: H(saCsrf), data: { competitionIds: [compId] } });
   expect(asn.ok(), `assign challenge: ${asn.status()} ${await asn.text()}`).toBeTruthy();
+  taskId = (await asn.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
 
   const asg = await sa.post("/api/admin/competitions/assign",
     { headers: H(saCsrf), data: { userIds: [participant.id], competitionIds: [compId] } });

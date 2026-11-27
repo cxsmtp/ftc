@@ -278,10 +278,11 @@ test.describe("Participant: a text challenge with several accepted answers (v8.9
       explanation: "<p>Either colour is on it.</p>",
       correct_answer: "red\nblue" } });
     expect(tr.ok(), `create task: ${tr.status()} ${await tr.text()}`).toBeTruthy();
-    const taskId = (await tr.json()).id;
+    let taskId = (await tr.json()).id;
     expect(taskId, "the create returns the new challenge's id").toBeTruthy();
     const asg = await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H, data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign task: ${asg.status()} ${await asg.text()}`).toBeTruthy();
+    taskId = (await asg.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
 
     // TWO participants, ONE of whom submits — so the all-solved auto-end cannot
     // fire under the test and the end below is the test's own deliberate act.

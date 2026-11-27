@@ -573,8 +573,9 @@ test.describe("v7.20.11 — the participant challenge list counts", () => {
           answer_type: "text", correct_answer: ANSWER, status: "published",
         }})).json()).id;
         expect(id, `challenge ${n} created`).toBeTruthy();
-        await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: SH, data: { competitionIds: [live.id] } });
-        myTasks.push(id);
+        const ar = await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: SH, data: { competitionIds: [live.id] } });
+        expect(ar.ok(), await ar.text()).toBeTruthy();
+        myTasks.push((await ar.json()).copies[0].task_id);   // the event's own copy (lib/event-copies.js): what its participants open and answer
       }
       expect((await registerPost(sa, "/api/register", { headers: SH, data: {
         firstName: "Lc", lastName: "Solve", nickname: `lc_${tag}`, email,

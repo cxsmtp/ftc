@@ -246,7 +246,9 @@ test.describe("Templates — the editor", () => {
     expect(nr.ok(), `numbering read: ${await nr.text()}`).toBeTruthy();
     const db = new Database(TEST_DB_PATH, { readonly: true });
     let got;
-    try { got = Object.fromEntries(db.prepare("SELECT task_id, task_number FROM competition_tasks WHERE competition_id=?").all(evId).map((r) => [r.task_id, r.task_number])); }
+    // The event holds its OWN copy of each (lib/event-copies.js): keyed by the
+    // library question it was copied from.
+    try { got = Object.fromEntries(db.prepare("SELECT COALESCE(t.copied_from_task_id, ct.task_id) AS origin, ct.task_number FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=?").all(evId).map((r) => [r.origin, r.task_number])); }
     finally { db.close(); }
     // The numbers the editor's order means: a counter per difficulty, in that order.
     const level = { easy: 1, medium: 2, hard: 3 }, count = {};

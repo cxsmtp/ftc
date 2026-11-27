@@ -164,9 +164,10 @@ test.describe("v8.11.1 F3 — blocking or unenrolling stops a submission that is
       title: `F3 ${uniq("t")}`, description: "<p>d</p>", difficulty: "easy",
       answer_type: "file", correct_answer: "win", status: "published" } });
     expect(tr.ok(), `task: ${tr.status()} ${await tr.text()}`).toBeTruthy();
-    taskId = (await tr.json()).id;
-    const asn = await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(saCsrf), data: { competitionIds: [compId] } });
+    const bankId = (await tr.json()).id;
+    const asn = await sa.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(saCsrf), data: { competitionIds: [compId] } });
     expect(asn.ok()).toBeTruthy();
+    taskId = (await asn.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): the row an answer names
   });
   test.afterAll(async () => { await sa?.dispose(); });
 

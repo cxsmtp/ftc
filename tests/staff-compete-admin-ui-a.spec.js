@@ -1061,15 +1061,17 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     // a browser signs in as it) puts it into the far compete event pAuth does
     // NOT organise. Removed again in `finally`, so the (d) switch arm's fixture
     // is byte-identical afterwards.
-    await assignTask(reader.api, reader.csrf, aSealed.id, [far.id]);
+    // The author's LIBRARY row (the Challenges page lists it; each event holds its
+    // own copy, lib/event-copies.js): the far event takes a copy of it.
+    const farCopy = (await assignTask(reader.api, reader.csrf, aSealed.bankId, [far.id])).copies[0].task_id;
     try {
       await adminPanel(page, pAuth.email);
       await clickTab(page, "Challenges");
       await expect.poll(() => page.evaluate(() => (window.adminTasksData || []).length), { timeout: 20000 }).toBeGreaterThan(0);
-      const row = await page.evaluate(id => (window.adminTasksData || []).find(t => t.id === id), aSealed.id);
+      const row = await page.evaluate(id => (window.adminTasksData || []).find(t => t.id === id), aSealed.bankId);
       expect(row.competitions.map(c => c.id), "PRECONDITION: the far event is withheld from the author's row").toEqual([aUp.id]);
       expect(row.withheld_compete, "PRECONDITION: …and the row says it competes").toBe(true);
-      await page.evaluate(id => window.editTask(id), aSealed.id);
+      await page.evaluate(id => window.editTask(id), aSealed.bankId);
       await expect(page.locator("#admin-task-form")).toBeVisible();
       await expect(page.locator("#tf-unseal-row"), "the Unseal tick is withheld — the save would meet the scoped 409").toBeHidden();
       const held = page.locator("#tf-unseal-held-note");
@@ -1079,7 +1081,7 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
       await expect(held, "the remedy is that event's organiser — not 'take it out first', which this actor cannot").toContainText(/that event.s organiser/i);
       await expect(held, "…so the imperative offered on an in-scope event is not offered here").not.toContainText(/Take it out of/);
     } finally {
-      const r = await reader.api.delete(`/api/admin/tasks/${aSealed.id}/competitions/${far.id}`, { headers: H(reader.csrf) });
+      const r = await reader.api.delete(`/api/admin/tasks/${farCopy}/competitions/${far.id}`, { headers: H(reader.csrf) });
       expect(r.ok(), `unassign aSealed from the far event: ${r.status()} ${await r.text()}`).toBeTruthy();
     }
     // CONTROL — with the far event gone the same author is offered the tick
@@ -1087,8 +1089,8 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     await page.reload();
     await page.locator("#admin-page").waitFor({ state: "visible", timeout: 30000 });
     await clickTab(page, "Challenges");
-    await expect.poll(() => page.evaluate(id => !!(window.adminTasksData || []).find(t => t.id === id && !t.withheld_compete), aSealed.id), { timeout: 20000 }).toBe(true);
-    await page.evaluate(id => window.editTask(id), aSealed.id);
+    await expect.poll(() => page.evaluate(id => !!(window.adminTasksData || []).find(t => t.id === id && !t.withheld_compete), aSealed.bankId), { timeout: 20000 }).toBe(true);
+    await page.evaluate(id => window.editTask(id), aSealed.bankId);
     await expect(page.locator("#admin-task-form")).toBeVisible();
     await expect(page.locator("#tf-unseal-row"), "CONTROL: offered once no compete event holds it").toBeVisible();
     await expect(page.locator("#tf-unseal-held-note"), "CONTROL: …and no hold is reported").toBeHidden();
