@@ -749,7 +749,8 @@ Click **Leaderboard** for live rankings.
 ![Leaderboard](../screenshots/participant/07-leaderboard.png)
 
 Ranking is by **score** (highest first), then by **finish time** (faster
-first) among ties. The top three stand on a **podium**, and the table below
+first) among ties. Your time is measured from **when your clock started** —
+see *When your clock starts* below. The top three stand on a **podium**, and the table below
 starts at rank 4. Your own row is highlighted, and the board updates by itself:
 soon after a score on it changes, and at least once a minute. When the event
 ends, an open board turns into the **Final standings** by itself within a
@@ -1152,6 +1153,30 @@ is no leave control, so ask an organiser to take you out.
   them to remove you instead.
 - An event that has already finished cannot be left.
 
+## When your clock starts
+
+Your **time to solve** — what separates you from someone with the same score —
+is measured from a starting moment, and on most events that moment is **when you
+open your first challenge**, not when the event began or when you arrived. The
+challenge list says so:
+
+> Your time to solve starts when you open your first challenge, not when you arrive.
+
+So arriving late, waiting in the lobby, or reading the list of challenges costs
+you nothing. Your clock starts the first time you open a challenge that scores
+points (answering one, or asking for a hint, before you have opened anything
+also starts it). The **Quick questions** at the end of the list do not start
+it. Until your clock has started you are not on the leaderboard yet. Opening
+more challenges, leaving and coming back, or being removed from the event and
+added again never restarts it.
+
+The countdown at the top still shows how long the **event** has left: your own
+clock does not change when the event ends.
+
+Some events — every event set up before this rule, and any whose organiser
+chose so — start your clock **when you enter the event** instead, and say
+nothing about it on the list.
+
 ## Time on platform
 
 Some events record how much time you spend on the platform. Where they do, you
@@ -1162,7 +1187,8 @@ will see it said on the event itself:
 It counts five-minute blocks in which you were actually doing something —
 typing, clicking, scrolling. Leaving a tab open in the background does not count,
 and neither does anything you do after you have finished every challenge, so
-there is nothing to gain by staying logged in.
+there is nothing to gain by staying logged in. On an event that starts your clock
+at your first challenge, nothing counts before you open one either.
 
 Organisers use it to tell a five-day event apart from five days of elapsed time.
 On some events it also breaks a tie between equal scores, in which case finishing

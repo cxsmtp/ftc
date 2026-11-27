@@ -619,6 +619,15 @@ export async function loadTasks(){
     const _c=_list.find(c=>c.id===S.currentCompetitionId);
     _pn.hidden=!(_c&&_c.measure_presence);
   }
+  // When the solve clock starts: said on an event that starts it at the first
+  // challenge (the server's answer, `clock_starts_at_first_open`), from the same
+  // row the presence note reads.
+  const _cn=document.getElementById('clock-note');
+  if(_cn){
+    const _list=(S.currentUser&&S.currentUser.competitions)||S.myCompetitions||[];
+    const _c=_list.find(c=>c.id===S.currentCompetitionId);
+    _cn.hidden=!(_c&&_c.clock_starts_at_first_open===true);
+  }
   // Show competition + session context
   const compLabel=document.getElementById('tasks-comp-label');
   if(compLabel){

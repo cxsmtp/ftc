@@ -1359,6 +1359,17 @@ export function openCompetitionForm(editId,opts){
   // two settings the platform accepts-and-ignores — so hiding it is what turns a
   // control that appears to work into one that is simply absent.
   const showTieBreak=showPresence&&pol.ranking_enabled!==false;
+  // When each participant's solve clock starts (clock_start_forbidden): offered
+  // only where the kind may start it at the first open, i.e. never on a Program.
+  const showClockStart=pol.clock_start==='allowed';
+  // The value shown: the event's own on an edit (or a template's), else the
+  // kind's create seed — never a client literal, so the server's
+  // `=== undefined` branch stays reachable.
+  const _clockStartInit=(src&&(src.clock_start==='first_open'||src.clock_start==='entry'))?src.clock_start
+    :(((_kinds.find(k=>k.value===kind)||{}).defaults||{}).clock_start==='entry'?'entry':'first_open');
+  // Withheld, with its reason, exactly where the PUT refuses `clock_start_locked`
+  // (`clock_start_locked` rides the admin row from the same predicate).
+  const _csLocked=comp?(comp.clock_start_locked||null):null;
   const showTrusted=pol.trusted_networks!=='never';        // trusted_networks_forbidden
   // The kind's own CREATE-time default for the CxOne opt-out. Until v8.2.0 the
   // form sent this field unconditionally, so `cxoneDisabledDefault` was dead for
@@ -1920,6 +1931,25 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
       </p>`:''}
     </div>`:''}
 
+    <!-- WHEN EACH PARTICIPANT'S CLOCK STARTS (owner decision, 27 Nov 2026).
+         Rendered only where the kind may start it at the first challenge (never
+         a Program, which does not rank). Locked once the event has started
+         (server: clock_start_locked), shown disabled with the reason so an
+         admin reading a running event still sees what it was set to. -->
+    ${showClockStart?`<div class="form-group" style="margin-top:12px">
+      <div class="help-label-row"><label for="comp-clock-start">Start each participant&rsquo;s clock</label><span data-help="event.clock" data-help-label="Clock start"></span></div>
+      <select id="comp-clock-start" ${_csLocked?'disabled':''} aria-describedby="comp-clock-start-hint">
+        <option value="first_open" ${_clockStartInit==='first_open'?'selected':''}>When they open their first challenge</option>
+        <option value="entry" ${_clockStartInit==='entry'?'selected':''}>When they enter the event</option>
+      </select>
+      <p class="comp-form-reveal-hint" id="comp-clock-start-hint">
+        Time to solve breaks score ties. With <strong>When they open their first challenge</strong>,
+        each participant&rsquo;s time starts when they first open a scoring challenge (or answer or
+        ask for a hint, if that comes first), so arriving late or reading the list is not counted.
+        Quick questions do not start it. Until it starts, a participant is not on the leaderboard.
+      </p>
+      ${_csLocked?`<p class="comp-form-cxone-note" id="comp-clock-start-lock-note" style="margin:6px 0 0 0">${ICO.lock} Locked: the event has started, so every participant&rsquo;s time is already being measured this way.</p>`:''}
+    </div>`:''}
 
     <!-- v7.8.1 — mark event as internal (dry run / testing). Backed by
          the permanent internal event tag: create seeds it via
@@ -2776,6 +2806,9 @@ function _collectSharedCompFields(){
     staff_compete:_optCheck('comp-staff-compete'),
     // Not a checkbox pair but the same rule: absent control, absent field.
     time_basis:tb?(tb.checked?'presence':'elapsed'):undefined,
+    // Absent control, absent field. A DISABLED (locked) select still reports the
+    // stored value, which the server treats as an echo, never a change.
+    clock_start:document.getElementById('comp-clock-start')?.value||undefined,
     trusted_network_ips:_collectTrustedIps(),
     // v8.4.0 — both `undefined` when the section is not rendered for this kind.
     registration_fields:_collectRegistrationFields(),
@@ -3195,6 +3228,7 @@ function _compRowHolds(row,body){
     if(_ROW_FLAG_KEYS.has(k))return !!v===!!row[k];
     if(k==='name')return String(v).trim()===row.name;
     if(k==='time_basis')return (v||'elapsed')===(row.time_basis||'elapsed');
+    if(k==='clock_start')return (v||'entry')===(row.clock_start||'entry');
     if(k==='trusted_network_ips')return _ipSet(v)===_ipSet(row.trusted_network_ips);
     if(k==='registration_fields'){
       const st=(row.policy&&row.policy.registration_fields)||{};
@@ -3295,6 +3329,7 @@ export async function saveCompetition(){
   // is about — so they are wired up here rather than left for later.
   if(fd.measure_presence!==undefined)body.measure_presence=fd.measure_presence;
   if(fd.time_basis!==undefined)body.time_basis=fd.time_basis;
+  if(fd.clock_start!==undefined)body.clock_start=fd.clock_start;
   // v8.12.0 — the same class, caught by the feature's own browser lock before it
   // shipped: `_collectSharedCompFields` read the box and this block never sent
   // it, so "Staff can compete" was a control that appeared to work. A DISABLED

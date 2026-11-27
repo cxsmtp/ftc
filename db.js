@@ -2076,6 +2076,16 @@ try {
   // choice there. Written by PUT .../look, so inside this fatal block.
   add("event_look", "event_look TEXT");
   add("event_look_locked", "event_look_locked INTEGER NOT NULL DEFAULT 0");
+  // WHEN A PARTICIPANT'S SOLVE CLOCK STARTS (owner decision, 27 Nov 2026):
+  // `first_open` — at their first open of a scoring challenge (or first answer or
+  // hint, if earlier), so time spent arriving and reading the list is not
+  // counted; `entry` — when they enter the live event, the rule every event
+  // before this column ran on. THE DEFAULT IS ITS BACKFILL: every existing row
+  // becomes `entry`, so no finished or running board changes its ranking basis.
+  // A new Booth Event or Competition is created `first_open` from the kind's
+  // seed (lib/event-policy.js `clockStartDefault`). Inside this fatal block
+  // because the create INSERT names it.
+  add("clock_start", "clock_start TEXT NOT NULL DEFAULT 'entry' CHECK(clock_start IN ('first_open','entry'))");
 
   // Three ALTERs are three autocommit statements, so VERIFY rather than assume.
   // A partial apply is the same wrong state as a total failure, and only a
@@ -2084,7 +2094,7 @@ try {
   const missing = ["event_kind", "registration_field_policy", "linkedin_signup_enabled",
     "deadline_at", "time_basis",
     "measure_presence", "auto_end_on_all_solved", "attempt_cap",
-    "join_code", "late_entry_enabled", "late_entry_deadline_at", "staff_compete", "certificate_config", "event_look", "event_look_locked"].filter(c => !after.includes(c));
+    "join_code", "late_entry_enabled", "late_entry_deadline_at", "staff_compete", "certificate_config", "event_look", "event_look_locked", "clock_start"].filter(c => !after.includes(c));
   if (missing.length) throw new Error(`columns absent after ALTER: ${missing.join(", ")}`);
   const bad = db.prepare(
     "SELECT COUNT(*) c FROM competitions WHERE event_kind IS NULL OR event_kind NOT IN ('booth','tournament','program')"
@@ -2160,7 +2170,7 @@ try {
     "  ALTER TABLE competitions ADD COLUMN event_kind TEXT NOT NULL DEFAULT 'tournament';",
     "  (and likewise registration_field_policy, linkedin_signup_enabled, deadline_at,",
     "   time_basis, measure_presence, auto_end_on_all_solved, attempt_cap, join_code,",
-    "   late_entry_enabled, late_entry_deadline_at, staff_compete)",
+    "   late_entry_enabled, late_entry_deadline_at, staff_compete, clock_start)",
   ].join("\n"));
   process.exit(1);
 }

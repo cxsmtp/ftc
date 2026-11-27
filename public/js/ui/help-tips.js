@@ -64,6 +64,7 @@ export const HELP_TIPS = {
   "event.team": "Adds a team ranking (each group's average score) beside the individual one. It appears only once at least two groups with members are assigned to the event.",
   "event.staff": "Normally staff and organisers never appear on the leaderboard. Turn this on to let enrolled staff compete like anyone else; while they compete they cannot edit this event or its challenges, and only sealed challenges can be assigned.",
   "event.presence": "Records how much time each participant spends actively on the platform, in five-minute blocks, for the rankings export. Optionally breaks score ties on it instead of elapsed time.",
+  "event.clock": "When each participant's time to solve starts. On their first challenge, arriving late or reading the list costs them nothing; on entry, it starts as they enter the running event. It cannot be changed once the event starts.",
   "event.dryrun": "For rehearsals: the event is flagged in the admin list, left out of Analytics by default, and earns no certificates.",
   "event.signup": "What people are asked when they sign up through this event's join link or QR code. Required fields are also asked of people who already signed up through it. Name, company and job title are always asked.",
   "event.late": "Keeps the join link open for a while after the end, so a late walk-up can still play. They are ranked in a separate Late entrants section; everyone else's results are final at the end.",

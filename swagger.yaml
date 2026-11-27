@@ -1354,6 +1354,13 @@ paths:
                             The derived policy for this event. The client's whole
                             suppression layer reads it: whether the event has a ranking at
                             all, what a certificate attests, whether sessions exist.
+                        clock_starts_at_first_open:
+                          type: boolean
+                          description: >-
+                            True when this event starts each participant's solve clock at
+                            their first open of a scoring challenge rather than on entry
+                            (the event's `clock_start`, a Program always false). The
+                            challenge list says so to the participant.
                         can_leave:
                           type: boolean
                           description: >-
@@ -2961,6 +2968,11 @@ paths:
                       allOf:
                         - $ref: '#/components/schemas/EventPolicy'
                       description: "the derived policy for this event."
+                    clock_starts_at_first_open:
+                      type: boolean
+                      description: >-
+                        True when this event starts each participant's solve clock at
+                        their first open of a scoring challenge rather than on entry.
                     can_leave:
                       type: boolean
                       description: >-
@@ -4676,13 +4688,15 @@ paths:
         (`POST .../timeslots` → `sessions_forbidden`), `measure_presence` and
         `time_basis:"presence"` refused (`measure_presence_forbidden` /
         `time_basis_forbidden`); `cxone_disabled` and `self_enroll_enabled` default
-        to 1. `tournament`: everything applies; `trusted_network_ips` is accepted
+        to 1; `clock_start` defaults to `first_open`. `tournament`: everything applies
+        (`clock_start` defaults to `first_open`): everything applies; `trusted_network_ips` is accepted
         while the event has a single session. `program`: `deadline_at` is REQUIRED
         and `duration_minutes` is derived from it, no sessions,
         `reveal_answers_on_end` and `group_leaderboard_enabled` refused
         (`reveal_answers_forbidden` / `group_leaderboard_forbidden`),
         `trusted_network_ips` refused (`trusted_networks_forbidden`),
-        `cxone_disabled` defaults to 1.
+        `cxone_disabled` defaults to 1, `clock_start` is `entry` and `first_open`
+        is refused (`clock_start_forbidden`).
 
 
         Booleans with a per-kind default (`cxone_disabled`, `self_enroll_enabled`)
@@ -4762,6 +4776,7 @@ paths:
                 self_enroll_enabled: { type: boolean, description: "Opt the self-enroll join link on at create (the link exists but does nothing until enabled). Also settable via the PUT. **The default is the KIND's**: ON for a Booth Event, OFF for a Competition and a Program. OMIT the key to take it; sending `false` is honoured as an explicit choice." }
                 measure_presence: { type: boolean, default: false, description: "record NET ACTIVE TIME (five-minute buckets in which a request carried a user-intent header). Off by default; REFUSED (400) for a Booth Event, whose window is too short for the bucket to discriminate. Participants are told, per event." }
                 time_basis: { type: string, enum: [elapsed, presence], default: elapsed, description: "which time breaks a score tie. `presence` only takes effect with measure_presence on, and only separates participants who FINISHED everything: for anyone still going, less time on the platform means less work done, not more efficiency." }
+                clock_start: { type: string, enum: [first_open, entry], description: "WHEN each participant's solve clock (the time-to-solve tie-break) starts. `first_open` — at their first open of a scoring challenge (or their first stored answer or hint, if that comes first); entering the event, reading the list and opening a Quick (qualifying) question start nothing, and a participant whose clock has not started is not on the leaderboard. `entry` — when they enter the live event (the rule of every event created before this setting). ABSENT takes the kind's seed: `first_open` for a Booth Event and a Competition, `entry` for a Program; `first_open` on a Program is refused with `clock_start_forbidden` (it is unranked)." }
                 group_leaderboard_enabled: { type: boolean, default: false, description: "opt in to the group/team leaderboard (default off). Even when true, the board only renders once ≥2 non-empty groups (each with an on-board member) are assigned to the competition. Also settable via the PUT." }
                 cxone_disabled: { type: boolean, default: false, description: "opt OUT of CxOne (Checkmarx One) account creation for this competition (default off, i.e. accounts ARE created). When true, no CxOne accounts are provisioned for this competition's participants via any path (assign / self-enroll / invite / group-sync). Also settable via the PUT." }
                 attempt_cap:
@@ -5071,6 +5086,18 @@ paths:
                     standings are final and any certificates already issued assert that
                     order. Echoing the stored value back is never a change.
                     `undefined` ⇒ no change.
+                clock_start:
+                  type: string
+                  enum: [first_open, entry]
+                  description: >-
+                    When each participant's solve clock starts (see the create body).
+                    Refused with 400 `clock_start_forbidden` when set to `first_open`
+                    on a kind that may not (a Program), and with 400
+                    `clock_start_locked` once the event or any of its sessions has
+                    started: every solve time is measured from this anchor, so a
+                    change mid-event would re-anchor some participants and not
+                    others. A kind change to a Program sets it to `entry`. Echoing the
+                    stored value back is never a change. `undefined` ⇒ no change.
                 cxone_disabled:
                   type: boolean
                   description: "opt OUT of CxOne account creation for this event. When true, no CxOne accounts are provisioned for its participants — and a provisioning job already under way for it is abandoned at its next check (before it creates the account, or before it grants the event's group); anything it had already created is not removed. `undefined` ⇒ no change."
@@ -5796,7 +5823,7 @@ paths:
             (`reveal_answers_forbidden`, `group_leaderboard_forbidden`,
             `measure_presence_forbidden`, `time_basis_forbidden`,
             `registration_fields_forbidden`,
-            `late_entry_forbidden`), `template_tasks_invalid` or a
+            `late_entry_forbidden`, `clock_start_forbidden`), `template_tasks_invalid` or a
             `template_task_*` code.
         "401": { description: Not signed in }
         "403": { description: "`template_task_competing` (`{error, code, task_id}`: a challenge in `task_ids` is held by an event the caller competes in; the message names that event only when the caller may see it), `event_admin_forbidden`, `csrf_invalid`, or a non-admin caller." }
@@ -18311,6 +18338,14 @@ components:
             Whether this kind may keep admitting people after it ends (the
             late-entry window). `allowed` only for a Booth Event, where it is also
             switched per event by `late_entry_enabled`; `never` for every other kind.
+        clock_start:
+          type: string
+          enum: [allowed, never]
+          description: >
+            Whether this kind may start each participant's solve clock at their
+            first open of a scoring challenge (`clock_start: first_open` on the
+            event). `allowed` for a Booth Event and a Competition; `never` for a
+            Program, which is unranked and always measures from entry.
         choice_layout:
           type: string
           enum: [tap, standard]
@@ -18681,6 +18716,23 @@ components:
             from the same predicate the PUT refuses with, so a form withholds the
             control with its reason. Returned on the admin list and on every
             create / update / end-now response.
+        clock_start:
+          type: string
+          enum: [first_open, entry]
+          description: >-
+            When each participant's solve clock starts: `first_open` — their first
+            open of a scoring challenge (or first stored answer or hint); `entry` —
+            entering the live event. Every event created before this setting is
+            `entry`. A Program always measures from entry, whatever this holds.
+        clock_start_locked:
+          type: string
+          nullable: true
+          enum: [started]
+          description: >-
+            WHY `clock_start` may not be changed (`started`: the event or any of
+            its sessions has started, 400 `clock_start_locked`), or `null` when it
+            may. Computed from the same predicate the PUT refuses with. Returned on
+            the admin list and on every create / update / end-now response.
         competing:
           type: boolean
           description: >-
@@ -18719,6 +18771,7 @@ components:
         attempt_cap: { type: integer, format: int32, minimum: 1, maximum: 1000, nullable: true }
         measure_presence: { type: boolean }
         time_basis: { type: string, enum: [elapsed, presence] }
+        clock_start: { type: string, enum: [first_open, entry], description: "Absent takes the kind's seed. `first_open` is refused for a Program (`clock_start_forbidden`)." }
         cxone_disabled: { type: boolean }
         registration_fields:
           type: object

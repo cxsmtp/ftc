@@ -675,7 +675,12 @@ All three start from your events.
   still there, and on your own sealed challenges you read the answers as usual.
 - **Rankings** — an event's **Rankings** section shows that event (or the
   session you picked); **Live rankings** in the sidebar shows the live events
-  you organise.
+  you organise. On a Booth Event or Competition set to **Start each
+  participant's clock: When they open their first challenge** (the default for
+  new ones, chosen on the event form's Advanced section before it starts),
+  each person's time to solve runs from their first open of a scoring
+  challenge, so somebody who has entered but opened nothing is not on the board
+  yet. The administrator guide's *Start each participant's clock* has the rest.
 - **Analytics** — pick one of your events or sessions. There is no
   platform-wide option: it would aggregate events that are not yours. The tag
   and group lists you can filter by are likewise drawn only from participants you

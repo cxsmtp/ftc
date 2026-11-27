@@ -482,6 +482,12 @@ function _kindOf(value) {
   return (Array.isArray(S.eventKinds) ? S.eventKinds : []).find(k => k.value === value) || null;
 }
 
+/** The kind's create-time seed for the clock-start choice (the wire's `defaults`). */
+function _kindClockSeed(kind) {
+  const k = _kindOf(kind);
+  return (k && k.defaults && k.defaults.clock_start === 'entry') ? 'entry' : 'first_open';
+}
+
 /** The kind's create-time seed for one setting (the wire's `defaults`). */
 function _kindSeed(kind, key) {
   const k = _kindOf(kind);
@@ -510,6 +516,7 @@ function _forbidReason(key, kind) {
     late_entry_enabled: () => (p.late_entry !== 'allowed' ? `Only a Booth Event takes late entries after it ends.` : ''),
     registration_fields: () => (p.registration_fields_configurable === true ? '' : `${label} always asks the short sign-up form.`),
     leaderboard_mode: () => (p.sessions === 'many' ? '' : `${label} runs in one sitting, so there is one board.`),
+    clock_start: () => (p.clock_start === 'allowed' ? '' : `${label} has no ranking, so each person's time starts when they enter.`),
   };
   // An unknown key has no refusal (never an exception).
   return Object.prototype.hasOwnProperty.call(reasons, key) ? reasons[key]() : '';
@@ -554,7 +561,12 @@ async function _openEditor(id, mode) {
     tasks: ((t && t.tasks) || []).map(x => ({ id: x.id, title: x.title, difficulty: x.difficulty })),
     // The seeded settings this template states for itself (see SEEDED_KEYS).
     explicit: new Set(SEEDED_KEYS.filter(k => Object.prototype.hasOwnProperty.call(s, k))),
+    // The clock-start choice is seeded the same way, but it is a choice of two
+    // values, not a box: shown as the kind's seed until the template states it
+    // or the organiser changes it, and only then sent.
+    clockExplicit: Object.prototype.hasOwnProperty.call(s, 'clock_start'),
   };
+  const clock0 = (s.clock_start === 'entry' || s.clock_start === 'first_open') ? s.clock_start : _kindClockSeed(kind0);
   document.getElementById('tpl-editor')?.remove();
   const ov = document.createElement('div');
   ov.id = 'tpl-editor';
@@ -592,6 +604,8 @@ async function _openEditor(id, mode) {
           ${chk('measure_presence', 'Record time on the platform')}
           <div class="form-group tpl-ed-opt" data-opt="time_basis"><label for="tpl-ed-time_basis">Ties are broken by</label><select id="tpl-ed-time_basis"><option value="elapsed"${s.time_basis !== 'presence' ? ' selected' : ''}>Time since starting</option><option value="presence"${s.time_basis === 'presence' ? ' selected' : ''}>Time on the platform</option></select></div>
           <p class="tpl-ed-why" data-why="time_basis" hidden></p>
+          <div class="form-group tpl-ed-opt" data-opt="clock_start"><label for="tpl-ed-clock_start">Each participant's clock starts</label><select id="tpl-ed-clock_start"><option value="first_open"${clock0 === 'first_open' ? ' selected' : ''}>When they open their first challenge</option><option value="entry"${clock0 === 'entry' ? ' selected' : ''}>When they enter the event</option></select></div>
+          <p class="tpl-ed-why" data-why="clock_start" hidden></p>
           <div class="form-group tpl-ed-opt" data-opt="leaderboard_mode"><label for="tpl-ed-leaderboard_mode">With sessions, the board is</label><select id="tpl-ed-leaderboard_mode"><option value="per_slot"${s.leaderboard_mode !== 'global' ? ' selected' : ''}>One board per session</option><option value="global"${s.leaderboard_mode === 'global' ? ' selected' : ''}>One board across sessions</option></select></div>
           <p class="tpl-ed-why" data-why="leaderboard_mode" hidden></p>
         </fieldset>
@@ -625,11 +639,14 @@ async function _openEditor(id, mode) {
   for (const key of SEEDED_KEYS) {
     ov.querySelector(`#tpl-ed-${key}`)?.addEventListener('change', () => state.explicit.add(key));
   }
+  ov.querySelector('#tpl-ed-clock_start')?.addEventListener('change', () => { state.clockExplicit = true; });
   ov.querySelector('#tpl-ed-kind').addEventListener('change', (e) => {
     for (const key of SEEDED_KEYS) {
       const box = ov.querySelector(`#tpl-ed-${key}`);
       if (box && !state.explicit.has(key)) box.checked = _kindSeed(e.target.value, key);
     }
+    const clock = ov.querySelector('#tpl-ed-clock_start');
+    if (clock && !state.clockExplicit) clock.value = _kindClockSeed(e.target.value);
   });
   // The save's note on a challenge row answers the form as it was saved. A
   // change the server judges the list against (the event type: whether a
@@ -771,7 +788,7 @@ function _syncEditor(ov, state) {
   const k = _kindOf(kind);
   const p = policyOrDefault(k && k.policy);
   // Policy-forbidden options: disabled, with the reason beside them.
-  for (const key of ['reveal_answers_on_end', 'group_leaderboard_enabled', 'measure_presence', 'late_entry_enabled', 'registration_fields', 'time_basis', 'leaderboard_mode']) {
+  for (const key of ['reveal_answers_on_end', 'group_leaderboard_enabled', 'measure_presence', 'late_entry_enabled', 'registration_fields', 'time_basis', 'leaderboard_mode', 'clock_start']) {
     let why = _forbidReason(key, kind);
     if (!why && key === 'time_basis' && !ov.querySelector('#tpl-ed-measure_presence').checked) why = 'Turn on Record time on the platform first.';
     const box = ov.querySelector(`[data-opt="${key}"]`);
@@ -805,6 +822,7 @@ function _syncEditor(ov, state) {
     p.ranking_enabled !== false ? `Ranked${v.settings.group_leaderboard_enabled ? ', with a team board' : ''}` : 'Not ranked',
     v.settings.reveal_answers_on_end ? 'Answers shown at the end' : null,
     v.settings.measure_presence ? `Time on the platform recorded${v.settings.time_basis === 'presence' ? ' and used for ties' : ''}` : null,
+    p.clock_start === 'allowed' ? (ov.querySelector('#tpl-ed-clock_start')?.value === 'entry' ? 'Each clock starts on entry' : "Each clock starts at the person's first challenge") : null,
     v.settings.staff_compete ? 'Staff compete' : null,
     on('cxone_disabled') ? 'No Checkmarx One accounts' : 'Checkmarx One accounts on enrolment',
     `${state.tasks.length} challenge${state.tasks.length === 1 ? '' : 's'}`,
@@ -827,6 +845,7 @@ function _readEditor(ov, state) {
   }
   if (!_forbidReason('time_basis', kind) && settings.measure_presence) settings.time_basis = val('time_basis').value;
   if (!_forbidReason('leaderboard_mode', kind)) settings.leaderboard_mode = val('leaderboard_mode').value;
+  if (!_forbidReason('clock_start', kind) && state.clockExplicit) settings.clock_start = val('clock_start').value;
   if (!_forbidReason('registration_fields', kind)) {
     settings.registration_fields = {};
     for (const [k] of REG_FIELDS) {
