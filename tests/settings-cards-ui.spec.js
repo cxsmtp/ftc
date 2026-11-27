@@ -76,38 +76,50 @@ test.describe("Settings cards in the browser", () => {
     try { await api.post("/api/test/clear-ip-ban-alerts"); } finally { await api.dispose(); }
   });
 
-  test("Email: the relay's three states, and Send test email sends the address and reads the relay again", async ({ page }) => {
-    let smtp = true;
-    let alertsReads = 0;
-    await page.route("**/api/admin/alerts", (r) => {
+  // ONE test send and ONE relay status in Email (SMTP) (owner decision, 27 Nov
+  // 2026): both on the Mail server card, whose Last check comes from
+  // GET /api/admin/smtp-settings; the old Outbound email card is not shown to a
+  // reader of the mail server (it stays for a role holding ops.email alone:
+  // tests/settings-cards-permissions.spec.js).
+  test("Email: the relay's three states on the Mail server card, and its one Send test email sends the address and reads the card again", async ({ page }) => {
+    let health = { state: true, checked_at: "2026-11-27T09:00:00.000Z" };
+    let failRead = false;
+    let reads = 0;
+    await page.route("**/api/admin/smtp-settings", async (r) => {
       if (r.request().method() !== "GET") return r.continue();
-      alertsReads++;
-      if (smtp === "fail") return r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Boom" }) });
-      return r.fulfill({ status: 200, contentType: "application/json",
-        body: JSON.stringify({ alerts: [], isSuperAdmin: true, smtp_healthy: smtp, cxone_withdrawals_attention: 0 }) });
+      reads++;
+      if (failRead) return r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Boom" }) });
+      const real = await r.fetch();
+      const body = await real.json();
+      return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...body, health }) });
     });
     await adminLogin(page);
     await clickTab(page, "settings"); await openSettingsSection(page, "email");
-    const status = page.locator("#email-relay-status");
-    await expect(status).toHaveText("The mail relay answered its last check.");
+    const status = page.locator("#smtp-settings-body .smtp-facts > div").filter({ has: page.locator("dt", { hasText: /^Last check$/ }) }).locator("dd");
+    await expect(status).toContainText("Answered its last check");
     await expect(status).toHaveClass(/settings-relay-ok/);
-    for (const [v, text, cls] of [
-      [false, "The mail relay failed its last check — sign-in codes and invitations may not arrive.", /settings-relay-bad/],
-      [null, "The mail relay has not been checked since the last restart.", null],
-      // The read itself failed: the card says it could not check, never a state.
-      ["fail", "Could not check the mail relay. Send a test to find out.", null],
+    // The duplicate is gone: no Outbound email card, one test send, one status.
+    await expect(page.locator("#email-test-card")).toBeHidden();
+    await expect(page.locator("#email-relay-status")).toBeHidden();
+    await expect(page.locator('#admin-settings-tab [data-action="send-test-email"]:visible')).toHaveCount(1);
+    for (const [h, text, cls] of [
+      [{ state: false, checked_at: "2026-11-27T09:05:00.000Z" }, "Did not answer its last check", /settings-relay-bad/],
+      [{ state: null, checked_at: null }, "Not checked yet since the server started or the settings changed.", null],
     ]) {
-      smtp = v;
-      await page.evaluate(() => window.loadEmailCard());
-      await expect(status).toHaveText(text);
+      health = h;
+      await page.evaluate(() => window.loadSmtpCard());
+      await expect(status).toContainText(text);
       if (cls) await expect(status).toHaveClass(cls);
       else await expect(status, "an unknown state claims neither health nor failure").not.toHaveClass(/settings-relay-(ok|bad)/);
     }
+    // The read itself failed: the card says it could not load, never a state.
+    failRead = true;
+    await page.evaluate(() => window.loadSmtpCard());
+    await expect(page.locator("#smtp-settings-body")).toContainText("Could not load the mail server settings");
     // CONTROL — once the read answers again, so does the card.
-    smtp = true;
-    await page.evaluate(() => window.loadEmailCard());
-    await expect(status).toHaveText("The mail relay answered its last check.");
-    await expect(status).toHaveClass(/settings-relay-ok/);
+    failRead = false; health = { state: true, checked_at: "2026-11-27T09:10:00.000Z" };
+    await page.evaluate(() => window.loadSmtpCard());
+    await expect(status).toContainText("Answered its last check");
 
     const posts = [];
     let answer = { status: 502, body: { error: "the relay refused the connection" } };
@@ -115,8 +127,8 @@ test.describe("Settings cards in the browser", () => {
       posts.push(r.request().postDataJSON());
       return r.fulfill({ status: answer.status, contentType: "application/json", body: JSON.stringify(answer.body) });
     });
-    const to = page.locator("#settings-test-email-to");
-    const send = page.locator('[data-action="send-test-email"]');
+    const to = page.locator("#smtp-current-test-to");
+    const send = page.locator('#smtp-settings-body [data-action="send-test-email"]');
     // Not an address: nothing is sent.
     await to.fill("not-an-address");
     await send.click();
@@ -127,14 +139,15 @@ test.describe("Settings cards in the browser", () => {
     await send.click();
     await expect(page.locator("#toast-stack .toast").last()).toHaveText("The test email was not sent: the relay refused the connection");
     expect(posts).toEqual([{ to: "ops@company.example" }]);
-    // A sent one says so, and the relay status is read again.
+    // A sent one says so, the card is read again, and the typed address stays.
     answer = { status: 200, body: { ok: true } };
-    smtp = true;
-    const readsBefore = alertsReads;
+    const readsBefore = reads;
+    await to.evaluate((el) => { el.dataset.beforeSend = "1"; });   // marks the box the re-render replaces
     await send.click();
     await expect(page.locator("#toast-stack .toast").last()).toHaveText("Test email sent to ops@company.example.");
-    await expect.poll(() => alertsReads, { message: "the relay status is re-read after a send" }).toBeGreaterThan(readsBefore);
-    await expect(status).toHaveText("The mail relay answered its last check.");
+    await expect.poll(() => reads, { message: "the card is re-read after a send" }).toBeGreaterThan(readsBefore);
+    await expect(page.locator("#smtp-current-test-to[data-before-send]"), "the card was drawn again").toHaveCount(0);
+    await expect(page.locator("#smtp-current-test-to"), "…and the typed address survived it").toHaveValue("ops@company.example");
   });
 
   test("Data & retention: the server's figures, then a real sweep's time and count", async ({ page }) => {

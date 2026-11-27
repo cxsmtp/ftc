@@ -50,11 +50,13 @@ const ROOT = path.join(__dirname, "..");
 // and +2.2 KB brotli on the bundle); then gzip 353400 -> 354600 and brotli
 // 308900 -> 310100 (Settings regrouped: the CxOne API audit table with its
 // pager, About & health from the route, the newest release notes inline, the
-// version at the sidebar's foot; the link items removed; about +1.2 KB each).
+// version at the sidebar's foot; the link items removed; about +1.2 KB each);
+// then gzip 354600 -> 354900 and brotli 310100 -> 310400 (the mail server
+// card's one test send, the Outbound email card folded into it).
 const AT_RULING = {
   stylesheet: { gzip: 56241, br: 52368 },
   page: { gzip: 33262, br: 31062 },
-  script: { gzip: 354600, br: 310100 },
+  script: { gzip: 354900, br: 310400 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));

@@ -229,7 +229,9 @@ answer, `GET /api/me` and `GET /api/admin/me`).
 platform name, sign-in and platform look cards need `settings.view` and
 `settings.edit`, the mail server in use `settings.view` (its form `ops.smtp`,
 superadmin only; everyone else reads "Only a superadmin can change this."),
-outbound email and the unsubscribe list `ops.email`, the
+the test send of the server in use and the unsubscribe list `ops.email` (the
+test send is a row on the mail server card; a role holding `ops.email` without
+`settings.view` gets it on its own Outbound email card instead), the
 Checkmarx One key and removals cards `ops.cxone` (superadmin only), the
 CxOne API audit table `audit.view` (its rows scoped as the Audit page scopes
 them), retention `ops.retention_view`, alerts `ops.alerts`, the team-report

@@ -878,7 +878,7 @@ function boot() {
   registerChange('cxone-audit-page-size',      (e, el) => _ns22.cxoneAuditPageSize(el.value));
   registerAction('settings-notes-retry',       () => _ns22.loadReleaseNotesCard()); // one caller, no poll
   registerAction('settings-health-retry',      () => _ns22.loadSystemHealthCard());
-  registerAction('send-test-email',            () => _ns22.sendTestEmail());
+  registerAction('send-test-email',            (e, el) => _ns22.sendTestEmail(el));
   registerAction('smtp-reload',                () => _ns22.loadSmtpCard());        // one caller, no poll
   registerAction('smtp-test',                  () => _ns22.smtpTest());
   registerAction('smtp-save',                  () => _ns22.smtpSave());

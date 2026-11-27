@@ -1220,8 +1220,8 @@ Settings is two panes: the list on the left, grouped under **People**,
   each with **Review**, and the [event team report
   domains](#event-team-report-domains)), **Branding** (the platform name, the
   platform look and the certificate design), **Email (SMTP)** (the [mail
-  server](#the-mail-server-smtp) in use and its form, **Send test email** and the
-  unsubscribe list) and **About & health**: **This server** (the version, and the
+  server](#the-mail-server-smtp) in use, with **Send test email** for it, and
+  its form, and the unsubscribe list) and **About & health**: **This server** (the version, and the
   commit, build time and release channel a release image was built with; when
   the server started and how long it has run; the database's start-up checks
   and size; maintenance mode; the mail relay and its last check; free disk space;
@@ -1321,6 +1321,12 @@ To change it, fill in the form under the facts:
   which the server's operator can remove it from the environment.
 - **Sender address** is the address mail comes from; the name recipients see is
   still the platform name.
+
+**Send test email**, under the facts, sends one plain message through the
+server in use, so you can see that mail arrives and what the sender looks like;
+the card's **Last check** is the relay's health. A custom role that may send a
+test but not read the mail server gets the same test on its own **Outbound
+email** card instead.
 
 **Test with these values** sends one message to the address you type, through
 the values in the form, before anything is saved, and shows the server's answer

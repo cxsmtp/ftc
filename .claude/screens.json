@@ -1785,7 +1785,7 @@
           "grep": "#admin-settings-tab \\.(settings-(card|row|relay-ok|relay-bad|scroll|help|facts-list|source|warning)|smtp-change)\\b"
         }
       },
-      "note": "Settings → Email (SMTP): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings email` step. Three cards: the mail server in use (its facts with where each comes from, and a superadmin's form behind Change the mail server), outbound email (relay status, test send) and the unsubscribe list. The relay is never checked on a test server (no SMTP probe under NODE_ENV=test)."
+      "note": "Settings → Email (SMTP): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings email` step. The mail server card (its facts with where each comes from and its one relay status, Last check; Send test email for the server in use; a superadmin's form behind Change the mail server) and the unsubscribe list. The Outbound email card shows only to a role holding ops.email without settings.view, never beside the mail server card. The relay is never checked on a test server (no SMTP probe under NODE_ENV=test)."
     },
     {
       "screen": "settings-certificates",

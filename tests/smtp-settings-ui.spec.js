@@ -59,6 +59,9 @@ test("an admin sees the server in use and where each value comes from, read-only
   await expect(fact(page, "Last check")).toContainText(/Not checked yet|last check/);
   await expect(page.locator("#smtp-settings-body"), "the read-only reason").toContainText("Only a superadmin can change this.");
   await expect(page.locator("#smtp-settings-body input, #smtp-settings-body select, #smtp-settings-body [data-action^='smtp-']"), "no form").toHaveCount(0);
+  // A built-in admin holds no ops.email: no test send anywhere in the section.
+  await expect(page.locator('#admin-settings-tab [data-action="send-test-email"]:visible'), "no test send without ops.email").toHaveCount(0);
+  await expect(page.locator("#email-test-card")).toBeHidden();
   expect(reads.every((m) => m === "GET"), "only the read").toBe(true);
   await axeCard(page, "read-only");
 });
@@ -66,6 +69,12 @@ test("an admin sees the server in use and where each value comes from, read-only
 test("a superadmin tests, saves and removes the server from the form; the password never reaches the page", async ({ page }) => {
   await openEmail(page, "superadmin");
   await expect(page.locator("#smtp-settings-body"), "no read-only note for the superadmin").not.toContainText("Only a superadmin can change this.");
+  // ONE test send for the server in use and ONE relay status: the old Outbound
+  // email card is not shown beside the card (owner decision, 27 Nov 2026).
+  await expect(page.locator('#admin-settings-tab [data-action="send-test-email"]:visible')).toHaveCount(1);
+  await expect(page.locator('#smtp-settings-body [data-action="send-test-email"]')).toBeVisible();
+  await expect(page.locator("#email-test-card")).toBeHidden();
+  await expect(page.locator("#admin-settings-tab .settings-section[data-settings-section=email]"), "one relay status").not.toContainText("The mail relay has not been checked");
   await expect(page.locator("#smtp-host"), "the form starts folded").toBeHidden();
   await page.locator("#smtp-change > summary").click();
   await expect(page.locator("#smtp-host")).toBeVisible();

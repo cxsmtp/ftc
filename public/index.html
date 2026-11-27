@@ -1424,6 +1424,9 @@
                 <p class="settings-help">The server every email the platform sends goes through: sign-in codes, invitations, certificates and reports.</p>
                 <div id="smtp-settings-body"></div>
               </div>
+              <!-- Outbound email: only for a role that may send a test but not read
+                   the mail server (ops.email without settings.view); everyone else
+                   has the test send and relay status on the card above. -->
               <div class="card settings-card" id="email-test-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">Outbound email</h3><span data-help="settings.test-email" data-help-label="Outbound email"></span></div>
                 <p class="settings-help" id="email-relay-status" role="status">Checking the mail relay…</p>

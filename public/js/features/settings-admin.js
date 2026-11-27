@@ -810,7 +810,11 @@ function _loadOwnRouteCards(){
   }
   if(!settingsCardOffered('cxone-withdrawals-card'))_wdFocusPending=false;
   if(settingsCardOffered('smtp-settings-card')){ document.getElementById('smtp-settings-card').style.display=''; loadSmtpCard(); }
-  if(settingsCardOffered('email-test-card')){ document.getElementById('email-test-card').style.display=''; loadEmailCard(); }
+  // Outbound email (its relay status and test send) only for a role that cannot
+  // read the Mail server card, which carries both for everyone else: one test
+  // send and one relay status on the page (owner decision, 27 Nov 2026).
+  if(settingsCardOffered('email-test-card')&&!settingsCardOffered('smtp-settings-card')){ document.getElementById('email-test-card').style.display=''; loadEmailCard(); }
+  else { const c=document.getElementById('email-test-card'); if(c)c.style.display='none'; }
   if(settingsCardOffered('unsubscribe-card')){ document.getElementById('unsubscribe-card').style.display=''; loadUnsubscribeList(); }
   if(settingsCardOffered('retention-card')){ document.getElementById('retention-card').style.display=''; loadRetentionCard(); }
   if(settingsCardOffered('alerts-card')){ document.getElementById('alerts-card').style.display=''; loadAlertsCard(); }
@@ -1152,7 +1156,7 @@ export function installSettingsShell(){
 
 export const SETTINGS_HELP_TIPS={
   'settings.platform-name':'Appears in the header and help, in every email subject, and as the sender name on all email. The sender address is set with the mail server, under Email (SMTP). Takes effect at once.',
-  'settings.smtp':'Every email the platform sends goes through this server. Each value says whether it was set here in the app or comes from the server’s environment; settings saved here replace the environment’s as a whole. Only a superadmin can change them, and the password is never shown.',
+  'settings.smtp':'Every email the platform sends goes through this server. Each value says whether it was set here in the app or comes from the server’s environment; settings saved here replace the environment’s as a whole. Send test email tries the server in use; Test with these values, in the form, tries values before they are saved. Only a superadmin can change the server, and the password is never shown.',
   'settings.approval':'A new account is created only after its first emailed code confirms the address. With this on, a new account waits for an administrator, except one made through the join link, QR code or event code of an open event. Invited people are always approved.',
   'settings.test-email':'Sends one plain message through the mail relay so you can see that email arrives and what the sender looks like. The relay status comes from the platform’s own check, run every few minutes.',
   'settings.unsubscribe':'Opt-outs cover invitations, reminders and assignment notices. Remove an address when its owner agrees to receive these again.',
@@ -1219,9 +1223,18 @@ function _renderSmtpCard(d){
   }
   h+=u?`<dl class="settings-facts-list smtp-facts">${rows.map(([k,v,s])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)} ${_smtpSourceTag(s)}</dd></div>`).join('')}<div><dt>Last check</dt><dd class="${health}">${esc(_smtpHealthText(d.health))}</dd></div></dl>`
        :'<p class="settings-warning">No mail server is configured.</p>';
+  // ONE test send for the server in use (POST /api/admin/test-email, ops.email),
+  // under its facts and its one relay status (Last check above). The form below
+  // keeps "Test with these values" for values not saved yet. The address typed
+  // here survives the card's own re-renders.
+  const typed=document.getElementById('smtp-current-test-to')?.value||'';
+  if(u&&adminCan('ops.email')){
+    h+=`<div class="settings-row smtp-current-test"><label for="smtp-current-test-to">Send a test to</label><input type="email" id="smtp-current-test-to" placeholder="you@company.com" autocomplete="off" maxlength="254" aria-describedby="smtp-current-test-hint"/><button class="btn secondary" data-action="send-test-email" data-input="smtp-current-test-to">Send test email</button><p class="settings-hint" id="smtp-current-test-hint">One plain message through the mail server in use, with the sender above.</p></div>`;
+  }
   if(!d.can_edit){
     h+='<p class="settings-hint">Only a superadmin can change this.</p>';
     setSafeHtml(body,h);
+    _restoreTyped(typed);
     return;
   }
   // The form starts from the SAVED relay when there is one (so re-entering a
@@ -1245,7 +1258,9 @@ function _renderSmtpCard(d){
   <div class="settings-actions"><button class="btn" data-action="smtp-save">Save</button>${d.saved&&d.environment_relay?'<button class="btn danger sm" data-action="smtp-remove">Remove saved settings</button>':''}</div>
   </div></details>`;
   setSafeHtml(body,h);
+  _restoreTyped(typed);
 }
+function _restoreTyped(v){ const el=document.getElementById('smtp-current-test-to'); if(el&&v)el.value=v; }
 function _smtpFormValues(){
   const g=(id)=>document.getElementById(id)?.value??'';
   const out={host:g('smtp-host').trim(),port:g('smtp-port').trim(),security:g('smtp-security'),username:g('smtp-username').trim(),sender:g('smtp-sender').trim()};
@@ -1309,15 +1324,20 @@ export async function loadEmailCard(){
   else { setSafeHtml(status,'The mail relay has not been checked since the last restart.'); status.className='settings-help'; }
 }
 
-export async function sendTestEmail(){
-  const input=document.getElementById('settings-test-email-to');
+// The test send of the server in use: the Mail server card's row (its input
+// named by the button's data-input), or, for a role that may send a test but
+// not read the mail server (ops.email without settings.view), the Outbound
+// email card. A send re-reads that door's relay status.
+export async function sendTestEmail(btn){
+  const fromCard=!!(btn&&btn.dataset&&btn.dataset.input==='smtp-current-test-to');
+  const input=document.getElementById(fromCard?'smtp-current-test-to':'settings-test-email-to');
   const to=(input?.value||'').trim();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){ showToast('Enter the address to send the test to.','error'); input?.focus(); return; }
   let r=null;
   try{ r=await fetch('/api/admin/test-email',{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({to})}); }
   catch(e){ showToast('Could not reach the server — check your connection.','error'); return; }
   const d=await r.json().catch(()=>({}));
-  if(r.ok&&d.ok){ showToast(`Test email sent to ${to}.`,'success'); loadEmailCard(); return; }
+  if(r.ok&&d.ok){ showToast(`Test email sent to ${to}.`,'success'); if(fromCard)loadSmtpCard(); else loadEmailCard(); return; }
   showToast(d.error?`The test email was not sent: ${d.error}`:`The test email was not sent (${r.status}).`,'error');
 }
 
