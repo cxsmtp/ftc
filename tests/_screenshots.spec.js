@@ -2566,15 +2566,15 @@ test.describe("admin", () => {
   // admin guide. Screenshots 19–26 cover the overlays that were
   // referenced in admin.md prose but never captured.
 
-  // The New event page: a blank starter per kind and the templates. The admin
+  // The New event page: one card per type (recommended setup, Start blank) and the templates. The admin
   // guide introduces the three kinds from this screen.
   test("44-competition-create-kind", async ({ page }) => {
     await gotoTab(page, "Events");
     await page.locator("#admin-comp-body tr").first().waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
     await page.locator("[data-action='open-competition-form']").first().click();
     await page.locator("#admin-templates-tab").waitFor({ state: "visible", timeout: 10000 });
-    await page.locator('#tpl-kind-cards [data-action="new-event-start"]').first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator("#tpl-list .tpl-row").first().waitFor({ state: "visible", timeout: 10000 });
+    await page.locator('#tpl-kind-cards button[data-action="tpl-pick"]:enabled').first().waitFor({ state: "visible", timeout: 10000 });
+    await page.locator("#tpl-list .tpl-row, #tpl-list-empty").first().waitFor({ state: "visible", timeout: 10000 });
     await settle(page, 400);
     await page.screenshot({ path: shotPath("admin", "44-competition-create-kind") });
   });
@@ -3539,7 +3539,7 @@ test.describe("admin", () => {
 
   test("66-template-editor", async ({ page }) => {
     await gotoTab(page, "Templates");
-    await page.locator("#tpl-list .tpl-row").first().waitFor({ state: "visible", timeout: 15000 });
+    await page.locator("#tpl-list .tpl-row, #tpl-list-empty").first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator("#tpl-new-btn").click();
     const ed = page.locator("#tpl-editor");
     await ed.waitFor({ state: "visible", timeout: 10000 });

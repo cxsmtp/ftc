@@ -45,7 +45,10 @@ export const HELP_TIPS = {
   "appearance.tips": "Opens every \"?\" note on every page at once, for people who prefer to read everything.",
   "appearance.org": "The look every browser gets until its viewer picks one, outside events that set their own; Apply to everyone now also replaces earlier picks. Locked for participants, it beats their pick and an event's unlocked look, and only an event that locks its own look wins inside that event (Settings, Branding).",
   // New event page and the one create form
-  "newevent.blank": "Starts an empty event of that type. You add challenges and invite people from its workspace after you create it.",
+  "newevent.types": {
+    default: "Recommended setup opens the form filled in the way most events of that type run; Start blank opens it empty. Either way you add challenges and invite people from the event's workspace after you create it.",
+    event_admin: "Recommended setup starts an event of that type set up the way most of them run: give it a name and a start. You add challenges and invite people from the event's workspace afterwards.",
+  },
   "templates.deleted": "Deleted templates wait here so one press of Restore brings them back. After the restore window they are removed for good.",
   "event.kind": "The type decides how the event runs: a short walk-up stand, a timed ranked contest, or a self-paced program to a deadline. The sentence under the choice describes the selected type. The form shows only the settings that type can use, and you can change the type until the event starts.",
   "event.name": "What participants and organisers see in lists, emails and on certificates. Each event needs its own name. It cannot be changed after the event ends.",

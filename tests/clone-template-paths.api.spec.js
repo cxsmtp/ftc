@@ -48,6 +48,7 @@ const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask } = requ
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { BUILTIN_TEMPLATES } = require("../lib/event-template-builtins");
 
 const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 const iso = (ms) => new Date(ms).toISOString();
@@ -297,24 +298,24 @@ test.describe("Built-in templates", () => {
   test("Restore built-in templates names a built-in “(built-in)” when an administrator's template took its name, and skips it when both names are taken", async () => {
     const list = async () => (await (await sa.get("/api/admin/event-templates")).json()).templates;
     const bi = (await list()).find(t => t.builtin_key === "tournament-2h");
-    expect(bi && bi.name, "PRECONDITION: the built-in Tournament template").toBe("Tournament (2 h)");
+    expect(bi && bi.name, "PRECONDITION: the built-in Competition template").toBe("Competition (several sessions)");
     // Deleted before built-ins were protected (no route deletes one now).
     write(db => db.prepare("DELETE FROM event_templates WHERE id=?").run(bi.id));
-    const own = await makeTemplate({ name: "Tournament (2 h)", event_kind: "tournament", settings: { duration_minutes: 45 } });
+    const own = await makeTemplate({ name: "Competition (several sessions)", event_kind: "tournament", settings: { duration_minutes: 45 } });
     const r = await sa.post("/api/admin/event-templates/restore-builtins", { headers: H(saCsrf) });
     expect(r.status(), await r.text()).toBe(200);
-    expect((await r.json()).restored.map(x => [x.name, x.builtin_key])).toEqual([["Tournament (2 h) (built-in)", "tournament-2h"]]);
+    expect((await r.json()).restored.map(x => [x.name, x.builtin_key])).toEqual([["Competition (several sessions) (built-in)", "tournament-2h"]]);
     const after = await list();
-    expect(after.filter(t => t.builtin_key === "tournament-2h").map(t => [t.name, t.is_builtin]), "the built-in is back under the other name").toEqual([["Tournament (2 h) (built-in)", true]]);
-    expect(after.find(t => t.id === own.id), "the administrator's template keeps its name").toMatchObject({ name: "Tournament (2 h)", is_builtin: false, builtin_key: null });
+    expect(after.filter(t => t.builtin_key === "tournament-2h").map(t => [t.name, t.is_builtin]), "the built-in is back under the other name").toEqual([["Competition (several sessions) (built-in)", true]]);
+    expect(after.find(t => t.id === own.id), "the administrator's template keeps its name").toMatchObject({ name: "Competition (several sessions)", is_builtin: false, builtin_key: null });
 
     // Both names taken: it is skipped, never a failure, and still listed as missing.
     write(db => db.prepare("DELETE FROM event_templates WHERE builtin_key='tournament-2h'").run());
-    await makeTemplate({ name: "Tournament (2 h) (built-in)", event_kind: "tournament", settings: { duration_minutes: 30 } });
+    await makeTemplate({ name: "Competition (several sessions) (built-in)", event_kind: "tournament", settings: { duration_minutes: 30 } });
     const r2 = await sa.post("/api/admin/event-templates/restore-builtins", { headers: H(saCsrf) });
     expect(r2.status(), await r2.text()).toBe(200);
     expect((await r2.json()).restored).toEqual([]);
-    expect((await (await sa.get("/api/admin/event-templates/deleted")).json()).missing_builtins).toEqual(["Tournament (2 h)"]);
+    expect((await (await sa.get("/api/admin/event-templates/deleted")).json()).missing_builtins).toEqual(["Competition (several sessions)"]);
   });
 
   test("the builtin_key backfill keys the built-ins seeded before the column by name and type, once, and never an administrator's template", () => {
@@ -339,6 +340,11 @@ test.describe("Built-in templates", () => {
       // administrator had renamed one built-in, changed another's type, and
       // given a template of their own the freed name.
       write(db => {
+        // Such a database holds the built-ins under their FIRST definitions.
+        for (const b of BUILTIN_TEMPLATES) {
+          db.prepare("UPDATE event_templates SET name=?, description=?, settings=? WHERE builtin_key=?")
+            .run(b.previous.name, b.previous.description, JSON.stringify(b.previous.settings), b.key);
+        }
         db.prepare("UPDATE event_templates SET builtin_key=NULL").run();
         db.prepare("UPDATE event_templates SET name='Our tournament' WHERE name='Tournament (2 h)'").run();
         db.prepare("UPDATE event_templates SET event_kind='tournament' WHERE name='Learning Program (30 days)'").run();
@@ -359,6 +365,71 @@ test.describe("Built-in templates", () => {
       write(db => db.prepare("UPDATE event_templates SET builtin_key=NULL WHERE name='Booth quick-spin'").run(), dbFile);
       boot("third boot");
       expect(rows().find(r => r.name === "Booth quick-spin").builtin_key, "the backfill does not run twice").toBeNull();
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  // The built-ins became the kinds' RECOMMENDED SETUPS (renamed, re-described,
+  // the booth one a full day). A stored built-in moves only while it still
+  // equals the definition it replaced, so an administrator's edit is kept; a
+  // new name another template holds leaves the row as it is; once, behind its
+  // marker, written even when nothing moved.
+  test("the recommended-setup rename moves only an untouched built-in, once, and never onto a name another template holds", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tpl-rename-"));
+    const dbFile = path.join(dir, "hackathon.db");
+    const boot = (label) => {
+      const r = require("child_process").spawnSync(process.execPath, ["-e", "require('./db')"], {
+        cwd: path.join(__dirname, ".."),
+        env: { ...process.env, NODE_OPTIONS: "", DATA_DIR: dir, UPLOADS_DIR: `${dir}/uploads`, BASE_URL: "http://localhost", SMTP_HOST: "localhost" },
+        encoding: "utf8",
+      });
+      expect(r.status, `${label}: ${r.stderr}`).toBe(0);
+      return r;
+    };
+    const MARKER = "event_templates_renamed_at";
+    const byKey = () => Object.fromEntries(sql(db => db.prepare("SELECT builtin_key, name, description, settings FROM event_templates WHERE is_builtin=1").all(), dbFile)
+      .map(r => [r.builtin_key, { name: r.name, description: r.description, settings: JSON.parse(r.settings) }]));
+    const marker = () => sql(db => db.prepare("SELECT value FROM settings WHERE key=?").get(MARKER), dbFile);
+    const def = (key) => BUILTIN_TEMPLATES.find(b => b.key === key);
+    const current = (b) => ({ name: b.name, description: b.description, settings: { ...b.settings } });
+    const previous = (b) => ({ name: b.previous.name, description: b.previous.description, settings: { ...b.previous.settings } });
+    try {
+      boot("first boot");
+      expect(byKey(), "PRECONDITION: a fresh database seeds the current definitions").toEqual(Object.fromEntries(BUILTIN_TEMPLATES.map(b => [b.key, current(b)])));
+      expect(byKey()["booth-quick-spin"].settings.duration_minutes, "PRECONDITION: the booth setup runs a full day").toBe(480);
+      expect(marker(), "a fresh database writes the marker though nothing moved").toBeTruthy();
+
+      // A database from before the rename: every built-in under its first
+      // definition, no marker. The Competition one an administrator re-worded;
+      // the Booth one's new name another template took (in other letter case).
+      // The Program one's rename changes only a letter's case, which its own
+      // row must not count as a clash.
+      write(db => {
+        for (const b of BUILTIN_TEMPLATES) {
+          db.prepare("UPDATE event_templates SET name=?, description=?, settings=? WHERE builtin_key=?")
+            .run(b.previous.name, b.previous.description, JSON.stringify(b.previous.settings), b.key);
+        }
+        db.prepare("UPDATE event_templates SET description='Our own words' WHERE builtin_key='tournament-2h'").run();
+        const at = new Date().toISOString();
+        db.prepare("INSERT INTO event_templates (id, name, description, event_kind, settings, task_ids, created_at, updated_at, is_builtin) VALUES (?,?,'','booth','{\"duration_minutes\":600}','[]',?,?,0)")
+          .run(require("crypto").randomUUID(), def("booth-quick-spin").name.toUpperCase(), at, at);
+        db.prepare("DELETE FROM settings WHERE key=?").run(MARKER);
+      }, dbFile);
+      expect(def("program-30d").name.toLowerCase(), "PRECONDITION: the Program rename is a change of case").toBe(def("program-30d").previous.name.toLowerCase());
+      const second = boot("second boot");
+      const after = byKey();
+      expect(after["program-30d"], "the untouched built-in moves to its recommended setup").toEqual(current(def("program-30d")));
+      expect(after["tournament-2h"], "the edited one is left exactly as the administrator left it")
+        .toEqual({ ...previous(def("tournament-2h")), description: "Our own words" });
+      expect(after["booth-quick-spin"], "the one whose new name is taken keeps its first definition").toEqual(previous(def("booth-quick-spin")));
+      expect(second.stderr, "and the skip is logged").toContain(`kept its name: another template is already called "${def("booth-quick-spin").name}"`);
+      expect(marker(), "the marker is written").toBeTruthy();
+
+      // ONCE: a row put back to its first definition after the rename ran is
+      // not moved by the next boot.
+      write(db => db.prepare("UPDATE event_templates SET name=?, description=?, settings=? WHERE builtin_key='program-30d'")
+        .run(def("program-30d").previous.name, def("program-30d").previous.description, JSON.stringify(def("program-30d").previous.settings)), dbFile);
+      boot("third boot");
+      expect(byKey()["program-30d"], "the rename does not run twice").toEqual(previous(def("program-30d")));
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   });
 });
