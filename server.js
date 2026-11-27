@@ -6063,6 +6063,9 @@ require("./routes/users")(app); // RBAC — Users & roles (admin accounts, custo
 require("./routes/admin-misc")(app, { isHealthy: _instanceInService,
   // Settings → Backups & health reads the same facts the gate does, each apart.
   healthState: () => ({ integrity: _dbIntegrityOk, schema: _dbSchemaOk, maintenance: _maintenanceState().active }) });
+// Settings → Email (SMTP): the mail relay in force, saved in the app or from the
+// environment (routes/smtp-settings.js).
+require("./routes/smtp-settings")(app);
 
 // ── Admin participants ──────────────────────────────────────────────────────
 

@@ -928,6 +928,7 @@ export const SETTINGS_CARD_PERMISSIONS={
   'platform-name-card':['settings.view','settings.edit'],    // GET + PATCH /api/admin/settings
   'account-approval-card':['settings.view','settings.edit'], // GET + PATCH /api/admin/settings
   'platform-look-card':['settings.view','settings.edit'],    // GET /api/admin/settings, PUT /api/admin/platform-look
+  'smtp-settings-card':['settings.view'],                    // GET /api/admin/smtp-settings (the form: ops.smtp, superadmin only)
   'email-test-card':['ops.email'],                           // POST /api/admin/test-email
   'unsubscribe-card':['ops.email'],                          // GET, DELETE /api/admin/unsubscribed
   'cxone-card':['settings.view','ops.cxone'],                // GET /api/admin/settings, PUT/DELETE /api/admin/default-cxone

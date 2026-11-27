@@ -4542,7 +4542,8 @@ beside them: press it for a one- or two-sentence explanation, or turn on
 ## Settings
 
 An administrator's **Settings** tab holds the platform **certificate design**,
-the **event history retention**, the open **blocked-address alerts**, **Backups &
+the **mail server** email goes through (read-only: only a superadmin can change
+it), the **event history retention**, the open **blocked-address alerts**, **Backups &
 health** (without the details only a superadmin sees), **Updates** and **About**
 (and, read-only, the domains event team reports may go to); everything else on it is
 for superadmins and is not shown to you. Each card shows to whoever may use it,

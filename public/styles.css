@@ -3723,6 +3723,16 @@ html[data-theme="light"] .help-drawer-body th{background:var(--surface2)}
 #admin-settings-tab .settings-alert-row>span{min-width:0;overflow-wrap:anywhere}
 #admin-settings-tab .settings-relay-bad{color:var(--danger)}
 #admin-settings-tab .settings-relay-ok{color:var(--ok)}
+/* The mail server's facts: one per line, the value in the form's column, its
+   source under it (the shared .settings-facts grid puts two facts on a line). */
+#admin-settings-tab .smtp-facts{display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin:0 0 12px}
+#admin-settings-tab .smtp-facts>div{display:grid;grid-template-columns:168px minmax(0,1fr);gap:4px 12px;padding:8px 0;border-bottom:1px solid var(--border)}
+#admin-settings-tab .smtp-facts dd{overflow-wrap:anywhere}
+#admin-settings-tab .settings-source{display:block;margin-top:2px;font-weight:var(--fw-regular);font-size:var(--fs-13);color:var(--muted)}
+#admin-settings-tab .smtp-change{margin-top:4px}
+#admin-settings-tab .smtp-change .settings-help{margin-top:12px}
+#admin-settings-tab .settings-warning{margin:0 0 12px;padding:12px 16px;border:1px solid var(--warn);border-radius:var(--r-m);background:var(--warn-soft);color:var(--text)}
+#admin-settings-tab .settings-row>select{flex:1 1 220px;width:auto;min-width:0}
 /* CxOne integration status banner — three-state pill (connected / empty).
    Connected uses the --green-soft tinted background pattern shared with
    .log-pill and .sub-event-pill so the visual language is consistent
@@ -3775,6 +3785,7 @@ html[data-theme="light"] .help-drawer-body th{background:var(--surface2)}
   #admin-settings-tab .settings-card{padding:14px 16px}
   #admin-settings-tab .settings-row>label:first-child:not(.checkbox-row){flex:1 0 100%}
   #admin-settings-tab .settings-row>.settings-hint{padding-left:0}
+  #admin-settings-tab .smtp-facts>div{grid-template-columns:minmax(0,1fr)}
 }
 
 /* Admin challenge form — scoped polish. Tokenises the inline margins/gaps

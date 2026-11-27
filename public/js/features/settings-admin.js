@@ -792,13 +792,14 @@ export async function loadAdminSettings(){
 // each loaded by its own loader. Every one is gated by SETTINGS_CARD_PERMISSIONS
 // (ui/nav.js). Hoisted: function bodies read them at call time.
 const _SETTINGS_READ_CARDS=['platform-name-card','account-approval-card','cxone-card'];
-const _OWN_ROUTE_CARDS=['email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card','system-health-card','cxone-audit-card','updates-card','about-card'];
+const _OWN_ROUTE_CARDS=['smtp-settings-card','email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card','system-health-card','cxone-audit-card','updates-card','about-card'];
 function _loadOwnRouteCards(){
   for(const id of _OWN_ROUTE_CARDS){
     const el=document.getElementById(id);
     if(el&&!settingsCardOffered(id))el.style.display='none';
   }
   if(!settingsCardOffered('cxone-withdrawals-card'))_wdFocusPending=false;
+  if(settingsCardOffered('smtp-settings-card')){ document.getElementById('smtp-settings-card').style.display=''; loadSmtpCard(); }
   if(settingsCardOffered('email-test-card')){ document.getElementById('email-test-card').style.display=''; loadEmailCard(); }
   if(settingsCardOffered('unsubscribe-card')){ document.getElementById('unsubscribe-card').style.display=''; loadUnsubscribeList(); }
   if(settingsCardOffered('retention-card')){ document.getElementById('retention-card').style.display=''; loadRetentionCard(); }
@@ -1083,7 +1084,8 @@ export function installSettingsShell(){
 }
 
 export const SETTINGS_HELP_TIPS={
-  'settings.platform-name':'Appears in the header and help, in every email subject, and as the sender name on all email. The sender address is fixed by the operator (EMAIL_FROM). Takes effect at once.',
+  'settings.platform-name':'Appears in the header and help, in every email subject, and as the sender name on all email. The sender address is set with the mail server, under Email (SMTP). Takes effect at once.',
+  'settings.smtp':'Every email the platform sends goes through this server. Each value says whether it was set here in the app or comes from the server’s environment; settings saved here replace the environment’s as a whole. Only a superadmin can change them, and the password is never shown.',
   'settings.approval':'A new account is created only after its first emailed code confirms the address. With this on, a new account waits for an administrator, except one made through the join link, QR code or event code of an open event. Invited people are always approved.',
   'settings.test-email':'Sends one plain message through the mail relay so you can see that email arrives and what the sender looks like. The relay status comes from the platform’s own check, run every few minutes.',
   'settings.unsubscribe':'Opt-outs cover invitations, reminders and assignment notices. Remove an address when its owner agrees to receive these again.',
@@ -1100,6 +1102,129 @@ export const SETTINGS_HELP_TIPS={
   'settings.about':'The running version and the typefaces the certificates use.',
   'settings.breakglass':'The boot-generated password is in the data folder. Changing the username keeps you signed in; the new one is needed from the next sign-in, and the old one then signs nobody in.',
 };
+
+// ─── Email (SMTP): the mail server in use ─────────────────────────────────────
+//
+// GET /api/admin/smtp-settings (settings.view) shows every reader the relay in
+// force and where each value comes from; a superadmin (ops.smtp, never
+// grantable) also gets the form: Test with these values sends through the
+// UNSAVED values, Save swaps the relay live, Remove saved settings returns to
+// the server's environment. The password is never sent to the browser: the form
+// says only whether one is set, and an empty box keeps it (for the same host and
+// username; the server refuses otherwise and says why).
+let _smtpSeq=0;
+let _smtpView=null;
+const _SMTP_SOURCE={app:'Set in the app',environment:'From the server’s environment',default:'Built-in default'};
+const _SMTP_SECURITY={starttls:'STARTTLS (upgrade required)',tls:'TLS from the start (implicit TLS)'};
+function _smtpSourceTag(src){ return `<span class="settings-source">${esc(_SMTP_SOURCE[src]||'')}</span>`; }
+function _smtpHealthText(h){
+  if(!h||h.state===null||h.state===undefined)return 'Not checked yet since the server started or the settings changed.';
+  const at=h.checked_at?` (${fmtDt(h.checked_at,'long')})`:'';
+  return h.state===true?`Answered its last check${at}.`:`Did not answer its last check${at} — sign-in codes and invitations may not arrive.`;
+}
+export async function loadSmtpCard(){
+  const body=document.getElementById('smtp-settings-body');
+  if(!body)return;
+  const seq=++_smtpSeq;
+  const d=await fetchJsonObject('/api/admin/smtp-settings');
+  if(seq!==_smtpSeq)return;
+  if(!d){ _smtpView=null; renderLoadFailure('smtp-settings-body',{noun:'the mail server settings',retryAction:'smtp-reload'}); return; }
+  _renderSmtpCard(d);
+}
+function _renderSmtpCard(d){
+  const body=document.getElementById('smtp-settings-body');
+  if(!body)return;
+  _smtpView=d;
+  const u=d.in_use;
+  const rows=[];
+  if(u){
+    const src=u.source;
+    // Plain text, escaped once where the list is drawn.
+    rows.push(['Server',`${u.host}:${u.port}`,src]);
+    rows.push(['Security',(_SMTP_SECURITY[u.security]||String(u.security))+(u.security==='starttls'&&d.plaintext_allowed?' — not required on this server (SMTP_ALLOW_PLAINTEXT)':''),src]);
+    rows.push(['Username',u.username?String(u.username):'None (no sign-in to the server)',src]);
+    rows.push(['Password',u.password_set?'Set (never shown)':'Not set',src]);
+    rows.push(['Sender address',String(u.sender),u.sender_source]);
+  }
+  const health=d.health&&d.health.state===false?'settings-relay-bad':d.health&&d.health.state===true?'settings-relay-ok':'';
+  let h='';
+  if(d.password_unreadable){
+    h+=`<p class="settings-warning" role="alert">The password saved in the app cannot be read on this server (its key file is not part of backups, so a restore or a move to another server loses it). ${d.in_use&&d.in_use.source==='environment'?'Email is going through the server’s environment settings meanwhile.':'Email is being sent without it and will likely fail.'} ${d.can_edit?'Enter the password again below and save.':'Ask a superadmin to enter it again.'}</p>`;
+  }
+  h+=u?`<dl class="settings-facts smtp-facts">${rows.map(([k,v,s])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)} ${_smtpSourceTag(s)}</dd></div>`).join('')}<div><dt>Last check</dt><dd class="${health}">${esc(_smtpHealthText(d.health))}</dd></div></dl>`
+       :'<p class="settings-warning">No mail server is configured.</p>';
+  if(!d.can_edit){
+    h+='<p class="settings-hint">Only a superadmin can change this.</p>';
+    setSafeHtml(body,h);
+    return;
+  }
+  // The form starts from the SAVED relay when there is one (so re-entering a
+  // lost password is one field), else from the one in force.
+  const f=d.saved||u||{host:'',port:587,security:'starttls',username:'',sender:''};
+  const savedPw=d.saved?d.saved.password_set&&!d.password_unreadable:(u&&u.password_set);
+  const pwHint=savedPw?'Leave empty to keep the current password (same host and username only).':'Needed when the server asks for a username.';
+  // The form sits behind a disclosure (the facts above are what most visits
+  // need), open while a saved password must be entered again.
+  h+=`<details class="comp-form-advanced smtp-change" id="smtp-change"${d.password_unreadable?' open':''}>
+  <summary class="comp-form-advanced-summary"><span class="comp-form-advanced-title">Change the mail server</span><span class="comp-form-advanced-sub">Test new values, then save them</span></summary>
+  <div class="comp-form-advanced-body">
+  <p class="settings-help">Saved settings replace the server’s environment settings for all email, at once and without a restart. ${d.saved?'Remove them to go back to the environment.':''}</p>
+  <div class="settings-row"><label for="smtp-host">Host</label><input type="text" id="smtp-host" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="253" value="${esc(f.host)}" placeholder="smtp.example.com"/></div>
+  <div class="settings-row"><label for="smtp-port">Port</label><input type="text" id="smtp-port" inputmode="numeric" autocomplete="off" maxlength="5" value="${esc(String(f.port||''))}"/></div>
+  <div class="settings-row"><label for="smtp-security">Security</label><select id="smtp-security" autocomplete="off">${Object.entries(_SMTP_SECURITY).map(([k,l])=>`<option value="${esc(k)}"${f.security===k?' selected':''}>${esc(l)}</option>`).join('')}</select><p class="settings-hint">Port 587 normally uses STARTTLS, port 465 TLS from the start.</p></div>
+  <div class="settings-row"><label for="smtp-username">Username</label><input type="text" id="smtp-username" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="254" value="${esc(f.username||'')}"/><p class="settings-hint">Leave empty for a server that takes mail without signing in.</p></div>
+  <div class="settings-row"><label for="smtp-password">Password</label><input type="password" id="smtp-password" autocomplete="new-password" maxlength="512" aria-describedby="smtp-password-hint"/><p class="settings-hint" id="smtp-password-hint">${esc(pwHint)} Stored encrypted; never shown again.</p></div>
+  <div class="settings-row"><label for="smtp-sender">Sender address</label><input type="email" id="smtp-sender" autocomplete="off" maxlength="254" value="${esc(f.sender||'')}" placeholder="no-reply@example.com"/><p class="settings-hint">The address mail comes from. The name shown is the platform name.</p></div>
+  <div class="settings-row"><label for="smtp-test-to">Send a test to</label><input type="email" id="smtp-test-to" autocomplete="off" maxlength="254" placeholder="you@company.com"/><button class="btn secondary" data-action="smtp-test">Test with these values</button></div>
+  <div class="settings-actions"><button class="btn" data-action="smtp-save">Save</button>${d.saved&&d.environment_relay?'<button class="btn danger sm" data-action="smtp-remove">Remove saved settings</button>':''}</div>
+  </div></details>`;
+  setSafeHtml(body,h);
+}
+function _smtpFormValues(){
+  const g=(id)=>document.getElementById(id)?.value??'';
+  const out={host:g('smtp-host').trim(),port:g('smtp-port').trim(),security:g('smtp-security'),username:g('smtp-username').trim(),sender:g('smtp-sender').trim()};
+  const pw=g('smtp-password');
+  if(pw)out.password=pw;
+  return out;
+}
+function _smtpRefused(d,status,what){
+  const msg=d&&d.error?d.error:`${what} (${status}).`;
+  showToast(msg,'error');
+  if(d&&d.field){ const el=document.getElementById(d.field==='to'?'smtp-test-to':`smtp-${d.field}`); el?.focus(); }
+}
+async function _smtpSend(method,url,payload){
+  let r=null;
+  try{ r=await fetch(url,{method,headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify(payload)}); }
+  catch(e){ showToast('Could not reach the server — check your connection.','error'); return null; }
+  const d=await r.json().catch(()=>null);
+  return {r,d};
+}
+export async function smtpTest(){
+  const to=(document.getElementById('smtp-test-to')?.value||'').trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){ showToast('Enter the address to send the test to.','error'); document.getElementById('smtp-test-to')?.focus(); return; }
+  const out=await _smtpSend('POST','/api/admin/smtp-settings/test',{..._smtpFormValues(),to});
+  if(!out)return;
+  if(out.r.ok&&out.d&&out.d.ok){ showToast(`Test email sent to ${to} with these settings. They are not saved yet.`,'success'); return; }
+  if(out.r.status===502&&out.d&&out.d.error){ showToast(`The server did not take the test email: ${out.d.error}`,'error'); return; }
+  _smtpRefused(out.d,out.r.status,'The test email was not sent');
+}
+export async function smtpSave(){
+  const v=_smtpFormValues();
+  const ok=await showModal({title:'Save the mail server?',message:`All email the platform sends will go through <strong>${esc(v.host)}:${esc(v.port)}</strong> from now on. Test these values first if you have not.`,confirmText:'Save',confirmClass:''});
+  if(!ok)return;
+  const out=await _smtpSend('PUT','/api/admin/smtp-settings',{...v,expectedVersion:_smtpView?_smtpView.version:null});
+  if(!out)return;
+  if(out.r.ok&&out.d&&out.d.ok){ showToast('Mail server saved. Email now goes through it.','success'); _renderSmtpCard(out.d); return; }
+  _smtpRefused(out.d,out.r.status,'The mail server was not saved');
+}
+export async function smtpRemove(){
+  const ok=await showModal({title:'Remove the saved mail server?',message:'Email will go through the mail server set in the server’s environment again, at once. The saved password is deleted.',confirmText:'Remove',confirmClass:'danger'});
+  if(!ok)return;
+  const out=await _smtpSend('DELETE','/api/admin/smtp-settings',{expectedVersion:_smtpView?_smtpView.version:null});
+  if(!out)return;
+  if(out.r.ok&&out.d&&out.d.ok){ showToast('Saved mail server removed. Email goes through the environment’s settings.','success'); _renderSmtpCard(out.d); return; }
+  _smtpRefused(out.d,out.r.status,'The saved mail server was not removed');
+}
 
 // ─── Email: relay status + test send ──────────────────────────────────────────
 let _emailSeq=0;

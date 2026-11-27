@@ -1401,6 +1401,14 @@
             </div>
 
             <div class="settings-section" data-settings-section="email" data-settings-group="system" data-settings-label="Email (SMTP)">
+              <!-- The mail server in use (loadSmtpCard, GET /api/admin/smtp-settings):
+                   every reader sees it and where each value comes from; a
+                   superadmin also gets the form. -->
+              <div class="card settings-card" id="smtp-settings-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Mail server (SMTP)</h3><span data-help="settings.smtp" data-help-label="Mail server"></span></div>
+                <p class="settings-help">The server every email the platform sends goes through: sign-in codes, invitations, certificates and reports.</p>
+                <div id="smtp-settings-body"></div>
+              </div>
               <div class="card settings-card" id="email-test-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">Outbound email</h3><span data-help="settings.test-email" data-help-label="Outbound email"></span></div>
                 <p class="settings-help" id="email-relay-status" role="status">Checking the mail relay…</p>

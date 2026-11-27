@@ -105,6 +105,7 @@ non-grantable gives nothing and was removed at boot).
 | `ops.retention_purge` | Purge old event data |  |  | ✓ | superadmin only |
 | `ops.cxone` | Manage Checkmarx One defaults and account removals |  |  | ✓ | no (operator ruling, 14 Nov 2026: the platform's key is a tenant credential covering every event) |
 | `ops.email` | Send test email, manage unsubscribed addresses |  |  | ✓ | superadmin only |
+| `ops.smtp` | Change the mail server (SMTP) the platform sends through |  |  | ✓ | no (owner decision, 27 Nov 2026: its password sends as the platform). Reading the mail server in use needs only `settings.view` |
 | `ops.perf_seed` | Seed performance data |  |  | ✓ | no |
 | `breakglass.self` | Manage the break-glass account (the built-in account only) |  |  |  | no |
 | `users.view` | See platform users and roles |  | ✓ | ✓ | yes |
@@ -226,7 +227,9 @@ answer, `GET /api/me` and `GET /api/admin/me`).
 **each card shows to a role holding every permission its routes check**
 (`SETTINGS_CARD_PERMISSIONS`, `ui/nav.js`; operator ruling, 14 Nov 2026): the
 platform name, sign-in and platform look cards need `settings.view` and
-`settings.edit`, outbound email and the unsubscribe list `ops.email`, the
+`settings.edit`, the mail server in use `settings.view` (its form `ops.smtp`,
+superadmin only; everyone else reads "Only a superadmin can change this."),
+outbound email and the unsubscribe list `ops.email`, the
 Checkmarx One cards `ops.cxone` (superadmin only), retention
 `ops.retention_view`, alerts `ops.alerts`, the team-report domains
 `settings.view` (its Save `settings.edit`), and the break-glass card its own

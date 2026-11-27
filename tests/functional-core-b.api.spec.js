@@ -8785,6 +8785,10 @@ test.describe("Docs hygiene", () => {
       "/api/admin/test-email": "its only write after the await is the audit row recording a send that already happened " +
         "during the await; the send was the act, authorised by requireSuperAdmin at the headers, and refusing the " +
         "record would erase the evidence of a completed send",
+      "/api/admin/smtp-settings/test": "the same shape as /api/admin/test-email: its only write after the await is " +
+        "the audit row recording a test send that already happened during the await, through a relay that is NOT saved " +
+        "(nothing is stored); the send was the act, authorised at the headers by requirePermission(\"ops.smtp\"), read " +
+        "live, and refusing the record would erase the evidence of a completed send",
       "/api/admin/certificate-config/preview": "it writes NOTHING, before or after its await: it renders sample data " +
         "to a PNG and sends it (no badge, image, settings or audit row; tests/certificate-config.spec.js counts the " +
         "tables). The answer it serves is a picture of a design, decided at the headers by requireAdmin and scope",

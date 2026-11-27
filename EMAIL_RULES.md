@@ -417,10 +417,13 @@ unsubscribe URL is in the mail body" both survived in this file.
 **One pipeline.** Every mail goes through `sendEmailLogged` (`lib/email.js`),
 which resolves the sender, waits for a free relay connection, asks whether the
 recipient still exists, applies the opt-out gate, sends, and records
-`email_sent`. The single exception is `POST /api/admin/test-email`, the SMTP
-diagnostic, which skips the recipient checks and the `email_sent` record on
+`email_sent`. The exceptions are the two SMTP diagnostics. `POST
+/api/admin/test-email` skips the recipient checks and the `email_sent` record on
 purpose (it reports the relay's own answer), but still waits for a free relay
-connection like every send.
+connection like every send. `POST /api/admin/smtp-settings/test` (Settings →
+Email (SMTP), "Test with these values") sends through a relay that is NOT saved,
+on its own short-lived connection outside the pool, and records the orphaned
+`test_email_sent` (`via: unsaved_settings`) instead.
 
 **EVERY SEND IS RECORDED, WITH OR WITHOUT A USER ROW (v8.7.6).** The record went
 to `user_events.email_sent` **only `if (userId)`** — and at the time exactly two
@@ -464,9 +467,12 @@ reasons the code really passes, in BOTH directions, so a new mail must be
 exercised or exempted with a reason: seven of these had no spec naming them at
 all before it, and it is what found the missing record above.
 
-**The sender is two halves from two places (v7.26.0):** the **address** from
-`EMAIL_FROM`, resolved once at boot — it is what SPF authenticates and where
-bounces return; the **display name** from Settings → Platform Name, read per
+**The sender is two halves from two places (v7.26.0):** the **address** of
+the mail server in force — `EMAIL_FROM`, resolved once at boot, or the bare
+address a superadmin saved with the mail server in Settings → Email (SMTP),
+which replaces the environment's relay as a whole and takes effect at once — it
+is what SPF authenticates and where bounces return, so only a superadmin sets
+it, never the free-text platform name; the **display name** from Settings → Platform Name, read per
 send, so a rebrand needs no redeploy. Never compose this header by
 concatenation: nodemailer re-parses a string and an embedded angle-addr wins,
 which made an admin-settable field able to take over the visible From *and* the

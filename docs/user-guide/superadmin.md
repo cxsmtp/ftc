@@ -1214,8 +1214,9 @@ Settings is two panes: the list on the left, grouped under **People**,
 - **System**: **General** (the platform name, the default Checkmarx One
   integration, how long event history is kept and when it was last swept, and
   open blocked-address alerts, each with **Review**), **Branding** (the platform
-  look and the certificate design), **Email (SMTP)** (the mail relay's last
-  check, **Send test email**, the unsubscribe list and the [event team report
+  look and the certificate design), **Email (SMTP)** (the [mail
+  server](#the-mail-server-smtp) in use and its form, **Send test email**, the
+  unsubscribe list and the [event team report
   domains](#event-team-report-domains)), **Updates** (the running version and
   **What's new**; a server set up with the Podman installer checks daily for
   a new signed release image and restarts on it, any other deployment updates
@@ -1239,7 +1240,7 @@ row with its own **?** for the longer explanation, and each form has its own
 Save. The section you last opened is remembered in this browser.
 
 Each card shows to whoever may use it: a regular admin sees the **Certificate
-design**, the event team report domains (read-only), event history retention,
+design**, the mail server in use (read-only), the event team report domains (read-only), event history retention,
 the blocked-address alerts and **Backups & health**; a custom role sees the cards for the permissions you gave it.
 
 ## Platform name
@@ -1257,10 +1258,11 @@ their inbox** on
 every email the platform sends: invitations, verification, sign-in codes,
 reminders, the lot.
 
-What it does **not** change is the sender *address*. That is fixed by the
-operator in the `EMAIL_FROM` environment variable, on a domain the deployment
-actually controls, because it is the identity SPF is checked against and the
-address bounces come back to. So renaming the platform changes
+What it does **not** change is the sender *address*. That belongs to the [mail
+server](#the-mail-server-smtp) (the `EMAIL_FROM` environment variable, or the
+address saved with the mail server under **Email (SMTP)**), on a domain the
+deployment actually controls, because it is the identity SPF is checked against
+and the address bounces come back to. So renaming the platform changes
 
 ```
 From: Old Name <no-reply@yourdomain.com>
@@ -1282,6 +1284,46 @@ punctuation is fine — commas, quotes, ampersands and brackets all work, and ar
 quoted correctly in the header. And if a rename lands while a large invitation or
 reminder batch is already going out, the messages still in that batch keep the
 old name in their subject and body; only new batches pick the new one up.
+
+---
+
+## The mail server (SMTP)
+
+**Settings → Email (SMTP) → Mail server (SMTP)** shows the server every email
+goes through: its host and port, the connection's security, the username,
+whether a password is set (never the password), the sender address, the
+server's last health check, and for each value whether it was **set in the
+app** or comes **from the server's environment** (the `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASS` and `EMAIL_FROM` the server was started with). Anyone
+who may open Settings sees it; only a superadmin can change it, and everyone
+else is told so.
+
+To change it, fill in the form under the facts:
+
+- **Security**: STARTTLS (normally port 587) upgrades the connection and is
+  required; TLS from the start is port 465. The platform never sends in the
+  clear unless the server's operator allowed it for local development.
+- **Username** empty means the server takes mail without signing in.
+- **Password** is stored encrypted and never shown again. Leave it empty to
+  keep the current one: that works only for the same host and username, so a
+  saved password is never sent to another server. Saving for the first time
+  with the box empty copies the environment's password into the app, after
+  which the server's operator can remove it from the environment.
+- **Sender address** is the address mail comes from; the name recipients see is
+  still the platform name.
+
+**Test with these values** sends one message to the address you type, through
+the values in the form, before anything is saved, and shows the server's answer
+if it refuses. **Save** asks first, then sends all email through the new server
+at once, with no restart; mail already on its way finishes on the old one.
+**Remove saved settings** goes back to the server's environment (offered only
+while the environment names a server). Each save is recorded in the Audit log
+with the fields it changed (never the password or username).
+
+After a restore from a backup, or a move to another server, the saved password
+cannot be read (its key is never in a backup). The card says so: mail goes
+through the environment's server meanwhile, if it names one, until you enter
+the password again and save.
 
 ---
 

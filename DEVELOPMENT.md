@@ -211,7 +211,7 @@ lib/*.js               # 78 shared backend modules — regenerate this list from
                        #   impersonation, invitation-claim, late-entry, leaderboard, lockout, log, log-sort,
                        #   login-code, login-method, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
                        #   qualifying, qualifying-rescore, query-plan, rbac, registration-fields, sanitise, scanner-classify, schema-required,
-                       #   scheduler, scoring, self-enroll, session-index, sessions, settings, staff-compete,
+                       #   scheduler, scoring, self-enroll, session-index, sessions, settings, smtp-settings, staff-compete,
                        #   task-fields, team-recipient, team-report-mail, team-reports, time, user-tags, util, validate, zip-writer —
                        #   required directly; one process-global singleton each
 routes/<entity>.js     # One module per entity: module.exports = register(app[,deps])

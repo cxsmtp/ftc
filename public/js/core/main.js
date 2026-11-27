@@ -874,6 +874,10 @@ function boot() {
   registerAction('settings-open-cxone-audit',  () => _ns22.openCxoneAudit());
   registerAction('settings-health-retry',      () => _ns22.loadSystemHealthCard());
   registerAction('send-test-email',            () => _ns22.sendTestEmail());
+  registerAction('smtp-reload',                () => _ns22.loadSmtpCard());        // one caller, no poll
+  registerAction('smtp-test',                  () => _ns22.smtpTest());
+  registerAction('smtp-save',                  () => _ns22.smtpSave());
+  registerAction('smtp-remove',                () => _ns22.smtpRemove());
   registerAction('settings-retention-reload',  () => _ns22.loadRetentionCard());   // one caller, no poll
   registerAction('settings-alerts-reload',     () => _ns22.loadAlertsCard());      // one caller, no poll
   registerAction('settings-alert-open',        (e, el) => _ns22.openSettingsAlert(el.dataset.id));

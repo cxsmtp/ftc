@@ -50,6 +50,11 @@ const SETTINGS_CARD_ROUTES = {
   "platform-name-card": ["GET /api/admin/settings", "PATCH /api/admin/settings"],
   "account-approval-card": ["GET /api/admin/settings", "PATCH /api/admin/settings"],
   "platform-look-card": ["GET /api/admin/settings", "PUT /api/admin/platform-look"],
+  // The mail server in use is read by every Settings reader (owner decision,
+  // 27 Nov 2026); its form (PUT, DELETE and the test, ops.smtp) is drawn only
+  // where the read's own `can_edit` says so, everyone else reading "Only a
+  // superadmin can change this." (tests/smtp-settings-ui.spec.js).
+  "smtp-settings-card": ["GET /api/admin/smtp-settings"],
   "email-test-card": ["POST /api/admin/test-email"],
   "unsubscribe-card": ["GET /api/admin/unsubscribed", "DELETE /api/admin/unsubscribed/:email"],
   "cxone-card": ["GET /api/admin/settings", "PUT /api/admin/default-cxone", "DELETE /api/admin/default-cxone"],

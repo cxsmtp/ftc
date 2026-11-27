@@ -9534,8 +9534,9 @@ paths:
         inline. Useful after SMTP credential rotation, DNS changes, or to confirm outbound
         delivery during a live event without reading the log file. It resolves its sender
         through the same shared resolver as real mail, so the From header it produces is the
-        one every other email carries — platform name as the display name, EMAIL_FROM as the
-        address.
+        one every other email carries — platform name as the display name, the sender
+        address of the mail server in use (saved in Settings, else EMAIL_FROM) as the
+        address. To try values that are not saved, use POST /api/admin/smtp-settings/test.
       requestBody:
         required: true
         content:
@@ -9564,6 +9565,156 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true, properties: { ok: { type: boolean }, error: { type: string } } }
+
+  /api/admin/smtp-settings:
+    get:
+      tags: [Admin - Settings]
+      summary: The mail server in use and where it comes from (Settings, Email)
+      security: [{ sessionAuth: [] }]
+      description: >
+        The mail relay (SMTP) every email goes through: `in_use` is the relay in
+        force, `source` saying whether it was saved in the app (`app`) or comes from
+        the server's environment (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
+        EMAIL_FROM: `environment`). A relay saved in the app replaces the
+        environment's as a whole; with none saved the environment's is used. The
+        password is never sent, in any form: only `password_set`. `saved` is the
+        saved relay (null when none), `password_unreadable` true while its saved
+        password cannot be decrypted on this server (its key file is not part of
+        backups, so after a restore or a move to another server; mail then goes
+        through the environment's relay if it names one, until a superadmin enters
+        the password again). `health` is the relay's last check (null until one ran;
+        checks are skipped under NODE_ENV=test). `version` is the saved relay's
+        digest (null when none), sent back as `expectedVersion`. `can_edit`: the
+        caller may change it (superadmin only). Needs `settings.view`; never cached.
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: The mail server in use
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmtpSettingsView' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Admin - Settings]
+      summary: Save the mail server (superadmin)
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >
+        Saves the relay and swaps the platform's mail to it at once, with no restart:
+        mail already being sent finishes on the old relay. The password is stored
+        encrypted (AES-256-GCM under `DATA_DIR/.smtp-key`) and never returned. An
+        absent or empty `password` keeps the password in force only for the same
+        host and username, and only while this server can read it; otherwise it is
+        refused `smtp_password_required` (a saved password is never sent to another
+        host). No `username`: the relay takes mail without signing in.
+        `security`: `starttls` requires the STARTTLS upgrade (unless the server's
+        environment sets SMTP_ALLOW_PLAINTEXT=1, which the app cannot), `tls` is
+        TLS from the first byte (port 465). Needs `ops.smtp`, which only a
+        superadmin holds and no custom role can be given. Audited as the `smtp`
+        settings event naming which fields changed, with the old and new host,
+        port, security and sender (never the username or password).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/SmtpSettingsInput' }
+                - type: object
+                  properties:
+                    expectedVersion: { type: string, nullable: true, description: "The read's `version` (null when nothing was saved). Absent: unchecked." }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { description: "`smtp_key_unavailable`: the server could not write its key file; nothing was changed. Or an internal error." }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: Saved; the same shape as the read, plus `ok`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmtpSettingsView' }
+        "400": { description: "`smtp_field_invalid` (with `field`) or `smtp_password_required`." }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "409": { description: "`smtp_settings_changed`: `expectedVersion` is not the saved relay's." }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+    delete:
+      tags: [Admin - Settings]
+      summary: Remove the saved mail server (superadmin)
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >
+        Deletes the saved relay, its encrypted password included, and sends through
+        the environment's relay again at once. Refused while the environment names
+        no relay (SMTP_HOST), which would stop all mail. Nothing saved: 200 with
+        `changed: false`. Needs `ops.smtp`. Audited as the `smtp` settings event
+        `cleared`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                expectedVersion: { type: string, nullable: true }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: Removed (or nothing was saved); the read's shape plus `ok` and `changed`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmtpSettingsView' }
+        "400": { description: "`smtp_field_invalid`: `expectedVersion` is not text or null." }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "409": { description: "`smtp_settings_changed`, or `smtp_environment_missing`: the environment names no relay." }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /api/admin/smtp-settings/test:
+    post:
+      tags: [Admin - Settings]
+      summary: Send a test through mail server values that are not saved (superadmin)
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >
+        Sends one message to `to` through the relay the body describes, on its own
+        short-lived connection: nothing is saved and the relay in force is
+        untouched. The From is the platform name with the body's `sender`. The
+        password rule is the save's. Needs `ops.smtp`. Audited as the orphaned
+        `test_email_sent` (`via: unsaved_settings`, the host, port, security and
+        outcome).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/SmtpSettingsInput' }
+                - type: object
+                  required: [to]
+                  properties:
+                    to: { type: string, format: email, maxLength: 254 }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: The relay accepted the test message
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: false, properties: { ok: { type: boolean } } }
+        "400": { description: "`smtp_test_recipient_invalid`, `smtp_field_invalid` (with `field`) or `smtp_password_required`." }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "502":
+          description: "`smtp_test_failed`: the relay refused or could not be reached; `error` is its answer (the password cut out)."
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true, properties: { ok: { type: boolean }, error: { type: string }, code: { type: string } } }
 
   /metrics:
     get:
@@ -18922,6 +19073,61 @@ components:
         global: { $ref: '#/components/schemas/CertificateConfigLayer' }
         effective: { $ref: '#/components/schemas/CertificateConfigLayer' }
         version: { type: string, description: "The stored layer's version (a digest of it; empty when none is stored): send it back as the PUT's `expectedVersion`." }
+    SmtpSettingsInput:
+      type: object
+      description: A mail relay as the Settings form sends it. Every text value is refused with a control character.
+      additionalProperties: true
+      required: [host, port, security, username, sender]
+      properties:
+        host: { type: string, maxLength: 253, description: "A host name or an IP address: no scheme, port or spaces." }
+        port: { description: "1 to 65535, a number or its digits as text.", oneOf: [{ type: integer, minimum: 1, maximum: 65535 }, { type: string, pattern: '^[0-9]{1,5}$' }] }
+        security: { type: string, enum: [starttls, tls] }
+        username: { type: string, maxLength: 254, description: "Empty: the relay takes mail without signing in." }
+        password: { type: string, description: "Write-only, at most 512 characters. Absent or empty: keep the password in force (same host and username only)." }
+        sender: { type: string, format: email, maxLength: 254, description: "A bare address; the name shown is the platform name." }
+    SmtpSettingsView:
+      type: object
+      additionalProperties: false
+      required: [in_use, saved, password_unreadable, environment_relay, plaintext_allowed, health, version, can_edit]
+      properties:
+        ok: { type: boolean }
+        changed: { type: boolean, description: "DELETE only: whether a saved relay was removed." }
+        in_use:
+          type: object
+          nullable: true
+          additionalProperties: false
+          properties:
+            source: { type: string, enum: [app, environment] }
+            host: { type: string }
+            port: { type: integer, minimum: 1, maximum: 65535 }
+            security: { type: string, enum: [starttls, tls] }
+            username: { type: string }
+            sender: { type: string }
+            sender_source: { type: string, enum: [app, environment, default], description: "`default`: EMAIL_FROM gives no usable address." }
+            password_set: { type: boolean }
+        saved:
+          type: object
+          nullable: true
+          additionalProperties: false
+          properties:
+            host: { type: string }
+            port: { type: integer, minimum: 1, maximum: 65535 }
+            security: { type: string, enum: [starttls, tls] }
+            username: { type: string }
+            sender: { type: string }
+            password_set: { type: boolean }
+            saved_at: { type: string, format: date-time, nullable: true }
+        password_unreadable: { type: boolean }
+        environment_relay: { type: boolean, description: "The server's environment names a relay (SMTP_HOST)." }
+        plaintext_allowed: { type: boolean, description: "SMTP_ALLOW_PLAINTEXT=1 in the environment: STARTTLS is not required." }
+        health:
+          type: object
+          additionalProperties: false
+          properties:
+            state: { type: boolean, nullable: true }
+            checked_at: { type: string, format: date-time, nullable: true }
+        version: { type: string, nullable: true }
+        can_edit: { type: boolean }
     PlatformLook:
       type: object
       additionalProperties: true

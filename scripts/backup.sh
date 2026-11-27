@@ -108,6 +108,12 @@
 #                  one would be stale and would mislead the operator.
 #   BACKUP_EXEMPT: .maintenance — restoring a maintenance gate would 503 users
 #                  on the way back up.
+#   BACKUP_EXEMPT: .smtp-key — the key the mail-server password saved in
+#                  Settings is encrypted under; a backup holding both it and
+#                  the database would hold that password in recoverable form.
+#                  After a restore the password cannot be read: mail goes
+#                  through the environment's relay (if SMTP_HOST is set) until
+#                  a superadmin enters it again (RESTORE.txt step 7).
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -674,11 +680,20 @@ At         : $TIMESTAMP
    server restarted. A NEW superadmin password is generated on this start —
    read it from the log or from $DATA_DIR/.superadmin-password.
 
+7. If a mail server was saved in Settings → Email (SMTP), its password is not
+   in this backup (its key file never is) and cannot be read after the restore.
+   Mail goes through the server's environment settings (SMTP_HOST …) if they
+   name a relay, and the Settings card says so: sign in as a superadmin, enter
+   the password again there and save.
+
 Not in this backup, deliberately:
   - uploads/ (UPLOADS_DIR)   transient — files are read and deleted after each
                              submission, and it is a separate docker volume
   - .superadmin-password     regenerated on every boot
   - .maintenance             a restored maintenance gate would 503 your users
+  - .smtp-key                the key of the mail-server password saved in
+                             Settings; with it, this backup would hold that
+                             password (step 7)
 RESTORE
 
 # v8.3.20 — THE COMPLETION MARKER, written LAST and only on success. Everything

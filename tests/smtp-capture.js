@@ -29,10 +29,16 @@ const net = require("net");
 /**
  * Start a capturing SMTP server on an ephemeral port.
  *
- * @returns {Promise<{port:number, messages:Array, waitFor:Function, clear:Function, close:Function}>}
+ * @param {{auth?: boolean}} [opts] `auth: true` advertises AUTH LOGIN and
+ *   records each sign-in's username and password in `logins` (a relay saved
+ *   with a password, tests/smtp-settings.spec.js). Off by default: the EHLO
+ *   answer every other spec sees is unchanged.
+ * @returns {Promise<{port:number, messages:Array, logins:Array, waitFor:Function, clear:Function, close:Function}>}
  *   `messages` accumulates `{ envelopeFrom, rcptTo, raw, headers, header(name) }`.
  */
-async function startSmtpCapture() {
+async function startSmtpCapture(opts = {}) {
+  const advertiseAuth = !!opts.auth;
+  const logins = [];
   const messages = [];
   const sockets = new Set();
   // v8.12.6 (sweep) — HOLD: while armed, a message that has fully arrived is
@@ -53,6 +59,8 @@ async function startSmtpCapture() {
     let inData = false;
     let buf = "";
     let cur = { envelopeFrom: null, rcptTo: [], raw: "" };
+    let authStep = null; // AUTH LOGIN: "user", then "pass"
+    let authUser = "";
     sock.setEncoding("utf8");
     sock.write("220 test-smtp-capture ESMTP\r\n");
 
@@ -76,8 +84,14 @@ async function startSmtpCapture() {
         const line = buf.slice(0, nl);
         buf = buf.slice(nl + 2);
         const verb = line.slice(0, 4).toUpperCase();
+        if (authStep) {
+          const v = Buffer.from(line.trim(), "base64").toString("utf8");
+          if (authStep === "user") { authUser = v; authStep = "pass"; sock.write("334 UGFzc3dvcmQ6\r\n"); }
+          else { logins.push({ user: authUser, pass: v }); authStep = null; sock.write("235 2.7.0 Accepted\r\n"); }
+          continue;
+        }
         if (verb === "EHLO") {
-          sock.write("250-test-smtp-capture\r\n250-8BITMIME\r\n250 SIZE 52428800\r\n");
+          sock.write("250-test-smtp-capture\r\n250-8BITMIME\r\n" + (advertiseAuth ? "250-AUTH LOGIN\r\n" : "") + "250 SIZE 52428800\r\n");
         } else if (verb === "HELO") {
           sock.write("250 test-smtp-capture\r\n");
         } else if (verb === "MAIL") {
@@ -101,6 +115,9 @@ async function startSmtpCapture() {
           sock.write("221 2.0.0 Bye\r\n");
           sock.end();
           return;
+        } else if (verb === "AUTH" && advertiseAuth && /^AUTH LOGIN\s*$/i.test(line)) {
+          authStep = "user";
+          sock.write("334 VXNlcm5hbWU6\r\n");
         } else if (verb === "AUTH") {
           sock.write("235 2.7.0 Accepted\r\n");
         } else {
@@ -121,6 +138,7 @@ async function startSmtpCapture() {
   return {
     port: server.address().port,
     messages,
+    logins,
     /** Poll until `pred` matches a captured message, or throw after `timeout`. */
     async waitFor(pred, timeout = 15000) {
       const deadline = Date.now() + timeout;
