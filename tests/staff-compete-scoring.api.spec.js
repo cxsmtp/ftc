@@ -673,7 +673,8 @@ test.describe("v8.12.0 — the boards list a competing staff member, and only on
     // `anchorLoginTime` stamps MIN(now, first submission/hint) instead, at
     // every writer of a new anchor. The discriminating fixture is TWO solves
     // before the row: with the fix the window is `t2 - t1 > 0`; without it, 0.
-    const comp = await makeCompetition(sa, saCsrf, "anchor-on", { staff_compete: true });
+    // The entry clock: the subject is the anchor the first live request stamps.
+    const comp = await makeCompetition(sa, saCsrf, "anchor-on", { staff_compete: true, clock_start: "entry" });
     const t1 = await sealedTask(author, "anchor-1");
     const t2 = await sealedTask(author, "anchor-2");
     await assignTask(author.api, author.csrf, t1.id, [comp.id]);
@@ -826,7 +827,8 @@ test.describe("v8.12.0 — the all-solved denominator counts a competing staff m
     // the benchmark row enters and never solves, so it is the ONLY thing that
     // could keep the event open — and it must not. The first test of this
     // describe is the control: the same shape with a STAFF row keeps it open.
-    const comp = await makeCompetition(sa, saCsrf, "denom-bm", { staff_compete: true });
+    // The entry clock: the benchmark row is anchored by ENTERING, like a member.
+    const comp = await makeCompetition(sa, saCsrf, "denom-bm", { staff_compete: true, clock_start: "entry" });
     const task = await sealedTask(author, "denom-bm-task");
     await assignTask(author.api, author.csrf, task.id, [comp.id]);
     const P = await makeP("denombm-P");
@@ -1189,7 +1191,8 @@ test.describe("v8.12.0 — a competing staff member takes the participant path t
 
   /** A two-session event: one slot LIVE now, one two hours out. */
   async function twoSessions(staffCompete, label) {
-    const comp = await makeCompetition(sa, saCsrf, label, { staff_compete: staffCompete });
+    // The entry clock: entering the live session is what stamps the anchor here.
+    const comp = await makeCompetition(sa, saCsrf, label, { staff_compete: staffCompete, clock_start: "entry" });
     const mk = async (name, startMs, dur) => {
       const r = await sa.post(`/api/admin/competitions/${comp.id}/timeslots`, {
         headers: H(saCsrf), data: { name, start_time: iso(startMs), duration_minutes: dur },
@@ -1782,7 +1785,8 @@ test.describe("v8.12.0 — the GROUP board averages a competing staff member int
    * in the entry set and their group would read as empty.
    */
   async function groupWorld(staffCompete, label) {
-    const comp = await makeCompetition(sa, saCsrf, `${label}-${staffCompete ? "on" : "off"}`, { staff_compete: staffCompete, group_leaderboard_enabled: true });
+    // The entry clock: members make their teams non-empty by ENTERING.
+    const comp = await makeCompetition(sa, saCsrf, `${label}-${staffCompete ? "on" : "off"}`, { staff_compete: staffCompete, group_leaderboard_enabled: true, clock_start: "entry" });
     const task = await sealedTask(author, `${label}-task`);
     await assignTask(author.api, author.csrf, task.id, [comp.id]);
     const W = await makeStaff(sa, saCsrf, `${label}-W`);

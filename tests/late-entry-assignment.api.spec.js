@@ -489,7 +489,8 @@ test.describe("v8.12.6 — somebody who played the event cannot rejoin it as a l
   test("the ABSENCE clause: entered and was removed before the end with nothing on record → refused; a late entrant removed in the window → re-admitted", async () => {
     const { api, csrf } = await sa();
     try {
-      const b = await liveBooth(api, csrf, { tasks: 1 });
+      // The entry clock: ENTERING is what records the anchor the absence clause reads.
+      const b = await liveBooth(api, csrf, { tasks: 1, create: { clock_start: "entry" } });
       const token = await selfEnrollToken(api, b.comp.id);
       const x = await makeParticipant(api, csrf, uniq());
       await enrol(api, csrf, b.comp.id, x.id);
