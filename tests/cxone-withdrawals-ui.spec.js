@@ -194,7 +194,7 @@ test.describe("v8.12.7 — Checkmarx One removals, client half", () => {
     expect(row(ids.inProgress).in_progress).toBe(true);
 
     await adminLogin(page);
-    await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+    await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
     const card = page.locator("#cxone-withdrawals-card");
     await expect(card).toBeVisible();
     const entry = (id) => card.locator(`tbody.cxone-wd-entry[data-cxone-user-id="${id}"]`);
@@ -237,7 +237,7 @@ test.describe("v8.12.7 — Checkmarx One removals, client half", () => {
       expect(api.past_retention_count).toBeGreaterThanOrEqual(1);
 
       await adminLogin(page);
-      await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+      await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
       const entry = (id) => page.locator(`#cxone-withdrawals-card tbody.cxone-wd-entry[data-cxone-user-id="${id}"]`);
       await expect(entry(old)).toHaveCount(1);
       await expect(entry(young)).toHaveCount(1);
@@ -329,7 +329,7 @@ test.describe("v8.12.7 — Checkmarx One removals, client half", () => {
       await adminLogin(page);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await expect(page.locator("#cxone-withdrawal-banner")).toBeVisible();
-      await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+      await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
       await expect(page.locator("#cxone-withdrawals-body tbody.cxone-wd-entry").first()).toBeVisible();
       const results = await new AxeBuilder({ page })
         .include("#cxone-withdrawals-card").include("#cxone-withdrawal-banner").analyze();
@@ -358,7 +358,7 @@ test.describe("v8.12.7 — Checkmarx One removals, client half", () => {
       const realm = (x) => `iam.checkmarx.net / ${tn(x)}`;
 
       await adminLogin(page);
-      await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+      await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
       const card = page.locator("#cxone-withdrawals-card");
       const entry = (k) => card.locator(`tbody.cxone-wd-entry[data-cxone-user-id="${ids[k]}"]`);
       for (const k of Object.keys(ids)) await expect(entry(k)).toHaveCount(1);
@@ -417,7 +417,7 @@ test.describe("v8.12.7 — Checkmarx One removals, client half", () => {
         return route.fulfill({ response: res, json: { ...d, rows: (d.rows || []).filter((r) => r.cxone_user_id === id) } });
       });
       await adminLogin(page);
-      await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+      await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
       const card = page.locator("#cxone-withdrawals-card");
       await expect(card.locator("tbody.cxone-wd-entry"), "PRECONDITION: one account is drawn").toHaveCount(1);
       expect(listed, "PRECONDITION: the server itself listed the account").toBe(true);
@@ -449,7 +449,7 @@ test.describe("v8.12.7 — Checkmarx One removals, client half", () => {
     };
     try {
       await adminLogin(page);
-      await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+      await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
       const card = page.locator("#cxone-withdrawals-card");
       for (const id of Object.values(ids)) await expect(card.locator(`tbody.cxone-wd-entry[data-cxone-user-id="${id}"]`)).toHaveCount(1);
       const order = () => card.locator("tbody.cxone-wd-entry").evaluateAll((tbs, want) => tbs
@@ -596,7 +596,7 @@ test.describe("v8.12.7 (review) — Checkmarx One removals, client fixes", () =>
         ...(kept ? { pending_since: daysAgo(731) } : {}) });
       try {
         await adminLogin(page);
-        await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+        await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
         const entry = page.locator(`#cxone-withdrawals-card tbody.cxone-wd-entry[data-cxone-user-id="${id}"]`);
         await expect(entry).toHaveCount(1);
         await expect(entry.locator('[data-action="cxone-withdrawal-override"]')).toBeVisible();
@@ -672,7 +672,7 @@ test.describe("v8.12.7 (review) — Checkmarx One removals, client fixes", () =>
     fail = false;
     await clickTab(page, "competitions");
     const wdP = page.waitForResponse((r) => r.url().includes("/api/admin/cxone/withdrawals") && r.request().method() === "GET");
-    await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+    await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
     await wdP;
     await expect(page.locator("#cxone-withdrawals-body tbody.cxone-wd-entry").first()).toBeVisible();
     // The focus move, had it been armed, runs in the same task as that render.
@@ -716,7 +716,7 @@ test.describe("v8.12.7 (review) — Checkmarx One removals, client fixes", () =>
     const retrying = plantPending({ attempts: 2, last_error: "http/delete_failed/503", attention: 1 });  // CONTROL
     const acct = dbGet("SELECT created_username AS u FROM cxone_realm_accounts WHERE cxone_user_id=?", unmarked).u;
     await adminLogin(page);
-    await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+    await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
     const entry = (id) => page.locator(`#cxone-withdrawals-card tbody.cxone-wd-entry[data-cxone-user-id="${id}"]`);
     await expect(entry(unmarked)).toHaveCount(1);
     await expect(entry(retrying)).toHaveCount(1);
@@ -826,7 +826,7 @@ test.describe("v8.13.1 — Remove anyway sends the hold its confirm quoted", () 
     const plainAcct = (await listedRow(sa, plain)).created_username;
 
     await adminLogin(page);
-    await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+    await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
     for (const r of [...rows, { id: plain }]) await expect(entryOf(page, r.id)).toHaveCount(1);
     const posts = capturePosts(page);
 
@@ -869,7 +869,7 @@ test.describe("v8.13.1 — Remove anyway sends the hold its confirm quoted", () 
       const remX = before.remedy, acct = before.created_username;
 
       await adminLogin(page);
-      await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+      await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
       const entry = entryOf(page, id);
       await expect(entry).toContainText(remX);
 
@@ -923,7 +923,7 @@ test.describe("v8.13.1 — Remove anyway sends the hold its confirm quoted", () 
     expect(before, "precondition").toMatchObject({ held_reason: "adopted_by_tenant", held_signal: "foreign_group", overridable: true });
     expect(now.held_signal_text, "precondition: the two signs read differently").not.toBe(before.held_signal_text);
     await adminLogin(page);
-    await clickTab(page, "settings"); await openSettingsSection(page, "cxone");
+    await clickTab(page, "settings"); await openSettingsSection(page, "cxone-audit");
     const entry = entryOf(page, id);
     await expect(entry.locator(".cxone-wd-found")).toHaveText(`What the platform found: ${before.held_signal_text}`);
     // The runner holds it again, for the same reason but another sign.

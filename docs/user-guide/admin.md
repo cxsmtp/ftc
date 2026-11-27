@@ -149,7 +149,7 @@ else that is yours rather than theirs.
 ### Tables: columns, sorting and filtering
 
 Every admin table (Events, Challenges, Participants, Groups, Live rankings,
-Analytics, Activity, Audit, Logs, Users & roles, the tables in
+Analytics, Activity, Audit, Logs, Roles & permissions, the tables in
 **Team & reports**, issued certificates and the Checkmarx One removals list)
 fits the window without scrolling sideways. Each shows a small default
 set of columns; **Columns** above the table adds or removes any of the others,
@@ -350,7 +350,7 @@ want these numbers is the night before, while people are still registering.
 An event's **Team & reports** section names the people its reports go to: one or
 more Solutions Engineers, Marketing, Sales and SDRs, plus an SE, Marketing and
 Sales manager. They need no account; a name and an address are enough, and the
-address must be at a domain a superadmin allowed under **Settings**, **Email**.
+address must be at a domain a superadmin allowed under **Settings**, **Email (SMTP)**.
 You can change the team of any event, and an event admin of their own events;
 nobody competing in the event can. A team member is emailed participants' details,
 so a custom role adds members and uses **Send now** only if it may also see
@@ -697,8 +697,8 @@ the note *You are competing in this event — you can view it, not change it* (s
 **The sidebar is for the pages about every event**: **Events**, **New event**,
 **Challenge library**, **Live rankings**, **Analytics** and **Audit** under
 *Manage*; **People** (participants and event organisers; admin accounts with
-**Show admin accounts**) and **Groups** under *Participants*;
-**Users & roles** and **Settings** under *Admin*. Opening one of those leaves the
+**Show admin accounts**) and **Teams** under *Participants*;
+**Roles & permissions** and **Settings** under *Admin*. Opening one of those leaves the
 event's workspace, so they always show everything you may see.
 
 On a phone the sidebar becomes a section bar at the top of the page, the event's
@@ -886,7 +886,7 @@ and the downloads. Only a superadmin can change the design of an event that has
 ended: anyone else sees why, with the preview and the downloads. If somebody else
 saved the design after you opened it, **Save design** says so and offers their
 version rather than putting back what they changed. The **platform design** every event starts from is under **Settings**,
-**Certificates design**: press **Open the certificate designer**; it works the
+**Branding**: press **Open the certificate designer**; it works the
 same way, and an event with its own design keeps it.
 
 ![An ended event's Certificates section: the issued certificates, then its certificate design](../screenshots/admin/69-workspace-certificates.png)
@@ -1200,7 +1200,7 @@ privileged account: with such an event open a regular admin is not offered
 the **Invite** dialog is skipped with *"N admin account(s) skipped — only a
 superadmin can enrol an admin"*. A bound group is the one route that does not
 ask: its live sync enrols every member it holds, admin accounts included. The
-Groups tab and the participant row's group chips guard that route — both refuse
+Teams page and the participant row's group chips guard that route — both refuse
 to put an admin account into a group for anyone but a superadmin — and the
 **Invite** dialog's **Add to Groups** picker skips the address with *"N admin
 account(s) not added to the selected group(s) — only a superadmin can put an
@@ -3511,7 +3511,7 @@ deleting and editing a profile are all reserved for superadmins when the target
 is itself an admin. It stops one admin locking a colleague out
 mid-event or taking over their account, and it's enforced by {{platformName}}
 itself — an admin who bypassed the menu would still be refused. The same holds
-for an account with a custom role from **Users & roles** that covers every
+for an account with a custom role from **Roles & permissions** that covers every
 event, and for one whose role can do something your own role cannot: it gets
 the same short menu.
 
@@ -3735,9 +3735,9 @@ audit log.
 
 ---
 
-## Groups
+## Teams
 
-**Groups** are named, reusable collections of participants. A participant can
+**Teams** (groups) are named, reusable collections of participants. A participant can
 be in many groups, and a group can hold many participants. Use them to
 organise people — by company, cohort, region, or any label that helps you run
 events — and to act on everyone in a group at once.
@@ -3785,11 +3785,11 @@ check, so sort out any overlap before you tick it.
 
 ### Managing groups
 
-The **Groups** tab lists every group with its member count and how many
+The **Teams** page lists every group with its member count and how many
 events it's bound to. Search by name, sort by any column, and page
 through the list — a mature instance accumulates a lot of groups.
 
-![Groups tab](../screenshots/admin/28-groups.png)
+![Teams page](../screenshots/admin/28-groups.png)
 
 From here you can:
 
@@ -4019,7 +4019,7 @@ Two things deliberately do *not* follow it:
 already filtered to them — the quickest route from "this person is stuck at rank
 40" to their profile, history or an impersonation session. Any status filter you
 had set is cleared first, so the person you clicked is always the row you land
-on. On the **Group Rankings** board a group name takes you to the **Groups** tab
+on. On the **Group Rankings** board a group name takes you to the **Teams** page
 the same way, and a solo participant to **Participants**.
 
 ### Export a leaderboard to CSV
@@ -4477,9 +4477,9 @@ the thresholds are deliberately biased towards notifying you when unsure.
 
 ---
 
-## Users & roles
+## Roles & permissions
 
-**Users & roles** lists the people who run the platform — every account whose
+**Roles & permissions** lists the people who run the platform — every account whose
 role is not Participant — with their role, the events a scoped role organises
 and when they last signed in (like the other admin tables, with **Columns** and
 a sort and filter on each heading), and the **Roles** view lists what each role
@@ -4503,7 +4503,7 @@ change leaves their choice alone.
 superadmin accounts appear there only with **Show admin accounts** ticked.
 The sidebar is grouped **Manage** (Events, New event and templates, Challenge
 library, Live rankings, Analytics, Audit), **Participants** (People, Groups) and
-**Admin** (Users & roles, Settings). Submissions and the request logs are inside
+**Admin** (Roles & permissions, Settings). Submissions and the request logs are inside
 **Audit** (see [The Audit page](#the-audit-page)).
 
 Most controls whose purpose is not obvious from their label have a small **?**
@@ -4513,17 +4513,17 @@ beside them: press it for a one- or two-sentence explanation, or turn on
 ## Settings
 
 An administrator's **Settings** tab holds the platform **certificate design**,
-the **event history retention** and the open **blocked-address alerts** (and,
-read-only, the domains event team reports may go to); everything else on it is
+the **event history retention**, the open **blocked-address alerts**, **Backups &
+health** (without the details only a superadmin sees), **Updates** and **About**
+(and, read-only, the domains event team reports may go to); everything else on it is
 for superadmins and is not shown to you. Each card shows to whoever may use it,
 so a custom role sees the cards for the permissions it was given. An event admin
 has no Settings tab.
-Everything on it is platform-wide rather than event-specific, in sections listed
-down its left side (a **Section** picker on a phone): the platform name, sign-in
-and account approval, email (a test send and the list of people who have
-unsubscribed from bulk email), the certificate design, the default CxOne
-credentials and the Checkmarx One accounts waiting to be removed for
-participants who have been deleted, data retention, and open alerts.
+Everything on it is platform-wide rather than event-specific, in a list down its
+left side (a **Section** picker on a phone) grouped under **People** (links to
+People, Teams and Roles & permissions, and Sign-in), **Records** (a link to the
+Audit log, and CxOne API audit) and **System** (General, Branding, Email (SMTP),
+Updates, Backups & health, Get help and About).
 
 The one worth knowing about as an organiser is the **platform name**. It is not
 just a label — it is what recipients see as the **sender name** on every email

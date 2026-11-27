@@ -192,7 +192,7 @@ test("looks: a refused platform look, event look and organisation default each s
 
     // ── The platform look's Save (Settings, Look).
     await page.evaluate(() => window.adminTab(null, "admin-settings-tab"));
-    await openSettingsSection(page, "look");
+    await openSettingsSection(page, "branding");
     await page.locator("#pl-look").selectOption("signature");
     await refuse(page, "**/api/admin/platform-look", "PUT", { ...REFUSE, status: 400 });
     await page.locator('[data-action="platform-look-save"]').click();

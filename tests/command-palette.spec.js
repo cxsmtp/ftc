@@ -9,7 +9,7 @@
 //     press inside it does not;
 //   • ROLE GATING, by value: a participant's palette holds no organiser page or
 //     action; an event admin's holds no superadmin page (Settings), no
-//     global-admin page (Users & roles) and no global-admin action (New event,
+//     global-admin page (Roles & permissions) and no global-admin action (New event,
 //     New template, the platform exports), and lists only their own event — each
 //     beside a superadmin CONTROL that does see them, so an empty or broken
 //     palette cannot pass the negative arms;
@@ -151,9 +151,9 @@ test.describe("command palette", () => {
       await signInSuperadmin(sp);
       await openPalette(sp);
       const all = await options(sp, "");
-      // RBAC sidebar — Logs has no sidebar item (Audit's Raw logs); Users & roles
+      // RBAC sidebar — Logs has no sidebar item (Audit's Raw logs); Roles & permissions
       // carries the same tier signal (every global admin, never an event admin).
-      for (const want of ["Settings", "Users & roles", "Challenge library", "People"]) expect(labels(all, "Go to"), `CONTROL: the superadmin's Go to has ${want}`).toContain(want);
+      for (const want of ["Settings", "Roles & permissions", "Challenge library", "People"]) expect(labels(all, "Go to"), `CONTROL: the superadmin's Go to has ${want}`).toContain(want);
       for (const want of ["New event", "New template", "Export people (CSV)", "New challenge"]) expect(labels(all, "Actions"), `CONTROL: the superadmin's Actions has ${want}`).toContain(want);
       const ev = await options(sp, W.theirs.name);
       expect(labels(ev, "Events"), "CONTROL: the superadmin finds the decoy event").toContain(W.theirs.name);
@@ -166,13 +166,13 @@ test.describe("command palette", () => {
     expect(go, "POSITIVE: the event admin's own pages are offered").toContain("Events");
     expect(go).toContain("Challenge library");
     expect(acts, "POSITIVE: an action they may take").toContain("New challenge");
-    for (const gone of ["Settings", "Users & roles"]) expect(go, `${gone} is not an event admin's page`).not.toContain(gone);
+    for (const gone of ["Settings", "Roles & permissions"]) expect(go, `${gone} is not an event admin's page`).not.toContain(gone);
     for (const gone of ["New event", "New template", "Export people (CSV)", "Export challenges"]) expect(acts, `${gone} is not an event admin's action`).not.toContain(gone);
     // Typing never surfaces them either (they are not merely ranked out).
     // "New event" is ALSO the sidebar page where every event starts; an event
     // admin legitimately goes there (they start events from templates), so for
     // the two create doors only the Actions entry is withheld.
-    for (const [q, door, sections] of [["settings", "Settings", ["Go to", "Actions"]], ["users", "Users & roles", ["Go to", "Actions"]], ["new event", "New event", ["Actions"]], ["new template", "New template", ["Go to", "Actions"]]]) {
+    for (const [q, door, sections] of [["settings", "Settings", ["Go to", "Actions"]], ["roles", "Roles & permissions", ["Go to", "Actions"]], ["new event", "New event", ["Actions"]], ["new template", "New template", ["Go to", "Actions"]]]) {
       const hit = await options(page, q);
       expect(hit.filter((o) => sections.includes(o.section)).map((o) => o.label), `"${q}" finds no ${door}`).not.toContain(door);
     }
@@ -190,7 +190,7 @@ test.describe("command palette", () => {
     const opts = await options(page, "");
     expect(labels(opts, "Go to"), "POSITIVE: the participant's pages").toEqual(expect.arrayContaining(["Events", "Profile", "Appearance"]));
     const all = opts.map((o) => o.label);
-    for (const gone of ["Challenge library", "People", "Settings", "Users & roles", "Templates", "Groups", "Live rankings", "New event", "New challenge", "Invite people", "Sign up at the desk", "Switch to Participant View", "Switch to Admin View"]) {
+    for (const gone of ["Challenge library", "People", "Settings", "Roles & permissions", "Templates", "Teams", "Live rankings", "New event", "New challenge", "Invite people", "Sign up at the desk", "Switch to Participant View", "Switch to Admin View"]) {
       expect(all, `${gone} is not a participant's`).not.toContain(gone);
     }
     for (const q of ["library", "settings", "new event", "invite"]) {

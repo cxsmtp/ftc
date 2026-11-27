@@ -17108,6 +17108,51 @@ paths:
         "403":
           $ref: '#/components/responses/Forbidden'
 
+  /api/admin/system-health:
+    get:
+      tags: [Admin - Settings]
+      summary: Platform health for Settings, Backups and health
+      security: [{ sessionAuth: [] }]
+      description: >
+        What the Settings page's Backups and health section shows: the boot
+        database integrity and schema checks, maintenance mode, the last mail-relay
+        probe, uptime, the version, the free space on the data and uploads volumes
+        (GiB, one decimal) and the event-history retention window. Coarse values
+        only: no path, driver message or secret. Needs `settings.view`. A
+        superadmin also gets the database file's size, the Node version and the
+        process start time; for every other reader those keys are absent. It
+        records nothing and is never cached (`Cache-Control: no-store`).
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: The platform's health, redacted for readers other than a superadmin
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [version, database_integrity_ok, database_schema_ok, maintenance, smtp_healthy, uptime_seconds, data_free_gib, uploads_free_gib, event_retention_days]
+                properties:
+                  version: { type: string }
+                  database_integrity_ok: { type: boolean, description: "The boot integrity check passed" }
+                  database_schema_ok: { type: boolean, description: "Every column and index the app needs was there at boot" }
+                  maintenance: { type: boolean }
+                  smtp_healthy: { type: boolean, nullable: true, description: "The last mail-relay probe's answer; null until it has run" }
+                  uptime_seconds: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
+                  data_free_gib: { type: number, nullable: true, description: "Free space on the data volume in GiB, one decimal; null when it cannot be read" }
+                  uploads_free_gib: { type: number, nullable: true, description: "Free space on the uploads volume in GiB, one decimal; null when it cannot be read" }
+                  event_retention_days: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+                  database_size_mib: { type: number, nullable: true, description: "Superadmin only: the database file's size in MiB, one decimal" }
+                  node_version: { type: string, description: "Superadmin only" }
+                  started_at: { type: string, format: date-time, description: "Superadmin only: when this server process started" }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
   /api/admin/retention/purge:
     post:
       tags: [Admin - Settings]
