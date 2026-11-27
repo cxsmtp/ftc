@@ -86,7 +86,7 @@ function _taskVisibilityScope(req) {
     // copy of (lib/event-copies.js), as lib/event-admin.js taskVisibilitySql.
     parts.push(`t.owner_competition_id IN (SELECT value FROM json_each(?))`);
     params.push(JSON.stringify(ids));
-    parts.push(`EXISTS (SELECT 1 FROM tasks tcp WHERE tcp.copied_from_task_id = t.id AND tcp.owner_competition_id IN (SELECT value FROM json_each(?)))`);
+    parts.push(`EXISTS (SELECT 1 FROM tasks tcp JOIN competition_tasks tca ON tca.task_id = tcp.id AND tca.competition_id = tcp.owner_competition_id WHERE tcp.copied_from_task_id = t.id AND tcp.owner_competition_id IN (SELECT value FROM json_each(?)))`);
     params.push(JSON.stringify(ids));
   }
   return { clause: ` AND (${parts.join(" OR ")})`, params };

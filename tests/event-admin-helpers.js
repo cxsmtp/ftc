@@ -268,6 +268,25 @@ function eventCopyOf(bankId, compId) {
     return r ? r.id : null;
   });
 }
+/**
+ * Run `fn` with the assign doors in the PREVIOUS release's mode (test hook
+ * `POST /api/test/legacy-shared-assign`): the bank question itself goes into the
+ * event, shared by every event it is added to. For a lock about the shape a
+ * database from before event-owned questions holds (and a qualifying question
+ * still has); always switched back off.
+ */
+async function withLegacySharedAssign(sa, saCsrf, fn) {
+  const set = async (on) => {
+    const r = await sa.post("/api/test/legacy-shared-assign", { headers: H(saCsrf), data: { on } });
+    expect((await r.json()).on, "the legacy switch took").toBe(on);
+  };
+  await set(true);
+  try { return await fn(); } finally { await set(false); }
+}
+/** The bank question `taskId` was copied from, or itself (a bank question, or one created in its event). */
+function originOf(taskId) {
+  return _ro(db => { const r = db.prepare("SELECT COALESCE(copied_from_task_id, id) AS o FROM tasks WHERE id=?").get(taskId); return r ? r.o : taskId; });
+}
 /** The bank questions event `compId`'s questions were copied from, sorted (its own id where none). */
 function originsHeldBy(compId) {
   return _ro(db => db.prepare("SELECT COALESCE(t.copied_from_task_id, t.id) AS o FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=?").all(compId).map(r => r.o).sort());
@@ -276,7 +295,7 @@ function originsHeldBy(compId) {
 module.exports = {
   H, uniq,
   makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin,
-  eventCopyOf, originsHeldBy,
+  eventCopyOf, originsHeldBy, originOf, withLegacySharedAssign,
   makeInvitedFreeEmailUser,
   buildWorld, expectRefused,
 };

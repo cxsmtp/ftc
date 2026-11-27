@@ -36,7 +36,7 @@
 
 const { test, expect } = require("./isolated-test");
 const {
-  H, uniq, makeTask, assignTask, buildWorld, expectRefused,
+  H, uniq, makeTask, assignTask, buildWorld, expectRefused, eventCopyOf,
 } = require("./event-admin-helpers");
 
 const PUBLIC_DOMAIN = "public-domain";
@@ -204,11 +204,12 @@ test.describe("v8.7.0 — the event-admin challenge scope", () => {
     await expectRefused(bad, "the tasks list scoped to a foreign event", "event_admin_out_of_scope");
 
     const good = await listTasks(w.eaApi, `?competitionId=${w.mine.id}`);
-    expect(good.map(t => t.id), "their own event's challenges ARE served").toContain(saInMine.id);
+    // The event holds its OWN copy of the question (lib/event-copies.js).
+    expect(good.map(t => t.id), "their own event's challenges ARE served").toContain(eventCopyOf(saInMine.id, w.mine.id));
 
     // CONTROL: the same query still serves an unscoped admin.
     const ctl = await listTasks(w.sa, `?competitionId=${w.theirs.id}`);
-    expect(ctl.map(t => t.id), "a superadmin reads the decoy event's challenges").toContain(decoy.id);
+    expect(ctl.map(t => t.id), "a superadmin reads the decoy event's challenges").toContain(eventCopyOf(decoy.id, w.theirs.id));
   });
 
   test("visibility governs the ANSWER KEY too — a version snapshot is the whole row", async () => {
@@ -398,6 +399,12 @@ test.describe("v8.7.0 — the event-admin challenge scope", () => {
       expect(sh, "the shared challenge really is in BOTH events").toEqual([w.mine.id, w.theirs.id].sort());
       const so = (await rowFor(w.sa, solo.id)).competitions.map(c => c.id);
       expect(so, "the control challenge is in the EA's event ONLY").toEqual([w.mine.id]);
+      // Each event holds its OWN copy, authored by the EA (lib/event-copies.js).
+      // The one `theirs` holds is the challenge "somebody else's event holds":
+      // the EA wrote it, and the event it changes is not theirs. The control is
+      // the copy in their own event.
+      shared = { ...shared, id: eventCopyOf(shared.id, w.theirs.id) };
+      solo = { ...solo, id: eventCopyOf(solo.id, w.mine.id) };
     });
 
     test("COSMETIC fields still save on a challenge somebody else's event also holds", async () => {
@@ -729,7 +736,13 @@ test.describe("v8.7.0 — the event-admin challenge scope", () => {
     const row = await rowFor(w.eaApi, own.id);
     expect(row, "their own challenge is in their list").toBeTruthy();
     expect(row.can_edit, "they own it, so cosmetic edits are offered").toBe(true);
-    expect(row.can_edit_scoring,
+    // `theirs` holds its OWN copy, which the EA wrote (lib/event-copies.js): the
+    // row of the question another admin's event holds.
+    const ownTheirs = eventCopyOf(own.id, w.theirs.id);
+    const tRow = await rowFor(w.eaApi, ownTheirs);
+    expect(tRow, "the copy they wrote is in their list").toBeTruthy();
+    expect(tRow.can_edit, "they wrote it, so cosmetic edits are offered").toBe(true);
+    expect(tRow.can_edit_scoring,
       "…but another admin's event holds it, so scoring is NOT offered").toBe(false);
     const byId = Object.fromEntries((row.competitions || []).map(c => [c.id, c]));
     expect(byId[w.mine.id].can_unassign, "they added it to their own event").toBe(true);
@@ -760,17 +773,17 @@ test.describe("v8.7.0 — the event-admin challenge scope", () => {
 
     // The flags must AGREE with the routes, which is the whole point of shipping
     // them: an offered control that 403s is the defect they exist to prevent.
-    const scoring = await w.eaApi.put(`/api/admin/tasks/${own.id}`, {
+    const scoring = await w.eaApi.put(`/api/admin/tasks/${ownTheirs}`, {
       headers: H(w.eaCsrf), data: { correct_answer: "nope" },
     });
     await expectRefused(scoring, "the route agrees with can_edit_scoring:false", "event_admin_scoring_locked");
-    expect((await rowFor(w.sa, own.id)).correct_answer, "…and the answer key did not move")
+    expect((await rowFor(w.sa, ownTheirs)).correct_answer, "…and the answer key did not move")
       .not.toBe("nope");
-    const cosmetic = await w.eaApi.put(`/api/admin/tasks/${own.id}`, {
+    const cosmetic = await w.eaApi.put(`/api/admin/tasks/${ownTheirs}`, {
       headers: H(w.eaCsrf), data: { title: `${own.title} ok` },
     });
     expect(cosmetic.ok(), "the route agrees with can_edit:true").toBeTruthy();
-    expect((await rowFor(w.sa, own.id)).title, "…and can_edit:true means the write really lands")
+    expect((await rowFor(w.sa, ownTheirs)).title, "…and can_edit:true means the write really lands")
       .toBe(`${own.title} ok`);
 
     // A challenge they can SEE but not own carries the flags DOWN — the arm that

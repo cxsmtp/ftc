@@ -52,7 +52,7 @@ const {
   clickTab, openKebab, findSeededTaskRow, adminLogin, loginViaApi, filterComps,
   AxeBuilder, AXE_GATED_IMPACTS, narrowPeopleTable } = require("./ui-admin-helpers");
 const {
-  H, uniq, buildWorld, makeParticipant, makeTask, assignTask, enrol, grantEventAdmin,
+  H, uniq, buildWorld, makeParticipant, makeTask, assignTask, enrol, grantEventAdmin, withLegacySharedAssign,
 } = require("./event-admin-helpers");
 
 // Route page.goto() and page.request.* at THIS worker's server rather than a
@@ -211,7 +211,11 @@ test.describe("v8.7.0 — the event-admin tier in the browser", () => {
     // v8.9.0 — TWO accepted answers, so the strict gate has an extra-answer row
     // and an Add button to disable, not only #tf-answer.
     sharedOwnTask = await makeTask(world.eaApi, world.eaCsrf, "sharedown", { correct_answer: "a\nb" });
-    await assignTask(sa, saCsrf, sharedOwnTask.id, [world.theirs.id]);
+    // A LIBRARY row another organiser's event holds: since event-owned questions
+    // (lib/event-copies.js) an event holds its own copy, so this is the shape a
+    // shared qualifying question and a database from before them keep. Built
+    // through the previous release's assign doors.
+    await withLegacySharedAssign(sa, saCsrf, () => assignTask(sa, saCsrf, sharedOwnTask.id, [world.theirs.id]));
 
     // For the assign picker: one row put on THEIR event by the superadmin (they
     // may not take it out) and one they put there themselves (they may).
