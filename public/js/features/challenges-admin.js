@@ -1,7 +1,7 @@
 "use strict";
 
 import { S } from "../core/state.js";
-import { wireTagDialog } from "../ui/tag-dialog.js";
+import { loadTopics, renderTopicFilter, renderTopicPicker, taskInTopicFilter, topicName, NO_TOPIC } from "./topics-admin.js"; // stage B — the Question bank's topics
 import { applyColumnFilters, applyColumnSort, columnSortActive, hasColumnFilters } from "../ui/table-columns.js"; // v8.17.0 — Columns + heading sort/filter
 import { colspanFor, countText, paginationHtml, pickerFilterHtml, renderLoadFailure, setListCount, wirePickerFilter } from "../ui/list-controls.js"; // v7.17.1 — shared list chrome; v8.1.4 — the grant dialog's participant search
 import { csrfHeaders, readyToWrite, trackInflightWrite, fetchWithLoading, loadCsrfToken, fetchJsonList, announceImpersonationEnded } from "../core/api.js";
@@ -510,13 +510,25 @@ export function sortAdminTasks(col){
   S.tPage=1;renderAdminTasks();
 }
 
+// Stage B — the pane is the QUESTION BANK on its own page and the event's own
+// QUESTIONS inside a workspace (the same pane; its title and doors say which).
+function _syncBankChrome(){
+  const inWs=!!S.adminSelectedCompetitionId;
+  const h=document.getElementById('tasks-pane-title');
+  if(h)h.textContent=inWs?'Questions':'Question bank';
+  // Topics are managed on the bank's own page.
+  const tb=document.getElementById('task-topics-btn');
+  if(tb)tb.style.display=(!inWs&&adminCan('challenges.view'))?'':'none';
+}
 export async function loadAdminTasks(){
   // RBAC — a role that may not read the challenge library sends no read (every
   // refusal toasts and counts towards the address's scanner block).
   if(!adminCan('challenges.view'))return 'failed';
   showSkeletonRows('admin-task-body',5);
   const mySeq=++S._taskFetchSeq;                     // ext-audit v7.15.13 — see _subFetchSeq
-  const _tasks=await _loadAdminTaskList();
+  // Stage B — the topics are read beside the questions (a failed read leaves the
+  // last good list; the filter and picker then offer what they hold).
+  const [_tasks]=await Promise.all([_loadAdminTaskList(),loadTopics()]);
   // v8.12.2 (second review) — the OUTCOME is returned ('landed' | 'superseded' |
   // 'failed'), because two callers act on the model right after awaiting this
   // and must not act on a stale one: a superseded load leaves the PREVIOUS rows
@@ -564,10 +576,12 @@ export async function loadAdminTasks(){
   const compStatus=comp?computeCompStatus(comp):null;
   if(comp&&compStatus!=='ended'&&adminCan('challenges.assign')){
     addTasksBtn.style.display='';
-    addTasksBtn.textContent=`+ Add Challenges to "${comp.name}"`;
+    addTasksBtn.textContent='+ Add from bank';
   }else{
     addTasksBtn.style.display='none';
   }
+  _syncBankChrome();
+  renderTopicFilter();
   renderAdminTasks();
   return 'landed';
 }
@@ -585,33 +599,12 @@ async function _loadAdminTasksSettled(){
   return 'superseded';
 }
 
-/**
- * v8.8.3 — a tag that COLLAPSES onto `public-domain` without being it.
- *
- * The server refuses these at the Add Tag route now, so a new one cannot be
- * created — but one applied before v8.8.3, or arriving through the importer or a
- * version restore (both deliberately unguarded, see routes/challenges.js), is
- * still on the row. It renders as an ordinary tag and grants NOTHING, and for a
- * SOFT HYPHEN or a ZERO-WIDTH SPACE it renders PIXEL-IDENTICALLY to the reserved
- * value — so without this marker an operator can read `public-domain` on the
- * row and have no way to learn it is inert. That is the whole reason the marker
- * exists: it is the only thing on any screen that can tell the two apart.
- *
- * A dashed edge and a warning glyph, never an opacity: dimming a text-bearing
- * element composites the text down with the chrome (the v7.23.1 rule).
- */
-// The challenge library stays QUIET: a row shows its category and one or two
-// identifying tags, and at most two of the events holding it (the open event
-// first). The rest sit behind a "+N" that expands the cell in place, controls
-// and all, so nothing becomes unreachable. Assignment itself is managed from an
-// event's workspace (its Challenges section), not by reading chips here.
-export const TAG_CELL_SHOWN=3;
+// The Question bank stays QUIET (stage B): a row shows its topic, never its
+// tags, and at most two of the events holding it (the open event first). The
+// rest sit behind a "+N" that expands the cell in place, so nothing becomes
+// unreachable. Assignment itself is managed from an event's workspace (its
+// Questions section), not by reading chips here.
 export const EVENT_CELL_SHOWN=2;
-function _orderedTags(tags){
-  const list=(tags||[]).slice();
-  const cat=list.filter(x=>String(x).startsWith('category:'));
-  return cat.concat(list.filter(x=>!String(x).startsWith('category:')));
-}
 function _moreChipsBtn(n,noun,title){
   if(n<=0)return'';
   return ` <button type="button" class="chip-more" data-action="cell-chips-toggle" aria-expanded="false" aria-label="+${n} more ${noun}${n===1?'':'s'} on ${esc(title)}">+${n}</button>`;
@@ -625,52 +618,6 @@ export function toggleCellChips(btn){
   btn.textContent=open?'Less':`+${n}`;
 }
 
-function _inertTagChip(t,tag,mayEdit){
-  // v8.8.4 — the MARKER is for everyone who can see the row; the REPAIR is for
-  // whoever may edit it. Both tag routes are owner-only, so a Fix link on a
-  // challenge somebody else created is an affordance the server is certain to
-  // refuse (v7.14.2). The explanation goes with it: an event admin who cannot
-  // repair it still needs to know the tag is inert, and now learns to ask the
-  // author rather than clicking a control that 403s.
-  const why=mayEdit
-    ? `This is not the reserved "${PUBLIC_DOMAIN_TAG}" tag — it differs by a separator or an invisible character, so it makes this challenge visible to nobody.`
-    : `This is not the reserved "${PUBLIC_DOMAIN_TAG}" tag — it makes this challenge visible to nobody. Only whoever created the challenge can put it right.`;
-  return `<span class="tag tag-inert" title="${esc(why)}">${ICO.alertTriangle}<span>${esc(tag)}</span>` +
-    (mayEdit
-      ? `<button type="button" class="tag-fix" data-action="task-tag-fix-public-domain" data-task-id="${esc(t.id)}" data-tag="${esc(tag)}" ` +
-        `aria-label="Fix — replace the inert tag ${esc(tag)} on ${esc(t.title)} with ${esc(PUBLIC_DOMAIN_TAG)}">Fix</button>` +
-        `<span class="tag-x" data-action="task-tag-remove" data-task-id="${esc(t.id)}" data-tag="${esc(tag)}" aria-label="Remove tag ${esc(tag)} from ${esc(t.title)}">×</span>`
-      : '') +
-    `</span>`;
-}
-
-/**
- * v8.8.3 — the one-click repair offered by the marker above.
- *
- * ADD FIRST, THEN REMOVE, and the order is the point: if the second call fails,
- * the challenge is left in the INTENDED state (visible to every event admin)
- * rather than having lost its only marker. A confirm fronts it because this
- * changes who can see the challenge platform-wide, which is not something to do
- * on a stray click.
- */
-export async function fixPublicDomainTag(taskId,badTag){
-  const t=S.adminTasksData.find(x=>x.id===taskId);
-  const ok=await showModal({
-    title:`Apply the ${PUBLIC_DOMAIN_TAG} tag?`,
-    message:`<p><strong>${esc(t?.title||"This challenge")}</strong> carries the tag <code>${esc(badTag)}</code>, which looks like the reserved tag but is not it, so it grants nothing.</p>` +
-      `<p>Applying <code>${esc(PUBLIC_DOMAIN_TAG)}</code> puts this challenge in the SHARED POOL: every event organiser on the platform may then use it in their own events. The inert tag is removed.</p>`,
-    confirmText:"Apply and remove",
-  });
-  if(!ok)return;
-  const add=await fetch(`/api/admin/tasks/${taskId}/tags`,{method:"POST",headers:csrfHeaders({"Content-Type":"application/json"}),body:JSON.stringify({tag:PUBLIC_DOMAIN_TAG})});
-  if(!add.ok){const d=await add.json().catch(()=>({}));showToast(d.error||"Failed to apply the tag.","error");return;}
-  {const d=await add.json();if(t)t.tags=d.tags;}
-  const del=await fetch(`/api/admin/tasks/${taskId}/tags/${encodeURIComponent(badTag)}`,{method:"DELETE",headers:csrfHeaders()});
-  if(del.ok){const d=await del.json();if(t)t.tags=d.tags;showToast("Shared-pool tag applied.","success");}
-  else{const d=await del.json().catch(()=>({}));showToast(d.error||`Applied ${PUBLIC_DOMAIN_TAG}, but could not remove the old tag.`,"error");}
-  renderAdminTasks();
-}
-
 // The rows this list shows (ui/task-search.js): the library outside an event;
 // inside one, the event's own questions and the bank questions it holds no copy of.
 function _listedTasks(){
@@ -681,7 +628,9 @@ export function renderAdminTasks(){
   let tasks=_listedTasks();
   // RBAC — a row is selected only to assign it (`challenges.assign`): a role
   // that may not gets no checkboxes and no Select all.
-  const _canSelect=adminCan('challenges.assign');
+  // Stage B — only on the bank's own page: inside an event the one door is
+  // + Add from bank (owner ruling, 27 Nov 2026).
+  const _canSelect=adminCan('challenges.assign')&&!S.adminSelectedCompetitionId;
   { const sa=document.getElementById('select-all-challenges'); const lb=sa&&sa.closest('label'); if(lb)lb.style.display=_canSelect?'':'none'; }
   // Search
   const q=(document.getElementById('task-search')?.value||'').toLowerCase().trim();
@@ -692,6 +641,8 @@ export function renderAdminTasks(){
   if(S.tStatusFilters.size>0)tasks=tasks.filter(t=>S.tStatusFilters.has(t.status));
   // State filter (visible/hidden)
   if(S.tStateFilters.size>0)tasks=tasks.filter(t=>{const s=t.active?'visible':'hidden';return S.tStateFilters.has(s);});
+  // Stage B — the Topic filter (features/topics-admin.js).
+  if(S.tTopicFilter)tasks=tasks.filter(taskInTopicFilter);
   // v8.17.0 — the heading filters (ui/table-columns.js), over the whole library, before paging.
   tasks=applyColumnFilters('challenges',tasks);
   // Sort
@@ -750,8 +701,12 @@ export function renderAdminTasks(){
     // list-count call below deliberately does not treat a focus as narrowing.
     // Reachable whenever the actor's whole visible set is empty, which for a
     // zero-grant event admin is the ordinary state.
-    const hasFilter=q||S.tDiffFilters.size>0||S.tStatusFilters.size>0||S.tStateFilters.size>0||hasColumnFilters('challenges');
-    const taskEmptyMsg=hasFilter?'No challenges match the current filters.':'No challenges yet.';
+    const hasFilter=q||S.tDiffFilters.size>0||S.tStatusFilters.size>0||S.tStateFilters.size>0||!!S.tTopicFilter||hasColumnFilters('challenges');
+    const taskEmptyMsg=hasFilter
+      ?(S.tTopicFilter&&!q&&!S.tDiffFilters.size&&!S.tStatusFilters.size&&!S.tStateFilters.size&&!hasColumnFilters('challenges')
+        ?(S.tTopicFilter===NO_TOPIC?'Every question here has a topic.':`No questions in the topic “${esc(topicName(S.tTopicFilter))}” yet.`)
+        :'No challenges match the current filters.')
+      :'No challenges yet.';
     setSafeHtml(document.getElementById('admin-task-body'),`<tr><td colspan="13" class="table-empty-row">${taskEmptyMsg}</td></tr>`);
   }else setSafeHtml(document.getElementById('admin-task-body'), pageData.map(t=>{
     const hidden=!t.active;
@@ -934,8 +889,8 @@ export function renderAdminTasks(){
           kebabActions+=`<button class="${hideCls}" data-action="task-toggle-visibility" data-task-id="${esc(t.id)}">${ICO.eyeOff} Hide</button>`;
         }
       }
-      // Its dialog lists the events to assign to (`events.view`).
-      if(_permAssign&&adminCan('events.view'))kebabActions+=`<button data-action="task-assign-to-comps" data-task-id="${esc(t.id)}">${ICO.target} Assign to Events</button>`;
+      // Stage B — no per-row door into events: the bank's one door is the
+      // selection bar's Add to events (owner ruling, 27 Nov 2026).
     }
     // v8.7.0 — `can_unassign` is PER COMPETITION, because "may I take this out of
     // THAT event" depends on who put it there: an event admin may remove only
@@ -967,6 +922,12 @@ export function renderAdminTasks(){
     }
     kebabActions+=`<button data-action="task-history" data-task-id="${esc(t.id)}">${ICO.clock} History</button>`;
     if(!t.locked&&_mayEdit&&_permEdit)kebabActions+=`<button class="${editCls}" data-action="task-edit" data-task-id="${esc(t.id)}">${ICO.edit} Edit</button>`;
+    // Stage B — SAVE TO BANK, on this event's own question: a NEW bank question
+    // copied from it (routes/challenges.js). Offered where the route accepts it:
+    // not a quick question, not while competing, and only with the key readable.
+    if(t.owner_competition_id&&t.owner_competition_id===S.adminSelectedCompetitionId&&_permEdit&&!_competes&&!isQualifyingTask(t)&&t.can_see_answer!==false){
+      kebabActions+=`<button data-action="task-save-to-bank" data-task-id="${esc(t.id)}">${ICO.save} Save to bank</button>`;
+    }
     kebabActions+=_notMineNote;
     kebabActions+=_scoringNote;
     // v8.12.2 — THE REVEAL, offered exactly where the server would accept it:
@@ -1022,7 +983,7 @@ export function renderAdminTasks(){
       <td class="cell-ts ${cellDim}">${fmtDt(t.last_changed)}</td>
       <td class="cell-ts ${cellDim}">${esc(t.changed_by||'—')}</td>
       <td class="cell-ts ${cellDim}">${esc(t.author_name||'—')}</td>
-      <td class="${cellDim}"${_mayEdit?'':` title="${_competes?'You are competing in an event that holds this challenge — you can view it, not change it':_sealBinds?'Its answer is sealed — only the person who created it, or a superadmin who reveals it on the record, can change this challenge':'Created by someone else — you can use it, not change it'}"`} style="min-width:120px;white-space:normal"><div class="cell-chips">${_orderedTags(t.tags).map((tag,i)=>{const _of=i>=TAG_CELL_SHOWN?' chip-overflow':'';return publicDomainNearMiss(tag)?_inertTagChip(t,tag,_mayEdit).replace('class="tag','class="tag'+_of):`<span class="tag${_of}">${esc(tag)}${_mayEdit?`<span class="tag-x" data-action="task-tag-remove" data-task-id="${esc(t.id)}" data-tag="${esc(tag)}" aria-label="Remove tag ${esc(tag)} from ${esc(t.title)}">×</span>`:''}</span>`;}).join('')}${_moreChipsBtn((t.tags||[]).length-TAG_CELL_SHOWN,'tag',t.title)}${_mayEdit?`<span class="tag-add" data-action="task-tag-add" data-task-id="${esc(t.id)}">+ tag</span>`:''}</div></td>
+      <td class="${cellDim}" data-col="topic">${t.topic_name?`<span class="topic-chip">${esc(t.topic_name)}</span>`:'<span class="cell-empty">&mdash;</span>'}</td>
       <td class="${cellDim}" style="white-space:normal;min-width:160px"><div class="cell-chips">${compBadgesHtml}</div></td>
       <td><div class="action-cell task-actions" style="gap:4px">${primaryBtn}</div>
         <button class="kebab-btn kebab-always" aria-label="More actions" data-action="kebab-toggle">⋮</button>
@@ -1036,7 +997,7 @@ export function renderAdminTasks(){
   // v7.20.11 — the three chip groups narrow the list too, so they count as
   // "filtered"; otherwise the count reports the whole table over a chip-narrowed
   // handful of rows.
-  setListCount('task-search',{matched:totalFiltered,total:_listedTasks().length,filtered:!!q||!!(S.tDiffFilters&&S.tDiffFilters.size)||!!(S.tStatusFilters&&S.tStatusFilters.size)||!!(S.tStateFilters&&S.tStateFilters.size)||hasColumnFilters('challenges'),queried:!!q||hasColumnFilters('challenges')});
+  setListCount('task-search',{matched:totalFiltered,total:_listedTasks().length,filtered:!!q||!!(S.tDiffFilters&&S.tDiffFilters.size)||!!(S.tStatusFilters&&S.tStatusFilters.size)||!!(S.tStateFilters&&S.tStateFilters.size)||!!S.tTopicFilter||hasColumnFilters('challenges'),queried:!!q||hasColumnFilters('challenges')});
   if(pagDiv)setSafeHtml(pagDiv, paginationHtml('tasks', {page:S.tPage,totalPages,totalLabel:`${totalFiltered} total`,pageSize:S.tPageSize}));
 
   // v7.12.0 — keep the bulk-assign selection bar + the select-all checkbox in sync
@@ -1070,9 +1031,7 @@ export function updateChallengeSelectionBar(){
   const comp=S.adminSelectedCompetitionId?S.adminCompetitionsData.find(c=>c.id===S.adminSelectedCompetitionId):null;
   // v8.12.0 — a competitor may not add challenges to the event they compete in.
   const directAdd=comp&&computeCompStatus(comp)!=='ended'&&!comp.competing;
-  const label=directAdd?`Assign to "${comp.name}"`:'Assign to Events'; // v7.12.1 — match the participants wording
   const barBtn=document.getElementById('challenge-selection-bar-assign-btn');
-  const topBtn=document.getElementById('assign-challenges-to-comp-btn'); // v7.12.1 — top button (mirrors participants)
   const countEl=document.getElementById('challenge-selection-count');
   if(count>0){
     bar.style.display='flex';
@@ -1080,23 +1039,17 @@ export function updateChallengeSelectionBar(){
     // bottom-of-page focusables aren't trapped under it (see styles.css).
     document.body.classList.add('selection-bar-open');
     if(countEl)countEl.textContent=count+' selected';
-    // RBAC — assigning is `challenges.assign`; outside an event its dialog also
-    // reads the event list (`events.view`).
-    const canAssign=adminCan('challenges.assign')&&(!!directAdd||adminCan('events.view'));
-    if(barBtn){barBtn.textContent=label;barBtn.style.display=canAssign?'':'none';}
-    if(topBtn){topBtn.style.display=canAssign?'':'none';topBtn.textContent=label;}
+    // RBAC — assigning is `challenges.assign`; its dialog reads the event list
+    // (`events.view`).
+    const canAssign=adminCan('challenges.assign')&&adminCan('events.view');
+    if(barBtn)barBtn.style.display=canAssign?'':'none';
   }else{
     bar.style.display='none';
     document.body.classList.remove('selection-bar-open');
-    if(topBtn)topBtn.style.display='none';
   }
-  // v7.12.2 — the "+ Add Challenges" picker button and the bulk "Assign to <comp>"
-  // button both add to the focused competition; never show BOTH (the participants
-  // pane shows only one). So the picker button appears ONLY when a comp is focused
-  // AND nothing is selected — the moment you tick a challenge it yields to the bulk
-  // button, and returns when you clear the selection.
+  // Inside an event the one door is + Add from bank (rows carry no box there).
   const addBtn=document.getElementById('add-tasks-to-comp-btn');
-  if(addBtn)addBtn.style.display=(directAdd&&count===0&&adminCan('challenges.assign'))?'':'none';   // RBAC — `challenges.assign`
+  if(addBtn)addBtn.style.display=(directAdd&&adminCan('challenges.assign'))?'':'none';   // RBAC — `challenges.assign`
   // Reflect the current page's selection state on the select-all checkbox
   // (checked when every visible box is selected; indeterminate when partial).
   const boxes=[...document.querySelectorAll('#admin-task-body input[type="checkbox"]')];
@@ -1108,22 +1061,13 @@ export function updateChallengeSelectionBar(){
   }
 }
 
-// Entry point for the selection-bar button: direct-add when a competition is
-// focused, otherwise open the competition picker.
+// The Question bank's one door into events (owner ruling, 27 Nov 2026): the
+// selection bar's Add to events. One question opens its own dialog (which lists
+// the events holding it and also takes it out of them); several open the bulk one.
 export function challengesBulkAssign(){
-  if(!S.selectedChallenges.size){showToast('Select challenges first.');return;}
-  // v8.12.0 — ONE predicate for the label and the handler. The label already
-  // read "Assign to Events" for a competitor (the focused event refuses them),
-  // while this branch re-derived the direct-add decision without `competing`
-  // and posted straight into the refusal — two copies of one rule, one drifted
-  // (the v7.21.13 class; the participants twin derives both from one value).
-  const comp=S.adminSelectedCompetitionId?S.adminCompetitionsData.find(c=>c.id===S.adminSelectedCompetitionId):null;
-  const directAdd=!!(comp&&computeCompStatus(comp)!=='ended'&&!comp.competing);
-  if(directAdd){
-    quickAssignSelectedChallengesToCompetition();
-  }else{
-    openBulkAssignChallengesModal();
-  }
+  if(!S.selectedChallenges.size){showToast('Select questions first.');return;}
+  if(S.selectedChallenges.size===1){openAssignTaskToComps([...S.selectedChallenges][0]);return;}
+  openBulkAssignChallengesModal();
 }
 
 async function _postBulkAssignChallenges(competitionIds){
@@ -1166,15 +1110,6 @@ async function _postBulkAssignChallenges(competitionIds){
     S.selectedChallenges.clear();
     loadAdminTasks();loadAdminCompetitions();
   }else{showToast(res.d.error||'Failed to assign challenges.','error');}
-}
-
-export async function quickAssignSelectedChallengesToCompetition(){
-  if(!S.adminSelectedCompetitionId||!S.selectedChallenges.size)return;
-  const comp=S.adminCompetitionsData.find(c=>c.id===S.adminSelectedCompetitionId);
-  const count=S.selectedChallenges.size;
-  const ok=await showModal({title:`Assign to ${comp?.name||'Event'}`,message:`Assign <strong>${count}</strong> selected challenge(s) to <strong>${esc(comp?.name||'')}</strong>?<br><br>Draft challenges, and challenges already assigned, are skipped.`,confirmText:'Assign'});
-  if(!ok)return;
-  await _postBulkAssignChallenges([S.adminSelectedCompetitionId]);
 }
 
 export async function openBulkAssignChallengesModal(){
@@ -2597,7 +2532,7 @@ function _tfSealApplyReadOnly(t){
 // bodies read-only through their editors' `setReadOnly`, which also switches their
 // toolbars off with the reason.
 function _tfFormReadOnly(reason,also){
-  document.querySelectorAll('#admin-task-form input,#admin-task-form select,#admin-task-form textarea,#tf-choices-list button,#tf-add-choice,#tf-answers-extra button,#tf-add-answer')
+  document.querySelectorAll('#admin-task-form input,#admin-task-form select,#admin-task-form textarea,#tf-choices-list button,#tf-add-choice,#tf-answers-extra button,#tf-add-answer,#tf-topic-new')
     .forEach(el=>{el.disabled=true;});
   _tfRichReadOnly(reason,also);
   const sb=document.getElementById('save-task-btn'); if(sb)sb.style.display='none';
@@ -2613,7 +2548,86 @@ export const CHALLENGE_EDITOR_TIPS={
   "challenge.attempts":"Optional. Leave it blank for no limit. A number from 1 to 1000 caps how many answers each participant may submit on this challenge, and it overrides the event's own limit. Organisers can grant more attempts later.",
   "challenge.choices":"Tick every choice that is correct. One correct choice shows participants radio buttons; two or more show checkboxes. The order is shuffled per participant. At a Booth Event on a phone, participants tap large lettered tiles instead: a short question with a few short choices fits one screen; with more than 6 choices, or any longer than 90 characters, the screen always scrolls.",
   "challenge.attachments":"ZIP files only, at most 64 MB each and up to 10 per challenge. Uploads stay invisible to participants until you save; Cancel discards them. A link points participants at a download hosted elsewhere.",
+  "challenge.topic":"The topic this question is filed under in the Question bank. Participants see it on the question as its category. A question has one topic; manage the list with Topics on the Question bank page.",
+  "challenge.shared":"On: every event organiser on the platform can find this bank question and use it in their own events, even though they did not create it. Off: only you, administrators and the events using it.",
 };
+
+// ── Stage B — TOPIC AND SHARING (the controls that replace the tag box) ──────
+// The topic is a field of the question (`topic_id`, sent with the save). The
+// shared switch and the needs choices write the stored markers the tag routes
+// write (`public-domain`, `needs:<what>`), after the save, so every rule those
+// routes ask (owner, seal, fit, near miss) still decides. Free-form tags are
+// neither shown nor changed.
+//
+// KNOWN_NEEDS mirrors lib/challenge-fit.js KNOWN_NEEDS (keys and wording;
+// held by tests/topics-ui.spec.js). A `needs:` marker the question carries that
+// is not in it is listed by its own name, so it can be cleared.
+export const KNOWN_NEEDS=Object.freeze({cxone:"a CxOne account",desktop:"a desktop computer"});
+function _tfOwnedByEvent(t){return t?!!t.owner_competition_id:!!S.adminSelectedCompetitionId;}
+function _tfOrgFill(t){
+  renderTopicPicker(t?(t.topic_id||null):null);
+  const tags=(t&&Array.isArray(t.tags))?t.tags.slice():[];
+  S._tfOrgTags=tags;
+  const ev=_tfOwnedByEvent(t);
+  const sg=document.getElementById('tf-shared-group');if(sg)sg.hidden=ev;
+  const sn=document.getElementById('tf-shared-note');if(sn)sn.hidden=!ev;
+  const sh=document.getElementById('tf-shared');if(sh)sh.checked=tags.includes(PUBLIC_DOMAIN_TAG);
+  // v8.8.3, kept — a LOOK-ALIKE of the shared marker (a space, a soft hyphen, a
+  // zero-width space) shares nothing, and on screen can read exactly like it.
+  // Named here, beside the switch that repairs it: turning the switch on adds the
+  // real marker and removes the look-alike.
+  const near=tags.filter(publicDomainNearMiss);
+  const nm=document.getElementById('tf-shared-nearmiss');
+  if(nm){
+    nm.hidden=ev||!near.length||tags.includes(PUBLIC_DOMAIN_TAG);
+    nm.textContent=near.length?`This question carries “${near[0]}”, which looks like the shared marker but shares nothing. Turn on Shared with all organisers to share it; the look-alike is then removed.`:'';
+  }
+  const needs=Object.entries(KNOWN_NEEDS);
+  for(const tg of tags){if(String(tg).startsWith('needs:')){const k=String(tg).slice(6);if(k&&!needs.some(n=>n[0]===k))needs.push([k,k]);}}
+  const list=document.getElementById('tf-needs-list');
+  if(list)setSafeHtml(list,needs.map(([k,label])=>`<label class="checkbox-row"><input type="checkbox" data-need="${esc(k)}" data-change-action="task-org-sync"${tags.includes('needs:'+k)?' checked':''}/><span>${esc(label)}</span></label>`).join(''));
+  tfOrgSync();
+}
+/** The collapsed row's one-line summary of what it holds. */
+export function tfOrgSync(){
+  const sel=document.getElementById('tf-topic');
+  const name=sel&&sel.value?(sel.options[sel.selectedIndex]?.textContent||''):'';
+  const parts=[name||'No topic'];
+  const sg=document.getElementById('tf-shared-group');
+  if(sg&&!sg.hidden&&document.getElementById('tf-shared')?.checked)parts.push('Shared');
+  const n=document.querySelectorAll('#tf-needs-list input[data-need]:checked').length;
+  if(n)parts.push(n===1?'1 need':`${n} needs`);
+  const el=document.getElementById('tf-org-sum');if(el)el.textContent=parts.join(' · ');
+}
+/** The marker changes the form asks for, applied through the tag routes. */
+async function _tfApplyOrgTags(taskId){
+  const before=new Set(S._tfOrgTags||[]);
+  const ops=[];
+  const sg=document.getElementById('tf-shared-group'),sh=document.getElementById('tf-shared');
+  if(sg&&!sg.hidden&&sh&&!sh.disabled){
+    if(sh.checked&&!before.has(PUBLIC_DOMAIN_TAG)){
+      ops.push(['add',PUBLIC_DOMAIN_TAG]);
+      // Add first, then drop any look-alike (the v8.8.3 Fix's order: a failed
+      // removal leaves the question shared, never unshared).
+      for(const t of before)if(publicDomainNearMiss(t))ops.push(['del',t]);
+    }
+    if(!sh.checked&&before.has(PUBLIC_DOMAIN_TAG))ops.push(['del',PUBLIC_DOMAIN_TAG]);
+  }
+  document.querySelectorAll('#tf-needs-list input[data-need]').forEach(cb=>{
+    if(cb.disabled)return;
+    const tag='needs:'+cb.dataset.need;
+    if(cb.checked&&!before.has(tag))ops.push(['add',tag]);
+    if(!cb.checked&&before.has(tag))ops.push(['del',tag]);
+  });
+  const failed=[];
+  for(const [op,tag] of ops){
+    const r=op==='add'
+      ?await fetch(`/api/admin/tasks/${encodeURIComponent(taskId)}/tags`,{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({tag})})
+      :await fetch(`/api/admin/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tag)}`,{method:'DELETE',headers:csrfHeaders()});
+    if(!r.ok){const d=await r.json().catch(()=>({}));failed.push(d.error||'A sharing or needs change was refused.');break;}
+  }
+  return failed;
+}
 
 /** Difficulty: the segmented radios mirror the hidden #tf-diff select. */
 function _tfDiffSync(){
@@ -2633,6 +2647,7 @@ const _TF_SECS=[
   {toggle:'[aria-controls="tf-explanation-body"]',body:'tf-explanation-body'},
   {toggle:'[aria-controls="tf-author-body"]',body:'tf-author-body'},
   {toggle:'#tf-attach-url-toggle',body:'tf-attach-url-body'},
+  {toggle:'[aria-controls="tf-org-body"]',body:'tf-org-body'},
 ];
 function _tfRichText(id){return (document.querySelector(`#${id} .rich-body`)?.textContent||'').replace(/\s+/g,' ').trim();}
 /** One-line summaries on the collapsed rows, so a filled row says what it holds. */
@@ -2742,7 +2757,7 @@ export function openTaskForm(){
   // answer would seal a challenge nobody meant to seal, and the decision is
   // irreversible in the sealing direction.
   _tfSealSetCreateMode();
-  document.getElementById('edit-task-id').value='';document.getElementById('task-form-title').textContent='New Challenge';
+  document.getElementById('edit-task-id').value='';document.getElementById('task-form-title').textContent='New question';
   clearTaskFormErrors();
   document.getElementById('task-feedback-section').style.display='none';
   // Show draft/publish buttons for new tasks
@@ -2751,6 +2766,8 @@ export function openTaskForm(){
   document.getElementById('save-task-btn').style.display='none';
   // Re-enable form inputs (may have been disabled by a locked task)
   document.querySelectorAll('#admin-task-form input,#admin-task-form select,#admin-task-form textarea').forEach(el=>{el.disabled=false;});
+  {const _tn=document.getElementById('tf-topic-new');if(_tn)_tn.disabled=false;}
+  _tfOrgFill(null);
   _tfRichReadOnly(null);
   // v8.9.0 — the two static ADD buttons are disabled by the scoring-locked path
   // below and are neither inputs nor re-rendered, so without this a read-only
@@ -2790,6 +2807,8 @@ export async function editTask(id){
   document.querySelectorAll('#admin-task-form input,#admin-task-form select,#admin-task-form textarea').forEach(el=>{el.disabled=false;});
   _tfRichReadOnly(null);
   ['tf-add-choice','tf-add-answer'].forEach(id=>{const b=document.getElementById(id);if(b){b.disabled=false;delete b.dataset.capDisabled;}});   // v8.9.0 — see openTaskForm
+  {const _tn=document.getElementById('tf-topic-new');if(_tn)_tn.disabled=false;}
+  _tfOrgFill(t);
   document.getElementById('edit-task-id').value=t.id;document.getElementById('tf-title').value=t.title;
   descEditor.setHtml(t.description||'');document.getElementById('tf-diff').value=t.difficulty;
   document.getElementById('tf-attempt-cap').value=(Number.isInteger(t.attempt_cap)&&t.attempt_cap>0)?String(t.attempt_cap):'';
@@ -2857,7 +2876,7 @@ export async function editTask(id){
   S._pendingStagingAttachments=[];
   _closeAttachPicker();
   _renderTaskFormAttachments();
-  document.getElementById('task-form-title').textContent='Edit Challenge';clearTaskFormErrors();
+  document.getElementById('task-form-title').textContent='Edit question';clearTaskFormErrors();
   // For editing existing, show generic save
   document.getElementById('save-draft-btn').style.display='none';
   document.getElementById('save-publish-btn').style.display='none';
@@ -2904,7 +2923,7 @@ export async function editTask(id){
   // Lock handling
   if(t.locked){
     _tfFormReadOnly(_tfLockedReason(t),S._tfAnswerVisible===false?'tf-sealed-note':undefined);
-    setSafeHtml(document.getElementById('task-form-title'), `Edit Challenge (<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:-2px">${ICO.lock} Locked</span>)`);
+    setSafeHtml(document.getElementById('task-form-title'), `Edit question (<span style="display:inline-flex;align-items:center;gap:4px;vertical-align:-2px">${ICO.lock} Locked</span>)`);
   }
   // v8.17.0 — last, after every enable/disable pass above, so the segmented
   // difficulty follows #tf-diff's final disabled state.
@@ -3049,6 +3068,12 @@ export async function saveTask(status){
       ? (_unsealTicked?{answer_sealed:false}:{})
       : (document.getElementById('tf-answer-seal')?.checked?{answer_sealed:true}:{}))};
   if(status)body.status=status;
+  // Stage B — the topic, sent only once the picker holds the topic list (a
+  // failed read must not file the question under no topic).
+  {const _ts=document.getElementById('tf-topic');if(_ts&&_ts.dataset.loaded==='1')body.topic_id=_ts.value||null;}
+  // Stage B — a NEW question made inside an event's workspace is that event's
+  // own from birth (POST /api/admin/tasks with competitionId), never a bank question.
+  if(!id&&S.adminSelectedCompetitionId)body.competitionId=S.adminSelectedCompetitionId;
   // v6.13.15 — both create AND edit flows send staging_attachments.
   // Server promotes them atomically inside the create/update
   // transaction and deletes the staging rows.
@@ -3078,7 +3103,12 @@ export async function saveTask(status){
   // Clear staging state AFTER a successful promotion so closeTaskForm() doesn't
   // fire a DELETE for rows the server already consumed.
   S._pendingStagingAttachments=[];
-  closeTaskForm();loadAdminTasks();showToast('Challenge saved!','success');
+  const _saved=await r.json().catch(()=>({}));
+  const _savedId=id||_saved.id;
+  const _orgFailed=_savedId?await _tfApplyOrgTags(_savedId):[];
+  closeTaskForm();loadAdminTasks();
+  if(_orgFailed.length)showToast(`Challenge saved, but: ${_orgFailed[0]}`,'error');
+  else showToast('Challenge saved!','success');
 }
 
 export async function deleteTask(id){
@@ -3092,56 +3122,17 @@ export async function deleteTask(id){
   else{const d=await r.json();showToast(d.error||'Failed to delete challenge.','error');}
 }
 
-export async function addTaskTag(taskId){
-  const taskTags=(S.adminTasksData.find(t=>t.id===taskId)?.tags)||[];
-  // v8.8.2 — offered only while it is NOT already applied, so the dialog never
-  // shows a control whose only effect would be a no-op.
-  const pdApplied=taskTags.includes(PUBLIC_DOMAIN_TAG);
-  // v8.3.17 — see core/api.js fetchJsonList: a 500's body parses to an object,
-  // and the .filter below then throws with nothing on screen.
-  const allTags=await fetchJsonList('/api/admin/task-tags');
-  if(allTags===null){showToast('Could not load the tag list. Try again.','error');return;}
-  const available=allTags.filter(t=>!taskTags.includes(t));
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;top:0;right:0;bottom:0;left:0;background:var(--overlay);z-index:3000;display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto';
-  // v7.21.0 — categories are an ordinary tag with a naming convention, so this
-  // dialog is the only place an admin would otherwise have to already KNOW about
-  // them. The hint below is deliberately STATIC copy: putting the category
-  // prefix into client logic would create a second definition of it to drift
-  // from the server's (lib/categories.js), which is the client/server-mirror
-  // class this codebase keeps getting bitten by.
-  setSafeHtml(overlay, `<div class="card" style="max-width:min(400px, calc(100vw - 32px));width:100%;border-top-color:var(--accent)">
-    <h3 style="margin-bottom:16px">Add Tag</h3>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input id="task-tag-input" placeholder="Enter new tag..." style="flex:1" data-enter-click-id="task-tag-save-btn"/>
-      <button class="btn sm" id="task-tag-save-btn">Add</button>
-    </div>
-    <p class="settings-help" style="margin:0 0 12px">Tags are private to admins — with two exceptions. Tag a challenge
-      <code>category:&lt;name&gt;</code> (for example <code>category:web</code>) and participants will see
-      <em>&lt;name&gt;</em> on the challenge as a category label. Everything else about the tag behaves normally.</p>
-    ${pdApplied?'':`<div id="task-tag-reserved" style="margin:0 0 12px">
-      <span class="tag" style="cursor:pointer" role="button" tabindex="0" data-tag="${esc(PUBLIC_DOMAIN_TAG)}">${esc(PUBLIC_DOMAIN_TAG)}</span>
-      <p class="settings-help" style="margin:6px 0 0">Puts this challenge in the SHARED POOL: every event organiser on the
-        platform may then use it in their own events, even though they did not create it. Click the tag rather than typing it
-        — the exact spelling is what does the work, and <code>public domain</code> with a space is an ordinary tag that
-        does nothing.</p>
-    </div>`}
-    ${available.length?`<div style="margin-bottom:8px;font-size:var(--fs-12);color:var(--muted)">Or choose existing:</div>
-    <div style="display:flex;flex-wrap:wrap;gap:4px">${available.map(t=>`<span class="tag" style="cursor:pointer" role="button" tabindex="0" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</div>`:''}
-    <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn sm secondary" id="task-tag-cancel-btn">Cancel</button></div>
-  </div>`);
-  document.body.appendChild(overlay);
-  const close=()=>overlay.remove();
-  document.getElementById('task-tag-cancel-btn').onclick=close;
-  overlayDismiss(overlay,close);
-  wireTagDialog({overlay,inputId:'task-tag-input',saveBtnId:'task-tag-save-btn',url:`/api/admin/tasks/${taskId}/tags`,close,
-    onSaved:(tags)=>{const t=S.adminTasksData.find(x=>x.id===taskId);if(t)t.tags=tags;renderAdminTasks();}});
-}
-
-export async function removeTaskTag(taskId,tag){
-  const r=await fetch(`/api/admin/tasks/${taskId}/tags/${encodeURIComponent(tag)}`,{method:'DELETE',headers:csrfHeaders()});
-  if(r.ok){const d=await r.json();const t=S.adminTasksData.find(x=>x.id===taskId);if(t)t.tags=d.tags;renderAdminTasks();}
-  else{const d=await r.json().catch(()=>({}));showToast(d.error||'Failed to remove tag.','error');}
+// Stage B — SAVE TO BANK: copy this event's own question into the Question bank
+// as a NEW bank question (never linked: later edits reach neither).
+export async function saveTaskToBank(id){
+  const t=S.adminTasksData.find(x=>x.id===id);if(!t)return;
+  const ok=await showModal({title:'Save to bank',message:`Save a copy of <strong>${esc(t.title)}</strong> to the Question bank?<br><br>The copy is a new bank question, with this event's wording and answer. Later changes to either one do not reach the other.`,confirmText:'Save to bank',confirmClass:''});
+  if(!ok)return;
+  const r=await fetch(`/api/admin/tasks/${encodeURIComponent(id)}/save-to-bank`,{method:'POST',headers:csrfHeaders()});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){showToast(d.error||'Could not save the question to the bank.','error');return;}
+  showToast(`“${t.title}” saved to the Question bank.`,'success');
+  loadAdminTasks();
 }
 
 export async function deleteFeedback(taskId,userId){
@@ -3360,10 +3351,10 @@ function _taskStatusLabel(t){return t.status==='draft'?'Draft':(t.active?'Publis
 export const CHALLENGE_TABLE_COLUMNS={
   noun:'challenge',
   // Type is under Columns: with it the default set does not fit a 1024 px window.
-  defaults:['title','difficulty','status','tags','events','actions'],
+  defaults:['title','difficulty','status','topic','events','actions'],
   fixed:['title','actions'],
   cols:{title:{grow:true},difficulty:{filter:'enum',options:['easy','medium','hard']},type:{filter:'enum'},status:{filter:'enum',options:['Draft','Hidden','Published']},
-    tags:{filter:'tags'},events:{filter:'tags'},last_changed:{filter:'date'},changed_by:{filter:'enum'},author:{filter:'enum'}},
+    topic:{filter:'enum'},events:{filter:'tags'},last_changed:{filter:'date'},changed_by:{filter:'enum'},author:{filter:'enum'}},
   model:{
     rows:()=>_listedTasks(),
     get:(t,k)=>{switch(k){
@@ -3376,7 +3367,7 @@ export const CHALLENGE_TABLE_COLUMNS={
       case 'last_changed':return t.last_changed||'';
       case 'changed_by':return t.changed_by||'';
       case 'author':return t.author_name||'';
-      case 'tags':return t.tags||[];
+      case 'topic':return t.topic_name||'';
       case 'events':return (t.competitions||[]).map(c=>c.name);
       default:return '';
     }},

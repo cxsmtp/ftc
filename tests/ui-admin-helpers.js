@@ -705,6 +705,25 @@ async function clickTab(page, name) {
  * a closed one, so it would otherwise read as success and fail later on a missing
  * item.
  */
+/**
+ * Stage B (owner ruling, 27 Nov 2026) — the Question bank's ONE door into events:
+ * tick this one question's row and press the selection bar's Add to events,
+ * which opens that question's own dialog (#assign-task-overlay). Clears any
+ * earlier selection first, so exactly this question is ticked.
+ */
+async function openAddToEventsFor(page, row) {
+  await page.evaluate(() => { const w = /** @type {any} */ (window); w.selectedChallenges.clear(); w.renderAdminTasks(); });
+  const box = row.locator('input[data-change-action="challenge-select-toggle"]').first();
+  await expect(box, "the question's row carries its selection box").toBeVisible({ timeout: 15000 });
+  await box.check();
+  const btn = page.locator("#challenge-selection-bar-assign-btn");
+  await expect(btn).toHaveText("Add to events");
+  await btn.click();
+  const overlay = page.locator("#assign-task-overlay");
+  await overlay.waitFor({ state: "visible", timeout: 20000 });
+  return overlay;
+}
+
 async function openKebab(page, row) {
   const portal = page.locator("#kebab-portal");
   const btn = row.locator(".kebab-btn").first();
@@ -826,7 +845,7 @@ async function showAllTableColumns(page, table, keys) {
     try { localStorage.setItem(`ha:tcols:${t}`, JSON.stringify(k)); } catch (_) { /* no storage: defaults stay */ }
   }, [table, keys]);
 }
-const CHALLENGE_ALL_COLUMNS = ["_select", "title", "difficulty", "type", "status", "attachments", "feedback", "last_changed", "changed_by", "author", "tags", "events", "actions"];
+const CHALLENGE_ALL_COLUMNS = ["_select", "title", "difficulty", "type", "status", "attachments", "feedback", "last_changed", "changed_by", "author", "topic", "events", "actions"];
 const EVENT_ALL_COLUMNS = ["name", "start", "end", "duration", "status", "tags", "participants", "challenges", "sessions", "actions"];
 
 /** Scope to a competition by clicking its name cell (same as old "View" button) */
@@ -1151,4 +1170,4 @@ module.exports = {
   signUpViaUi,
   textContrast, rowMarking,
   focusOwnLiveComp, openCompCreateForm, openCompAdvanced,
-  awaitCompModel, expectSpaBooted, login, fillBreakGlass, submitLogin, loginViaApi, openAnalyticsTab, saLoginRetry, filterComps, rerenderedAfter, narrowGroupsTable, adminLogin, participantLogin, clickTab, openKebab, findSeededTaskRow, viewComp, showEveryoneInWorkspace, showAllParticipantColumns, showAllTableColumns, openSettingsSection, CHALLENGE_ALL_COLUMNS, EVENT_ALL_COLUMNS, openFilterPanels, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS };
+  awaitCompModel, expectSpaBooted, login, fillBreakGlass, submitLogin, loginViaApi, openAnalyticsTab, saLoginRetry, filterComps, rerenderedAfter, narrowGroupsTable, adminLogin, participantLogin, clickTab, openKebab, findSeededTaskRow, openAddToEventsFor, viewComp, showEveryoneInWorkspace, showAllParticipantColumns, showAllTableColumns, openSettingsSection, CHALLENGE_ALL_COLUMNS, EVENT_ALL_COLUMNS, openFilterPanels, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS };

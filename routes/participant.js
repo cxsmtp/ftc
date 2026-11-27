@@ -33,7 +33,7 @@ const { POINTS, HINT_DEDUCTION_RATE, taskGradingHash } = require("../lib/scoring
 // v8.12.6 — `sealRevealUnrecorded` / `SEAL_UNRECORDED_REASON`: a sealed value
 // the tier admits is withheld when its record cannot be written (below).
 const { sealedAnswerReadable, sealedHintReadable, sealedHintDenied, sealRevealUnrecorded, SEAL_UNRECORDED_REASON, answerSealed, isTaskAuthor } = require("../lib/answer-seal");
-const { categoriesFromTags } = require("../lib/categories"); // v7.21.0 — challenge categories (server-side parse only)
+const { participantCategories, topicNamesFor } = require("../lib/topics"); // a question's topic, else its legacy category tags (server-side parse only)
 const { certificatePrintedName } = require("../lib/badge"); // the name a certificate issued now would print
 const { parseChoices, parseCorrectIds, shuffleChoicesFor, choiceMode, gradeChoice, choiceIdsByText, legacySelectionIds } = require("../lib/choices");
 const { _extractOldSessionId, lookupKickedSession, kickReasonOf } = require("../lib/sessions");
@@ -1944,7 +1944,10 @@ app.get("/api/tasks", requireParticipant, requireCompetitionContext, requirePart
   // challenge's own read. False on an uncapped challenge, a solved one and a
   // Quick question whose answer can be changed.
   const outOfAttempts = outOfAttemptsTaskIds(req.session.userId, req.competition, tasks.map(t => t.id));
-  res.json(tasks.map(t => ({ ...t, categories: categoriesFromTags(_catMap.get(t.id) || []), qualifying: tagsMakeQualifying(_catMap.get(t.id) || []), solved: solved.includes(t.id), out_of_attempts: outOfAttempts.has(t.id), hackathon_ended: mySlotEnded, competition_fully_ended: fullyEnded })));
+  // Stage B — a question's TOPIC is its category (lib/topics.js); one with no
+  // topic still reads its legacy `category:` tags.
+  const _topicNames = topicNamesFor(db, tasks.map(t => t.id));
+  res.json(tasks.map(t => ({ ...t, categories: participantCategories(_topicNames.get(t.id), _catMap.get(t.id) || []), qualifying: tagsMakeQualifying(_catMap.get(t.id) || []), solved: solved.includes(t.id), out_of_attempts: outOfAttempts.has(t.id), hackathon_ended: mySlotEnded, competition_fully_ended: fullyEnded })));
 });
 
 app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, rateLimit(60_000, 120, "tasks-get"), (req, res) => {
@@ -2296,7 +2299,8 @@ app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, require
     grading_hash: taskGradingHash(task.answer_type, correct_answer, _rawChoices),
     // v7.21.0 — the challenge's categories, same one-directional filter as the
     // list endpoint: parsed NAMES only, never the raw tag list.
-    categories: categoriesFromTags(
+    categories: participantCategories(
+      topicNamesFor(db, [task.id]).get(task.id),
       db.prepare("SELECT tag FROM task_tags WHERE task_id=? ORDER BY tag").all(task.id).map(r => r.tag)
     ),
   });

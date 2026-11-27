@@ -6383,6 +6383,28 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .ce-sec-body{padding:6px 0 4px}
 .ce-sec-body[hidden]{display:none}
 .ce-sec-help{margin:0 0 6px}
+/* Stage B — the editor's Topic and sharing row. */
+.tf-topic-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tf-topic-row select{flex:1;min-width:0}
+.tf-needs{border:0;margin:8px 0 0;padding:0;min-width:0}
+.tf-needs legend{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-2);padding:0;margin-bottom:4px}
+/* Stage B — the Question bank's Topic filter, topic chip and Topics dialog. */
+.topic-filter{display:inline-flex;align-items:center;gap:6px}
+.topic-filter label{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-2)}
+.topic-filter select{max-width:min(260px, 60vw)}
+.topic-chip{display:inline-block;padding:1px 8px;border-radius:var(--r-s);font-size:var(--fs-12);font-weight:var(--fw-semibold);background:var(--surface-2);color:var(--text);border:1px solid var(--border);white-space:normal;overflow-wrap:anywhere;max-width:100%;vertical-align:middle}
+.topics-card{max-width:min(560px, calc(100vw - 32px));width:100%;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto}
+.topics-add{margin:12px 0}
+.topics-add label{display:block;font-size:var(--fs-13);font-weight:var(--fw-semibold);margin-bottom:6px}
+.topics-add-row{display:flex;gap:8px}
+.topics-add-row input{flex:1;min-width:0}
+.topics-list{list-style:none;margin:8px 0 0;padding:0}
+.topics-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--border)}
+.topics-name{flex:1;min-width:0;font-weight:var(--fw-semibold);overflow-wrap:anywhere}
+.topics-count{color:var(--text-2);font-size:var(--fs-13)}
+.topics-acts{display:flex;gap:6px;flex-wrap:wrap}
+.topics-note{color:var(--text-2);font-size:var(--fs-13)}
+.topics-empty{color:var(--text-2);padding:8px 0}
 .ce-attach-actions{display:flex;flex-wrap:wrap;gap:4px 14px;padding:0 4px}
 #tf-attach-url-toggle{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;line-height:32px}
 #admin-task-form.ce-form .tf-attachments-list{margin:4px 0;min-height:0}

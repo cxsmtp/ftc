@@ -5,16 +5,14 @@ import { wireTagDialog } from "../ui/tag-dialog.js";
 import { csrfHeaders, fetchJsonList, fetchTransientRetry, readBody } from "../core/api.js";
 import { setSafeHtml } from "../core/trusted-types.js";
 import { _buildTzInput, _isValidTz, wallClockToUtc, wallClockToUtcChecked, dstGapMessage, utcToWallClock} from "../data/country-tz.js";
-import { loadAdminTasks, openTaskPickerForCompetition, showAssignmentRefusalModal } from "./challenges-admin.js";
+import { loadAdminTasks } from "./challenges-admin.js";
 import { computeCompStatus, compDisplayCategory, COMP_CATEGORY_LABEL, isLateEntryOpen } from "./competition-picker.js";
 import { loadAdminParticipants, resyncParticipantsWithFocus } from "./participants-admin.js";
 import { loadAdminRankingsTab } from "./rankings-admin.js";
 import { _sessionGetDurMinutes, _sessionGetStartUtc, sessionFormUpdateEnd } from "./sessions-admin.js";
 import { loadAdminSubmissions } from "./submissions-admin.js";
-import { paginationHtml, setListCount, renderLoadFailure, colspanFor, countText, patchTableRows, setHtmlIfChanged } from "../ui/list-controls.js";
-import { esc, fmtDt, formatCountdown, formatDuration, _syncSortAria, DRY_RUN_TAG, PUBLIC_DOMAIN_TAG, eventKindChipHtml, eventKindLabel, eventCollectiveSingular, policyOrDefault, NO_FIXED_DEADLINE, eventEndText } from "../ui/format.js";
-import { taskMatchesQuery, isQualifyingTag, isQualifyingTask, isBankTask } from "../ui/task-search.js";   // the one challenge search; the one qualifying test
-import { addTasksToCompetition } from "./task-assign.js";   // the one add-to-event path
+import { paginationHtml, setListCount, renderLoadFailure, colspanFor, patchTableRows, setHtmlIfChanged } from "../ui/list-controls.js";
+import { esc, fmtDt, formatCountdown, formatDuration, _syncSortAria, DRY_RUN_TAG, eventKindChipHtml, eventKindLabel, eventCollectiveSingular, policyOrDefault, NO_FIXED_DEADLINE, eventEndText } from "../ui/format.js";
 import { ICO } from "../ui/icons.js";
 import { applyColumnFilters, hasColumnFilters } from "../ui/table-columns.js"; // v8.17.0 — heading filters
 import { hideLoading, showLoading } from "../ui/loading.js";
@@ -1179,7 +1177,6 @@ export async function compKindSelect(el){
     date:document.getElementById('comp-date')?.value||'',
     time:document.getElementById('comp-time')?.value||'',
     tz:document.getElementById('comp-tz')?.value||'',
-    chPicked:ov&&ov._chPicked?[...ov._chPicked]:[],
     // The event a refused first save already made from the template: the
     // re-rendered form still finishes it (`_markSpawnedForm`), with what this
     // form knows of its token (`saveCompetition`).
@@ -1856,23 +1853,9 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
       </p>
     </div>
 
-    ${comp?'':`<div class="help-label-row comp-form-section-row"><h4 class="comp-form-section">Challenges</h4><span data-help="event.challenges" data-help-label="Challenges"></span></div>
-    <!-- CREATE ONLY: pick the challenges the event starts with. The search box,
-         the tag chips and the count are SIBLINGS of #comp-ch-list, the only box
-         a keystroke or a chip re-renders (the sibling rule). The picks are
-         assigned after the event exists, through the Add challenges dialog's
-         own per-challenge path (task-assign.js). -->
-    <div class="comp-ch" id="comp-ch">
-      <p class="comp-form-reveal-hint" id="comp-ch-hint">${tpl&&tpl.task_count?'The template&rsquo;s challenges are ticked and come with it. ':''}Search, or press tags to narrow the list, then tick the challenges to add. You can change them later.</p>
-      <input id="comp-ch-search" class="picker-search comp-ch-search" aria-label="Search challenges by title, difficulty or tag" placeholder="Search by title, difficulty or tag…" autocomplete="off"/>
-      <div class="comp-ch-tags" id="comp-ch-tags" role="group" aria-label="Narrow by tag"></div>
-      <div class="comp-ch-bar">
-        <span class="comp-ch-count" id="comp-ch-count" aria-live="polite">Loading the challenge library…</span>
-        <button type="button" class="btn sm secondary" id="comp-ch-all">Tick all shown</button>
-        <button type="button" class="btn sm secondary" id="comp-ch-none">Clear ticks</button>
-      </div>
-      <div class="picker-rows comp-ch-list" id="comp-ch-list"></div>
-    </div>`}
+    <!-- Stage B (owner ruling, 27 Nov 2026): the form picks no questions. A
+         blank event gets them from its Questions section's one door, + Add from
+         bank; a template's questions come with its spawn. -->
 
     <!-- ADVANCED: the rarely changed settings, collapsed on a create (open on an
          edit, where an organiser came to change something specific). Nothing in
@@ -1982,12 +1965,10 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
     </details>
     <div class="comp-form-actions">
       <button class="btn secondary" data-action="overlay-close" data-overlay-id="comp-form-overlay">Cancel</button>
-      ${(!comp&&!tpl)?'<button class="btn secondary" data-action="comp-save-and-pick-tasks">Create and pick challenges</button>':''}
       <button class="btn" data-action="comp-save">${comp?'Update':'Create event'}</button>
     </div>
    </div>`);
   document.body.appendChild(overlay);
-  if(!comp)_initCompChallengePicker(overlay,tpl,carry&&carry.chPicked);   // the create form's Challenges section
   if(carry&&carry.spawned){
     _markSpawnedForm(carry.spawned);
     overlay._spawnedLost=carry.spawnedLost||null;
@@ -3057,155 +3038,18 @@ export function certificatesKeptOnReviveNote(comp){
   return `${comp.name} has already issued ${n} certificate${n===1?'':'s'}. They stay as issued: if the new results change someone's placing, a superadmin can revoke that certificate and issue it again from the new results.`;
 }
 
-// ── THE CREATE FORM'S CHALLENGES SECTION ─────────────────────────────────────
-//
-// Search the library (`taskMatchesQuery`: title, difficulty, tags — the one
-// organiser challenge search) and narrow it with tag chips (a challenge carrying
-// ANY pressed tag is shown). Only PUBLISHED challenges are listed, from
-// `GET /api/admin/tasks`, which already holds only what this actor may view.
-// Qualifying challenges are per-event copies ("Add the qualifying questions"
-// makes this event's own), so they are not offered. Fit for the kind is the
-// server's: a Booth Event's refusal of a file answer or a `needs:` tag comes back
-// from the assignment and is named, rather than re-derived from a kind literal.
-//
-// State lives on the overlay, so it ends with the form: `_chPicked` (ids to add
-// after the create), `_chTpl` (the template's own challenges, which its spawn
-// assigns: ticked, disabled, never sent twice).
-const _CH_HIDDEN_CHIP=t=>{const s=String(t||'').toLowerCase();return !s||s.startsWith('needs:')||isQualifyingTag(s)||s===PUBLIC_DOMAIN_TAG||s===DRY_RUN_TAG;};
-const _chIsQualifying=isQualifyingTask;
-const _chTagLabel=tg=>String(tg).startsWith('category:')?String(tg).slice(9):String(tg);
-
-async function _initCompChallengePicker(overlay,tpl,picked){
-  // The ticks a change of type carried over (`compKindSelect`), else none.
-  overlay._chPicked=new Set(Array.isArray(picked)?picked.map(String):[]);
-  overlay._chTpl=new Set(tpl&&Array.isArray(tpl.task_ids)?tpl.task_ids.map(String):[]);
-  overlay._chTags=new Set();
-  overlay._chLib=null;
-  const q=sel=>overlay.querySelector(sel);
-  const search=q('#comp-ch-search');
-  if(!search)return;
-  // RBAC — the section reads the library (challenges.view) and its ticks are
-  // assigned to the new event (challenges.assign): a role missing either is told
-  // so in the section's place, and nothing is read.
-  if(!(adminCan('challenges.view')&&adminCan('challenges.assign'))){
-    const n=overlay._chTpl.size;
-    setSafeHtml(q('#comp-ch'),`<p class="comp-form-reveal-hint" id="comp-ch-unseen">${n?'The template&rsquo;s challenges come with it. ':''}Your role cannot add challenges to an event, so it starts with ${n?'only those':'none'}.</p>`);
-    return;
-  }
-  // Enter in the search box must not submit anything.
-  search.addEventListener('keydown',e=>{if(e.key==='Enter')e.preventDefault();});
-  search.addEventListener('input',()=>_renderCompChallenges(overlay));
-  q('#comp-ch-tags').addEventListener('click',e=>{
-    const b=e.target.closest('[data-ch-tag]');
-    if(!b)return;
-    const tg=b.dataset.chTag;
-    if(overlay._chTags.has(tg))overlay._chTags.delete(tg);else overlay._chTags.add(tg);
-    b.setAttribute('aria-pressed',overlay._chTags.has(tg)?'true':'false');
-    b.classList.toggle('active',overlay._chTags.has(tg));
-    _renderCompChallenges(overlay);
-  });
-  q('#comp-ch-list').addEventListener('change',e=>{
-    const cb=e.target;
-    if(!cb||cb.type!=='checkbox'||cb.disabled)return;
-    if(cb.checked)overlay._chPicked.add(cb.value);else overlay._chPicked.delete(cb.value);
-    _paintCompChallengeCount(overlay);
-  });
-  q('#comp-ch-all').addEventListener('click',()=>{
-    for(const t of _compChallengesShown(overlay))if(!overlay._chTpl.has(String(t.id)))overlay._chPicked.add(String(t.id));
-    _renderCompChallenges(overlay);
-  });
-  q('#comp-ch-none').addEventListener('click',()=>{overlay._chPicked.clear();_renderCompChallenges(overlay);});
-  const lib=await fetchJsonList('/api/admin/tasks');
-  if(!document.body.contains(overlay))return;   // the form closed meanwhile
-  overlay._chLib=Array.isArray(lib)?lib.filter(t=>t&&isBankTask(t)&&t.status==='published'&&!_chIsQualifying(t)):null;
-  // The chips: every tag the listed challenges carry, categories first, minus
-  // the platform's own markers. Rendered once; pressing one only flips it.
-  const tags=new Map();
-  for(const t of overlay._chLib||[])for(const tg of t.tags||[])if(!_CH_HIDDEN_CHIP(tg))tags.set(String(tg),(tags.get(String(tg))||0)+1);
-  const order=[...tags.keys()].sort((a,b)=>{
-    const ca=a.startsWith('category:')?0:1,cb=b.startsWith('category:')?0:1;
-    return ca-cb||_chTagLabel(a).localeCompare(_chTagLabel(b));
-  });
-  setSafeHtml(q('#comp-ch-tags'),order.map(tg=>{
-    const n=Number(tags.get(tg))||0;
-    return `<button type="button" class="filter-btn comp-ch-tag" data-ch-tag="${esc(tg)}" aria-pressed="false">${esc(_chTagLabel(tg))}<span class="sr-only">, ${esc(String(n))} challenge${n===1?'':'s'}</span></button>`;
-  }).join(''));
-  _renderCompChallenges(overlay);
-}
-
-/** The library challenges the search and the pressed chips leave on screen. */
-function _compChallengesShown(overlay){
-  const lib=overlay._chLib||[];
-  const qv=overlay.querySelector('#comp-ch-search')?.value||'';
-  const chips=overlay._chTags||new Set();
-  return lib.filter(t=>taskMatchesQuery(t,qv)&&(!chips.size||(t.tags||[]).some(tg=>chips.has(String(tg)))));
-}
-
-function _renderCompChallenges(overlay){
-  const list=overlay.querySelector('#comp-ch-list');
-  if(!list)return;
-  if(!Array.isArray(overlay._chLib)){
-    setSafeHtml(list,'<p class="picker-note">Could not load the challenge library. You can still create the event and add challenges afterwards.</p>');
-    _paintCompChallengeCount(overlay);return;
-  }
-  if(!overlay._chLib.length){
-    setSafeHtml(list,'<p class="picker-note">No published challenges exist yet.</p>');
-    _paintCompChallengeCount(overlay);return;
-  }
-  const shown=_compChallengesShown(overlay);
-  setSafeHtml(list,shown.length?shown.map(t=>{
-    const id=String(t.id);
-    const fromTpl=overlay._chTpl.has(id);
-    // Operator ruling, 23 Nov 2026 (sweep #63): the spawn leaves out a template
-    // challenge held by an event you compete in, so the form does not promise it.
-    const leftOut=fromTpl&&_tplChallengeLeftOut(t);
-    const on=(fromTpl&&!leftOut)||overlay._chPicked.has(id);
-    const tags=(t.tags||[]).map(tg=>`<span class="tag">${esc(tg)}</span>`).join('');
-    return `<label class="picker-row${fromTpl?' is-disabled':''}">
-      <input type="checkbox" class="picker-row-check" value="${esc(id)}" ${on?'checked':''} ${fromTpl?'disabled':''}/>
-      <span class="picker-row-body"><strong>${esc(t.title)}</strong> <span class="badge ${esc(t.difficulty)}">${esc(t.difficulty)}</span>${tags}${t.active?'':'<span class="picker-row-flag">Hidden</span>'}${leftOut?'<span class="picker-row-flag">Left out: you compete in an event that holds it</span>':(fromTpl?'<span class="picker-row-flag is-on">From the template</span>':'')}</span>
-    </label>`;
-  }).join(''):'<p class="picker-note">No challenge matches that search and those tags.</p>');
-  _paintCompChallengeCount(overlay);
-}
-
-// A template challenge the spawn will leave out: held by an event you compete in.
-function _tplChallengeLeftOut(t){ return !!t&&Array.isArray(t.competing_in)&&t.competing_in.length>0; }
-
-function _paintCompChallengeCount(overlay){
-  const el=overlay.querySelector('#comp-ch-count');
-  if(!el)return;
-  let text;
-  if(!Array.isArray(overlay._chLib))text='';
-  else{
-    const qv=(overlay.querySelector('#comp-ch-search')?.value||'').trim();
-    const filtered=!!qv||(overlay._chTags&&overlay._chTags.size>0);
-    const shown=_compChallengesShown(overlay).length;
-    // The template's challenges the spawn will carry; one it will leave out is
-    // counted apart, as its row says (a challenge not in the library is counted).
-    const lib=new Map(overlay._chLib.map(t=>[String(t.id),t]));
-    const out=[...overlay._chTpl].filter(id=>_tplChallengeLeftOut(lib.get(id))).length;
-    const n=overlay._chPicked.size,tn=overlay._chTpl.size-out;
-    const tplPart=[tn?`plus ${tn} from the template`:'',out?`${out} left out`:''].filter(Boolean).join('; ');
-    text=`${n} ticked${tplPart?` (${tplPart})`:''} · `
-      +countText({matched:shown,total:overlay._chLib.length,filtered,queried:!!qv,noun:'challenge'});
-  }
-  if(el.textContent!==text)el.textContent=text;
-}
-
 // A create that started from a template is made by the template's own door
 // (spawn: its challenges, join-link settings, tags and provenance), and the
 // form is then applied to that new event as an ordinary edit. Spawning needs a
 // start in the future; the real start rides the edit that follows.
 // The form a refused first save left behind: its event exists, so the button
-// finishes it, the save-and-pick door goes (it would create), and "Add the
+// finishes it, and "Add the
 // qualifying questions", which rode the spawn, can no longer change.
 function _markSpawnedForm(spawned){
   const ov=document.getElementById('comp-form-overlay');
   if(!ov)return;
   ov._spawned=spawned;
   const save=ov.querySelector('[data-action="comp-save"]');if(save)save.textContent='Finish creating';
-  ov.querySelector('[data-action="comp-save-and-pick-tasks"]')?.remove();
   const q=ov.querySelector('#comp-add-qualifying');if(q)q.disabled=true;
 }
 
@@ -3277,10 +3121,6 @@ export async function saveCompetition(){
   // "No fixed deadline" ticked: the deadline is the one the platform filled in
   // (_noFixedDeadlineTicked says what the confirmations below do with it).
   const noFixedDeadline=!!fd.deadline_at&&_noFixedDeadlineTicked();
-  // The Challenges section's ticks (create only), minus the template's own,
-  // which its spawn assigns.
-  const _chPicks=creating&&_formOv&&_formOv._chPicked?[..._formOv._chPicked].filter(x=>!(_formOv._chTpl&&_formOv._chTpl.has(x))):[];
-  const _chNames=new Map(((_formOv&&_formOv._chLib)||[]).map(t=>[String(t.id),t.title]));
   // Staff compete holds sealed challenges only, and a qualifying question can
   // never be sealed, so the qualifying questions cannot join it: said here,
   // before a template spawn makes the event, rather than by the PUT that follows.
@@ -3561,7 +3401,6 @@ export async function saveCompetition(){
       summary+=`</ul>`;
     }
     if(tpl)summary+=`<br><br>From the template <strong>${esc(tpl.name)}</strong>${tpl.task_count?`, with its ${tpl.task_count} challenge${tpl.task_count===1?'':'s'}`:''}.`;
-    if(_chPicks.length)summary+=`<br><br>${tpl?'Plus ':''}${_chPicks.length} challenge${_chPicks.length===1?'':'s'} you ticked, added once the event exists.`;
     // The opt-out sits in the folded Advanced section: the confirmation says
     // what it will do (ON creates an account for everyone who joins).
     if(fd.cxone_disabled!==undefined)summary+=`<br><br><span id="comp-confirm-cxone">${esc(_cxoneAccountsLine(fd.cxone_disabled))}${fd.cxone_disabled?'.':' — one is created for everyone who joins.'}</span>`;
@@ -3882,22 +3721,8 @@ export async function saveCompetition(){
     }
   }
 
-  // The Challenges section's ticks, now that the event exists: the Add
-  // challenges dialog's own per-challenge path, so a refusal (a Booth Event and a
-  // file answer, a locked challenge) comes back naming the challenge.
-  let _chResult=null;
-  if(creating&&compId&&_chPicks.length){
-    showLoading();
-    try{_chResult=await addTasksToCompetition(compId,_chPicks,tid=>_chNames.get(String(tid))||String(tid));}
-    finally{hideLoading();}
-  }
 
   document.getElementById('comp-form-overlay')?.remove();
-  if(_chResult&&(_chResult.failures.length||_chResult.refused.length)){
-    const _bad=_chResult.failures.length+_chResult.refused.length;
-    showToast(`Event created with ${_chResult.added} of ${_chPicks.length} ticked challenge${_chPicks.length===1?'':'s'}. ${_bad} could not be added${_chResult.failures.length?`: ${_chResult.failures.join('; ')}`:'.'}`,'error');
-    if(_chResult.refused.length)showAssignmentRefusalModal(_chResult.refused);
-  }
   if(cxoneFailed)showToast(`Event created, but CxOne config was NOT saved: ${cxoneFailed}. Open the event and re-enter it under CxOne settings.`,'error');
   else{
     // Report the ACTUAL revive outcome from the server, not a pre-save guess.
@@ -3909,7 +3734,6 @@ export async function saveCompetition(){
       const _n=spawned.assigned_challenges||0;
       _msg=`Created “${spawned.competition.name}” from the template with ${_n} challenge${_n===1?'':'s'}.${skippedSummary(_sk)}`;
     }
-    if(_chResult&&_chResult.added)_msg+=` ${_chResult.added} ticked challenge${_chResult.added===1?'':'s'} added.`;
     if(!creating){
       const _allSolved=(fd.mode==='single')?!!d.allSolved:_anyTsStaysEndedAllSolved;
       const _revived=(fd.mode==='single')?(!!d.statusChanged&&d.oldStatus==='ended'&&d.newStatus==='live'):_anyTsRevived;
@@ -3933,13 +3757,6 @@ export async function saveCompetition(){
     document.querySelector('.admin-nav-item[data-tab-id="admin-competitions-tab"]')?.click();
   }
   return compId;
-}
-
-export async function saveCompetitionAndPickTasks(){
-  const compId=await saveCompetition();
-  if(!compId)return;
-  showToast('Event created. Now pick challenges.','success');
-  openTaskPickerForCompetition(compId);
 }
 
 export async function deleteCompetition(id){

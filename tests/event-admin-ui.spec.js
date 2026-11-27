@@ -515,7 +515,10 @@ test.describe("v8.7.0 — the event-admin tier in the browser", () => {
     await expect(portal.locator(".kebab-note"),
       "the missing items are EXPLAINED, not merely absent").toContainText(/created by someone else/i);
     // The row is not merely inert: what they CAN do with it is still offered.
-    await expect(portal.locator('[data-action="task-assign-to-comps"]'),
+    // Stage B — the bank's one door into events is the selection bar, so using it
+    // in their own events means the row carries its selection box.
+    await page.keyboard.press("Escape");
+    await expect(row.first().locator('input[data-change-action="challenge-select-toggle"]'),
       "they may still use it in their own events").toHaveCount(1);
   });
 
@@ -574,37 +577,39 @@ test.describe("v8.7.0 — the event-admin tier in the browser", () => {
   // affordance-that-lies defect, sitting on exactly the shared-pool row the
   // v8.8.2/v8.8.3 reports were about: an operator confirming the tag clicks the
   // × or + tag and meets a 403.
-  test("the tag controls are withheld on a challenge they do not own, WITH the reason", async ({ page }) => {
+  // Stage B — free tags are not shown any more; the shared-pool switch and the
+  // needs choices live in the editor's Topic and sharing row, which only the
+  // owner reaches (both tag routes stay owner-only). So the door that is
+  // withheld, WITH its reason, is the editor itself.
+  test("the sharing controls are withheld on a challenge they do not own, WITH the reason", async ({ page }) => {
     await eventAdminLogin(page, world);
     await clickTab(page, "Challenges");
 
     const row = await findSeededTaskRow(page, publicDraft.title);
     await expect(row.first(), "the public-domain draft IS visible — rule (c)").toBeVisible();
-
-    // PRECONDITION, asserted rather than assumed: the tag really is rendered on
-    // this row. Without it "no × is offered" is equally true of a row carrying no
-    // tags at all, which is most rows in this fixture.
-    await expect(row.first().locator(".tag"), "the public-domain tag is on the row")
-      .toContainText("public-domain");
-
-    await expect(row.first().locator(".tag-x"),
-      "the per-tag remove is owner-only — the route refuses it").toHaveCount(0);
-    await expect(row.first().locator(".tag-add"),
-      "+ tag is owner-only for the same reason").toHaveCount(0);
-    await expect(row.first().locator("td[title]").filter({ hasText: "public-domain" }),
-      "the controls are withheld WITH their reason, not silently").toHaveAttribute(
-      "title", /created by someone else/i);
+    // PRECONDITION: it really is the shared one (its badge), so "no editor" is
+    // about ownership and not about an ordinary row.
+    await expect(row.first().locator(".badge.shared-pool"), "the shared badge is on the row").toHaveCount(1);
+    await expect(row.first().locator(".tag-x"), "no tag chip is rendered at all").toHaveCount(0);
+    await expect(row.first().locator('[data-action="task-edit"]'),
+      "the editor (and with it the sharing switch) is owner-only — the routes refuse it").toHaveCount(0);
+    await expect(row.first().locator(".kebab-note"),
+      "the door is withheld WITH its reason, not silently").toContainText(/created by someone else/i);
   });
 
-  test("CONTROL — on their OWN challenge the tag controls are offered", async ({ page }) => {
+  test("CONTROL — on their OWN challenge the sharing controls are offered", async ({ page }) => {
     // Without this, "the controls are absent" is satisfied by a build that removed
-    // tagging from the Challenges tab for everybody.
+    // sharing from the Question bank for everybody.
     await eventAdminLogin(page, world);
     await clickTab(page, "Challenges");
     const row = await findSeededTaskRow(page, ownTask.title);
     await expect(row.first(), "their own challenge is visible").toBeVisible();
-    await expect(row.first().locator(".tag-add"),
-      "the owner may tag their own challenge").toHaveCount(1);
+    await expect(row.first().locator('[data-action="task-edit"]'), "the owner may edit their own challenge").toHaveCount(1);
+    await page.evaluate((tid) => window.editTask(tid), ownTask.id);
+    await page.locator('[aria-controls="tf-org-body"]').click();
+    await expect(page.locator("#tf-shared"), "the Shared with all organisers switch is offered").toBeVisible();
+    await expect(page.locator("#tf-shared")).toBeEnabled();
+    await page.locator("[data-action='close-task-form']").first().click();
   });
 
   // The shared-pool arm had NO on-row signal that did not require horizontal
@@ -833,9 +838,14 @@ test.describe("v8.7.0 — the event-admin tier in the browser", () => {
     // Driven through the real controls: tick a challenge, open the bulk picker,
     // choose an event, execute. The private poster is not reachable from the page
     // and reaching for it would test a function rather than the flow.
-    const row = await findSeededTaskRow(page, ownTask.title);
-    await row.first().locator('input[type="checkbox"]').check();
-    await page.locator("#assign-challenges-to-comp-btn").click();
+    // Stage B — the bank's one door into events: the selection bar's Add to
+    // events, which opens the BULK picker for two or more ticked questions.
+    for (const t of [ownTask, othersTask]) {
+      const row = await findSeededTaskRow(page, t.title);
+      await row.first().locator('input[type="checkbox"]').check();
+    }
+    await expect(page.locator("#challenge-selection-count")).toHaveText("2 selected");
+    await page.locator("#challenge-selection-bar-assign-btn").click();
     const overlay = page.locator("#challenge-bulk-assign-overlay");
     await expect(overlay, "the bulk picker opened").toBeVisible({ timeout: 15000 });
     await overlay.locator("#challenge-bulk-comp-list input[type=\"checkbox\"]").first().check();

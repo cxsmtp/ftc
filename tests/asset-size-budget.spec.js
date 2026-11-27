@@ -59,11 +59,15 @@ const ROOT = path.join(__dirname, "..");
 // then gzip 356880 -> 357920 and brotli 312000 -> 312940 (the first-open solve
 // clock: measured +1031 B gzip and +935 B brotli on its own branch, the event
 // form's "Start each participant's clock" choice, the template editor's select,
-// its help tip and the challenge list's clock note).
+// its help tip and the challenge list's clock note); then script gzip 357920 ->
+// 359960 and brotli 312940 -> 315200, page gzip 33262 -> 33907 and brotli
+// 31062 -> 31536 (stage B, measured as the delta over its base: the Question
+// bank's topics module and dialog, the editor's Topic and sharing row, Save to
+// bank, the page's Topic filter and sharing markup).
 const AT_RULING = {
   stylesheet: { gzip: 56241, br: 52368 },
-  page: { gzip: 33262, br: 31062 },
-  script: { gzip: 357920, br: 312940 },
+  page: { gzip: 33907, br: 31536 },
+  script: { gzip: 359960, br: 315200 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));

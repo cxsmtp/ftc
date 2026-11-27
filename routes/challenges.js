@@ -159,6 +159,18 @@ const uploadAttachment = boundedMulter({
 //
 // An explicitly empty value (null / "" ) means UNCAPPED and is honoured, because
 // removing a cap has to be expressible; `undefined` means the caller said nothing.
+// Stage B — a question's TOPIC (lib/topics.js). Absent leaves it alone, null or
+// "" files it under no topic, an id must name an existing topic (a value the
+// route could not honour is refused, never ignored).
+function _resolveTopicField(raw) {
+  if (raw === undefined) return { value: undefined };
+  if (raw === null || raw === "") return { value: null };
+  if (typeof raw !== "string") return { error: "topic_id must be a topic id, or null for no topic." };
+  const row = db.prepare("SELECT id, name FROM topics WHERE id=?").get(raw);
+  if (!row) return { error: "That topic no longer exists. Pick another topic.", code: "topic_not_found" };
+  return { value: row.id, name: row.name };
+}
+
 function _resolveAttemptCap(raw) {
   if (raw === undefined) return { value: undefined };
   if (raw === null || raw === "") return { value: null };
@@ -1318,6 +1330,7 @@ app.get("/api/admin/tasks", requireAdmin, (req, res) => {
       tagMap.get(r.task_id).push(r.tag);
     }
   }
+  const _topicNames = require("../lib/topics").topicNamesFor(db, taskIds);
   // v6.13.10 — attachment count per task. The admin Challenges pane's
   // new Attachments column sorts + displays a badge per row, and the
   // count is a common decision cue ("does this challenge ship with
@@ -1496,6 +1509,9 @@ app.get("/api/admin/tasks", requireAdmin, (req, res) => {
         ...(withheldComps.some(c => c.staff_compete) ? { withheld_compete: true } : {}),
       } : {}),
       tags: tagMap.get(t.id) || [],
+      // Stage B — the question's topic (lib/topics.js): `topic_id` rides the
+      // row as stored; its name is joined here so every list can show it.
+      topic_name: _topicNames.get(t.id) || null,
       ...(qualifyingKeysFromTags(tagMap.get(t.id)).length ? { qualifying_keys: qualifyingKeysFromTags(tagMap.get(t.id)) } : {}),
       // Only where this caller may change the options at all (`can_edit_scoring`):
       // whether anybody has answered is not told to a caller the PUT's scope gate
@@ -1607,6 +1623,8 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
   const _capC = _resolveAttemptCap(req.body.attempt_cap);
   if (_capC.error) return res.status(400).json({ error: _capC.error });
   const _attemptCap = _capC.value === undefined ? null : _capC.value;
+  const _topicC = (req.body.topic_id == null || typeof req.body.topic_id === "string") ? _resolveTopicField(req.body.topic_id) : { error: "topic_id must be a topic id, or null for no topic." };
+  if (_topicC.error) return res.status(400).json({ error: _topicC.error, ...(_topicC.code ? { code: _topicC.code } : {}) });
   // v8.10.0 — SEAL THE ANSWER. Create is the only moment it can be chosen; the
   // PUT refuses 0 -> 1 for everyone (lib/answer-seal.js, sealChangeDenied).
   //
@@ -1742,8 +1760,8 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
     // admin who corrected their own address would otherwise lose edit rights over
     // every challenge they had created, silently. NULL for the built-in
     // superadmin, which owns nothing and needs to own nothing.
-    db.prepare("INSERT INTO tasks (id,title,description,difficulty,answer_type,correct_answer,choices,explanation,hint,attachment_url,active,status,author_name,author_linkedin,attempt_cap,updated_at,created_by_id,answer_sealed) VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?)")
-      .run(id, title, processRichText(description||"", storedImageIds), difficulty, answer_type||"text", correct_answer, _cf.choicesJson, processRichText(explanation||"", storedImageIds), _effTypeC === "any" ? null : processRichText(hint||"", storedImageIds), validateUrl(attachment_url), taskStatus, author_name||null, validateUrl(author_linkedin)||null, _attemptCap, now().toISOString(), actorId(req), _wantSealed);
+    db.prepare("INSERT INTO tasks (id,title,description,difficulty,answer_type,correct_answer,choices,explanation,hint,attachment_url,active,status,author_name,author_linkedin,attempt_cap,updated_at,created_by_id,answer_sealed,topic_id) VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?)")
+      .run(id, title, processRichText(description||"", storedImageIds), difficulty, answer_type||"text", correct_answer, _cf.choicesJson, processRichText(explanation||"", storedImageIds), _effTypeC === "any" ? null : processRichText(hint||"", storedImageIds), validateUrl(attachment_url), taskStatus, author_name||null, validateUrl(author_linkedin)||null, _attemptCap, now().toISOString(), actorId(req), _wantSealed, _topicC.value === undefined ? null : _topicC.value);
     if (ownerComp) {
       db.prepare("UPDATE tasks SET owner_competition_id=? WHERE id=?").run(ownerComp.id, id);
       if (taskStatus === "published") {
@@ -1776,6 +1794,45 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
   }
   createTaskVersion(id, adminId, "create", storedImageIds, { ...reqContext(req), ...(ownerComp ? { competition_id: ownerComp.id } : {}) });
   res.json({ ok: true, id, status: taskStatus, ...(ownerComp ? { owner_competition_id: ownerComp.id } : {}) });
+});
+
+// SAVE TO BANK (stage B) — an event's own question copied back into the
+// Question bank as a NEW bank question (lib/event-copies.js copyTaskToBank):
+// never a link and never an overwrite of the bank question it came from. Gates,
+// in order: 404; not an event's question (400 `save_to_bank_not_event`); the
+// competitor lock (a competitor may not take a copy of a question their event
+// holds); scope (`taskViewDenied`: a question of an event the caller organises);
+// the seal (a key the caller may not read is not theirs to copy); a quick
+// question (400 `save_to_bank_qualifying`: an event's own, by rule). The new
+// question belongs to whoever saved it (`created_by_id`), or to the source's
+// author when the answer is sealed, so the seal still names that person.
+// Recorded as the new question's `created` version, `via: save_to_bank`, naming
+// the source and its event.
+app.post("/api/admin/tasks/:id/save-to-bank", requireAdmin, csrfProtection, (req, res) => {
+  const src = db.prepare("SELECT * FROM tasks WHERE id=?").get(req.params.id);
+  if (!src) return res.status(404).json({ error: "Challenge not found" });
+  if (!src.owner_competition_id) return res.status(400).json({ error: "This question is already in the Question bank.", code: "save_to_bank_not_event" });
+  { const _cmp = refuseCompetitor(res, competitorTaskEditDenied(db, competitorIds(req), src.id)); if (_cmp) return _cmp; }
+  {
+    const denied = taskViewDenied(req, src);
+    if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
+  }
+  {
+    const denied = sealedEditDenied(src, actingAdminId(req), sealRevealedFor(req, src.id));
+    if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
+  }
+  if (tagsMakeQualifying(db.prepare("SELECT tag FROM task_tags WHERE task_id=?").all(src.id).map(r => r.tag))) {
+    return res.status(400).json({ error: "A quick question belongs to its event and cannot be saved to the Question bank.", code: "save_to_bank_qualifying" });
+  }
+  const adminId = getAdminIdentity(req);
+  const createdById = answerSealed(src) ? (src.created_by_id || null) : actorId(req);
+  let id;
+  const _stbTxn = db.transaction(() => {
+    id = require("../lib/event-copies").copyTaskToBank(db, src.id, { createdById });
+  });
+  runTxnWithMirrorBuffer(() => _stbTxn());
+  createTaskVersion(id, adminId, "create", [], { via: "save_to_bank", saved_from: src.id, competition_id: src.owner_competition_id, ...reqContext(req) });
+  res.json({ ok: true, id, title: src.title });
 });
 
 app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
@@ -1909,6 +1966,8 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
   // been moved out of staging orphans those files on disk.
   const _capU = _resolveAttemptCap(req.body.attempt_cap);
   if (_capU.error) return res.status(400).json({ error: _capU.error });
+  const _topicU = (req.body.topic_id == null || typeof req.body.topic_id === "string") ? _resolveTopicField(req.body.topic_id) : { error: "topic_id must be a topic id, or null for no topic." };
+  if (_topicU.error) return res.status(400).json({ error: _topicU.error, ...(_topicU.code ? { code: _topicU.code } : {}) });
 
   // ext-audit v7.20.9 (F3) — resolve the multiple-choice fields FIRST, because
   // the fairness check below has to test the value that will actually be
@@ -2247,8 +2306,9 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
       author_name=CASE WHEN ?=1 THEN ? ELSE author_name END, author_linkedin=CASE WHEN ?=1 THEN ? ELSE author_linkedin END,
       attempt_cap=CASE WHEN ?=1 THEN ? ELSE attempt_cap END,
       answer_sealed=COALESCE(?,answer_sealed),
+      topic_id=CASE WHEN ?=1 THEN ? ELSE topic_id END,
       updated_at=? WHERE id=?`)
-      .run(title, description != null ? processRichText(description, storedImageIds) : null, difficulty, answer_type, correct_answer, _choicesJson !== undefined ? 1 : 0, _choicesJson !== undefined ? _choicesJson : null, explanation != null ? processRichText(explanation, storedImageIds) : null, _hintProvided, _hintVal, attachment_url != null ? validateUrl(attachment_url) : null, _activeVal, _authorNameProvided, _authorNameVal, _authorLiProvided, _authorLiVal, _capProvided, _capVal, _sealVal, now().toISOString(), req.params.id);
+      .run(title, description != null ? processRichText(description, storedImageIds) : null, difficulty, answer_type, correct_answer, _choicesJson !== undefined ? 1 : 0, _choicesJson !== undefined ? _choicesJson : null, explanation != null ? processRichText(explanation, storedImageIds) : null, _hintProvided, _hintVal, attachment_url != null ? validateUrl(attachment_url) : null, _activeVal, _authorNameProvided, _authorNameVal, _authorLiProvided, _authorLiVal, _capProvided, _capVal, _sealVal, _topicU.value !== undefined ? 1 : 0, _topicU.value === undefined ? null : _topicU.value, now().toISOString(), req.params.id);
     if (!result.changes) throw new Error("not_found");
     // Promote each staged attachment (assign order_idx at the tail so
     // pre-existing attachments keep their ordering).
@@ -2306,6 +2366,11 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
   }
   if (stagingSpecs.length) {
     changes.attachments_promoted = stagingSpecs.map(s => ({ id: s.finalId, display_name: s.display_name }));
+  }
+  // The topic by NAME (an id reads as nothing in History).
+  if ((existing.topic_id || null) !== (updated.topic_id || null)) {
+    const _tn = (tid) => (tid ? ((db.prepare("SELECT name FROM topics WHERE id=?").get(tid) || {}).name || null) : null);
+    changes.topic = { from: _tn(existing.topic_id), to: _tn(updated.topic_id) };
   }
   createTaskVersion(req.params.id, adminId, "update", storedImageIds, Object.keys(changes).length ? { changes, ...reqContext(req) } : { ...reqContext(req) });
   // v6.20.x — bust leaderboard + /api/me caches when a scoring-relevant field

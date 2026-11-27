@@ -13,7 +13,7 @@ const {
   adminPanel, eventRow, openEdit, saveEdit, challengeRow, participantRow, closeKebab, focus,
   expectInactiveRow, toDarkTheme,
   H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin,
-  loginViaApi, formLogin, adminLogin, clickTab, openKebab, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
+  loginViaApi, formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
 } = F;
 
 test.use({ baseURL: BASE });
@@ -116,8 +116,8 @@ test.describe("v8.12.0 — the per-challenge Assign to Events dialog", () => {
 
   async function openAssignDialog(page, title, id) {
     const row = await challengeRow(page, title, id);
-    await openKebab(page, row);
-    await page.locator('#kebab-portal [data-action="task-assign-to-comps"]').click();
+    // Stage B — the bank's one door into events (the selection bar's Add to events).
+    await openAddToEventsFor(page, row);
     await expect(page.locator("#assign-task-overlay"), "the dialog opened").toBeVisible({ timeout: 15000 });
   }
   const dialogRow = (page, compName) => page.locator(`#assign-task-comp-list label:has-text("${compName}")`).first();

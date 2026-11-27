@@ -200,7 +200,7 @@ This means:
 server.js              # Backend bootstrap + middleware order + boot checks + shutdown
                        #   + the deliberately-inline routes (submit/import/submissions/
                        #   logs/metrics test pins, the superadmin login, analytics)
-lib/*.js               # 78 shared backend modules — regenerate this list from
+lib/*.js               # 84 shared backend modules — regenerate this list from
                        # `ls lib/` rather than appending by memory:
                        #   account-lookup, account-reaper, admin-alerts, answer-seal, attachments, attempts,
                        #   audit, badge, best-effort, categories, certificate-config, certificate-dispatch, certificate-share, challenge-fit, choices, comp-allowlist,
@@ -210,10 +210,10 @@ lib/*.js               # 78 shared backend modules — regenerate this list from
                        #   image-refs, image-sweep,
                        #   impersonation, invitation-claim, late-entry, leaderboard, lockout, log, log-sort,
                        #   login-code, login-method, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
-                       #   qualifying, qualifying-rescore, query-plan, rbac, registration-fields, sanitise, scanner-classify, schema-required,
+                       #   program-grade, qualifying, qualifying-rescore, query-plan, rbac, registration-fields, sanitise, scanner-classify, schema-required,
                        #   scheduler, scoring, self-enroll, session-index, sessions, settings, smtp-settings, staff-compete,
                        #   build-info, backup-status,
-                       #   task-fields, team-recipient, team-report-mail, team-reports, time, user-tags, util, validate, zip-writer —
+                       #   task-fields, team-recipient, team-report-mail, team-reports, time, topics, user-tags, util, validate, zip-writer —
                        #   required directly; one process-global singleton each
 routes/<entity>.js     # One module per entity: module.exports = register(app[,deps])
 db.js                  # SQLite schema + migrations

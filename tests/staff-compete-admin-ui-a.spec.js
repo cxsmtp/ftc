@@ -835,11 +835,13 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     await expect(portal.locator('[data-action="task-view"]'), "viewing is not editing").toHaveCount(1);
     await expect(portal.locator('[data-action="task-history"]')).toHaveCount(1);
     await page.keyboard.press("Escape");
-    await expect(row.locator(".tag-add"), "+ tag is withheld on the row too").toHaveCount(0);
+    // Stage B — no tag control on any question row; the sharing switch is in
+    // the editor, read-only here (asserted below).
 
     // THE EDITOR, reached the only way left — `editTask` is on `window`.
     await page.evaluate(id => window.editTask(id), sealedHinted.id);
     await expect(page.locator("#admin-task-form")).toBeVisible();
+    await expect(page.locator("#tf-shared"), "the sharing switch is withheld with the rest of the form").toBeDisabled();
     const tfNote = page.locator("#tf-sealed-note");
     await expect(tfNote, "the form says WHY it is read-only").toBeVisible();
     await expect(tfNote).toContainText(/competing/i);
@@ -904,7 +906,8 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     await expect(portal.locator('[data-action="task-edit"]'), "a regular admin may edit an unrelated challenge").toHaveCount(1);
     await expect(portal.locator(".kebab-note"), "nothing is withheld, so nothing is explained").toHaveCount(0);
     await page.keyboard.press("Escape");
-    await expect(row.locator(".tag-add"), "+ tag is offered").toHaveCount(1);
+    // Stage B — the row carries no tag control for anyone; the sharing switch,
+    // its successor, is in the editor (asserted below once it is open).
 
     // The preview FIRST: opening the editor hides the table, and the row's View
     // button with it.
@@ -923,6 +926,8 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     await expect(page.locator("#tf-hint-group"), "the hint editor is shown").toBeVisible();
     await expect(page.locator("#save-task-btn"), "Save is offered").toBeVisible();
     await expect(page.locator("#tf-title")).toBeEnabled();
+    await page.locator('[aria-controls="tf-org-body"]').click();
+    await expect(page.locator("#tf-shared"), "the sharing switch is live").toBeEnabled();
     // "Withheld" is measured against "delivered": the unsealed challenge's key
     // (makeTask's default) reaches the field, so the empty box in the competing
     // arm is a withholding and not a form that never populates `#tf-answer`.

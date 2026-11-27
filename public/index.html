@@ -531,7 +531,7 @@
              in its own WORKSPACE (header, KPIs, its own Participants, Challenges,
              Rankings, Certificates and Settings), opened from the Events list.
              The other items are the cross-event pages a global admin keeps
-             (People, the Challenge library, Teams, Logs, Analytics, Settings).
+             (People, the Question bank, Teams, Logs, Analytics, Settings).
              Every item is still found by `data-tab-id`, never by label.
              RBAC — three groups (Manage, Participants, Admin). ui/nav.js hides
              each item the role's permissions do not open (ADMIN_NAV_PERMISSIONS)
@@ -542,7 +542,7 @@
         <ul class="admin-nav-list" role="list" data-nav-group="manage">
           <li><button class="admin-nav-item active" data-action="admin-tab" data-tab-id="admin-competitions-tab" aria-current="page"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Events</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-templates-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">New event</span></button></li>
-          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-tasks-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Challenge library</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-tasks-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Question bank</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-rankings-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Live rankings</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-analytics-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Analytics</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-audit-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Audit</span></button></li>
@@ -610,7 +610,7 @@
         <nav id="ws-tabs" class="ws-tabs" aria-label="Event sections">
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-event-overview-tab">Overview</button>
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-participants-tab">Participants <span class="ws-count" id="ws-count-participants"></span></button>
-          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-tasks-tab">Challenges <span class="ws-count" id="ws-count-tasks"></span></button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-tasks-tab">Questions <span class="ws-count" id="ws-count-tasks"></span></button>
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-rankings-tab">Rankings</button>
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-submissions-tab">Activity</button>
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-analytics-tab">Analytics</button>
@@ -755,21 +755,21 @@
              panes are <h3>, so with no h2 above them the document skipped a
              level (axe `heading-order`). The GROUPS pane already carried one
              — it is the house pattern, and these were the outliers. -->
-        <h2 class="admin-pane-title">Challenges</h2>
+        <h2 class="admin-pane-title" id="tasks-pane-title">Question bank</h2>
         <div id="task-controls-row" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
-          <span data-help="library.list" data-help-label="Challenge library"></span>
-          <div class="search-wrap"><input id="task-search" placeholder="Search challenges..." aria-label="Search challenges" data-input-action="task-search"/><button class="search-clear hidden" id="task-search-clear" data-action="task-search-clear" aria-label="Clear challenges search"><span aria-hidden="true">×</span> Clear</button></div><span id="task-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="challenge" data-noun-plural="challenges"></span>
+          <span data-help="library.list" data-help-label="Question bank"></span>
+          <div class="search-wrap"><input id="task-search" placeholder="Search questions..." aria-label="Search questions" data-input-action="task-search"/><button class="search-clear hidden" id="task-search-clear" data-action="task-search-clear" aria-label="Clear questions search"><span aria-hidden="true">×</span> Clear</button></div><span id="task-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="challenge" data-noun-plural="challenges"></span>
+          <!-- Stage B — the bank's Topic filter (features/topics-admin.js): every
+               topic with how many of the reader's bank questions it holds. -->
+          <span class="topic-filter"><label for="task-topic-filter">Topic</label><select id="task-topic-filter" data-change-action="task-topic-filter"><option value="">All topics</option></select><span data-help="library.topics" data-help-label="Topics"></span></span>
           <div id="new-task-btn-row" style="display:flex;gap:8px">
-            <!-- v7.12.1 — top bulk-assign button (mirrors #assign-to-comp-btn on the
-                 Participants pane): shown when >=1 challenge is selected, always visible
-                 in the controls even when the sticky selection bar is scrolled below. -->
-            <button class="btn sm" id="assign-challenges-to-comp-btn" style="display:none" data-action="challenges-bulk-assign">Assign to Events</button>
-            <button class="btn sm" id="add-tasks-to-comp-btn" style="display:none" data-action="open-add-tasks-to-competition">+ Add Challenges</button>
+            <button class="btn sm" id="add-tasks-to-comp-btn" style="display:none" data-action="open-add-tasks-to-competition">+ Add from bank</button>
+            <button class="btn sm secondary" id="task-topics-btn" data-action="open-topics-dialog">Topics</button>
             <button class="btn sm secondary" id="export-tasks-btn" data-action="export-tasks">Export</button>
             <span data-help="library.export" data-help-label="Export and import"></span>
             <button class="btn sm secondary" id="import-tasks-btn" style="display:none" data-action="click-hidden-input" data-target-id="import-tasks-file">Import</button>
             <input type="file" id="import-tasks-file" accept=".json" style="display:none" data-change-action="import-tasks-file"/>
-            <button class="btn sm" data-action="open-task-form">+ New Challenge</button>
+            <button class="btn sm" data-action="open-task-form">+ New question</button>
           </div>
         </div>
         <div id="task-filters-row" style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
@@ -807,7 +807,7 @@
              pinned foot. Every id and data-action the editor code and the specs
              use is unchanged; the long explanations moved behind "?" tips. -->
         <div id="admin-task-form" class="card task-form-card ce-form" style="display:none">
-          <h2 id="task-form-title" class="task-form-title">New Challenge</h2>
+          <h2 id="task-form-title" class="task-form-title">New question</h2>
           <input type="hidden" id="edit-task-id"/>
           <!-- v8.8.5 — shown when the server's can_edit_scoring is false: this
                actor may edit the challenge but not the fields another
@@ -952,6 +952,32 @@
                   <div class="form-group"><label for="tf-author-linkedin">Author LinkedIn</label><input id="tf-author-linkedin" type="url" placeholder="https://linkedin.com/in/..."/></div>
                 </div>
               </div>
+              <!-- Stage B — TOPIC AND SHARING, the controls that replace the tag
+                   box: the question's topic (features/topics-admin.js), "Shared
+                   with all organisers" (the public-domain marker) and what the
+                   question needs (needs: markers). They write the same stored
+                   values the tag routes do; free-form tags are not shown. -->
+              <div class="ce-sec" id="tf-org-sec">
+                <button type="button" class="ce-sec-toggle" data-action="task-sec-toggle" aria-expanded="false" aria-controls="tf-org-body"><span class="ce-sec-name">Topic and sharing</span><span class="ce-sec-sum" id="tf-org-sum">No topic</span></button>
+                <div class="ce-sec-body" id="tf-org-body" hidden>
+                  <div class="form-group">
+                    <div class="ce-label-row"><label for="tf-topic">Topic</label><span data-help="challenge.topic" data-help-label="Topic"></span></div>
+                    <div class="tf-topic-row"><select id="tf-topic" data-change-action="task-org-sync"><option value="">No topic</option></select><button type="button" class="ce-link" id="tf-topic-new" data-action="task-topic-new">+ New topic</button></div>
+                  </div>
+                  <div class="form-group" id="tf-shared-group">
+                    <div class="ce-seal-row">
+                      <label for="tf-shared" class="checkbox-row ce-switch"><input type="checkbox" role="switch" id="tf-shared" data-change-action="task-org-sync"/><span>Shared with all organisers</span></label>
+                      <span data-help="challenge.shared" data-help-label="Shared with all organisers"></span>
+                    </div>
+                    <p class="settings-help ce-note" id="tf-shared-nearmiss" role="note" hidden></p>
+                  </div>
+                  <p class="settings-help ce-note" id="tf-shared-note" hidden>This question belongs to its event. To share it with every organiser, save it to the Question bank and share the bank question.</p>
+                  <fieldset class="form-group tf-needs" id="tf-needs-group">
+                    <legend>This question needs</legend>
+                    <div id="tf-needs-list"></div>
+                  </fieldset>
+                </div>
+              </div>
             </div>
           </div>
           <div id="task-feedback-section" class="task-form-feedback" style="display:none">
@@ -982,16 +1008,19 @@
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="last_changed">Last Changed<span id="tsort-last_changed-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="changed_by">Changed By<span id="tsort-changed_by-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="author">Author<span id="tsort-author-icon"></span></th>
-            <th scope="col" data-tcol="tags">Tags</th>
+            <th scope="col" data-tcol="topic">Topic</th>
             <th scope="col" data-tcol="events">Events</th><th scope="col" data-tcol="actions">Actions</th>
           </tr></thead>
           <tbody id="admin-task-body"></tbody>
         </table></div>
         <div id="tasks-pagination" class="pagination"></div>
-        <!-- v7.12.0 — bulk-assign selection bar (mirrors #participants-selection-bar). -->
+        <!-- Stage B (owner ruling, 27 Nov 2026) — the Question bank's ONE door into
+             events: tick questions, then Add to events (one question opens its own
+             dialog, which also takes it out of events; several, the bulk one).
+             Inside an event the one door is + Add from bank, and rows carry no box. -->
         <div id="challenges-selection-bar" class="selection-bar" style="display:none">
           <span id="challenge-selection-count">0 selected</span>
-          <button class="btn sm" id="challenge-selection-bar-assign-btn" data-action="challenges-bulk-assign">Assign to Events</button>
+          <button class="btn sm" id="challenge-selection-bar-assign-btn" data-action="challenges-bulk-assign">Add to events</button>
         </div>
       </div>
 

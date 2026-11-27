@@ -388,7 +388,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     // The palette inherits the same gates (Invite and every workspace write).
     await openPalette(page);
     const acts = (await paletteOptions(page, "")).filter((o) => o.section === "Actions").map((o) => o.label);
-    for (const gone of ["Invite people", "Edit settings", "Clone", "Export everything", "Add challenges", "Sign up at the desk", "Join-link settings", "Save as template", "New event", "New challenge"]) {
+    for (const gone of ["Invite people", "Edit settings", "Clone", "Export everything", "Add from bank", "Sign up at the desk", "Join-link settings", "Save as template", "New event", "New question"]) {
       expect(acts, `${gone} is not this role's`).not.toContain(gone);
     }
     expect(acts, "POSITIVE: the read doors are listed").toContain("History");
@@ -709,7 +709,7 @@ test.describe("RBAC — a custom role in the browser", () => {
       await expect(srow.locator('td.cb-cell input[type="checkbox"]'), "CONTROL: the row can be selected to assign").toHaveCount(1);
       await openKebab(sp, srow);
       const sk = await sp.locator("#kebab-portal").innerText();
-      for (const want of ["Edit", "Assign to Events", "Delete"]) expect(sk, `CONTROL: ${want}`).toContain(want);
+      for (const want of ["Edit", "Delete"]) expect(sk, `CONTROL: ${want}`).toContain(want);   // stage B: assigning is the selection bar's Add to events (the box above)
     } finally { await ctx.close(); }
 
     const t = recordTraffic(page);
@@ -999,7 +999,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     expect(t.refused, "no refused request").toEqual([]);
   });
 
-  test("New event for a role that may create but not see templates or the library: blank starters only, no refused read (a role holding both: control)", async ({ page, browser }) => {
+  test("New event for a role that may create but not see templates: blank starters only, no refused read (a role holding both: control)", async ({ page, browser }) => {
     test.setTimeout(120_000);
     const ctx = await browser.newContext({ baseURL: BASE, viewport: { width: 1440, height: 900 } });
     try {
@@ -1009,8 +1009,11 @@ test.describe("RBAC — a custom role in the browser", () => {
       await cp.locator("#new-competition-btn").click({ timeout: 15000 });
       await expect(cp.locator("#tpl-list .tpl-row").first(), "CONTROL: the templates are listed").toBeVisible({ timeout: 15000 });
       await cp.locator('[data-action="new-event-start"]').first().click();
-      await expect(cp.locator("#comp-ch-search"), "CONTROL: the form offers the challenge library").toBeVisible({ timeout: 15000 });
-      await expect.poll(() => ct.reads.includes("GET /api/admin/tasks"), { message: "CONTROL: the library was read" }).toBe(true);
+      // Stage B — the form picks no questions (the event's one door is + Add
+      // from bank), so even a role that may read the bank reads nothing here.
+      await expect(cp.locator("#comp-name"), "CONTROL: the form is open").toBeVisible({ timeout: 15000 });
+      await expect(cp.locator("#comp-ch-search"), "the form lists no questions").toHaveCount(0);
+      expect(ct.reads.filter((x) => x === "GET /api/admin/tasks"), "no library read from the form").toEqual([]);
       expect(ct.refused).toEqual([]);
     } finally { await ctx.close(); }
 
@@ -1021,8 +1024,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     await expect(page.locator("#tpl-list-unseen"), "no templates: said, not failed").toHaveText("Your role cannot see templates. Start a blank event above.", { timeout: 15000 });
     await expect(page.locator('[data-action="new-event-start"]').first(), "POSITIVE: the blank starters").toBeVisible();
     await page.locator('[data-action="new-event-start"]').first().click();
-    await expect(page.locator("#comp-ch-unseen"), "the form says why it offers no challenges").toContainText("Your role cannot add challenges to an event", { timeout: 15000 });
-    await expect(page.locator("#comp-ch-search")).toHaveCount(0);
+    await expect(page.locator("#comp-ch-search"), "the form lists no questions").toHaveCount(0);
     await expect(page.locator("#comp-name"), "POSITIVE: the create form is open").toBeVisible();
     expect(t.reads.filter((x) => x === "GET /api/admin/event-templates" || x === "GET /api/admin/tasks"), "no template or library read").toEqual([]);
     expect(t.refused, "no refused request").toEqual([]);

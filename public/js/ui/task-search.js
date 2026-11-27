@@ -2,7 +2,7 @@
 
 // ── One matcher for every challenge search an organiser types into ───────────
 //
-// The Challenge library, the workspace "Add challenges" dialog and the event /
+// The Question bank, the workspace "Add from bank" dialog and the event /
 // template editor's challenge picker all answer "which challenges did I mean?".
 // Each used to carry its own filter, and they disagreed: the editor matched the
 // TITLE only, so typing a tag (`public-domain`, `needs:docker`, a category) found
@@ -10,8 +10,8 @@
 //
 // THE RULE: the query is split on whitespace and EVERY word must appear
 // (case-insensitively, as a substring) in at least one of the challenge's fields:
-// its title, difficulty and every tag. A category is the tag `category:<name>`,
-// so typing either `web` or `category:web` finds it. Callers may pass further
+// its title, difficulty, topic and every tag. A category is the tag
+// `category:<name>`, so typing either `web` or `category:web` finds it. Callers may pass further
 // fields (answer type, author, event names) through `extra`. Plain substring
 // tests only: the typed text never becomes a regular expression.
 
@@ -19,7 +19,7 @@
 // A qualifying challenge is an ordinary challenge tagged `qualifying:<key>`
 // (lib/qualifying.js); an organiser's screen knows one only by that tag (a
 // participant gets the boolean `qualifying` instead). The Analytics filters, the
-// create form's Challenges section and its tag chips, and View as participant
+// template editor's picker, the workspace Overview and View as participant
 // all ask these two, so no screen can disagree about which challenge is one.
 
 /** A qualifying challenge's tag, `qualifying:<key>` (lib/qualifying.js). */
@@ -74,7 +74,7 @@ export function taskQueryTerms(q) {
 export function taskMatchesQuery(t, q, extra) {
   const terms = taskQueryTerms(q);
   if (!terms.length) return true;
-  const fields = [t && t.title, t && t.difficulty, ...((t && t.tags) || []), ...(extra ? (extra(t) || []) : [])]
+  const fields = [t && t.title, t && t.difficulty, t && t.topic_name, ...((t && t.tags) || []), ...(extra ? (extra(t) || []) : [])]
     .filter(v => v !== null && v !== undefined && v !== "")
     .map(v => String(v).toLowerCase());
   return terms.every(term => fields.some(f => f.includes(term)));

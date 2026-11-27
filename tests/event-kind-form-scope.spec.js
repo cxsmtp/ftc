@@ -124,7 +124,7 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await expect(page.locator("#comp-time")).toHaveValue("10:30");
   });
 
-  test("a change of type keeps the ticked challenges, and asks first when it would drop a setting the admin changed", async ({ page }) => {
+  test("a change of type keeps the name and date, and asks first when it would drop a setting the admin changed", async ({ page }) => {
     const { api, csrf } = await freshCtx();
     const lg = await api.post("/api/login", { headers: H(csrf), data: { email: "superadmin", password: getSuperadminPass() } });
     expect(lg.ok(), `superadmin login: ${lg.status()}`).toBeTruthy();
@@ -139,19 +139,17 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await openCompCreateForm(page, "tournament");
     await page.locator("#comp-name").fill(`${TAG} Ticks`);
     await page.locator("#comp-date").fill("2033-04-05");
-    await page.locator("#comp-ch-search").fill(title);
-    const box = page.locator("#comp-ch-list .picker-row", { hasText: title }).locator('input[type="checkbox"]');
-    await box.check();
-    await expect(page.locator("#comp-ch-count")).toContainText("1 ticked");
+    // Stage B — the form picks no questions, so what a change of type carries is
+    // the name, the date and the zone.
     const pick = (k) => page.locator(`#comp-form-overlay label.kind-seg-opt:has(input[value="${k}"])`).click();
 
-    // Nothing the re-render would drop has changed: no question, and the tick
-    // goes with the new type.
+    // Nothing the re-render would drop has changed: no question, and the name
+    // and date go with the new type.
     await pick("booth");
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("booth");
     await expect(page.locator("#modal-overlay.open"), "an untouched form changes type without asking").toHaveCount(0);
-    await expect(page.locator("#comp-ch-count"), "the ticks are carried").toContainText("1 ticked", { timeout: 15000 });
-    await expect(page.locator("#comp-ch-list .picker-row", { hasText: title }).locator('input[type="checkbox"]')).toBeChecked();
+    await expect(page.locator("#comp-name"), "the name is carried").toHaveValue(`${TAG} Ticks`);
+    await expect(page.locator("#comp-date"), "and the date").toHaveValue("2033-04-05");
 
     // A setting the re-render WOULD drop: it asks, and Cancel keeps everything.
     await page.locator("#comp-attempt-cap").fill("3");
@@ -164,13 +162,12 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await expect(page.locator('#comp-form-overlay input[name="comp-kind-seg"][value="booth"]'), "and the control shows it").toBeChecked();
     await expect(page.locator("#comp-attempt-cap"), "and the setting").toHaveValue("3");
 
-    // Confirmed: the new type's defaults, the ticks still carried.
+    // Confirmed: the new type's defaults, the name still carried.
     await pick("program");
     await expect(modal.locator("#modal-title")).toHaveText("Change type to Program?", { timeout: 10000 });
     await page.locator("#modal-confirm-btn").click();
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("program");
     await expect(page.locator("#comp-attempt-cap"), "the dropped setting is back to its default").toHaveValue("");
-    await expect(page.locator("#comp-ch-count")).toContainText("1 ticked", { timeout: 15000 });
     await expect(page.locator("#comp-name")).toHaveValue(`${TAG} Ticks`);
   });
 

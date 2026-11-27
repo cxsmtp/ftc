@@ -3535,6 +3535,50 @@ try {
   }
 }
 
+// TOPICS (lib/topics.js): a question belongs to at most one topic, a topic holds
+// many. A base table (fatal, like every CREATE TABLE) and one column on `tasks`,
+// OUTSIDE try/catch: the task create and PUT write `topic_id`, so a swallowed ADD
+// would fail every save. Below every `tasks` rebuild, so neither the ALTER nor
+// the index is taken by a DROP TABLE. No foreign key: a topic is deleted only
+// once no question names it (the route moves them first), and an event's copy
+// names the topic its bank question had.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS topics (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    created_by TEXT,
+    created_by_id TEXT,
+    updated_at TEXT
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS uq_topics_name_nocase ON topics(name COLLATE NOCASE);
+`);
+{
+  const _cols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+  if (!_cols.includes("topic_id")) db.exec("ALTER TABLE tasks ADD COLUMN topic_id TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_topic ON tasks(topic_id)");
+}
+// One shot: each question's first `category:<name>` tag (the order the
+// participant wire used: lib/categories.js) becomes its topic, the topic made
+// once per name. The tags themselves are kept (owner rule: no stored tag is
+// deleted); a question with a topic shows the topic to participants, not its
+// tags. Questions that already have a topic are left alone. The marker is
+// written even when there was nothing to do.
+{
+  const done = db.prepare("SELECT value FROM settings WHERE key='topics_from_categories_at'").get();
+  if (!done) {
+    const at = new Date().toISOString();
+    const rep = require("./lib/topics").migrateCategoryTagsToTopics(db, { nowIso: at });
+    db.prepare("INSERT INTO settings (key, value) VALUES ('topics_from_categories_at', ?) ON CONFLICT(key) DO NOTHING").run(at);
+    if (rep.questions) {
+      db.prepare("INSERT INTO settings_events (id, setting_key, event_type, changed_by, changed_at, details) VALUES (?,?,?,?,?,?)")
+        .run(crypto.randomUUID(), "topics", "updated", "system", at,
+          JSON.stringify({ via: "migration", topics_created: rep.topicsCreated, questions: rep.questions }));
+      console.log(`[migration] topics: ${rep.questions} question(s) filed under ${rep.topicsCreated} new topic(s) from their category tags`);
+    }
+  }
+}
+
 // ── Prepared-statement memo (installed AFTER every migration above) ──────────
 //
 // Request code calls `db.prepare(sql)` inline, so the same SQL text was compiled

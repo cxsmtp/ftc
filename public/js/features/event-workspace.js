@@ -51,7 +51,7 @@ const OVERVIEW = 'admin-event-overview-tab';
 const SECTION_LABELS = {
   'admin-event-overview-tab': 'Overview',
   'admin-participants-tab': 'Participants',
-  'admin-tasks-tab': 'Challenges',
+  'admin-tasks-tab': 'Questions',
   'admin-rankings-tab': 'Rankings',
   'admin-submissions-tab': 'Activity',
   'admin-analytics-tab': 'Analytics',
@@ -490,7 +490,8 @@ export function wsMenuItemsHtml(c) {
   const b = (action, icon, label, extra = '') => `<button data-action="${action}" data-comp-id="${id}" data-comp-name="${nm}"${extra}>${icon} ${esc(label)}</button>`;
   const items = [];
   if (competing) items.push(`<div class="kebab-note" role="presentation">${ICO.lock} You are competing in this event — you can view it, not change it</div>`);
-  if (status !== 'ended' && !competing && adminCan('challenges.assign') && adminCan('challenges.view')) items.push(b('comp-assign-challenges', ICO.clipboardCheck, 'Add challenges'));
+  // Stage B — no Add from bank here: the event's one door into the bank is its
+  // Questions section's + Add from bank (owner ruling, 27 Nov 2026).
   if (!competing && adminCan('events.clone')) items.push(b('ws-clone', ICO.copy, 'Clone'));
   // The full export needs `export.data` (the route's permission).
   if (!competing && adminCan('export.data')) items.push(b('ws-export-zip', ICO.download, 'Export everything'));
@@ -1377,7 +1378,7 @@ function _renderOverviewAttn(c) {
     const hidden = tasks.filter(t => t.status !== 'published' || !t.active).length;
     if (hidden) {
       items.push(`<div class="ws-attn ws-attn-warn">${ICO.eyeOff}<span><b>${hidden} ${hidden === 1 ? 'challenge is' : 'challenges are'} not visible to participants.</b> Drafts and hidden challenges are not played.</span>`
-        + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Challenges</button>' : '') + '</div>');
+        + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Questions</button>' : '') + '</div>');
     }
     // Nobody ENROLLED (`_joinedCount`, the roster): an organiser playing an
     // event where staff do not compete has joined it, though the live figures
@@ -1437,11 +1438,11 @@ function _paintReady(c) {
   } else if (!n) {
     open++;
     items.push(todo('No challenges yet', 'Participants need at least one to play.')
-      + (competing || !adminCan('challenges.assign') || !adminCan('challenges.view') ? '' : `<button type="button" class="btn sm secondary" data-action="comp-assign-challenges" data-comp-id="${id}" data-comp-name="${nm}">Add challenges</button>`) + '</li>');
+      + (competing || !adminCan('challenges.assign') || !adminCan('challenges.view') ? '' : `<button type="button" class="btn sm secondary" data-action="ws-add-from-bank">Add from bank</button>`) + '</li>');
   } else if (unready) {
     open++;
     items.push(todo(`${unready} of ${n} challenges are not visible to participants`, 'Drafts and hidden challenges are not played.')
-      + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Challenges</button>' : '') + '</li>');
+      + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Questions</button>' : '') + '</li>');
   } else items.push(`${ok(`${n} ${n === 1 ? 'challenge' : 'challenges'} published`, '')}</li>`);
   const canJoinLink = adminCan('events.join_link');
   if (c.self_enroll_enabled) items.push(`${ok('Join link is on', 'Walk-ups join with the event code.')}${canJoinLink ? showMe('join') : ''}</li>`);

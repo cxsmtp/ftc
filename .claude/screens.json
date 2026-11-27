@@ -859,7 +859,7 @@
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "#admin-tasks-tab|admin-task-body|admin-task-table-card|task-search"
+          "grep": "#admin-tasks-tab|admin-task-body|admin-task-table-card|task-search|task-topic-filter|task-topics-btn"
         },
         "behaviour": {
           "path": "public/js/features/challenges-admin.js",
@@ -867,7 +867,7 @@
         },
         "styles": {
           "path": "public/styles.css",
-          "grep": "#admin-task-table-card|#admin-tasks-tab|\\.tag-add"
+          "grep": "#admin-task-table-card|#admin-tasks-tab|\\.tag-add|\\.topic-chip|\\.topic-filter"
         }
       }
     },
@@ -1031,9 +1031,8 @@
         "markup": null,
         "behaviour": {
           "path": "public/js/features/participants-admin.js",
-          "grep": "Add Tag|tag-input|task-tag-input|wireTagDialog",
+          "grep": "Add Tag|tag-input|wireTagDialog",
           "also": [
-            "public/js/features/challenges-admin.js",
             "public/js/features/competitions-admin.js",
             "public/js/ui/tag-dialog.js"
           ]
@@ -1043,7 +1042,27 @@
           "grep": "\\.tag\\{|\\.tag:focus-visible|\\.tag-add"
         }
       },
-      "note": "Add Tag: the one dialog a person's, a challenge's and an event's \"+ tag\" chip opens (participants-admin.js addTag, challenges-admin.js addTaskTag, competitions-admin.js addCompTag), each building its own body and saving through ui/tag-dialog.js wireTagDialog; the challenge's adds the category hint and the shared-pool chip. Opened on alice's row in People; fixture adPeopleColumns shows the Tags column, which the default six leave out. Nothing is saved. The card is inline-styled in each builder; .tag is the chip every table shares."
+      "note": "Add Tag: the one dialog a person's and an event's \"+ tag\" chip opens (participants-admin.js addTag, competitions-admin.js addCompTag), each building its own body and saving through ui/tag-dialog.js wireTagDialog. Questions have no tag box (stage B: the editor's Topic and sharing row replaces it). Opened on alice's row in People; fixture adPeopleColumns shows the Tags column, which the default six leave out. Nothing is saved. The card is inline-styled in each builder; .tag is the chip every table shares."
+    },
+    {
+      "screen": "topics-dialog",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#topics-overlay .topics-card",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab tasks ; waitFor #admin-tasks-tab ; click #task-topics-btn ; waitFor #topics-list .topics-row, #topics-list .topics-empty",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/topics-admin.js",
+          "grep": null
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.topics-"
+        }
+      },
+      "note": "Stage B: the Question bank's Topics dialog (Topics button beside Export) — add, rename and delete topics; a held topic's delete opens the move step (#topic-move-overlay, same module), which asks where its questions go. Both overlays are built in features/topics-admin.js."
     },
     {
       "screen": "add-to-group-dialog",
@@ -1213,7 +1232,7 @@
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "challenges-selection-bar|assign-challenges-to-comp-btn"
+          "grep": "challenges-selection-bar|challenge-selection-bar-assign-btn"
         },
         "behaviour": {
           "path": "public/js/features/challenges-admin.js",
@@ -2003,7 +2022,7 @@
       "route": "/",
       "visual_anchor": "#assign-task-overlay",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab tasks ; waitFor #admin-task-body tr ; fill #task-search Challenge easy1 ; click #admin-task-body tr:has-text('Challenge easy1') .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=task-assign-to-comps] ; waitFor #assign-task-comp-list label",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab tasks ; waitFor #admin-task-body tr ; fill #task-search Challenge easy1 ; click #admin-task-body tr:has-text('Challenge easy1') input[data-change-action=challenge-select-toggle] ; click #challenge-selection-bar-assign-btn ; waitFor #assign-task-comp-list label",
       "files": {
         "markup": null,
         "behaviour": {
@@ -2015,7 +2034,7 @@
           "grep": "#assign-task-comp-list"
         }
       },
-      "note": "Challenge library → a row's ⋯ → Assign to Events, opened on the seeded 'Challenge easy1' (assigned to Test Live and Test Upcoming); nothing is saved. Its card is inline-styled in challenges-admin.js."
+      "note": "Question bank → tick one question → Add to events on the selection bar (the bank's one door into events), opened on the seeded 'Challenge easy1' (assigned to Test Live and Test Upcoming); nothing is saved. Its card is inline-styled in challenges-admin.js."
     },
     {
       "screen": "attempt-grant-dialog",

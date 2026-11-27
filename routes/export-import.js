@@ -272,6 +272,7 @@ app.get("/api/admin/export/tasks", requireAdmin, exportLimiter, async (req, res)
   // switched off for a competitor, is the whole rule: an unsealed key travels, a
   // sealed one travels only to its author. The HINT is withheld from a
   // competitor whatever the seal (v8.12.0), and from a non-reader of a sealed one.
+  const _topicName = require("../lib/topics").topicNamesFor(db, _exportedTaskIds);
   const exported = tasks.map(t0 => {
     const _competes = competitorEventsForTask(db, _expCompetes, t0.id).length > 0;
     const _hide = !sealedAnswerReadable(t0, _expActor, _expReveals[t0.id] === true && !_competes);
@@ -308,6 +309,10 @@ app.get("/api/admin/export/tasks", requireAdmin, exportLimiter, async (req, res)
     active: t.active,
     status: t.status || "published",
     tags: tagMap[t.id] || [],
+    // Stage B — the question's topic by NAME (lib/topics.js): a topic id means
+    // nothing on another server, so the import files the question under the
+    // topic of this name, made there if missing. null for no topic.
+    topic: _topicName.get(t.id) || null,
     attachments: attMap[t.id] || [],
   };
   });

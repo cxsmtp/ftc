@@ -44,6 +44,7 @@ const EXCLUDED = new Map([
   ["locked", "A per-deployment moderation state, not a property of the challenge. Importing it would let one server's lock silently freeze a challenge on another, where the superadmin who set it has no standing."],
   ["created_by_id", "v8.7.0 — a user id on THIS platform, and the AUTHORIZATION key an event admin's edit rights hang on. Imported elsewhere it either dangles or hands ownership to whichever row happens to hold that uuid. Same reasoning as users.linkedin_sub. The import leaves it NULL, which means 'no event admin owns this' — accurate for a challenge that arrived from another server."],
   ["owner_competition_id", "The event owning the question (lib/event-copies.js): an event id on THIS platform, and there is no competitions import, so on another server it names no event. The library export holds bank questions only; an imported question lands in the bank (NULL)."],
+  ["topic_id", "Stage B — a topic id on THIS platform (lib/topics.js), meaningless elsewhere. The export carries the topic's NAME as `topic`, and the import files the question under the topic of that name, made there if missing."],
   ["copied_from_task_id", "The bank question an event's copy came from: a task id on THIS platform, meaningless elsewhere (import resolves by title). An imported question is a bank question with no origin."],
 ]);
 
@@ -107,7 +108,9 @@ test.describe("v7.29.0 — tasks export/schema drift", () => {
     // answer — irreversibly, since the platform refuses to seal one twice.
     // An event's question keeps its owner and origin whatever an old snapshot
     // says (lib/event-copies.js): restoring them would move it between events.
-    for (const col of ["created_by_id", "answer_sealed", "owner_competition_id", "copied_from_task_id"]) {
+    // Stage B — nor the topic: it files the question in the Question bank, it is
+    // not the question's content, and a snapshot predating topics would unfile it.
+    for (const col of ["created_by_id", "answer_sealed", "owner_competition_id", "copied_from_task_id", "topic_id"]) {
       expect(restored, `version restore must NOT write ${col} — a snapshot predating it would reverse the decision`).not.toContain(col);
     }
   });

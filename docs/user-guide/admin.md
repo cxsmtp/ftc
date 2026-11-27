@@ -71,7 +71,7 @@ four groups:
   sections (Overview, Participants, Challenges, Rankings and the rest);
 - **Actions** — what you can do from here: **New event**, **New challenge**,
   **Invite people**, **Sign up at the desk**, **New template** and the exports,
-  and inside an event the doors of its **⋯** menu (Add challenges, Clone,
+  and inside an event the doors of its **⋯** menu (Clone,
   Export everything, Join-link settings, Edit settings, History, …). Only what
   your role may use is listed. The irreversible doors — **End now**, **Close
   late entries now**, **Delete** — stay in the **⋯** menu, behind their confirm;
@@ -207,7 +207,7 @@ a chip you can press to remove; **Clear all** in the panel removes them all. The
 panel stays open or closed as you left it in this browser. On a phone it opens
 as a sheet over the page, only when you press **Filters**: **Done** or **Esc**
 closes it and you are back on the **Filters** button. The People page and
-the Challenge library use the same **Filters** button.
+the Question bank use the same **Filters** button.
 
 **The list opens showing live, upcoming and late-entry events.** The **Ended**
 filter starts switched off, so a finished event is not missing — turn on
@@ -395,13 +395,13 @@ with options until the event ends (**Change answer** on the answered question),
 so a slip of the thumb is not final; the reports read each person's latest answer.
 
 **One question per topic.** Another event's qualifying question can be added to
-this one (through **Add challenges**, **Assign to Events** or the bulk assign);
+this one (through **Add from bank**, or **Add to events** on the Question bank);
 the two events then share that question's wording, while each keeps its own
 answers. But an event asks each one once: a question on a topic the event
 already asks (its own developers question, say) is not listed in **Add
-challenges**, is greyed out as *Topic already asked* in **Assign to Events**, and
-is skipped, and counted in the toast, by the bulk assign. Only one question per
-topic can be ticked in **Add challenges** at a time. A question the event holds
+from bank**, is greyed out as *Topic already asked* in a single question's **Add to events**
+dialog, and is skipped, and counted in the toast, by the bulk one. Only one question per
+topic can be ticked in **Add from bank** at a time. A question the event holds
 counts even while it is hidden or a draft. Tagging a challenge, restoring one of
 its versions or importing a challenge file cannot make an event ask a topic twice
 either.
@@ -595,8 +595,7 @@ at the top as you scroll.
 - **Invite** — the one primary button (see [Inviting
   participants](#inviting-participants)). **Approve** joins it while somebody in
   the event is waiting for approval.
-- **⋯** — every other door for the event, in one place: **Add challenges**,
-  **Clone**, **Export everything** (a ZIP), **Export activity (CSV)** (once it is
+- **⋯** — every other door for the event, in one place: **Clone**, **Export everything** (a ZIP), **Export activity (CSV)** (once it is
   live or ended), **Sign up at the desk**, **Save as template** (administrators),
   **Join-link settings**, **Edit settings**, **History**, **Organisers**, **Email
   delivery** and **Start now** (an upcoming single-session event). The
@@ -666,8 +665,13 @@ when they change. Then the event's **sections**, a strip of tabs:
   platform** to list every account, each with **Add to event**; untick it to
   narrow back. On a multi-session event the rows of people in other sessions are
   dimmed. See [Participants](#participants).
-- **Challenges** — the event's challenges first, then the rest of the library
-  dimmed below them, ready to add.
+- **Questions** — the event's own questions first (edit any of them, its answer
+  included, for this event only), then the rest of the Question bank dimmed below
+  them, ready to add. **+ Add from bank** adds bank questions (the event gets its
+  own copy of each), **+ New question** makes a question that belongs to the
+  event from the start, and **Save to bank** in an event question's menu copies
+  it into the bank as a new bank question (never linked: later changes to either
+  do not reach the other).
 
   ![An event's Challenges section — its challenges at the top](../screenshots/admin/18-challenges-scoped.png)
 - **Rankings** — its leaderboard (a single session's, if you picked one), the
@@ -695,7 +699,7 @@ the note *You are competing in this event — you can view it, not change it* (s
 [The competitor lock](#the-competitor-lock)).
 
 **The sidebar is for the pages about every event**: **Events**, **New event**,
-**Challenge library**, **Live rankings**, **Analytics** and **Audit** under
+**Question bank**, **Live rankings**, **Analytics** and **Audit** under
 *Manage*; **People** (participants and event organisers; admin accounts with
 **Show admin accounts**) and **Teams** under *Participants*;
 **Roles & permissions** and **Settings** under *Admin*. Opening one of those leaves the
@@ -969,23 +973,9 @@ One. Folded or not, its heading line says whether Checkmarx One accounts will
 be created (**Checkmarx One accounts: on** or **off**, following the box and the
 type you picked), and the **Create** confirmation says it again. Every setting
 that is not obvious has a **?** beside it that explains it.
-**Create event** makes it; for a blank event, **Create and pick challenges**
-goes straight on to the Add challenges dialog.
-
-**Challenges** lets you pick the challenges the event starts with while you
-create it. Type in the search box (it matches a challenge's title, difficulty or
-any tag, `category:web` and plain `web` alike), or press the **tag chips** under
-it: each tag and category in the library is a chip, and pressing several shows
-challenges carrying any of them. Tick the ones you want; **Tick all shown** ticks
-every challenge on screen, and the count says how many are ticked. Only published
-challenges you may use are listed (qualifying questions are not: the event gets
-its own through **Add the qualifying questions**), and the platform's own markers
-(`needs:` tags, `public-domain`, `test/dry run`) are never chips. The ticked
-challenges are added once the event exists. A challenge that does not fit the
-event's type (a Booth Event refuses file answers and `needs:` tags), or that is
-locked, is left out and named in the message, and the rest are added. From a template, the
-template's challenges are already ticked, marked **From the template**, and come
-with it; tick more to add them as well.
+**Create event** makes it. The form picks no questions: a blank event gets them
+afterwards from its **Questions** section (**+ Add from bank**), and an event made
+from a template gets the template's questions with it.
 
 **Add the qualifying questions** (under Advanced settings) is offered on every
 create, from a template too, ticked by default for a Booth Event. It cannot be
@@ -1272,7 +1262,7 @@ compete in, for the same reason.) In practice:
   **Some challenges were not added** names each refused challenge and why. The
   refused ones are left out; every other challenge you ticked is still added
   (or removed), so read the list before assuming the event is unchanged.
-- The per-challenge **Assign to Events** dialog greys out such an event for an
+- A single question's **Add to events** dialog greys out such an event for an
   unsealed challenge and marks it *Sealed only*; where the author rule refuses
   the save, nothing changes on any of the ticked events, and the dialog names
   every event that refused, not just the first. The bulk **Assign to
@@ -1932,9 +1922,10 @@ section.
 
 ### Choosing an event's challenges
 
-From the event's three-dot menu on the Events list, click **Assign Challenges**
-(**Add challenges** in its workspace's **⋯** menu), or press **Create and pick
-challenges** when you create a blank event.
+**One door puts bank questions into an event: + Add from bank**, in the event's
+**Questions** section (the Overview's *Ready to start?* checklist offers the same
+door while the event has none). From the Question bank itself, tick questions and
+press **Add to events** on the selection bar (see below).
 
 ![Task picker — assign challenges to an event](../screenshots/admin/23-task-picker.png)
 
@@ -2391,14 +2382,14 @@ cancels it everywhere the moment those browsers next load the site.
 
 ## Challenges
 
-The **Challenges** tab lists the challenge **library** (the bank of questions),
-whatever events use them.
+The **Question bank** (the sidebar item of that name) lists the bank of
+questions, whatever events use them, filed by [topic](#topics).
 
 **A challenge added to an event lives in that event.** Adding a library
 challenge to an event gives the event its **own copy** of it — the question,
 answer, options, hint, explanation, tags, attachments and seal — and the event
 uses that copy from then on. Editing the event's copy (in the event's
-**Challenges** section), its answer included, changes that event only; editing
+**Questions** section), its answer included, changes that event only; editing
 the library challenge changes no event at all, so a later fix to the library is
 not carried into an event that already has its copy. Cloning an event, or
 making one from a template, gives the new event fresh copies of its own. An
@@ -2429,10 +2420,11 @@ Booth Event** and tells you which one it objected to:
 An **Any answer** challenge is fine at a Booth Event — it asks for nothing a
 phone cannot give.
 
-`needs:` is an ordinary tag, so you add and remove it exactly like any other,
-and it is **never shown to participants** (only `category:` tags are). Any
-`needs:` tag restricts, including one you invent — `needs:burp` will be
-refused at a Booth Event without anyone changing the platform.
+Tick what a question needs under **This question needs** in the editor's
+**Topic and sharing** row (a CxOne account, a desktop computer). It is **never
+shown to participants**. Any `needs:` marker restricts, including one added
+through the API or an import (`needs:burp` is refused at a Booth Event too); the
+editor lists such a marker by its own name so you can clear it.
 
 None of this applies to a Competition or a Program, which can use all three
 freely. The refusal also fires the other way round: if a challenge is already
@@ -2478,7 +2470,7 @@ From this tab you can:
 
 ### Creating or editing a challenge
 
-**+ New Challenge** (or **Edit** from a row's three-dot menu) replaces the
+**+ New question** (or **Edit** from a row's three-dot menu) replaces the
 challenge table with an inline form that fits on one screen. Cancel or Save
 brings the table back:
 
@@ -2753,9 +2745,11 @@ if you are asked to sign in, do that first.* The second one does not say
 why the session ended, because {{platformName}} only knows that it did. Either way
 nothing from it is kept.
 
-- Manage **tags** — labels for grouping challenges; they drive the Analytics
-  filter and the challenge browser. Tags are **private to admins**, with one
-  deliberate exception — see [Categories](#categories) below.
+- File it under a **topic**, share it with every organiser and say what it
+  needs, in the editor's **Topic and sharing** row — see [Topics](#topics) below.
+- **Save to bank** (inside an event, on the event's own question) — copies it
+  into the Question bank as a new bank question; later changes to either one do
+  not reach the other.
 - Assign or un-assign the challenge to specific events.
 - View past versions and **restore** an earlier one from the three-dot menu.
 - **Grant Attempts** — offered from the three-dot menu where the challenge,
@@ -2972,83 +2966,52 @@ above still applies to them like anyone else, so once a session has ended
 they cannot change its scoring fields either. See [Sealing a challenge
 answer](#sealing-a-challenge-answer).
 
-### Categories
+### Topics
 
-Tags are normally an admin-only device — participants never see them, which is
-what makes them safe for workflow labels like `needs-review` or an author's
-name. **Categories are the one exception**, and they are opt-in per tag.
+The **Question bank** is organised by **topic**. A topic holds many questions,
+and a question belongs to at most one. Participants see a question's topic on
+its card and inside it, as its category label; nothing else about a topic
+reaches them, and it does not affect scoring, ordering or the leaderboard.
 
-Tag a challenge **`category:<name>`** and participants will see *<name>* on that
-challenge — on its card in the challenge grid, and again when they open it.
+- **Filter by topic** with the **Topic** box beside the search: every topic,
+  with how many of your bank questions it holds, or **No topic**.
+- **File a question under a topic** in the question editor: open its **Topic
+  and sharing** row and pick one, or press **+ New topic** to make one there.
+- **Manage topics** with **Topics** beside **Export**: add one, rename one (every
+  question filed under it, in the bank and inside events, shows the new name at
+  once), or delete one. A topic still holding questions asks where they go — to
+  another topic, or to none — before it is deleted; questions are never deleted
+  with it. An administrator can rename or delete any topic; an event admin only
+  the topics they made, and deletes one only once it is empty.
 
-```
-category:web          →  participants see    web
-category:crypto       →  participants see    crypto
-category:web security →  participants see    web security
-```
+**Tags are no longer shown or edited.** Questions used to carry free-form tags,
+and a tag written `category:<name>` was shown to participants. Each question's
+first such tag became its topic when the platform was updated; the tags
+themselves are kept, unseen, and a question with no topic still shows its old
+`category:` tags to participants. Exports carry a question's topic by name, and
+an import files it under the topic of that name, making it when missing.
 
-A challenge can carry as many as you like; each appears as its own label. A
-challenge with none looks exactly as it always has.
+#### Shared with all organisers
 
-**Things worth knowing**
+One switch changes who can use a bank question rather than describing it. In
+the editor's **Topic and sharing** row, turn on **Shared with all organisers**
+and every **event admin** on the platform may use the question in their own
+events, even though they did not create it and none of their events holds it
+yet. Without it an event admin sees only questions they created and questions
+one of their events already uses. Participants never see it.
 
-- **It is an ordinary tag.** Add and remove it the same way, from the same
-  dialog. It shows in the tag column, narrows the challenge search, feeds the
-  Analytics tag filter, and survives export/import — because it *is* just a tag
-  with an agreed name.
-- **Only the part after the colon is shown.** Participants never see the word
-  "category", the prefix, or any of your other tags.
-- **Tags are stored in lower case**, so `category:Web` and `category:web` are
-  the same tag and both display as *web*.
-- **`category:` on its own does nothing** — a category with no name is ignored
-  rather than shown as an empty label.
-- **Nothing else changes.** Categories do not affect scoring, ordering,
-  visibility or the leaderboard. They are a label, and only a label.
+**A shared question is badged `Shared`** in the Status column of the Question
+bank. Turn the switch off and the access goes with it, except for events that
+have already added the question — those keep their own copy, as they would any
+question they hold. A question inside an event belongs to that event and has no
+switch: save it to the bank and share the bank question instead.
 
-There is no separate list of categories to maintain: the set of categories is
-simply whichever `category:` tags exist. To rename one, remove the old tag and
-add the new one; to retire one, remove it from the challenges that carry it.
+Underneath, the switch writes the platform's reserved `public-domain` marker,
+spelled exactly. A question that carries a look-alike (`public domain` with a
+space, or one with an invisible character pasted in) is not shared, and the
+switch shows it off; turning it on adds the real marker.
 
-#### The shared pool: `public-domain`
-
-One other tag changes behaviour rather than describing the challenge. Tag a
-challenge **`public-domain`** and every **event admin** on the platform may use
-it in their own events, even though they did not create it and none of their
-events holds it yet. Without the tag an event admin sees only challenges they
-created and challenges one of their events already uses, so this is how you
-publish a challenge to the shared pool. Participants never see it — it behaves
-like any other private tag to them.
-
-**Add it from the `+ tag` control rather than typing it.** The Add Tag dialog
-offers `public-domain` as a one-click chip with the explanation beside it,
-because the exact spelling is what does the work: **`public domain` with a space
-is an ordinary descriptive tag and grants nothing.** It is deliberately not
-treated as the same thing — a challenge somebody labelled "public domain" as a
-note to themselves should not silently become visible to every organiser on the
-platform. Casing does not matter, because tags are stored in lower case.
-
-**Type one of those spellings and the platform now refuses it**, and tells you the
-reserved one. Before, it accepted the tag, showed it on the challenge, and shared
-nothing — which is indistinguishable from a broken feature and was reported as one
-twice. The refusal covers every near miss, including the ones you cannot see: a
-non-breaking space, a soft hyphen or a zero-width space pasted from a document
-renders *identically* to `public-domain` on screen and would have shared nothing.
-The trade is that `public domain` is no longer available as an ordinary
-descriptive label; use different words if you meant it literally.
-
-**A challenge in the shared pool is badged `Shared`** in the Status column of the
-Challenges table, so you can see at a glance which of your challenges other
-organisers can use — without scrolling the table sideways to the Tags column.
-
-**A challenge that already carries one shows a warning triangle and a Fix link**
-in its Tags column. Fix applies the real `public-domain` and removes the inert
-tag; it asks first, because it puts the challenge in front of every organiser on
-the platform.
-
-Remove the tag and the access goes with it, except for events that have already
-assigned the challenge — those keep it, as they would any challenge they hold.
-
-![The Add Tag dialog offering public-domain as a one-click chip, with the explanation beneath it](../screenshots/admin/52-public-domain-tag.png)
+![The question editor's Topic and sharing row, open: the topic picker with + New topic, the Shared with all organisers switch and the needs choices](../screenshots/admin/52-public-domain-tag.png)
 
 New challenges start as **Draft** — fully editable but invisible to
 participants and left out of event assignments. Publish when the
@@ -3080,10 +3043,11 @@ Use it to sanity-check formatting and confirm the answer matches your
 grading rules. The preview never counts as a submission and has no side
 effects.
 
-### Assigning a challenge to events
+### Adding questions to events from the bank
 
-From the Challenges tab's three-dot menu, **Assign to Events** picks
-one or more events for the current challenge.
+On the **Question bank**, tick the questions you want and press **Add to events**
+on the selection bar: the bank's one door into events. With **one** question
+ticked it opens that question's own dialog, which picks one or more events for it.
 
 ![Assign to Events dialog — one challenge, many events](../screenshots/admin/26-challenge-assign-comps.png)
 
@@ -3098,22 +3062,21 @@ reports](#event-team-and-lead-reports)).
 
 ### Bulk-adding challenges to events
 
-To add **several challenges at once**, tick the checkbox at the start of each
-published challenge's row (or the header checkbox to select the whole page — only
-published challenges are selectable). An **Assign to Events** button then
-appears at the top of the tab **and** in a bar at the bottom (either works):
+To add **several questions at once**, tick the checkbox at the start of each
+published question's row (or the header checkbox to select the whole page — only
+published questions are selectable), then **Add to events** on the selection bar:
 
 ![Bulk-select challenges with the Assign to Events button](../screenshots/admin/35-challenges-bulk-assign.png)
 
-- If you are in an **event's workspace** (see [The event workspace](#the-event-workspace)), the button assigns the selected challenges straight to it — and challenges **already in** that event don't show a checkbox (nothing to add). The moment you tick a challenge, the open event's **+ Add Challenges** picker button gives way to **Assign to Events**, so you only ever see one — clear the selection to bring the picker back.
-- Otherwise it opens a picker to choose one or more events.
+It opens a picker to choose one or more events. Inside an event's workspace the
+rows carry no checkboxes: there the one door is **+ Add from bank**.
 
 Assignments are best-effort: drafts, and any challenge already in a chosen
 event, are skipped, and ended events are left out — the toast tells
 you what went in and what was skipped. A challenge a Booth Event cannot use is
 skipped too, but the bulk toast does not name it — so if the count comes back
-lower than you expected with no reason listed, open that challenge's own
-**Assign to Events** dialog, which names the challenge, says what the objection is — a file answer,
+lower than you expected with no reason listed, tick that one question alone and press
+**Add to events**: its own dialog names the challenge, says what the objection is — a file answer,
 or a `needs:` tag — and names the kind of event that refuses it. It stops short
 of naming the event itself, so with two Booth Events ticked you may have to try
 them one at a time. On an event that lets staff compete, a challenge whose
@@ -3419,9 +3382,9 @@ depends on the tab:
   invited them — so `staff`, `pending`, or the name of an event all work as
   search terms.
 - **Events** — the name, the event's tags and its sessions' names.
-- **Challenges** — the title, difficulty and tags (`web` finds the category
-  `category:web`), the answer type, the status, the author, who last changed
-  it, and the names of the events it is in.
+- **Question bank** — the title, difficulty, topic and the question's stored
+  tags (shown nowhere, still searched), the answer type, the status, the author,
+  who last changed it, and the names of the events it is in.
 - **Submissions** — participant, challenge, answer text, event/session,
   and **Activity** type (correct / wrong / hint).
 - **Logs** — anything in the entry, including participant names and emails
@@ -3429,7 +3392,7 @@ depends on the tab:
 
 Combine text with the chips under **Filters** beside the box (All / Pending / …
 on People, Status and Type on Events, difficulty tiers and Published / Draft in
-the Challenge library) to narrow by both text and category at once. Submissions
+the Question bank, beside its Topic box) to narrow by both text and category at once. Submissions
 has no chips, only its search box.
 
 ### Editing a profile

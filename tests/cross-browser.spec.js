@@ -508,10 +508,10 @@ test.describe("cross-browser smoke", () => {
       expect(bb.y + bb.height, `[${browserName}] fixed selection bar off BOTTOM (vh=${vp.height})`).toBeLessThanOrEqual(vp.height + slack);
     }
     await assertReachable(page, page.locator("#challenge-selection-bar-assign-btn"), `[${browserName}] selection bar Add-to-Competitions`);
-    // v7.12.1 — the TOP "Assign to Events" button (in the controls) must also be
-    // reachable + on-screen on every viewport (it's the primary affordance when the
-    // sticky bottom bar has scrolled below a tall list, and the only one at the top).
-    await assertReachable(page, page.locator("#assign-challenges-to-comp-btn"), `[${browserName}] top Assign-to-Competitions button`);
+    await expect(page.locator("#challenge-selection-bar-assign-btn"), `[${browserName}] the bar's door reads Add to events`).toHaveText("Add to events");
+    // Stage B (owner ruling, 27 Nov 2026) — the selection bar is the Question
+    // bank's ONE door into events: the old top button is gone.
+    await expect(page.locator("#assign-challenges-to-comp-btn"), `[${browserName}] no second, top door`).toHaveCount(0);
   });
 
   test("v9.0.2: a table's sort and filter menu is reachable + on-screen in every viewport (the phone cards hide the headings)", async ({ page, browserName }) => {
