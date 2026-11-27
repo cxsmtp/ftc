@@ -3161,9 +3161,11 @@ paths:
                       type: array
                       description: >-
                         The challenge's CATEGORY names, always present
-                        (`[]` when it has none). A category is an ordinary task
-                        tag written `category:<name>`; the participant is sent
-                        the parsed NAMES only.
+                        (`[]` when it has none). A question filed under a TOPIC
+                        (the Question bank's topics) has exactly one: the topic's
+                        name. A question with no topic falls back to its legacy
+                        category tags, written `category:<name>`; the participant
+                        is sent the parsed NAMES only.
 
 
                         This is the one and only task-tag information a
@@ -7325,6 +7327,8 @@ paths:
                             withheld hint over a box that was always empty. Absent for
                             everybody else. A client tells the two reasons apart by
                             `competing_in`.
+                        topic_id: { type: string, nullable: true, description: "The question's topic (GET /api/admin/topics), or null." }
+                        topic_name: { type: string, nullable: true, description: "That topic's name, or null for no topic." }
                         qualifying_keys:
                           type: array
                           items: { type: string }
@@ -7410,6 +7414,7 @@ paths:
                       text:    { type: string }
                       correct: { type: boolean, description: "Multiple choice: marks a correct option; one sent without it is incorrect. Ignored on a pick-one question, whose every option is accepted." }
                 attempt_cap: { type: integer, format: int32, nullable: true, minimum: 1, maximum: 1000, description: "CHALLENGE-level ceiling on submissions per participant, per event. Null/absent means uncapped, and it OVERRIDES any event-level `attempt_cap`. An attempt is a stored submission row, so a de-duplicated re-send and a throttled 429 cost nothing. On a PUT, send `null` (or an empty string) to remove the cap; omit the field to leave it unchanged." }
+                topic_id: { type: string, nullable: true, description: "The question's TOPIC (GET /api/admin/topics): an existing topic's id, or null/empty for no topic. A topic id that names no topic is refused 400 `topic_not_found`, a value that is not text 400. Participants see the topic's name as the question's category." }
                 correct_answer: { type: string, maxLength: 65536, description: "Required for every answer type EXCEPT `choice`, where it is derived from the ticked options, and `any`, which has none (stored empty). For `text` it is a NEWLINE-separated list of accepted answers (v8.9.0): one line is the single answer it always was; each line is graded ignoring case and whitespace; the list is canonicalised on save (lines trimmed, blank lines and duplicates dropped, the first spelling kept), so an all-blank list is refused. A text challenge that already carried an embedded newline now accepts each line rather than the concatenation." }
                 explanation: { type: string }
                 hint: { type: string, description: "Refused with 400 on an `any` challenge when it carries real content; empty markup (`<p></p>`) is accepted and stored as no hint." }
@@ -7636,6 +7641,7 @@ paths:
                 hint: { type: string, maxLength: 2000, description: "Refused with 400 on an `any` challenge when it carries real content. Omit it (or send empty markup) for that type; the row's hint is NULL either way." }
                 attachment_url: { type: string }
                 attempt_cap: { type: integer, format: int32, nullable: true, minimum: 1, maximum: 1000, description: "CHALLENGE-level ceiling on submissions per participant, per event. It OVERRIDES any event-level `attempt_cap` (most-specific-wins). Send `null` (or an empty string) to remove the cap; omit the field to leave it unchanged." }
+                topic_id: { type: string, nullable: true, description: "The question's topic: a topic id, null or empty for none, absent to leave it unchanged. 400 `topic_not_found` when it names no topic. History records the change by topic name. A version restore never changes it." }
                 active:
                   description: >-
                     Visibility. A PRESENT value must be `true`/`false` or `0`/`1`;
@@ -9865,6 +9871,214 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /api/admin/topics:
+    get:
+      tags: [Admin - Challenges]
+      summary: List the Question bank's topics
+      security: [{ sessionAuth: [] }]
+      description: >-
+        Every topic, by name. A question belongs to at most one topic and a topic
+        holds many; participants see a question's topic as its category. Topic names
+        are platform-wide (any organiser may file a question under any topic), so
+        the list is not narrowed; `question_count` counts only the bank questions
+        this reader can see. `can_manage` says whether this reader may rename or
+        delete the topic (a global admin, or the organiser who made it), and
+        `manage_refusal` says why not.
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: "Every topic, in name order."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                    question_count: { type: integer }
+                    can_manage: { type: boolean }
+                    manage_refusal: { type: string }
+    post:
+      tags: [Admin - Challenges]
+      summary: Make a topic
+      description: >-
+        Makes a topic. The name is 1–60 characters with no control characters,
+        trimmed, and unique case-insensitively (409 `topic_exists`, naming the
+        existing topic's `id` and `name`). Any organiser holding `challenges.edit`
+        may make one. Audited as an orphaned `topic` event `created`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 60 }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "201":
+          description: "The topic was made."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string }
+                  name: { type: string }
+        "400": { description: "`topic_name_invalid`: the name is missing, not text, empty, over 60 characters or holds a control character." }
+        "409": { description: "`topic_exists`: a topic of that name exists (its `id` and `name` are in the body)." }
+  /api/admin/topics/{id}:
+    put:
+      tags: [Admin - Challenges]
+      summary: Rename a topic
+      description: >-
+        Renames the topic, under the name rules of the create. Only a global admin
+        or the organiser who made the topic (403 `topic_not_yours`). Every question
+        filed under it, events' own copies included, shows the new name at once.
+        Audited as an orphaned `topic` event `edited` with the old and new names.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 60 }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "200":
+          description: "Renamed (`changed` false when the name was already this one)."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string }
+                  name: { type: string }
+                  changed: { type: boolean }
+        "400": { description: "`topic_name_invalid` (see the create)." }
+        "403": { description: "`topic_not_yours`, or the CSRF token was refused (see CsrfRefused)." }
+        "404": { description: "`topic_not_found`." }
+        "409": { description: "`topic_exists`: another topic has that name." }
+    delete:
+      tags: [Admin - Challenges]
+      summary: Delete a topic
+      description: >-
+        Deletes the topic. Questions are never deleted with it. While any question
+        names it (a bank question or an event's own copy) the delete is refused
+        409 `topic_not_empty` with the count, unless `move_to` says where the
+        questions go first: another topic's id, or null for no topic. Only a global
+        admin may move questions (`can_move` in the refusal); the organiser who made
+        a topic may delete it only once it is empty. Only a global admin or the
+        topic's creator may delete it (403 `topic_not_yours`). Audited as an
+        orphaned `topic` event `deleted`, with how many questions moved and where.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              properties:
+                move_to: { type: string, nullable: true }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "200":
+          description: "Deleted; `moved` questions went to `moved_to` (null: no topic)."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  moved: { type: integer }
+                  moved_to: { type: object, nullable: true, additionalProperties: true }
+        "400": { description: "`topic_move_invalid` (move_to is not text or null, or names this topic) or `topic_not_found` (move_to names no topic)." }
+        "403": { description: "`topic_not_yours`, or the CSRF token was refused (see CsrfRefused)." }
+        "404": { description: "`topic_not_found`." }
+        "409": { description: "`topic_not_empty`: questions still name it (`questions`), and `can_move` says whether this caller may name `move_to`." }
+
+  /api/admin/tasks/{id}/save-to-bank:
+    post:
+      tags: [Admin - Challenges]
+      summary: Save an event's question to the Question bank
+      description: >-
+        Copies an event's own question into the Question bank as a NEW bank
+        question: never a link and never an overwrite of the bank question it was
+        copied from, so later edits to either reach neither. The copy takes the
+        question's wording, answer, options, topic, tags (never a `qualifying:`
+        one) and attachments (new rows naming the same files); it is not locked,
+        and it belongs to whoever saved it (`created_by_id`), or, when the answer
+        is sealed, to the source's author so the seal still names them. Refused
+        for a bank question (400 `save_to_bank_not_event`), a quick question (400
+        `save_to_bank_qualifying`), a caller who competes in an event holding it
+        (403 `competitor_cannot_edit`), an event admin for a question of an event
+        they do not organise (403), and a sealed answer the caller may not read
+        (403). Recorded as the new question's `created` version with `via:
+        save_to_bank`, naming the source (`saved_from`) and its event.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "200":
+          description: "The new bank question's id."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string }
+                  title: { type: string }
+        "400": { description: "`save_to_bank_not_event` or `save_to_bank_qualifying`." }
+        "403":
+          description: >-
+            Out of scope, a sealed answer the caller may not read, the CSRF token
+            refused, or `competitor_cannot_edit` (see the CompetitorCannotEdit response).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "404": { description: Challenge not found }
 
   /api/admin/task-tags:
     get:
@@ -15174,6 +15388,10 @@ paths:
         `size_bytes`, `sha256`, `order_idx`) and, unless
         `include_attachment_content=0`, a `content_b64` field carrying the
         base64-encoded ZIP binary.
+
+        Each task carries its topic by NAME as `topic` (null for none): a topic
+        id means nothing on another server, so the import files the question
+        under the topic of that name, made there when missing.
 
         A total size cap of 96 MB across all attachments bounds the JSON
         body (worst-case ~128 MB after base64 inflation, matching the

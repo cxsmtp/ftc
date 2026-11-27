@@ -209,7 +209,7 @@ function _actionItems() {
     // (ui/nav.js adminCan; the built-in tiers answer exactly as before), and a
     // door that opens a page first offers only a page the role may open.
     if (_globalAdmin() && adminCan("events.create") && _tabOffered("admin-competitions-tab")) act("act:new-event", "New event", () => { _goAdminTab("admin-competitions-tab"); _dispatch("open-competition-form"); }, "Create");
-    if (adminCan("challenges.edit") && _tabOffered("admin-tasks-tab")) act("act:new-challenge", "New challenge", () => { _goAdminTab("admin-tasks-tab"); _dispatch("open-task-form"); }, "Create");
+    if (adminCan("challenges.edit") && _tabOffered("admin-tasks-tab")) act("act:new-challenge", "New question", () => { _goAdminTab("admin-tasks-tab"); _dispatch("open-task-form"); }, "Create");
     if (!c && adminCan("participants.enrol") && _tabOffered("admin-participants-tab")) {
       act("act:invite", "Invite people", () => { _goAdminTab("admin-participants-tab"); _dispatch("open-invite-dialog"); }, "People");
       // Withheld while it would be refused (sweep #501); the People button says why.

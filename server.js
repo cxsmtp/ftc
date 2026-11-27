@@ -4503,6 +4503,21 @@ function _applyImportedTaskTags(taskId, tags) {
   // batch 5 — skip non-string tags (would 500 at tag.trim()).
   for (const tag of tags) if (typeof tag === "string" && tag.trim()) insertTag.run(taskId, tag.trim().toLowerCase());
 }
+// Stage B — the imported question's topic, by NAME (the file carries no topic
+// id: lib/topics.js). An existing topic of that name (case-insensitive) is used,
+// else one is made; null or "" files it under no topic; a name the topic rules
+// refuse leaves the question as it was. Inside the import's transaction.
+function _applyImportedTopic(taskId, name) {
+  const T = require("./lib/topics");
+  if (name === null || (typeof name === "string" && !name.trim())) {
+    db.prepare("UPDATE tasks SET topic_id=NULL WHERE id=?").run(taskId);
+    return;
+  }
+  if (typeof name !== "string" || T.topicNameError(name)) return;
+  const found = T.topicByName(db, name);
+  const topicId = found ? found.id : T.insertTopic(db, name, { createdBy: "import" });
+  db.prepare("UPDATE tasks SET topic_id=? WHERE id=?").run(topicId, taskId);
+}
 
 // v8.1.0 — the name and the zero-participant guard are unchanged (both are
 // source-pinned, and all three call sites pass the same arguments), but the RULE
@@ -4762,6 +4777,8 @@ require("./routes/badge")(app);
 require("./routes/certificate-config")(app);
 // The per-event look (routes/event-look.js; lib/platform-look.js).
 require("./routes/event-look")(app);
+// Stage B — the Question bank's topics (routes/topics.js; lib/topics.js).
+require("./routes/topics")(app);
 // The event workspace Overview's live read (routes/event-overview.js).
 require("./routes/event-overview")(app);
 // The event team and its persona reports (routes/event-team.js; lib/event-team.js, lib/team-reports.js).
@@ -6173,6 +6190,8 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
       // array would read as "not sealed" and quietly import a row the source
       // platform had sealed.
       answer_sealed: "flag",
+      // Stage B — the topic by name (lib/topics.js).
+      topic: "str",
     });
     if (_shape) return res.status(400).json({ error: _shape });
   }
@@ -6760,6 +6779,7 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
         targetTaskId = conflict.existingId;
         overwrittenTaskIds.add(conflict.existingId);
         if (_countsTowardFinish(conflict.existingId) !== _countedBefore) completionCountMoved.add(conflict.existingId);
+        if (t.topic !== undefined) _applyImportedTopic(conflict.existingId, t.topic);
         createTaskVersion(conflict.existingId, adminId, "import");
         overwritten++;
       } else {
@@ -6782,6 +6802,7 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
         db.prepare("INSERT INTO tasks (id,title,description,difficulty,answer_type,correct_answer,choices,explanation,hint,attachment_url,author_name,author_linkedin,active,status,attempt_cap,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
           .run(newId, title, desc, t.difficulty, t.answer_type || "text", correctAnswer, _importChoices(t), expl, hint, normalisedAttachmentUrl, authorName, authorLinkedin, importedActive, importedStatus, importedCap, new Date().toISOString());
         if (Array.isArray(t.tags)) _applyImportedTaskTags(newId, t.tags);
+        if (t.topic != null) _applyImportedTopic(newId, t.topic);
         targetTaskId = newId;
         createTaskVersion(newId, adminId, "import");
         imported++;

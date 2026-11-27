@@ -240,6 +240,8 @@ export const S = {
   tDiffFilters: new Set(),
   tStatusFilters: new Set(),
   tStateFilters: new Set(),
+  tTopicFilter: "",          // stage B — the Question bank's Topic filter ("" all, "__none__" none, else a topic id)
+  adminTopics: null,         // stage B — GET /api/admin/topics (features/topics-admin.js); null until read
   tPage: 1,
   tPageSize: 30,
   _histState: null,

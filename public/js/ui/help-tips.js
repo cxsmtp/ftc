@@ -86,7 +86,7 @@ export const HELP_TIPS = {
   // ── Organiser screens ────────────────────────────────────────────────────
   "ws.join": "Walk-ups scan the QR code or type the code to join this event. Anyone who has it can join, so if it leaks, regenerate it in Join-link settings.",
   "ws.sessions": "Each session is a separate sitting of this event with its own start and end, and each participant picks one. Only sessions that have not started can be edited or deleted.",
-  "ws.challenges": "The challenges this event's participants play. Press one to see its points, how many solved it and whether participants can see it. Open Challenges lists the library with this event's challenges first, where you add or remove them.",
+  "ws.challenges": "The challenges this event's participants play. Press one to see its points, how many solved it and whether participants can see it. Open Questions lists this event's own questions first, then the Question bank, where you add more.",
   "ws.progress": "How many have finished every challenge, and how many solved each one, so you can see where people are stuck (the leaderboard is under Rankings). Staff, event admins and roles like theirs are not counted unless they take part in an event where staff compete, and answers given while impersonating never are.",
   "ws.ready": "What still needs doing before the start. Each open item has the button that fixes it; Show me points at the button in the header.",
   "ws.certs": "Whether this event's certificates were issued and emailed. They go out a few minutes after the end. Open Certificates to see each one or send one again.",
@@ -115,9 +115,10 @@ export const HELP_TIPS = {
   "people.columns": "Choose which columns the table shows. The choice is kept in this browser only.",
   "people.status": "Unconfirmed: has not confirmed their email. Pending: waiting for approval. Denied: refused. Confirmed: can take part. Blocked: stopped by an organiser. Locked: too many wrong codes, for a short while.",
   "library.list": {
-    default: "Every challenge you can see. Inside an event, that event's challenges come first and the rest of the library is dimmed below them, ready to add.",
-    event_admin: "Your challenges and the shared ones. Inside an event, that event's challenges come first and the rest is dimmed below them, ready to add.",
+    default: "Every bank question you can see, filed by topic. Inside an event, the event's own questions come first (edit them there for that event only) and the rest of the bank is dimmed below them, ready to add.",
+    event_admin: "Your bank questions and the shared ones, filed by topic. Inside an event, the event's own questions come first (edit them there for that event only) and the rest is dimmed below them, ready to add.",
   },
+  "library.topics": "Show only the questions in one topic, or those with no topic. Topics lists them, with how many of your bank questions each holds, and adds, renames or deletes them.",
   "library.export": {
     default: "Export downloads the challenges listed as a JSON file. A superadmin can import such a file to add or update challenges.",
     superadmin: "Export downloads the challenges listed as a JSON file; Import adds or updates challenges from one, and shows conflicts before anything changes.",

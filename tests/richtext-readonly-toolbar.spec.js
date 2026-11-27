@@ -414,7 +414,7 @@ test.describe("A read-only rich text box switches its toolbar off and says why",
     await expectOff(page, "#tf-desc", RO.lockedUnlock);
     await page.locator("[data-action='close-task-form']").click();
     await page.locator("[data-action='open-task-form']").click();
-    await expect(page.locator("#task-form-title")).toHaveText("New Challenge");
+    await expect(page.locator("#task-form-title")).toHaveText("New question");
     for (const sel of EDITORS) await expectOn(page, sel);
     await expect(page.locator("#tf-attach-add-btn"), "a new challenge offers its attachments again").toBeVisible();
     expect((await look(page, "#tf-explanation")).placeholder, "CONTROL: an empty editable body shows its placeholder")

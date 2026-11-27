@@ -212,7 +212,7 @@ lib/*.js               # 78 shared backend modules — regenerate this list from
                        #   login-code, login-method, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
                        #   qualifying, qualifying-rescore, query-plan, rbac, registration-fields, sanitise, scanner-classify, schema-required,
                        #   scheduler, scoring, self-enroll, session-index, sessions, settings, staff-compete,
-                       #   task-fields, team-recipient, team-report-mail, team-reports, time, user-tags, util, validate, zip-writer —
+                       #   task-fields, team-recipient, team-report-mail, team-reports, time, topics, user-tags, util, validate, zip-writer —
                        #   required directly; one process-global singleton each
 routes/<entity>.js     # One module per entity: module.exports = register(app[,deps])
 db.js                  # SQLite schema + migrations
