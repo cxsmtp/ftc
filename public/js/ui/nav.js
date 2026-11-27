@@ -934,6 +934,8 @@ export const SETTINGS_CARD_PERMISSIONS={
   'cxone-withdrawals-card':['ops.cxone'],                    // /api/admin/cxone/withdrawals
   'retention-card':['ops.retention_view'],                   // GET /api/admin/retention
   'alerts-card':['ops.alerts'],                              // GET /api/admin/alerts
+  'system-health-card':['settings.view'],                    // GET /api/admin/system-health
+  'cxone-audit-card':['audit.view'],                         // GET /api/admin/audit (the page it opens)
 };
 // Is this Settings card offered to the signed-in role? Fails closed until
 // /api/admin/me has said what the role holds (a superadmin holds every card),

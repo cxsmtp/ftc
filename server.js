@@ -6039,7 +6039,9 @@ require("./routes/users")(app); // RBAC — Users & roles (admin accounts, custo
 // Default-CxOne credential (get/set/clear), the operator SMTP test-email
 // diagnostic, and the unsubscribed-list view + re-subscribe now live in
 // routes/admin-misc.js, registered here in one call.
-require("./routes/admin-misc")(app, { isHealthy: _instanceInService });
+require("./routes/admin-misc")(app, { isHealthy: _instanceInService,
+  // Settings → Backups & health reads the same facts the gate does, each apart.
+  healthState: () => ({ integrity: _dbIntegrityOk, schema: _dbSchemaOk, maintenance: _maintenanceState().active }) });
 
 // ── Admin participants ──────────────────────────────────────────────────────
 

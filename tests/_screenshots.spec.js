@@ -3171,7 +3171,7 @@ test.describe("admin", () => {
     if (g1 && bindTarget) {
       await page.request.post("/api/admin/competitions/assign", { headers: H, data: { groupIds: [g1.id], competitionIds: [bindTarget.id] } }).catch(() => {});
     }
-    await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+    await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
     await page.locator("#admin-groups-body table").waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
     await settle(page);
     await page.screenshot({ path: shotPath("admin", "28-groups") });
@@ -3185,7 +3185,7 @@ test.describe("admin", () => {
   // dismisses the modal with Cancel/Close.
   test("29-group-create-dialog", async ({ page }) => {
     await loginAsAdminCarol(page);
-    await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+    await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
     await page.locator("#admin-groups-body").waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
     await settle(page);
     await page.locator("button[data-action='group-create']").first().click().catch(() => {});
@@ -3210,7 +3210,7 @@ test.describe("admin", () => {
   test("30-group-rename-dialog", async ({ page }) => {
     await loginAsAdminCarol(page);
     await ensureSeedGroup(page);
-    await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+    await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
     await page.locator("#admin-groups-body table").waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
     await settle(page);
     await page.locator("button[data-action='group-rename']").first().click().catch(() => {});
@@ -3223,7 +3223,7 @@ test.describe("admin", () => {
   test("31-group-members-dialog", async ({ page }) => {
     await loginAsAdminCarol(page);
     await ensureSeedGroup(page);
-    await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+    await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
     await page.locator("#admin-groups-body table").waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
     await settle(page);
     await page.locator("button[data-action='group-manage-members']").first().click().catch(() => {});
@@ -3242,7 +3242,7 @@ test.describe("admin", () => {
     // that state when run alone too.
     const stand = "Security Stand — Hall 2";
     await ensureLateEntryStand(page, stand);
-    await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+    await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
     await page.locator("#admin-groups-body table").waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
     await settle(page);
     await page.locator("button[data-action='group-bind-comps']").first().click().catch(() => {});
@@ -3774,8 +3774,8 @@ test.describe("superadmin", () => {
     await loginAsSuperadmin(page);
     await page.locator("button.admin-nav-item:has-text('Settings')").first().click();
     await page.locator("#admin-settings-tab").waitFor({ state: "visible" });
-    // Settings is two panes: the CxOne card is in its own section.
-    await require("./ui-admin-helpers").openSettingsSection(page, "cxone");
+    // Settings is two panes: the CxOne card is in General.
+    await require("./ui-admin-helpers").openSettingsSection(page, "general");
     const card = page.locator("#cxone-card");
     await expect(card).toBeVisible({ timeout: 10000 });
     await page.evaluate(() => {
@@ -4003,7 +4003,7 @@ test.describe("superadmin", () => {
   test("13-certificate-designer", async ({ page }) => {
     await loginAsSuperadmin(page);
     await page.locator("button.admin-nav-item[data-tab-id='admin-settings-tab']").first().click();
-    await require("./ui-admin-helpers").openSettingsSection(page, "certificates");   // two panes
+    await require("./ui-admin-helpers").openSettingsSection(page, "branding");   // two panes
     const open = page.locator("[data-cw-open]");
     await open.waitFor({ state: "visible", timeout: 15000 });
     await open.click();

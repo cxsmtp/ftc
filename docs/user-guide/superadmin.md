@@ -59,9 +59,9 @@ password or an emailed code, never with the built-in account's password.
 
 ---
 
-## Users & roles and custom roles
+## Roles & permissions and custom roles
 
-**Users & roles** (sidebar) lists everyone who can open the admin panel — every
+**Roles & permissions** (sidebar) lists everyone who can open the admin panel — every
 account whose role is not Participant — with their role, the events a scoped
 role organises, and when they last signed in. From there you:
 
@@ -95,7 +95,7 @@ stays a superadmin's), and some can be given only by a superadmin. Some reach
 beyond any one event — the raw request and application logs, the operational
 alerts, platform settings, metrics, data retention, test email and the
 unsubscribe list, exporting every event or the settings, imports, event
-templates, certificate designs, Users & roles, deleting accounts, creating
+templates, certificate designs, Roles & permissions, deleting accounts, creating
 events from scratch and adding organisers — so only a role that acts on every
 event can hold them: the matrix offers them only while **every event** is
 chosen. Everything else a role scoped to its events holds works on its own
@@ -124,12 +124,12 @@ changing it, and a role allowed to delete accounts cannot delete an administrato
 a superadmin or anyone whose role can do more than its own. Accounts that hold a
 custom role cannot be viewed as a participant.
 
-Admins can see Users & roles but cannot change anything on it; event admins do
+Admins can see Roles & permissions but cannot change anything on it; event admins do
 not see it.
 
 ## Role promotion
 
-Role changes are made on **Users & roles** (above). The participant row's
+Role changes are made on **Roles & permissions** (above). The participant row's
 three-dot menu in People still offers **Promote to Admin** or
 **Promote to Superadmin** for a participant, and demoting uses the same menu.
 
@@ -331,7 +331,7 @@ yours to know about:
   account, so a regular admin is not offered **Invite to …** on that row, and
   the selection bar and the **Invite** dialog skip it with *only a superadmin
   can enrol an admin*. A bound group is the exception that needs no skip: its
-  live sync enrols every member it holds — the Groups tab and the **Invite**
+  live sync enrols every member it holds — the Teams page and the **Invite**
   dialog put an admin account into a group only for a superadmin. Any organiser
   may enrol themselves. The same rule reaches **Grant Attempts**: on such an
   event an enrolled admin or superadmin can run out of attempts like anyone
@@ -1042,7 +1042,7 @@ sign-in method as they were.
 
 **An unrecognised role is ignored rather than stored.** An import accepts a
 role this platform has: a built-in one (participant, event admin, admin,
-superadmin) or a custom role from **Users & roles** (an export carries its id).
+superadmin) or a custom role from **Roles & permissions** (an export carries its id).
 Anything else in a `role` field — a custom role from another platform, say — is
 skipped and counted, and the toast tells you how many: a **new** account
 imports as a participant, and an **existing** one keeps whatever role it
@@ -1141,7 +1141,7 @@ so the placing it prints is final.
 
 A new account is approved the moment it is created, because its owner has just
 proven the address with an emailed code. Tick **Require admin approval for new
-accounts** under **Settings → Sign-in & accounts** to change that: from then on a new account
+accounts** under **Settings → Sign-in** to change that: from then on a new account
 waits in the approval queue and sees a "Pending Approval" message until an
 organiser approves it. People who sign up through an open event's join link, QR
 code or event code (typing their code in the browser where they asked for it,
@@ -1168,7 +1168,7 @@ recorded in the settings history.
 
 ### The platform look (Settings)
 
-**Settings → Look & appearance → Platform look** sets the whole starting appearance: the **Look**,
+**Settings → Branding → Platform look** sets the whole starting appearance: the **Look**,
 the **Mode** (or leave it to each browser, which follows its device until they choose) and, for Ambient, the
 **Light colour**. The app uses it from its very first moment, the sign-in page
 included, and so do the help page (which opens in its own tab), the pages
@@ -1196,33 +1196,47 @@ Each change is recorded in the settings history.
 
 ## The Settings page
 
-Settings is two panes: the list of sections on the left, the chosen section on
-the right (on a phone, a **Section** picker above it). The sections are
-**Platform** (the platform name), **Look & appearance** (the platform look),
-**Sign-in & accounts** (approval for new
-accounts), **Email** (the mail relay's last check, **Send test email**, the
-unsubscribe list and the [event team report
-domains](#event-team-report-domains)), **Certificates design**, **Checkmarx One** (the default
-integration and the account removals), **Data & retention** (how long event
-history is kept and when it was last swept; the operator sets the period; and
-how many unused pictures that sweep removed, or that it held their clean-up
-because the database failed a start-up check or maintenance was on; a picture
-is unused once no challenge or saved version, account photo, frozen team board
-or older certificate shows it, and the next daily sweep removes it (never within
-a week of it being stored), links to it from outside the platform included; the **Audit** page's record of each
-sweep lists the pictures it removed, so one can be restored from a backup),
-**Alerts** (blocked-address alerts that are still open, each with **Review**),
-and **Break-glass** (only in the built-in account's own session). Each setting
-is one row with its own **?** for the longer explanation, and each form has its
-own Save. The section you last opened is remembered in this browser.
+Settings is two panes: the list on the left, grouped under **People**,
+**Records** and **System**, and the chosen section on the right (on a phone, a
+**Section** picker above it).
 
-Each card shows to whoever may use it: a regular admin sees **Certificates
-design**, the event team report domains (read-only), **Data & retention** and
-**Alerts**; a custom role sees the cards for the permissions you gave it.
+- **People**: **People**, **Teams** and **Roles & permissions** open those
+  pages; **Sign-in** holds approval for new accounts and, only in the built-in
+  account's own session, the **Break-glass account**.
+- **Records**: **Audit log** opens the Audit page; **CxOne API audit** opens the
+  Audit log searching for Checkmarx One activity, and lists the Checkmarx One
+  accounts waiting to be removed for deleted participants.
+- **System**: **General** (the platform name, the default Checkmarx One
+  integration, how long event history is kept and when it was last swept, and
+  open blocked-address alerts, each with **Review**), **Branding** (the platform
+  look and the certificate design), **Email (SMTP)** (the mail relay's last
+  check, **Send test email**, the unsubscribe list and the [event team report
+  domains](#event-team-report-domains)), **Updates** (the running version and
+  **What's new**; the server installs new versions itself from the signed
+  release image), **Backups & health** (the database's start-up checks,
+  maintenance mode, the mail relay, free disk space and how long the server has
+  run; a superadmin also sees the database's size, the Node.js version and when
+  the server started; backups are taken by the server before every start and
+  update, and this page cannot list them), **Get help** (opens the guides) and
+  **About** (the version and the typefaces certificates use).
+
+The history sweep also reports how many unused pictures it removed, or that it
+held their clean-up because the database failed a start-up check or maintenance
+was on; a picture is unused once no challenge or saved version, account photo,
+frozen team board or older certificate shows it, and the next daily sweep
+removes it (never within a week of it being stored), links to it from outside
+the platform included; the **Audit** page's record of each sweep lists the
+pictures it removed, so one can be restored from a backup. Each setting is one
+row with its own **?** for the longer explanation, and each form has its own
+Save. The section you last opened is remembered in this browser.
+
+Each card shows to whoever may use it: a regular admin sees the **Certificate
+design**, the event team report domains (read-only), event history retention,
+the blocked-address alerts and **Backups & health**; a custom role sees the cards for the permissions you gave it.
 
 ## Platform name
 
-**Settings → Platform** is where the platform is named, and **only a superadmin (or a
+**Settings → General** is where the platform is named, and **only a superadmin (or a
 custom role you give both *See platform settings* and *Change platform settings*)
 can change it** — a regular admin does not see that section at all.
 
@@ -1265,7 +1279,7 @@ old name in their subject and body; only new batches pick the new one up.
 
 ## Default CxOne integration
 
-**Settings → Checkmarx One** holds the platform-wide CxOne credentials.
+**Settings → General** holds the platform-wide CxOne credentials.
 
 ![Settings — default CxOne](../screenshots/superadmin/05-cxone-settings.png)
 
@@ -1518,7 +1532,7 @@ a locked account) **and approval notices**.
 > someone learns the account they asked for is usable, and nobody should have to
 > re-subscribe to find that out.
 
-The **Unsubscribe list** under **Settings → Email** (superadmins only) shows each
+The **Unsubscribe list** under **Settings → Email (SMTP)** (superadmins only) shows each
 opted-out address, the date, and the reason. Click **Remove** on a row to
 re-enable delivery for someone who has since consented again.
 

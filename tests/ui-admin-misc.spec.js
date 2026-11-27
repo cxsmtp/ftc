@@ -660,8 +660,9 @@ test.describe("Mobile admin hamburger + active nav-btn (v6.17.3)", () => {
 test.describe("Participant groups UI (v6.20)", () => {
   test("Groups nav item opens the Groups pane with a New Group action", async ({ page }) => {
     await adminLogin(page);
-    const nav = page.locator("button.admin-nav-item:has-text('Groups')").first();
+    const nav = page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first();
     await expect(nav).toBeVisible();
+    await expect(nav, "the sidebar names the page Teams").toHaveText(/^\s*Teams\s*$/);
     await nav.click();
     await expect(page.locator("#admin-groups-tab")).toBeVisible();
     await expect(page.locator("#admin-groups-tab button[data-action='group-create']")).toBeVisible();
@@ -725,7 +726,7 @@ test.describe("Participant groups UI (v6.20)", () => {
     const parts = (await (await page.request.get("/api/admin/participants?limit=50")).json()).participants;
     const g = await createGroupViaApi(page, `UIGrp_${Date.now()}`, [parts[0].id]); // 1 member → others are candidates
     try {
-      await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+      await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
       await page.locator(`button[data-action='group-manage-members'][data-group-id='${g.id}']`).click();
       await page.locator("#gm-candidates label").first().waitFor({ state: "visible" });
       const firstRow = page.locator("#gm-candidates label").first();
@@ -751,7 +752,7 @@ test.describe("Participant groups UI (v6.20)", () => {
     const parts = (await (await page.request.get("/api/admin/participants?limit=50")).json()).participants;
     const g = await createGroupViaApi(page, `UIAxeGrp_${Date.now()}`, [parts[0].id]);
     try {
-      await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+      await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
       await page.locator(`button[data-action='group-manage-members'][data-group-id='${g.id}']`).click();
       await page.locator("#gm-search").waitFor({ state: "visible", timeout: 5000 });
       const { AxeBuilder } = require("@axe-core/playwright");
@@ -780,7 +781,7 @@ test.describe("Participant groups UI (v6.20)", () => {
     await adminLogin(page);
     const g = await createGroupViaApi(page, `UICompGrp_${Date.now()}`);
     try {
-      await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+      await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
       await page.locator(`button[data-action='group-bind-comps'][data-group-id='${g.id}']`).click();
       await page.locator("#gc-save").waitFor({ state: "visible" });
       const rows = page.locator(".gc-cb");
@@ -932,7 +933,7 @@ test.describe("Participant groups UI (v6.20)", () => {
       expect(seed.status(), `bulk-seed: ${seed.status()}`).toBe(200);
       fs.unlinkSync(maintFile);
 
-      await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+      await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
       await page.locator(`button[data-action='group-manage-members'][data-group-id='${gid}']`).click();
       await page.locator("#gm-candidates label").first().waitFor({ state: "visible", timeout: 10000 });
       // Pager must be present (60 candidates > page size 50).
