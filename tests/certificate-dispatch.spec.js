@@ -206,7 +206,8 @@ async function makeEvent(sa, { kind = "tournament", minutes = 600, startAgoMs = 
     expect(tr.ok, tr.text).toBeTruthy();
     const a = await sa.post(`/api/admin/tasks/${tr.body.id}/competitions`, { competitionIds: [comp.id] }, await sa.h());
     expect(a.ok, a.text).toBeTruthy();
-    taskIds.push(tr.body.id);
+    // The event's OWN copy is the question it holds (lib/event-copies.js).
+    taskIds.push(a.body.copies[0].task_id);
   }
   return { comp, taskIds };
 }
