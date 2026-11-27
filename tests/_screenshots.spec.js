@@ -2220,7 +2220,8 @@ test.describe("admin", () => {
     await expect(page.locator("#tf-topic"), "the topic picker").toBeVisible();
     await expect(page.locator("#tf-shared"), "the shared switch").toBeVisible();
     await expect(page.locator("#tf-needs-list input[data-need]").first(), "the needs choices").toBeVisible();
-    await page.locator("#tf-org-sec").scrollIntoViewIfNeeded();
+    // Centred, so the editor's pinned Save row does not cover the needs choices.
+    await page.locator("#tf-org-sec").evaluate((el) => el.scrollIntoView({ block: "center" }));
     await settle(page, 400);
     await page.locator("#tf-org-sec").screenshot({ path: shotPath("admin", "52-public-domain-tag") });
     await page.locator("[data-action='close-task-form']").first().click().catch(() => {});

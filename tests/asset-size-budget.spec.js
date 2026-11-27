@@ -44,11 +44,15 @@ const ROOT = path.join(__dirname, "..");
 // items, and the Updates, Backups & health and About cards with their loaders);
 // then gzip 350700 -> 350960 and brotli 306560 -> 306820 (event-owned questions: the
 // library/workspace/picker row filters in ui/task-search.js and the bulk toast's
-// "belonging to another event" skip line).
+// "belonging to another event" skip line); then script gzip 350960 -> 353000 and
+// brotli 306820 -> 309080, page gzip 33262 -> 33907 and brotli 31062 -> 31536
+// (stage B, measured as the delta over its base: the Question bank's topics
+// module and dialog, the editor's Topic and sharing row, Save to bank, and the
+// page's Topic filter and sharing markup; the removed tag dialog offsets part).
 const AT_RULING = {
   stylesheet: { gzip: 56241, br: 52368 },
-  page: { gzip: 33262, br: 31062 },
-  script: { gzip: 350960, br: 306820 },
+  page: { gzip: 33907, br: 31536 },
+  script: { gzip: 353000, br: 309080 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));
