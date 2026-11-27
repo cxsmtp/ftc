@@ -1026,6 +1026,8 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
     const taskTitle = db.prepare("SELECT title FROM tasks WHERE id=?").get(task.id)?.title;
     const changedCids = [];
     const copies = [];
+    // Each changed event with the question it held or now holds, for the completers.
+    const changedPairs = [];
     for (const cid of toRemoveIds) {
       // The question the event actually holds: its copy, for a bank question.
       const eid = assignedEventTaskId(db, task.id, cid) || task.id;
@@ -1033,6 +1035,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
       recordCompetitionEvent(cid, "task_removed", adminId, { task_id: eid, task_title: taskTitle, ...reqContext(req) });
       _invalidateTaskNumbersCache(cid);
       changedCids.push(cid);
+      changedPairs.push([eid, cid]);
     }
     for (const cid of toAdd) {
       // The event's own question (lib/event-copies.js), as on the POST twin.
@@ -1044,13 +1047,14 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
         recordCompetitionEvent(cid, "task_added", adminId, { task_id: _et.id, task_title: taskTitle, ...(_et.id !== task.id ? { copied_from: task.id } : {}), ...reqContext(req) });
         _invalidateTaskNumbersCache(cid);
         changedCids.push(cid);
+        changedPairs.push([_et.id, cid]);
         // v6.8.2 — eagerly re-number live/ended comps so the admin table
         // shows the new challenge's X.YY id on the very next fetch.
         const comp = db.prepare("SELECT id, name, start_time, duration_minutes, ended_at FROM competitions WHERE id=?").get(cid);
         if (comp) ensureTaskNumbers(cid, comp);
       }
     }
-    return { added: toAdd.length, removed: toRemoveIds.length, changedCids, copies };
+    return { added: toAdd.length, removed: toRemoveIds.length, changedCids, copies, changedPairs };
   });
   let result;
   try {
@@ -1078,7 +1082,9 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
   // comp whose assignment set changed (matches the DELETE sibling).
   for (const cid of result.changedCids) invalidateLeaderboardCache(cid);
   _invalidateMeCacheForComps(result.changedCids);
-  _queueCompleters(req.params.id, result.changedCids);
+  // Per event, by the question that event held: "solved it before" is asked of
+  // the event's own copy, never of the bank question nobody answers.
+  for (const [eid, cid] of result.changedPairs) _queueCompleters(eid, [cid]);
   res.json({ ok: true, added: result.added, removed: result.removed, copies: result.copies });
 });
 

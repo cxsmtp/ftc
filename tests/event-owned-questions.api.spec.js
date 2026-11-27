@@ -212,6 +212,15 @@ test.describe("event-owned questions", () => {
     expect(ids, "the bank question their event holds a copy of is listed").toContain(B.id);
     expect(ids, "another event's copy is not").not.toContain(Ct);
     expect(rows.find(t => t.id === Cm).can_edit_scoring, "the row offers scoring edits on their own question").toBe(true);
+    // The bank question is "used by their event" only while that event's copy is
+    // assigned: taken out, the bank question is no longer theirs to open, while
+    // the event's own (now unassigned) question still is.
+    const versions = (id) => eaApi.get(`/api/admin/tasks/${id}/versions`);
+    expect((await versions(B.id)).status(), "PRECONDITION: the bank question opens while their event holds its copy").toBe(200);
+    const out = await sa.delete(`/api/admin/tasks/${B.id}/competitions/${W.mine.id}`, { headers: H(saCsrf) });
+    expect(out.status(), await out.text()).toBe(200);
+    expect((await versions(B.id)).status(), "the bank question is not theirs once the copy is out").toBe(403);
+    expect((await versions(Cm)).status(), "CONTROL: their event's own question still is").toBe(200);
   });
 
   test("the manifest decides every table with a task_id, both ways", async () => {
