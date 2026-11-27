@@ -190,7 +190,7 @@ test.describe("command palette", () => {
     const opts = await options(page, "");
     expect(labels(opts, "Go to"), "POSITIVE: the participant's pages").toEqual(expect.arrayContaining(["Events", "Profile", "Appearance"]));
     const all = opts.map((o) => o.label);
-    for (const gone of ["Challenge library", "People", "Settings", "Roles & permissions", "Templates", "Teams", "Live rankings", "New event", "New challenge", "Invite people", "Sign up at the desk", "Switch to Participant View", "Switch to Admin View"]) {
+    for (const gone of ["Challenge library", "People", "Settings", "Roles & permissions", "Templates", "Groups", "Live rankings", "New event", "New challenge", "Invite people", "Sign up at the desk", "Switch to Participant View", "Switch to Admin View"]) {
       expect(all, `${gone} is not a participant's`).not.toContain(gone);
     }
     for (const q of ["library", "settings", "new event", "invite"]) {

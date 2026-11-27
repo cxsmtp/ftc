@@ -11646,7 +11646,7 @@ paths:
         created plus the groups bound to one of their events (an organiser with no
         events sees only their own). Each row also carries THE ANSWER to what this
         caller may do with it — `can_write`, `can_bind`, `can_delete` and, when it
-        applies, `competing` — so the Teams page and the pickers can withhold a
+        applies, `competing` — so the Groups page and the pickers can withhold a
         control with its reason instead of offering one the server refuses.
       responses:
         default: { $ref: '#/components/responses/UnexpectedError' }

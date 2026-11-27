@@ -662,7 +662,9 @@ test.describe("Participant groups UI (v6.20)", () => {
     await adminLogin(page);
     const nav = page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first();
     await expect(nav).toBeVisible();
-    await expect(nav, "the sidebar names the page Teams").toHaveText(/^\s*Teams\s*$/);
+    // Renamed from Teams (owner's decision, 27 Nov 2026): the page and its heading say Groups.
+    await expect(nav, "the sidebar names the page Groups").toHaveText(/^\s*Groups\s*$/);
+    await expect(page.locator("#admin-groups-tab h2")).toHaveText("Groups");
     await nav.click();
     await expect(page.locator("#admin-groups-tab")).toBeVisible();
     await expect(page.locator("#admin-groups-tab button[data-action='group-create']")).toBeVisible();

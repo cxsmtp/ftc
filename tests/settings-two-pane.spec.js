@@ -19,7 +19,7 @@
 //     scrolls sideways;
 //   • the remembered section survives a reload;
 //   • the list is grouped under PEOPLE, RECORDS and SYSTEM captions (not
-//     buttons), its link items open the page they name (People, Teams, Roles &
+//     buttons), its link items open the page they name (People, Groups, Roles &
 //     permissions, Audit log) or the guides (Get help), and a link to a page the
 //     role is not offered is not listed (CONTROL: a role with settings.view
 //     alone);
@@ -33,7 +33,7 @@ test.use({ baseURL: BASE });
 const EXPECTED = ["signin", "cxone-audit", "general", "branding", "email", "updates", "health", "about"];
 // The whole list as rendered, captions and link items included, in order.
 const EXPECTED_MENU = [
-  "PEOPLE", "People", "Teams", "Roles & permissions", "Sign-in",
+  "PEOPLE", "People", "Groups", "Roles & permissions", "Sign-in",
   "RECORDS", "Audit log", "CxOne API audit",
   "SYSTEM", "General", "Branding", "Email (SMTP)", "Updates", "Backups & health", "Get help", "About",
 ];
@@ -210,5 +210,5 @@ test("CONTROL — a role holding settings.view alone is offered no link to a pag
   // POSITIVE: its own section (Backups & health reads settings.view) and Get help.
   await expect.poll(() => menuText(page), { timeout: 15000 }).toEqual(expect.arrayContaining(["Backups & health", "Get help"]));
   const menu = await menuText(page);
-  for (const gone of ["People", "Teams", "Roles & permissions", "Audit log", "CxOne API audit", "RECORDS"]) expect(menu, `no "${gone}" for a role that cannot open it`).not.toContain(gone);
+  for (const gone of ["People", "Groups", "Roles & permissions", "Audit log", "CxOne API audit", "RECORDS"]) expect(menu, `no "${gone}" for a role that cannot open it`).not.toContain(gone);
 });

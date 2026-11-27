@@ -466,7 +466,7 @@ function _rkGroupLink(name){
   const g=String(name||'');
   if(!crossNavOffered('group'))return `<span class="rk-player-name"><strong>${esc(g)}</strong></span>`;
   return `<button type="button" class="rk-player-link" data-action="rankings-open-group" data-group-name="${esc(g)}"
-           title="Show ${esc(g)} in Teams" aria-label="${esc(g)} — show in the Teams page"><strong>${esc(g)}</strong></button>`;
+           title="Show ${esc(g)} in Groups" aria-label="${esc(g)} — show in the Groups page"><strong>${esc(g)}</strong></button>`;
 }
 
 // v7.22.0 — the rankings search. It is deliberately a plain substring match over

@@ -527,7 +527,7 @@
              in its own WORKSPACE (header, KPIs, its own Participants, Challenges,
              Rankings, Certificates and Settings), opened from the Events list.
              The other items are the cross-event pages a global admin keeps
-             (People, the Challenge library, Teams, Logs, Analytics, Settings).
+             (People, the Challenge library, Groups, Logs, Analytics, Settings).
              Every item is still found by `data-tab-id`, never by label.
              RBAC — three groups (Manage, Participants, Admin). ui/nav.js hides
              each item the role's permissions do not open (ADMIN_NAV_PERMISSIONS)
@@ -546,7 +546,7 @@
         <p class="admin-nav-section" aria-hidden="true" data-nav-group="participants">Participants</p>
         <ul class="admin-nav-list" role="list" data-nav-group="participants">
           <li><button id="participants-tab-btn" class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-participants-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">People</span><span id="pending-badge"></span></button></li>
-          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-groups-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Teams</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-groups-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Groups</span></button></li>
         </ul>
         <p class="admin-nav-section" aria-hidden="true" data-nav-group="admin">Admin</p>
         <ul class="admin-nav-list" role="list" data-nav-group="admin">
@@ -1088,12 +1088,12 @@
       <!-- Groups tab -->
       <div id="admin-groups-tab" style="display:none">
         <div class="admin-toolbar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-          <h2 style="margin:0">Teams</h2>
-          <span data-help="groups.list" data-help-label="Teams"></span>
+          <h2 style="margin:0">Groups</h2>
+          <span data-help="groups.list" data-help-label="Groups"></span>
           <span style="flex:1"></span>
           <button class="btn sm" data-action="group-create">New Group</button>
         </div>
-        <p class="settings-help" style="margin:0 0 12px">Teams (groups) organise participants for bulk operations. Binding a group to an event keeps that event's membership in sync as the group changes.</p>
+        <p class="settings-help" style="margin:0 0 12px">Groups organise participants for bulk operations. Binding a group to an event keeps that event's membership in sync as the group changes.</p>
         <!--
           v7.17.2 — the search box, the table shell and the pagination bar are
           STATIC, and only #groups-tbody is re-rendered. That is what lets the
@@ -1296,7 +1296,7 @@
             <div id="settings-load-failure" class="card settings-card" style="display:none"></div>
 
             <div class="settings-link" data-settings-link="people" data-settings-group="people" data-settings-label="People" data-settings-tab="admin-participants-tab" hidden></div>
-            <div class="settings-link" data-settings-link="teams" data-settings-group="people" data-settings-label="Teams" data-settings-tab="admin-groups-tab" hidden></div>
+            <div class="settings-link" data-settings-link="teams" data-settings-group="people" data-settings-label="Groups" data-settings-tab="admin-groups-tab" hidden></div>
             <div class="settings-link" data-settings-link="roles" data-settings-group="people" data-settings-label="Roles &amp; permissions" data-settings-tab="admin-users-tab" hidden></div>
             <div class="settings-section" data-settings-section="signin" data-settings-group="people" data-settings-label="Sign-in">
               <div class="card settings-card" id="account-approval-card" style="display:none">

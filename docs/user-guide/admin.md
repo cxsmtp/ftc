@@ -1219,7 +1219,7 @@ privileged account: with such an event open a regular admin is not offered
 the **Invite** dialog is skipped with *"N admin account(s) skipped — only a
 superadmin can enrol an admin"*. A bound group is the one route that does not
 ask: its live sync enrols every member it holds, admin accounts included. The
-Teams page and the participant row's group chips guard that route — both refuse
+Groups page and the participant row's group chips guard that route — both refuse
 to put an admin account into a group for anyone but a superadmin — and the
 **Invite** dialog's **Add to Groups** picker skips the address with *"N admin
 account(s) not added to the selected group(s) — only a superadmin can put an
@@ -3767,9 +3767,9 @@ audit log.
 
 ---
 
-## Teams
+## Groups
 
-**Teams** (groups) are named, reusable collections of participants. A participant can
+**Groups** are named, reusable collections of participants. A participant can
 be in many groups, and a group can hold many participants. Use them to
 organise people — by company, cohort, region, or any label that helps you run
 events — and to act on everyone in a group at once.
@@ -3817,11 +3817,11 @@ check, so sort out any overlap before you tick it.
 
 ### Managing groups
 
-The **Teams** page lists every group with its member count and how many
+The **Groups** page lists every group with its member count and how many
 events it's bound to. Search by name, sort by any column, and page
 through the list — a mature instance accumulates a lot of groups.
 
-![Teams page](../screenshots/admin/28-groups.png)
+![Groups page](../screenshots/admin/28-groups.png)
 
 From here you can:
 
@@ -4051,7 +4051,7 @@ Two things deliberately do *not* follow it:
 already filtered to them — the quickest route from "this person is stuck at rank
 40" to their profile, history or an impersonation session. Any status filter you
 had set is cleared first, so the person you clicked is always the row you land
-on. On the **Group Rankings** board a group name takes you to the **Teams** page
+on. On the **Group Rankings** board a group name takes you to the **Groups** page
 the same way, and a solo participant to **Participants**.
 
 ### Export a leaderboard to CSV
@@ -4553,7 +4553,7 @@ so a custom role sees the cards for the permissions it was given. An event admin
 has no Settings tab.
 Everything on it is platform-wide rather than event-specific, in a list down its
 left side (a **Section** picker on a phone) grouped under **People** (links to
-People, Teams and Roles & permissions, and Sign-in), **Records** (a link to the
+People, Groups and Roles & permissions, and Sign-in), **Records** (a link to the
 Audit log, and CxOne API audit) and **System** (General, Branding, Email (SMTP),
 Updates, Backups & health, Get help and About).
 

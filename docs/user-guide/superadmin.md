@@ -336,7 +336,7 @@ yours to know about:
   account, so a regular admin is not offered **Invite to …** on that row, and
   the selection bar and the **Invite** dialog skip it with *only a superadmin
   can enrol an admin*. A bound group is the exception that needs no skip: its
-  live sync enrols every member it holds — the Teams page and the **Invite**
+  live sync enrols every member it holds — the Groups page and the **Invite**
   dialog put an admin account into a group only for a superadmin. Any organiser
   may enrol themselves. The same rule reaches **Grant Attempts**: on such an
   event an enrolled admin or superadmin can run out of attempts like anyone
@@ -1205,7 +1205,7 @@ Settings is two panes: the list on the left, grouped under **People**,
 **Records** and **System**, and the chosen section on the right (on a phone, a
 **Section** picker above it).
 
-- **People**: **People**, **Teams** and **Roles & permissions** open those
+- **People**: **People**, **Groups** and **Roles & permissions** open those
   pages; **Sign-in** holds approval for new accounts and, only in the built-in
   account's own session, the **Break-glass account**.
 - **Records**: **Audit log** opens the Audit page; **CxOne API audit** opens the

@@ -122,7 +122,7 @@ export const HELP_TIPS = {
     default: "Export downloads the challenges listed as a JSON file. A superadmin can import such a file to add or update challenges.",
     superadmin: "Export downloads the challenges listed as a JSON file; Import adds or updates challenges from one, and shows conflicts before anything changes.",
   },
-  "groups.list": "A team (group) is a reusable list of people. Bind it to an event and its members join that event, and leave it when they leave the group.",
+  "groups.list": "A group is a reusable list of people. Bind it to an event and its members join that event, and leave it when they leave the group.",
   "activity.list": "Every answer and hint, newest first. Δ pts is what each one changed the score by: a wrong answer costs points, and a hint costs a share of the challenge's points.",
   "rankings.board": "Ranked by score, with ties broken by time to solve. Benchmark accounts are listed apart and not ranked. Export CSV saves every column, whatever is hidden on screen.",
   "analytics.scope": {
