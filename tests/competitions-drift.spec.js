@@ -41,6 +41,8 @@ test.describe("v7.29.0 — competitions export/schema drift", () => {
     ["linkedin_signup_enabled", "As registration_field_policy: no importer can honour it, and a door left closed on a target where the event does not exist is a setting nobody can find to reopen."],
     ["deadline_at", "Phase 3: as event_kind."],
     ["time_basis", "Phase 3: as event_kind."],
+    // When each participant's solve clock starts (owner decision, 27 Nov 2026).
+    ["clock_start", "As time_basis: a ranking-basis setting no competitions IMPORT endpoint could honour; the export already carries each membership's login_time, the anchor it decided."],
     ["measure_presence", "Phase 3: as event_kind."],
     ["auto_end_on_all_solved", "Phase 3: as event_kind."],
     // v8.1.0 — the EVENT-level ceiling. Still EXCLUDED, and the reason changed

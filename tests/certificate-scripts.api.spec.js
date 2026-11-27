@@ -598,7 +598,8 @@ test("the admin board names each row as its certificate would print it", async (
   const { api, csrf } = await sa();
   try {
     const cr = await api.post("/api/admin/competitions", { headers: H(csrf), data: {
-      name: `${uniq()} board`, event_kind: "tournament", start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 60 } });
+      // `entry`: every person is on the board by entering it, so each row is named.
+      name: `${uniq()} board`, event_kind: "tournament", start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 60, clock_start: "entry" } });
     expect(cr.ok(), `create: ${await cr.text()}`).toBeTruthy();
     const comp = (await cr.json()).competition;
     const people = [

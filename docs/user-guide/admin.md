@@ -1018,6 +1018,7 @@ Here is the whole matrix, so you know what to expect before you click:
 | **Group (team) leaderboard** | ● | ● | — |
 | **Record time on platform** | — | ● | ● |
 | **Break score ties on time spent** | — | ● | — |
+| **Start each participant's clock** | ● | ● | — |
 | **Staff can compete** | ● | ● | ● |
 | **Attempt limit per challenge** | ● | ● | ● |
 | **Mark as test / dry run** | ● | ● | ● |
@@ -2192,6 +2193,36 @@ form, and what the sign-up form behind the link asks for.
   - On a Competition with quick questions, ending early also waits until
     everyone in it has answered them all, so nobody's are cut off; the answer
     that completes the last person ends it, and a changed answer does not.
+- **Start each participant's clock** — a setting on the **event form**, in
+  its Advanced section, on a Booth Event and a Competition (a Program is not
+  ranked, so it always measures from entry). It decides when each
+  participant's **time to solve** — the tie-break between equal scores —
+  starts:
+  - **When they open their first challenge** (the default for every new Booth
+    Event and Competition): each participant's time starts the first time they
+    open a challenge that scores points, or answer one or ask for a hint before
+    opening anything. Entering the event, waiting in the lobby, reading the
+    list and opening a **Quick question** start nothing, so somebody who
+    arrives ten minutes late is not ten minutes behind. Until their clock has
+    started a participant is **not on the leaderboard** (Rankings, the
+    participant board and its exports), and *Time on platform*, where
+    recorded, counts nothing for them. The participants see a line on the
+    challenge list saying when their time starts.
+  - **When they enter the event**: their time starts as they enter the
+    running event (or its session). Every event created before this setting
+    existed keeps this rule, so no finished or running board changes.
+  - Either way the event's own countdown and end are unchanged; only each
+    person's starting point moves. Removing a participant and adding them back
+    keeps the starting point they had; a late entrant's starts at their first
+    open in the late window (or, on the entry rule, when they enter it); an
+    admin looking at a participant's view never starts it. Entering a live
+    session still locks the session choice, whether or not a challenge was
+    opened.
+  - **Decide it before the event goes live**: it is locked once the event, or
+    any session, has started (shown greyed with the reason), since every time
+    already measured would no longer compare with the rest. A copy of an event
+    keeps its source's choice; a template that does not state one gives each
+    new event its type's default.
 - **Record time on platform** — a setting on the **event form**, not a
   control in this dialog: open **Edit** on the event to reach it. Off by
   default. When on, the platform counts five-minute blocks in which each

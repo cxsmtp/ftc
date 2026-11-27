@@ -153,8 +153,9 @@ test("coalesced first entries: K people entering inside the window rebuild the b
   const K = 8;
   const { api: sa, csrf } = await apiLogin("superadmin");
   const t = uniq();
+  // The entry clock: a FIRST ENTRY is what stamps the anchor and adds the zero-score row.
   const created = await sa.post("/api/admin/competitions", { headers: H(csrf), data: {
-    name: `SW ${t}`, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240,
+    name: `SW ${t}`, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240, clock_start: "entry",
   }});
   expect(created.ok(), `create: ${await created.text()}`).toBeTruthy();
   const compId = (await created.json()).competition.id;

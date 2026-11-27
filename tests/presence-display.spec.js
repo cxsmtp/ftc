@@ -106,7 +106,10 @@ async function makeEvent(api, csrf, extra = {}) {
   const r = await api.post("/api/admin/competitions", {
     headers: H(csrf),
     data: {
-      name, timezone: "UTC",
+      // `clock_start: "entry"`: a participant is on the board, and accrues
+      // presence, from ENTERING, which these locks are written against (a
+      // first-open clock counts nothing before an open: first-open-clock.api.spec.js).
+      name, timezone: "UTC", clock_start: "entry",
       start_time: new Date(Date.now() - 3600e3).toISOString(), duration_minutes: 600, ...extra,
     },
   });

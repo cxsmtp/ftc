@@ -467,10 +467,12 @@ test.describe("Participant impersonation (v7.14.0)", () => {
     expect(an1.summary.incorrect, "an impersonated WRONG answer must not count either").toBe(0);
     expect(an1.summary.unique_participants).toBe(0);
 
-    // A REAL participant action still counts (and stamps the clock normally).
+    // A REAL participant action still counts (and stamps the clock normally: on
+    // entry, or at the first open where the event starts it there).
     const tgt = await apiLogin(ST.tgtEmail, PARTICIPANT_PASS);
     await tgt.api.post("/api/select-competition", { headers: h(tgt.csrf), data: { competitionId: ST.compId } });
-    expect(dbGet("SELECT login_time FROM competition_users WHERE competition_id=? AND user_id=?", ST.compId, ST.tgtId).login_time, "REAL entry stamps the clock").toBeTruthy();
+    expect((await tgt.api.get(`/api/tasks/${ST.taskB}`)).ok()).toBeTruthy();
+    expect(dbGet("SELECT login_time FROM competition_users WHERE competition_id=? AND user_id=?", ST.compId, ST.tgtId).login_time, "REAL entry and open stamp the clock").toBeTruthy();
     await tgt.api.post(`/api/tasks/${ST.taskB}/submit`, { headers: h(tgt.csrf), data: { answer: "wrong-guess" , gradingHash: await gradingHashFor(tgt.api, ST.taskB)} });
     await tgt.api.dispose();
     await expect.poll(async () => {

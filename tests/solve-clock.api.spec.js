@@ -50,7 +50,9 @@ const cuRow = (compId, userId) => withDb(d =>
 async function createComp(api, csrf, name, startOffsetMs, durationMin = 180) {
   const r = await api.post("/api/admin/competitions", {
     headers: H(csrf),
-    data: { name, start_time: new Date(Date.now() + startOffsetMs).toISOString(), duration_minutes: durationMin },
+    // `clock_start: "entry"` — the entry clock: this file's subject is the anchor ENTERING stamps (a new event's default starts it at the first open); the first-open rule's own lock is
+    // tests/first-open-clock.api.spec.js.
+    data: { name, start_time: new Date(Date.now() + startOffsetMs).toISOString(), duration_minutes: durationMin, clock_start: "entry" },
   });
   expect(r.status(), await r.text()).toBe(200);
   return (await r.json()).competition.id;

@@ -11362,8 +11362,10 @@ test.describe("Group leaderboard visibility gating (v7.11.7)", () => {
   test.afterAll(async () => { await sa?.dispose(); });
 
   // A live comp; `enabled` = group_leaderboard_enabled (omit to test the default).
+  // `clock_start: "entry"`: `activate` puts a member on the board by ENTERING, the
+  // rule these locks are written against (a first-open clock waits for an open).
   const mkComp = async (enabled) => {
-    const data = { name: uniq("VG"), start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240 };
+    const data = { name: uniq("VG"), start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240, clock_start: "entry" };
     if (enabled !== undefined) data.group_leaderboard_enabled = enabled;
     return (await (await sa.post("/api/admin/competitions", { headers: saH, data })).json()).competition.id;
   };
@@ -12530,7 +12532,8 @@ test.describe("Participant groups (v6.20)", () => {
     const { api, h } = await saCtx();
     let gid, compId; let user;
     try {
-      compId = await mkComp(api, h, `GSyncLive ${uniq()}`, Date.now() - 30 * 60_000, 180); // live
+      // live, on the entry clock: selecting it is what sets login_time below
+      compId = await mkComp(api, h, `GSyncLive ${uniq()}`, Date.now() - 30 * 60_000, 180, { clock_start: "entry" });
       user = await mkUser(api, h);
       gid = await mkGroup(api, h, `GSyncLive ${uniq()}`, [user.id]);
       await api.post("/api/admin/competitions/assign", { headers: h, data: { groupIds: [gid], competitionIds: [compId] } });

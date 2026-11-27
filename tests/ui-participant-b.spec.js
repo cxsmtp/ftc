@@ -871,6 +871,12 @@ test.describe("Leaderboard top-20 cap (v6.14.1)", () => {
     // refused precondition now fails AS a precondition instead of silently
     // redirecting this assertion at another competition's board.
     await enterCompAsParticipant(page, me.email, live.id);
+    // The seeded event's clock may start at the first open of a challenge rather
+    // than on entry, so open one: the board then lists the caller either way.
+    { const tl = await (await page.request.get("/api/tasks")).json();
+      const first = (Array.isArray(tl) ? tl : (tl.tasks || [])).find(t => !t.qualifying);
+      expect(first, "PRECONDITION: the event has a scoring challenge to open").toBeTruthy();
+      expect((await page.request.get(`/api/tasks/${first.id}`)).ok(), "PRECONDITION: the challenge opens").toBeTruthy(); }
     await page.locator(".nav-btn:not([aria-disabled=true]):has-text('Leaderboard')").first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator(".nav-btn:not([aria-disabled=true]):has-text('Leaderboard')").first().click();
     await page.locator("#leaderboard-page.active").waitFor({ state: "visible", timeout: 5000 });

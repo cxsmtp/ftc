@@ -273,7 +273,8 @@ test("v7.21.9: enabling the team board AFTER the end still surfaces it — a fla
   const t = uniq();
   // group_leaderboard_enabled deliberately OFF (the default).
   const compId = (await (await sa.post("/api/admin/competitions", { headers: H(csrf), data: {
-    name: `FF Null ${t}`, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240,
+    // `entry`: entering puts each member on the board, making the groups non-empty.
+    name: `FF Null ${t}`, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240, clock_start: "entry",
   }})).json()).competition.id;
   const p1 = await mkP(sa, csrf, `i${t}`), p2 = await mkP(sa, csrf, `j${t}`);
   const p3 = await mkP(sa, csrf, `k${t}`), p4 = await mkP(sa, csrf, `l${t}`);

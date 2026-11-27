@@ -395,7 +395,7 @@ const { escapeHtml, sanitiseAvatar, sanitiseRichText, extractAndStoreImages, ric
 // v8.1.0 (PR 13) — the kind label table + the collective noun, pre-rendered once as
 // HTML-attribute-safe JSON for the SPA-shell substitution below. Source constants,
 // so there is nothing to recompute per request and nothing to go stale until deploy.
-const { eventKindsForWire, EVENT_COLLECTIVE, eventPolicy, autoEndOnAllSolvedApplies } = require("./lib/event-policy");
+const { eventKindsForWire, EVENT_COLLECTIVE, eventPolicy, autoEndOnAllSolvedApplies, clockStartsAtFirstOpen } = require("./lib/event-policy");
 const _EVENT_KINDS_ATTR = escapeHtml(JSON.stringify(eventKindsForWire()));
 const _EVENT_COLLECTIVE_ATTR = escapeHtml(JSON.stringify(EVENT_COLLECTIVE));
 // The emailed sign-in code's lifetime (LOGIN_CODE_TTL_MS, fixed at boot) rides
@@ -430,7 +430,7 @@ const { competitionAllowlistMatch, anyCompetitionLive,
 const { recordIpBanAlert, deliverAlert, _clearAllAlertsForTests } = require("./lib/admin-alerts");
 const { classifyHit, isProbeSignature, addPathBit, flattenPath, classifyScannerTraffic, probeEarlyBlockDue, PROBE_EARLY_THRESHOLD, PROBE_SAMPLE_MAX, PROBE_SAMPLE_PATH_MAX } = require("./lib/scanner-classify"); // v7.25.0 — scanner vs venue
 const { LOG_SORT_COLUMNS, makeLogComparator } = require("./lib/log-sort"); // v7.25.0 — global ordering for a FILTERED /api/admin/logs read
-const { setTestSelectTimeslotDelay, setTestAdminEmailDelay, setTestAdminCommitDelay, testAdminCommitDelay, testAdminCommitPark, releaseTestAdminCommitPark, rateLimit, _setTestRateLimitForceEnabled, _rateLimitBucketCount, _sweepRateLimitBuckets, _ageRateLimitBuckets, generateToken, csrfProtection, requireParticipant, requireAdmin, requireSuperAdmin, requireCompetitionContext, requireParticipantInCompetition, participantAuthzDenied, adminAuthzDenied, impersonatingHandDenied, sendImpersonationCommitDenial, participantSessionDenied, sendParticipantSessionDenial, _rateLimitAllowlisted } = require("./lib/middleware"); // v7.0.0: per-route middleware (rate-limit/CSRF/auth guards) extracted
+const { setTestSelectTimeslotDelay, setTestAdminEmailDelay, setTestAdminCommitDelay, testAdminCommitDelay, testAdminCommitPark, releaseTestAdminCommitPark, rateLimit, _setTestRateLimitForceEnabled, _rateLimitBucketCount, _sweepRateLimitBuckets, _ageRateLimitBuckets, generateToken, csrfProtection, requireParticipant, requireAdmin, requireSuperAdmin, requireCompetitionContext, requireParticipantInCompetition, participantAuthzDenied, adminAuthzDenied, impersonatingHandDenied, sendImpersonationCommitDenial, participantSessionDenied, sendParticipantSessionDenial, _rateLimitAllowlisted, stampClockOnFirstTouch } = require("./lib/middleware"); // v7.0.0: per-route middleware (rate-limit/CSRF/auth guards) extracted
 const { impersonationGuard, impersonationActor, impersonationEndedDetails, isImpersonating } = require("./lib/impersonation"); // v7.14.0 — participant impersonation (write gate + audit-actor helper)
 const { eventAdminGuard, actorId, actingAdminId, sealRevealSet, sealRevealedFor, competitorIds, competitionDenied, scopeFilterSql, scopedCompetitionIds, groupViewDenied } = require("./lib/event-admin"); // v8.7.0 — the default-deny route gate, plus the row-level scope predicates the inline reporting handlers below enforce
 // v8.10.0 — the sealed answer. Two consumers in this file: the admin submissions
@@ -3542,6 +3542,16 @@ function _recordPresenceIfActive(req) {
     : competitionStatus(comp) === "live";
   if (!live) return;
 
+  // ── A FIRST-OPEN CLOCK THAT HAS NOT STARTED ──────────────────────────────
+  //
+  // On an event whose solve clock starts at the participant's first open of a
+  // scoring challenge (lib/event-policy.js `clockStartsAtFirstOpen`), time
+  // spent before it is not theirs to be measured on: the solve clock does not
+  // count it, so neither does the platform clock, or "Time on Platform" would
+  // exceed "Time to Solve" for exactly the participant who read the list first.
+  if (clockStartsAtFirstOpen(comp)
+      && !db.prepare("SELECT 1 FROM competition_users WHERE competition_id=? AND user_id=? AND login_time IS NOT NULL").get(compId, userId)) return;
+
   // ── THE COMPLETION FREEZE ────────────────────────────────────────────────
   //
   // THIS IS THE RULE NOBODY WOULD WRITE UNPROMPTED, and without it the feature
@@ -5179,6 +5189,10 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
   // `let`, not `const`: the file path re-reads this after its await and grades
   // against the fresh row (see the re-validation block below).
   let task = db.prepare("SELECT * FROM tasks WHERE id=? AND active=1 AND status='published'").get(req.params.id);
+  // Set once this request STORES an answer: only a stored answer may start a
+  // first-open solve clock (lib/middleware.js `stampClockOnFirstTouch`), never
+  // a refused or folded one.
+  let _answerStored = false;
   if (!task) { cleanupUpload(req); return res.status(404).json({ error: "Challenge not found" }); }
   // The locked flag was previously cosmetic — only blocked admin edits in the
   // UI. Honour it on submit too: a locked task is treated as frozen, so neither
@@ -5575,6 +5589,7 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
     const submittedAtIso = now().toISOString();
     db.prepare("INSERT INTO submissions (id,user_id,task_id,answer,is_correct,points_delta,submitted_at,competition_id,timeslot_id,updated_at,answer_canonical) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
       .run(uuid(), req.session.userId, task.id, answer, correct ? 1 : 0, pts, submittedAtIso, compId, tsId, submittedAtIso, answerCanonical);
+    _answerStored = true;
 
     // Audit trail — every submission attempt, correct or wrong.
     const evDetails = {
@@ -5877,6 +5892,9 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
     });
   }
   invalidateLeaderboardCache(compId);
+  // An answer stored before any open (a client that never opened the challenge)
+  // starts a first-open clock at that answer; a no-op once an open has stamped it.
+  if (_answerStored) stampClockOnFirstTouch(req, task);
   // v8.1.7 — its OWN outcome tag, not folded into "rejected": the perf span
   // asserts by presence, so a terminal branch shipping under a neighbour's tag
   // would attribute a vanished-competition refusal to "the event has ended" in

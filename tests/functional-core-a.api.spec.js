@@ -1241,6 +1241,9 @@ test.describe("Admin", () => {
         name: `AssignRevive-${t}`,
         start_time: new Date(t - 60_000).toISOString(),
         duration_minutes: 120, // plenty of future headroom for the revive
+        // The newcomer's clock starts as they ENTER (the subject: a live
+        // solveTimeMs on entry), not at a first open this test never makes.
+        clock_start: "entry",
       },
     });
     const compId = (await compR.json()).competition.id;
@@ -4283,7 +4286,8 @@ test.describe("Admin", () => {
     const now = Date.now();
     const created = await sa.post("/api/admin/competitions", {
       headers: saH,
-      data: { name: `LB-Remove-${now}`, start_time: new Date(now - 60_000).toISOString(), duration_minutes: 120 },
+      // `entry`: bob is put on the board by entering it, the state the removal must clear.
+      data: { name: `LB-Remove-${now}`, start_time: new Date(now - 60_000).toISOString(), duration_minutes: 120, clock_start: "entry" },
     });
     const compId = (await created.json()).competition.id;
     await sa.post("/api/admin/competitions/assign", { headers: saH, data: { userIds: [S.bob.id], competitionIds: [compId] } });
@@ -4991,7 +4995,8 @@ test.describe("Benchmark user", () => {
 
   test("benchmark user excluded from participant leaderboard ranking", async () => {
     // v8.12.4 — with the CONTROL that bob would otherwise be there. He enters the
-    // event (which anchors him on its board) and the ADMIN board, which keeps
+    // event and opens a challenge (which anchors him on its board whichever rule
+    // starts its clock: entry, or the first open) and the ADMIN board, which keeps
     // benchmark rows in their own section, must show him; only then does his
     // absence from the participant board mean the exclusion worked rather than
     // that he was never on it.
@@ -4999,6 +5004,7 @@ test.describe("Benchmark user", () => {
     const bob = await apiLogin("bob@acme.com", PARTICIPANT_PASS);
     try {
       expect((await bob.api.post("/api/select-competition", { headers: H(bob.csrf), data: { competitionId: S.liveComp.id } })).ok()).toBeTruthy();
+      expect((await bob.api.get(`/api/tasks/${S.liveTask("Challenge easy1").id}`)).ok()).toBeTruthy();
     } finally { await bob.api.dispose(); }
     const { api: sa } = await apiLogin("superadmin");
     try {
@@ -5017,12 +5023,14 @@ test.describe("Benchmark user", () => {
 
   test("benchmark user shown separately in admin leaderboard", async () => {
     await ensureState();
-    // Ensure bob has login_time by selecting the live competition
+    // Ensure bob has login_time by selecting the live competition and opening a
+    // challenge (its clock may start at the first open rather than on entry)
     const { api: bobApi, csrf: bobCsrf } = await apiLogin("bob@acme.com", PARTICIPANT_PASS);
     await bobApi.post("/api/select-competition", {
       headers: { "x-csrf-token": bobCsrf, "content-type": "application/json" },
       data: { competitionId: S.liveComp.id },
     });
+    expect((await bobApi.get(`/api/tasks/${S.liveTask("Challenge easy1").id}`)).ok()).toBeTruthy();
     await bobApi.dispose();
     // Check admin leaderboard
     const { api } = await apiLogin("superadmin");

@@ -55,11 +55,15 @@ const ROOT = path.join(__dirname, "..");
 // card's one test send, the Outbound email card folded into it); then gzip
 // 354900 -> 356880 and brotli 310400 -> 312000 (Program grades: measured +1938 B
 // gzip and +1550 B brotli on its own branch, the learner's grade card and Try
-// again, the organisers' Grades list, the designer's grade bands, plus rounding).
+// again, the organisers' Grades list, the designer's grade bands, plus rounding);
+// then gzip 356880 -> 357920 and brotli 312000 -> 312940 (the first-open solve
+// clock: measured +1031 B gzip and +935 B brotli on its own branch, the event
+// form's "Start each participant's clock" choice, the template editor's select,
+// its help tip and the challenge list's clock note).
 const AT_RULING = {
   stylesheet: { gzip: 56241, br: 52368 },
   page: { gzip: 33262, br: 31062 },
-  script: { gzip: 356880, br: 312000 },
+  script: { gzip: 357920, br: 312940 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));

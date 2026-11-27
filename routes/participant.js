@@ -12,9 +12,9 @@
 const { v4: uuid } = require("uuid");
 const crypto = require("crypto");
 const db = require("../db");
-const { rateLimit, testSelectTimeslotDelay, requireParticipant, requireCompleteProfile, requireCompetitionContext, requireParticipantInCompetition, tabEventMismatch, csrfProtection, applyAutoResumeToSession } = require("../lib/middleware");
+const { rateLimit, testSelectTimeslotDelay, requireParticipant, requireCompleteProfile, requireCompetitionContext, requireParticipantInCompetition, tabEventMismatch, csrfProtection, applyAutoResumeToSession, stampClockOnFirstTouch } = require("../lib/middleware");
 const { getCompetition, getCompetitionTimeslots, getTimeslot, hasTimeslots, timeslotStatus, timeslotEffectiveEnd, competitionStatus, competitionEffectiveEnd, competitionFullyEnded, ensureTaskNumbers, compareTaskNumbers, participantContentNotStarted, listParticipantCompetitions, autoResumeAllows, anchorLoginTime, userScoresOn, isOpenEnded } = require("../lib/competitions");
-const { eventPolicyForWire, eventPolicy } = require("../lib/event-policy"); // v8.1.0 (PR 12/18)
+const { eventPolicyForWire, eventPolicy, clockStartsAtFirstOpen } = require("../lib/event-policy"); // v8.1.0 (PR 12/18)
 const { _deferAudit, recordChallengeEvent, recordCompetitionEvent, recordTimeslotEvent, recordUserEvent, recordSealedReveal, sealRevealHistoryDetails, reqContext, getAdminIdentity } = require("../lib/audit");
 const { swallowed } = require("../lib/best-effort");
 const { BASE_URL, PLATFORM_VERSION, SERVER_STARTED_AT, PERF_SPAN_SLOW_MS, LOGIN_CODE_TTL_MS, RATE_LIMIT_CONFIG_PER_MIN } = require("../lib/config");
@@ -1324,6 +1324,11 @@ app.post("/api/select-competition", requireParticipant, csrfProtection, (req, re
   //     telemetry that would be false.
   //   • users.active_competition_id — the target's auto-resume marker.
   const _impNav = isImpersonating(req);
+  // An event whose clock starts at the FIRST OPEN (lib/event-policy.js
+  // `clockStartsAtFirstOpen`) writes no anchor on entry: the branches below take
+  // their re-entry path (last_login_time and the re-entry record only), and the
+  // anchor waits for `stampClockOnFirstTouch`.
+  const _firstOpenClock = clockStartsAtFirstOpen(comp);
 
   // For multi-slot competitions, check if participant needs to pick a timeslot
   const slots = getCompetitionTimeslots(comp.id);
@@ -1340,7 +1345,7 @@ app.post("/api/select-competition", requireParticipant, csrfProtection, (req, re
       const tsStatus = timeslotStatus(ts);
       if (assigned && !_impNav && (tsStatus === "live" || tsStatus === "ended")) {
         const loginNow = now().toISOString();
-        if (!assigned.login_time && tsStatus === "live") {
+        if (!assigned.login_time && tsStatus === "live" && !_firstOpenClock) {
           // v8.12.0 — the honest anchor (lib/competitions.js anchorLoginTime).
           db.prepare("UPDATE competition_users SET login_time=?, last_login_time=? WHERE competition_id=? AND user_id=?")
             .run(anchorLoginTime(_selfUid, competitionId, loginNow), loginNow, competitionId, _selfUid);
@@ -1380,7 +1385,7 @@ app.post("/api/select-competition", requireParticipant, csrfProtection, (req, re
     req.session.timeslotId = null;
     if (assigned && !_impNav && (status === "live" || status === "ended")) {
       const loginNow = now().toISOString();
-      if (!assigned.login_time && status === "live") {
+      if (!assigned.login_time && status === "live" && !_firstOpenClock) {
         // v8.12.0 — the honest anchor (lib/competitions.js anchorLoginTime).
         db.prepare("UPDATE competition_users SET login_time=?, last_login_time=? WHERE competition_id=? AND user_id=?")
           .run(anchorLoginTime(_selfUid, competitionId, loginNow), loginNow, competitionId, _selfUid);
@@ -1540,7 +1545,15 @@ app.post("/api/select-timeslot", requireParticipant, requireCompleteProfile, csr
   const staffUser = _staffTagged && !(assigned && staffCompeteOn(comp));
 
   // Check locking: if participant already entered a live timeslot, they can't change (staff exempt)
-  if (!staffUser && assigned?.login_time && assigned?.timeslot_id) {
+  //
+  // "Entered" is the solve-clock anchor on an entry-clock event. On a FIRST-OPEN
+  // clock event (`clockStartsAtFirstOpen`) entering a live session stamps no
+  // anchor, only `last_login_time`, so that column is what records the entry
+  // there — the confirm promised "once you join, you cannot change your choice",
+  // and opening no challenge must not reopen the choice.
+  const _firstOpenClock = clockStartsAtFirstOpen(comp);
+  const _enteredSlot = !!(assigned?.login_time || (_firstOpenClock && assigned?.last_login_time));
+  if (!staffUser && _enteredSlot && assigned?.timeslot_id) {
     const currentTs = getTimeslot(assigned.timeslot_id);
     if (currentTs) {
       const currentStatus = timeslotStatus(currentTs);
@@ -1562,7 +1575,7 @@ app.post("/api/select-timeslot", requireParticipant, requireCompleteProfile, csr
   // participant across two slots (submissions.timeslot_id = X stays
   // in slot X's board while cu.timeslot_id = Y would also attach
   // them to slot Y's board).
-  if (!staffUser && (!assigned?.login_time || !assigned?.timeslot_id)) {
+  if (!staffUser && (!_enteredSlot || !assigned?.timeslot_id)) {
     const priorSlot = db.prepare(
       `SELECT timeslot_id FROM (
          SELECT timeslot_id FROM submissions
@@ -1669,7 +1682,14 @@ app.post("/api/select-timeslot", requireParticipant, requireCompleteProfile, csr
       .run(req.session.userId, compId);
     if (delR.changes) txState.reminderCleared = true;
 
-    if (freshStatus === "live" && !_impSel) {
+    if (freshStatus === "live" && !_impSel && _firstOpenClock) {
+      // A first-open clock: entering the live session records the entry
+      // (`last_login_time`, which the slot lock above reads) and starts nothing.
+      const loginNow = now().toISOString();
+      txState.loginNowIso = loginNow;
+      db.prepare("UPDATE competition_users SET last_login_time=? WHERE competition_id=? AND user_id=?")
+        .run(loginNow, compId, req.session.userId);
+    } else if (freshStatus === "live" && !_impSel) {
       const loginNow = now().toISOString();
       txState.loginNowIso = loginNow;
       txState.firstTime = !assigned?.login_time;
@@ -1944,6 +1964,12 @@ app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, require
   const task = db.prepare("SELECT id,title,description,difficulty,answer_type,correct_answer,choices,explanation,hint,attachment_url,author_name,author_linkedin,attempt_cap,answer_sealed,created_by_id FROM tasks WHERE id=? AND active=1 AND status='published'").get(req.params.id);
   if (task) task.task_number = inComp.task_number || null;
   if (!task) return res.status(404).json({ error: "Challenge not found" });
+  // THE FIRST OPEN STARTS THE SOLVE CLOCK on an event that runs that rule
+  // (owner decision, 27 Nov 2026; lib/middleware.js `stampClockOnFirstTouch`
+  // asks the rest: a scoring challenge, live or a late entrant's open window,
+  // not impersonated, not yet started). Here, after the challenge is proved
+  // assigned and published, so a 404 never starts anybody's clock.
+  stampClockOnFirstTouch(req, task);
   const solved        = !!db.prepare("SELECT id FROM submissions WHERE user_id=? AND task_id=? AND competition_id=? AND is_correct=1").get(req.session.userId, task.id, compId);
   // v8.13.2 — ONE count, read through lib/attempts.js: the card prints this as
   // "N attempt(s)", and the submit response updates it in place from the same
@@ -2387,6 +2413,9 @@ app.post("/api/tasks/:id/hint", requireParticipant, requireCompetitionContext, r
     const denied = sealedHintDenied(task, actingAdminId(req), _hintSuper, _hintScores, _hintWhy);
     if (denied) return res.status(403).json({ error: denied.message, code: denied.code, reason: denied.reason });
   }
+  // A hint asked for before any open starts a first-open clock too (a client
+  // that never opened the challenge); a no-op once the open has stamped it.
+  stampClockOnFirstTouch(req, task);
   // v7.2.x (audit) — a participant who has already SOLVED this task gains nothing
   // from a hint; don't let them self-inflict a -30% deduction. Return the hint,
   // record no hint_reveals row. (hint_reveals is keyed (comp,user,task) — no

@@ -31,9 +31,10 @@ async function sa() {
 async function fixture(api, csrf, label) {
   const start = new Date(Date.now() - 3600e3).toISOString();
   const mk = async (kind, nm) => {
+    // The Competition control's row comes from ENTERING it: the entry clock.
     const body = kind === "program"
       ? { deadline_at: new Date(Date.now() + 200 * 86400e3).toISOString() }
-      : { duration_minutes: 600 };
+      : { duration_minutes: 600, clock_start: "entry" };
     const r = await api.post("/api/admin/competitions", {
       headers: H(csrf), data: { name: nm, event_kind: kind, start_time: start, timezone: "UTC", ...body },
     });

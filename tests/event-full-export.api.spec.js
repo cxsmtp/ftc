@@ -493,8 +493,10 @@ test.describe("person export — the absences file", () => {
     const { sa, saCsrf, eaApi, ea } = W;
     const tag = uniq("abs").replace(/[^a-zA-Z0-9]/g, "");
     const p = await makeParticipant(sa, saCsrf, "absent");
-    const inScope = await makeCompetition(sa, saCsrf, "abs-in", { name: `+Absent ${tag}` });
-    const decoy = await makeCompetition(sa, saCsrf, "abs-decoy");
+    // `entry`: ENTERING each event starts the solve clock below, so a removal
+    // records an absence (on a first-open clock it would wait for an open).
+    const inScope = await makeCompetition(sa, saCsrf, "abs-in", { name: `+Absent ${tag}`, clock_start: "entry" });
+    const decoy = await makeCompetition(sa, saCsrf, "abs-decoy", { clock_start: "entry" });
     // A live session in the in-scope event: the absence records it.
     const sessionName = `Morning ${tag}`;
     const ts = await sa.post(`/api/admin/competitions/${inScope.id}/timeslots`, { headers: H(saCsrf),

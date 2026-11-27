@@ -32,7 +32,9 @@ async function makeEvent(api, csrf, extra = {}) {
   const r = await api.post("/api/admin/competitions", {
     headers: H(csrf),
     data: {
-      name: `${uniq()} Ev`, timezone: "UTC",
+      // `clock_start: "entry"`: the anchor a leave and rejoin must preserve is the
+      // one ENTERING stamps here.
+      name: `${uniq()} Ev`, timezone: "UTC", clock_start: "entry",
       start_time: new Date(Date.now() - 3600e3).toISOString(), duration_minutes: 600,
       self_enroll_enabled: true, ...extra,
     },
