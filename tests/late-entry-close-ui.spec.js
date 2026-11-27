@@ -67,7 +67,7 @@ test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").openFi
 test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").showAllParticipantColumns(page); });
 const { BASE, PARTICIPANT_PASS } = require("./helpers");
 const {
-  adminLogin, loginViaApi, clickTab, openKebab, viewComp, filterComps, awaitCompModel, narrowChallengesTable, narrowEventsTable, narrowPeopleTable } = require("./ui-admin-helpers");
+  adminLogin, loginViaApi, clickTab, openKebab, viewComp, filterComps, awaitCompModel, narrowChallengesTable, narrowEventsTable, narrowPeopleTable, openEventMenu } = require("./ui-admin-helpers");
 const {
   H, uniq, MIN, sa, makeParticipant, liveBooth, enrol, expireEvent, rawGetComp, rawAll,
 } = require("./late-entry-fixture");
@@ -270,11 +270,13 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
     } finally { await api.dispose(); }
   });
 
-  test("U1 — the Events menu offers Close late entries now on a window-open booth, and on nothing else", async ({ page }) => {
+  // The event's doors are its workspace ⋯ menu's (the Events-row menu keeps only
+  // Delete event; owner's decision, 27 Nov 2026), so the offer is read there.
+  test("U1 — the event's menu offers Close late entries now on a window-open booth, and on nothing else", async ({ page }) => {
     await adminPanelAs(page, GA.email);
     const portal = page.locator("#kebab-portal");
 
-    await openKebab(page, await eventRow(page, OPEN.name));
+    await openEventMenu(page, OPEN.name);
     expect((await modelRow(page, OPEN.id)).can_close_late_entries, "PRECONDITION: the server offers it to a regular admin").toBe(true);
     const item = portal.locator(CLOSE_SEL);
     await expect(item, "a window-open booth offers it").toHaveCount(1);
@@ -283,7 +285,7 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
     await page.keyboard.press("Escape");
 
     for (const [comp, why] of [[LIVE, "a live booth"], [LAPSED, "a lapsed window"], [OFF, "late entries off"], [TOURN, "a Competition"]]) {
-      await openKebab(page, await eventRow(page, comp.name));
+      await openEventMenu(page, comp.name);
       // The row IS there — so the absence below is the flag, not a missing row.
       expect((await modelRow(page, comp.id)).can_close_late_entries, `the server does not offer it on ${why}`).toBe(false);
       await expect(portal.locator(CLOSE_SEL), `CONTROL: ${why} offers no close`).toHaveCount(0);
@@ -293,23 +295,21 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
 
   test("U2 — a COMPETITOR is withheld it on the menu and the banner WITH the reason; a non-competing admin is offered it", async ({ page, browser }) => {
     await adminPanelAs(page, CA.email);
-    const row = await eventRow(page, COMPETE.name);
+    await eventRow(page, COMPETE.name);
     const m = await modelRow(page, COMPETE.id);
     expect(m.competing, "PRECONDITION: CA competes here").toBe(true);
     expect(m.late_entry_window_open, "PRECONDITION: …and the window is open").toBe(true);
     expect(m.can_close_late_entries, "the server withholds it from a competitor").toBe(false);
 
-    await openKebab(page, row);
-    const portal = page.locator("#kebab-portal");
+    const portal = await openEventMenu(page, COMPETE.name);
     await expect(portal.locator(".kebab-note"), "the reason is on the menu").toContainText("You are competing in this event");
     await expect(portal.locator(CLOSE_SEL), "…and the close is not").toHaveCount(0);
     await page.keyboard.press("Escape");
 
-    await viewComp(page, COMPETE.name);
     const banner = page.locator("#admin-scope-banner");
     await expect(banner).toContainText("Ended · late entry open");
     // The workspace header's ⋯ menu is the one place for the close.
-    const hdrMenu = page.locator("#ws-quick .kebab-menu");
+    const hdrMenu = page.locator("#ws-quick .ws-more-btn + .kebab-menu");
     await expect(hdrMenu.locator(".kebab-note"), "the header menu gives the same reason").toContainText("You are competing in this event");
     await expect(hdrMenu.locator(CLOSE_SEL), "…and offers no close").toHaveCount(0);
     // Nor the exports the server refuses a competitor (the file holds every rival's answers).
@@ -322,10 +322,9 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
     try {
       await adminPanelAs(p2, GA.email);
       expect((await modelRow(p2, COMPETE.id)).competing, "PRECONDITION: GA does not compete").toBe(false);
-      await openKebab(p2, await eventRow(p2, COMPETE.name));
+      await openEventMenu(p2, COMPETE.name);
       await expect(p2.locator("#kebab-portal").locator(CLOSE_SEL), "a non-competitor is offered it").toHaveCount(1);
       await p2.keyboard.press("Escape");
-      await viewComp(p2, COMPETE.name);
       await expect(p2.locator("#ws-quick .kebab-menu").locator(CLOSE_SEL), "…in the workspace header's ⋯ menu too").toHaveCount(1);
       await expect(p2.locator("#ws-quick .kebab-menu").locator('[data-action="ws-export-zip"]'), "CONTROL: a non-competitor is offered Export everything").toHaveCount(1);
     } finally { await ctx2.close(); }
@@ -350,7 +349,7 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
       "another organiser's booth is not in this event admin's list at all").toBe(false);
     expect((await modelRow(page, OWN.id)).can_close_late_entries, "their own booth is offered").toBe(true);
 
-    await openKebab(page, await eventRow(page, OWN.name));
+    await openEventMenu(page, OWN.name);
     await page.locator("#kebab-portal").locator(CLOSE_SEL).click();
     const modal = page.locator("#modal-overlay");
     await expect(modal.locator("#modal-title")).toHaveText("Close late entries now", { timeout: 10000 });
@@ -380,7 +379,7 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
     await adminPanelAs(page, GA.email);
     const rec = closeRecorder(page);
     try {
-      await openKebab(page, await eventRow(page, PIN.name));
+      await openEventMenu(page, PIN.name);
       await page.locator("#kebab-portal").locator(CLOSE_SEL).click();
       const modal = page.locator("#modal-overlay");
       await expect(modal.locator("#modal-title")).toHaveText("Close late entries now", { timeout: 10000 });
@@ -415,25 +414,24 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
     // anything (filterComps clears them only for a row they would hide).
     await clickTab(page, "Events");
     await filterComps(page, A.name);
-    const row = page.locator("#admin-comp-body tr", { hasText: A.name }).first();
-    await expect(row).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#admin-comp-body tr", { hasText: A.name }).first()).toBeVisible({ timeout: 15000 });
     expect(await page.evaluate(() => [...window.S.compStatusFilters].sort()),
       "PRECONDITION: the default chips, which hide Ended").toEqual(["late-entry", "live", "upcoming"]);
     // The 15 s admin poll reloads this list too, and it has run since boot — so
     // its next tick lands inside any wait long enough to be comfortable, and a
-    // close handler that forgot to reload would pass on the poll's reload
-    // (measured with the reload removed: the row left ~14.4 s after the toast,
-    // inside the 15 s wait this arm used to allow). Stop it, so the handler's own
-    // reload is the only thing that can move the row.
+    // close handler that forgot to reload would pass on the poll's reload. Stop
+    // it, so the handler's own reload is the only thing that can move the row.
     await page.evaluate(() => { clearInterval(window.S.adminCompPollInterval); window.S.adminCompPollInterval = null; });
-    await openKebab(page, row);
-    await page.locator("#kebab-portal").locator(CLOSE_SEL).click();
+    // Closed from the event's own menu (its workspace ⋯; the row keeps only Delete).
+    await (await openEventMenu(page, A.name)).locator(CLOSE_SEL).click();
     await page.locator("#modal-overlay #modal-confirm-btn").click();
     const t1 = await toastText(page, `Late entries for “${A.name}” are closed.`);
-    expect(t1, "the row is about to vanish, so the toast says where it went").toContain("It is now listed under Ended.");
+    expect(t1, "the row will be gone from the default list, so the toast says where it went").toContain("It is now listed under Ended.");
     expect(rawGetComp(A.id).late_entry_deadline_at, "the close really landed").toBeTruthy();
-    // A third of the poll period, as a second guard should the poll ever be
-    // restarted underneath this test.
+    // Back on the list (the poll stopped): the handler's own reload moved it.
+    await page.locator('#admin-scope-banner [data-action="scope-clear"]').first().click();
+    await expect(page.locator("#admin-competitions-tab")).toBeVisible();
+    await narrowEventsTable(page, A.name);
     await expect(page.locator("#admin-comp-body tr", { hasText: A.name }),
       "the row leaves the default view — through the close handler's own reload, the poll being stopped").toHaveCount(0, { timeout: 5000 });
 
@@ -442,25 +440,19 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
     const endedRow = page.locator("#admin-comp-body tr", { hasText: A.name }).first();
     await expect(endedRow).toBeVisible({ timeout: 15000 });
     await expect(endedRow.locator(".status-badge")).toHaveText(/Ended/);
-    await openKebab(page, endedRow);
-    const portal = page.locator("#kebab-portal");
+    const portal = await openEventMenu(page, A.name);
     await expect(portal.locator(CLOSE_SEL), "no close on a closed window").toHaveCount(0);
-    await expect(portal.locator('[data-action="comp-manage-participants"]'), "…nor Manage Participants").toHaveCount(0);
     await expect(portal.locator('[data-action="comp-self-enroll"]'), "…nor the Join Link").toHaveCount(0);
     await page.keyboard.press("Escape");
+    await expect(page.locator("#ws-quick .ws-invite-btn"), "…nor Invite").toHaveCount(0);
 
     // CONTROL — the Ended chip is already part of the view, so the row does not
     // vanish and the toast must not claim it did.
     expect(await page.evaluate(() => window.S.compStatusFilters.size), "PRECONDITION: every chip is on (All)").toBe(0);
-    await narrowEventsTable(page, B.name);
-    const rowB = page.locator("#admin-comp-body tr", { hasText: B.name }).first();
-    await expect(rowB).toBeVisible({ timeout: 15000 });
-    await openKebab(page, rowB);
-    await page.locator("#kebab-portal").locator(CLOSE_SEL).click();
+    await (await openEventMenu(page, B.name)).locator(CLOSE_SEL).click();
     await page.locator("#modal-overlay #modal-confirm-btn").click();
     const t2 = await toastText(page, `Late entries for “${B.name}” are closed.`);
     expect(t2, "CONTROL: nothing to explain when the row stays in view").not.toContain("listed under Ended");
-    await expect(rowB, "…and it does stay").toBeVisible();
   });
 
   test("U6 — pressed from the header's ⋯ menu on the Challenges tab: the status chip repaints, focus lands on the ⋯ trigger, the late-entry badge and the late entrant's Remove go", async ({ page }) => {
@@ -830,7 +822,7 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
 
     await adminPanelAs(page, GA.email);
     const historyOf = async (comp) => {
-      await openKebab(page, await eventRow(page, comp.name));
+      await openEventMenu(page, comp.name);
       await page.locator('#kebab-portal [data-action="comp-history"]').click();
       const ov = page.locator("#hist-overlay");
       await expect(ov).toBeVisible({ timeout: 15000 });
@@ -864,7 +856,7 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
       try { ({ comp: EV } = await openBooth(api, csrf, "stale")); } finally { await api.dispose(); }
     }
     await adminPanelAs(page, GA.email);
-    await openKebab(page, await eventRow(page, EV.name));
+    await openEventMenu(page, EV.name);
     const item = page.locator("#kebab-portal").locator(CLOSE_SEL);
     await expect(item, "the menu was rendered while the window was open").toHaveCount(1);
 
@@ -901,6 +893,9 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
       await page.waitForFunction((cid) => (window.S?.adminCompetitionsData || []).some((c) => c.id === cid), id, { timeout: 20000 });
       await page.evaluate((cid) => window.editCompetition(cid), id);
       await expect(page.locator("#comp-form-overlay")).toBeVisible({ timeout: 15000 });
+      // Late entries sit under Advanced settings, folded on an edit too (owner's
+      // decision, 27 Nov 2026).
+      await require("./ui-admin-helpers").openCompAdvanced(page);
     };
     const closeForm = async () => {
       await page.locator('[data-action="overlay-close"][data-overlay-id="comp-form-overlay"]').first().click();
@@ -925,7 +920,7 @@ test.describe("v8.12.8 — Close late entries now: the client", () => {
 
   test("U9b — the Join Link dialog names the close for an organiser, and not for a competitor", async ({ page, browser }) => {
     const joinLinkNote = async (p, comp) => {
-      await openKebab(p, await eventRow(p, comp.name));
+      await openEventMenu(p, comp.name);
       await p.locator('#kebab-portal [data-action="comp-self-enroll"]').click();
       const ov = p.locator("#self-enroll-overlay");
       await expect(ov).toBeVisible({ timeout: 15000 });

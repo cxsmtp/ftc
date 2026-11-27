@@ -159,14 +159,18 @@ async function competingAdminEvent(label) {
   return { sc, comp };
 }
 
-test("from the cross-event Live rankings a competing admin opens in People with the admin accounts shown", async ({ page }) => {
+// People has no "Show admin accounts" (owner's decision, 27 Nov 2026: admin
+// accounts live on Roles & permissions). A link to one still shows them: that
+// one entry lists admin accounts too, and the list says so above the table.
+test("from the cross-event Live rankings a competing admin opens in People, the list saying it shows admin accounts", async ({ page }) => {
   test.setTimeout(120_000);
   const { comp } = await competingAdminEvent("sa");
 
   await adminLogin(page);
   await page.locator('.admin-nav-item[data-tab-id="admin-participants-tab"]').click();
   await narrowPeopleTable(page, comp.nickname);
-  await expect(page.locator("#p-include-admins"), "PRECONDITION: admin accounts are not shown").not.toBeChecked();
+  await expect(page.locator("#p-include-admins"), "People has no admin-accounts box").toHaveCount(0);
+  await expect(page.locator("#p-admins-note"), "PRECONDITION: admin accounts are not shown").toBeHidden();
   // The search applied and matched nobody: the competing admin is not listed.
   await expect(page.locator("#admin-participants-body"), "CONTROL: so the competing admin is not listed").toContainText("No participants match", { timeout: 15000 });
   await expect(page.locator("#admin-participants-body tr").filter({ hasText: comp.nickname })).toHaveCount(0);
@@ -177,8 +181,13 @@ test("from the cross-event Live rankings a competing admin opens in People with 
   await link.click();
   await expect(page.locator("#admin-participants-tab")).toBeVisible();
   await expect(page.locator("#admin-workspace"), "no event was opened").toBeHidden();
-  await expect(page.locator("#p-include-admins"), "the list says it shows admin accounts").toBeChecked();
+  await expect(page.locator("#p-admins-note"), "the list says it shows admin accounts").toBeVisible();
   await expect(page.locator("#admin-participants-body tr").filter({ hasText: comp.nickname })).toHaveCount(1, { timeout: 15000 });
+  // Entering People again from the sidebar lists participants only.
+  await page.locator('.admin-nav-item[data-tab-id="admin-participants-tab"]').click();
+  await narrowPeopleTable(page, comp.nickname);
+  await expect(page.locator("#admin-participants-body tr").filter({ hasText: comp.nickname }), "the next entry leaves them out").toHaveCount(0, { timeout: 15000 });
+  await expect(page.locator("#p-admins-note")).toBeHidden();
 });
 
 test("an event admin's link to a competing admin on their Live rankings opens that admin in People, saying the list now shows admin accounts", async ({ page }) => {
@@ -197,7 +206,7 @@ test("an event admin's link to a competing admin on their Live rankings opens th
   // CONTROL: the event admin's People list leaves the competing admin out, and
   // offers no admin-accounts box.
   await page.locator('.admin-nav-item[data-tab-id="admin-participants-tab"]').click();
-  await expect(page.locator("#p-admins-scope"), "PRECONDITION: no admin-accounts box for an event admin").toBeHidden();
+  await expect(page.locator("#p-admins-note"), "PRECONDITION: admin accounts are not shown").toBeHidden();
   await narrowPeopleTable(page, comp.nickname);
   await expect(page.locator("#admin-participants-body"), "CONTROL: so the competing admin is not listed").toContainText("No participants match", { timeout: 15000 });
 
@@ -208,11 +217,11 @@ test("an event admin's link to a competing admin on their Live rankings opens th
   await expect(page.locator("#admin-participants-tab")).toBeVisible();
   await expect(page.locator("#admin-workspace"), "no event was opened").toBeHidden();
   await expect(page.locator("#admin-participants-body tr").filter({ hasText: comp.nickname }), "the competing admin is shown").toHaveCount(1, { timeout: 15000 });
-  await expect(page.locator("#p-admins-scope"), "the list says why: the box shows, ticked").toBeVisible();
-  await expect(page.locator("#p-include-admins")).toBeChecked();
-  // Taking it off leaves them out again.
-  await page.locator("#p-include-admins").uncheck();
-  await expect(page.locator("#admin-participants-body tr").filter({ hasText: comp.nickname }), "unticked: left out").toHaveCount(0, { timeout: 15000 });
+  await expect(page.locator("#p-admins-note"), "the list says why").toBeVisible();
+  // Entering People again leaves them out.
+  await page.locator('.admin-nav-item[data-tab-id="admin-participants-tab"]').click();
+  await narrowPeopleTable(page, comp.nickname);
+  await expect(page.locator("#admin-participants-body tr").filter({ hasText: comp.nickname }), "the next entry: left out").toHaveCount(0, { timeout: 15000 });
 });
 
 test("a group link clears the Groups heading filter that would hide it", async ({ page }) => {

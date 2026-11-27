@@ -32,13 +32,9 @@ const h = csrf => ({ "x-csrf-token": csrf, "content-type": "application/json" })
 // wait for the kind=all reload) before searching. It must be offered to every
 // global admin, so its absence fails rather than skips.
 async function showAdminAccounts(page) {
-  const inc = page.locator("#p-include-admins");
-  await expect(inc, "People offers Show admin accounts to a global admin").toBeVisible({ timeout: 10000 });
-  if (!(await inc.isChecked())) {
-    const reload = page.waitForResponse((r) => r.url().includes("/api/admin/participants?") && r.url().includes("kind=all"));
-    await inc.check();
-    await reload;
-  }
+  // People has no "Show admin accounts" (admin accounts live on Roles &
+  // permissions); a link to one lists them, which the helper takes.
+  await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
 }
 
 async function loginSuperadmin(page) {

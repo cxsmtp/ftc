@@ -63,7 +63,7 @@ test.describe("v8.12.0 — the assign ledger is rendered", () => {
     }
     await expect.poll(() => page.evaluate(() => (window.S?.selectedParticipants || new Set()).size),
       { message: "every ticked row is in the selection model" }).toBe(emails.length);
-    const top = page.locator("#assign-to-comp-btn");
+    const top = page.locator("#selection-bar-assign-btn");
     await expect(top, "the selection bar's button is offered with no event focused").toBeVisible();
     await expect(top).toHaveText(/Assign to Events/);
     await top.click();
@@ -145,7 +145,7 @@ test.describe("v8.12.0 — the assign ledger is rendered", () => {
     await clickTab(page, "Participants");
     const row = await participantRow(page, plainP.email);
     await row.locator("td.cb-cell input[type=checkbox]").check();
-    const top = page.locator("#assign-to-comp-btn");
+    const top = page.locator("#selection-bar-assign-btn");
     await expect(top).toBeVisible();
     await top.click();
     const overlay = page.locator("#bulk-assign-overlay");
@@ -477,11 +477,10 @@ test.describe("v8.12.0 — the invite dialog renders the skip ledger", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("v8.12.0 — the Join Link dialog for a competitor is read-only", () => {
 
-  /** Open the Join Link dialog of a named event through the row kebab. */
+  /** Open the Join Link dialog of a named event through its workspace ⋯ menu
+   *  (the event's doors; the Events-row menu keeps only Delete event). */
   async function openJoinLink(page, name) {
-    const row = await eventRow(page, name);
-    await openKebab(page, row);
-    const item = page.locator('#kebab-portal [data-action="comp-self-enroll"]');
+    const item = (await require("./ui-admin-helpers").openEventMenu(page, name)).locator('[data-action="comp-self-enroll"]');
     await expect(item, `Join Link is offered on "${name}"`).toHaveCount(1);
     await item.click();
     await page.locator("#self-enroll-overlay").waitFor({ state: "visible", timeout: 15000 });
@@ -591,14 +590,16 @@ test.describe("v8.12.0 — a RIVAL's row in the Participants pane withholds the 
     const portal = page.locator("#kebab-portal");
     let row = await participantRow(page, mateP.email);
     await openKebab(page, row);
-    for (const action of ["participant-role", "participant-delete", "participant-block", "participant-email-code", "participant-impersonate"]) {
+    // The role link (role changes live on Roles & permissions) is a rival door
+    // as the role route is, so it is withheld with the rest.
+    for (const action of ["participant-open-roles", "participant-delete", "participant-block", "participant-email-code", "participant-impersonate"]) {
       await expect(portal.locator(`[data-action="${action}"]`), `${action} is withheld on a rival`).toHaveCount(0);
     }
     await expect(portal.locator(".kebab-note").filter({ hasText: /alongside/ })).toContainText(competeLive.name);
     await closeKebab(page);
     row = await participantRow(page, plainP.email);
     await openKebab(page, row);
-    await expect(portal.locator('[data-action="participant-role"]'), "CONTROL: the role menu is offered on a non-rival").not.toHaveCount(0);
+    await expect(portal.locator('[data-action="participant-open-roles"]'), "CONTROL: the role link is offered on a non-rival").toHaveCount(1);
     await expect(portal.locator('[data-action="participant-delete"]'), "CONTROL: Delete is offered on a non-rival").toHaveCount(1);
     await expect(portal.locator(".kebab-note").filter({ hasText: /alongside/ })).toHaveCount(0);
   });

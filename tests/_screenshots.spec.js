@@ -30,7 +30,20 @@ const { registerPost } = require("./helpers");
 const fs = require("fs");
 const path = require("path");
 const { apiLogin, getSuperadminPass, freshCtx, BASE, PARTICIPANT_PASS, TEST_DB_PATH, gradingHashFor, codeLogin } = require("./helpers");
-const { openAnalyticsTab, openCompCreateForm, filterComps, openKebab, signUpViaUi, narrowChallengesTable, narrowEventsTable, narrowPeopleTable } = require("./ui-admin-helpers"); // v8.1.0 — one analytics entry point; v8.2.0 — one create entry point
+const { openAnalyticsTab, openCompCreateForm, filterComps, openKebab, signUpViaUi, narrowChallengesTable, narrowEventsTable, narrowPeopleTable, pickFormKind, peopleWithAdminAccounts, openCompAdvanced } = require("./ui-admin-helpers"); // v8.1.0 — one analytics entry point; v8.2.0 — one create entry point
+
+// An event's doors are its WORKSPACE's ⋯ menu (the Events-row menu keeps only
+// Delete event; owner's decision, 27 Nov 2026). Open an event's workspace from
+// its row (narrowed to `name` when given, else the first row) and its ⋯ menu.
+async function openEventWsMenu(page, name) {
+  if (name) await filterComps(page, name);
+  const row = name ? page.locator("#admin-comp-body tr", { hasText: name }).first() : page.locator("#admin-comp-body tr").first();
+  await row.locator('[data-action="comp-open"]').first().click();
+  await page.locator("#ws-record").waitFor({ state: "visible", timeout: 10000 });
+  await page.locator("#ws-quick .ws-more-btn").click();
+  await page.locator("#kebab-portal.open").waitFor({ state: "visible", timeout: 5000 });
+  return page.locator("#kebab-portal");
+}
 
 // Theme controlled by env so the same spec can produce both light and dark
 // shots via two sequential runs (see the `docs:shots` npm script). Output
@@ -1943,10 +1956,7 @@ test.describe("admin", () => {
       await page.goto("/");
       await page.locator("#admin-page").waitFor({ state: "visible", timeout: 15000 });
       await page.locator(_tabSel("Events")).first().click();
-      await filterComps(page, "Purple Team Invitational");
-      const row = page.locator("#admin-comp-body tr", { hasText: "Purple Team Invitational" }).first();
-      await openKebab(page, row);
-      const menu = page.locator("#kebab-portal");
+      const menu = await openEventWsMenu(page, "Purple Team Invitational");
       // ASSERT THE STATE: the note is there and Edit is not. Both halves, or the
       // picture could be an ordinary menu under a caption about a lock.
       await expect(menu).toContainText(/competing in this event/i);
@@ -2136,10 +2146,7 @@ test.describe("admin", () => {
     // is admin-level; only the GLOBAL default credentials in Settings stay
     // superadmin-only). Referenced from the admin guide's Competitions section.
     await gotoTab(page, "Events");
-    await page.locator("#admin-comp-body .kebab-btn").first().waitFor({ state: "visible" });
-    await page.locator("#admin-comp-body .kebab-btn").first().click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await (await openEventWsMenu(page, "Test Live")).locator('[data-action="comp-edit"]').click();
     await page.locator("#comp-form-overlay").waitFor({ state: "visible" });
     await settle(page, 400);
     await page.screenshot({ path: shotPath("admin", "13-edit-competition-modal") });
@@ -2505,11 +2512,7 @@ test.describe("admin", () => {
     // absent on an upcoming one, so capturing the wrong row would document the
     // feature as missing.
     await gotoTab(page, "Events");
-    await narrowEventsTable(page, "Test Live");
-    const row = page.locator("#admin-comp-body tr", { hasText: "Test Live" }).first();
-    await row.waitFor({ state: "visible", timeout: 10000 });
-    await row.locator(".kebab-btn").first().click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
+    await openEventWsMenu(page, "Test Live");
     await page.locator("#kebab-portal [data-action='comp-export-activity']")
       .waitFor({ state: "visible", timeout: 5000 });
     await settle(page, 400);
@@ -2606,7 +2609,7 @@ test.describe("admin", () => {
     await page.evaluate((id) => window.openCompetitionForm(id), comp.id);
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 10000 });
     // The type is a field on the form; picking another asks to confirm.
-    await page.locator('#comp-form-overlay label.kind-seg-opt:has(input[value="program"])').click();
+    await pickFormKind(page, "program");
     await page.locator("#modal-overlay.open").waitFor({ state: "visible", timeout: 10000 });
     await settle(page, 400);
     await page.screenshot({ path: shotPath("admin", "46-competition-change-kind") });
@@ -2906,9 +2909,11 @@ test.describe("admin", () => {
     // sideways to reach the row menu, which takes the event's NAME and its "Late
     // entry open" badge out of the picture behind the dialog.
     await widenUntilUnclipped(page, "#admin-competitions-tab .table-card", { max: 3000 });
-    await openKebab(page, row);
-    const item = page.locator('#kebab-portal [data-action="comp-close-late-entries"]');
-    await expect(item, "the menu offers Close late entries now").toBeVisible();
+    await row.locator('[data-action="comp-open"]').first().click();
+    await page.locator("#ws-record").waitFor({ state: "visible", timeout: 10000 });
+    await page.locator("#ws-quick .ws-more-btn").click();
+    const item = page.locator('#kebab-portal.open [data-action="comp-close-late-entries"]');
+    await expect(item, "the event's menu offers Close late entries now").toBeVisible();
     await item.click();
     const modal = page.locator("#modal-overlay");
     await expect(modal.locator("#modal-title")).toHaveText("Close late entries now", { timeout: 10000 });
@@ -2987,11 +2992,8 @@ test.describe("admin", () => {
     // Reload so the competitions list picks up the new comp.
     await page.locator("button.admin-nav-item[data-tab-id=\"admin-competitions-tab\"]").first().click();
     await page.locator(`#admin-comp-body tr:has-text('Multi-Session Demo')`).first().waitFor({ state: "visible", timeout: 5000 });
-    // Open Edit via the kebab.
-    const row = page.locator(`#admin-comp-body tr:has-text('Multi-Session Demo')`).first();
-    await row.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    // Open Edit settings from the event's workspace ⋯ menu.
+    await (await openEventWsMenu(page, "Multi-Session Demo")).locator('[data-action="comp-edit"]').click();
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     await settle(page, 400);
     await page.screenshot({ path: shotPath("admin", "21-competition-edit-multi") });
@@ -3007,9 +3009,7 @@ test.describe("admin", () => {
     // event, which is guaranteed by its creation.
     await gotoTab(page, "Events");
     await page.locator("#admin-comp-body tr").first().waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
-    await page.locator("#admin-comp-body .kebab-btn").first().click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('History')").first().click();
+    await (await openEventWsMenu(page)).locator('[data-action="comp-history"]').click();
     await page.locator("#hist-overlay").waitFor({ state: "visible", timeout: 5000 });
     await settle(page, 500);
     await page.screenshot({ path: shotPath("admin", "22-competition-history") });
@@ -3025,10 +3025,7 @@ test.describe("admin", () => {
     await page.locator("#admin-comp-body tr").first().waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
     // Find the Test Upcoming row (non-ended so Assign Challenges is
     // enabled).
-    const row = page.locator("#admin-comp-body tr:has-text('Test Upcoming')").first();
-    await row.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Assign Challenges')").first().click();
+    await (await openEventWsMenu(page, "Test Upcoming")).locator('[data-action="comp-assign-challenges"]').click();
     await page.locator("#task-picker-overlay").waitFor({ state: "visible", timeout: 5000 });
     await settle(page, 500);
     // Type a partial query so the search bar shows active state in the screenshot.
@@ -3262,10 +3259,7 @@ test.describe("admin", () => {
     // admin guide's Competitions section. The first comp row is non-ended
     // (start_time DESC), so its kebab carries the Join Link action.
     await gotoTab(page, "Events");
-    await page.locator("#admin-comp-body .kebab-btn").first().waitFor({ state: "visible" });
-    await page.locator("#admin-comp-body .kebab-btn").first().click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Join Link')").first().click();
+    await (await openEventWsMenu(page, "Test Live")).locator('[data-action="comp-self-enroll"]').click();
     await page.locator("#self-enroll-overlay").waitFor({ state: "visible" });
     // The QR is rendered from a lazy-loaded vendor lib — wait for the <svg>.
     await page.locator("#self-enroll-qr img.se-qr-img").waitFor({ state: "visible", timeout: 8000 }).catch(() => {});
@@ -3408,8 +3402,9 @@ test.describe("admin", () => {
       await sa.api.dispose();
     }
     await gotoTab(page, "Participants");
-    // People leaves admin accounts out until this is ticked.
-    await page.locator("#p-include-admins").check();
+    // People lists admin accounts only after a link to one (they live on Roles &
+    // permissions); the helper takes that path.
+    await peopleWithAdminAccounts(page);
     await narrowPeopleTable(page, email);
     const row = page.locator(`#admin-participants-body tr:has-text("${email}")`).first();
     await row.waitFor({ state: "visible", timeout: 10000 });
@@ -3615,12 +3610,11 @@ test.describe("superadmin", () => {
     await page.locator("#admin-participants-body .kebab-btn").first().waitFor({ state: "visible" });
     await page.locator("#admin-participants-body .kebab-btn").first().click();
     await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    // Click Promote — opens a confirm modal.
-    await page.locator("#kebab-portal button:has-text('Promote')").first().click();
+    // Role changes live on Roles & permissions: the row menu links there.
+    await page.locator("#kebab-portal [data-action='participant-open-roles']").first().waitFor({ state: "visible" });
     await settle(page);
     await page.screenshot({ path: shotPath("superadmin", "01-role-promotion") });
-    // Cancel — leave seed state untouched.
-    await page.locator("#modal-cancel-btn").click().catch(() => {});
+    await page.keyboard.press("Escape");
   });
 
   test("02-task-delete-confirm", async ({ page }) => {
@@ -3796,11 +3790,10 @@ test.describe("superadmin", () => {
     // so we scroll it into view inside the card before capture.
     await loginAsSuperadmin(page);
     await page.locator("button.admin-nav-item[data-tab-id=\"admin-competitions-tab\"]").first().click();
-    await page.locator("#admin-comp-body .kebab-btn").first().waitFor({ state: "visible" });
-    await page.locator("#admin-comp-body .kebab-btn").first().click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    // A Competition: a Booth Event has no Checkmarx One section at all.
+    await (await openEventWsMenu(page, "Test Live")).locator('[data-action="comp-edit"]').click();
     await page.locator("#comp-form-overlay").waitFor({ state: "visible" });
+    await openCompAdvanced(page);   // folded on an edit too
     await page.locator("#comp-form-overlay h3:has-text('CxOne')").scrollIntoViewIfNeeded();
     await settle(page, 400);
     await page.screenshot({ path: shotPath("superadmin", "07-comp-edit-cxone") });

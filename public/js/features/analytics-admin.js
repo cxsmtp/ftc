@@ -289,9 +289,28 @@ export function renderAnalyticsFilterBar(){
       ${tasksLabel}<span class="picker-btn-chev">${ICO.chevronDown}</span>
     </button>`;
 
+  // INSIDE AN EVENT'S WORKSPACE, ANALYTICS IS THAT EVENT (owner's decision, 27
+  // Nov 2026): no Global/Event switch and no event picker, which would only
+  // lead out of the event the workspace is about. The scope card names the
+  // event and, where it has sessions, narrows to one. The sidebar's Analytics
+  // is the cross-event page and keeps the switch.
+  const wsComp=S.adminSelectedCompetitionId?comps.find(c=>c.id===S.adminSelectedCompetitionId):null;
+  const wsScopeHtml=S.adminSelectedCompetitionId?`
+      <section class="filter-card" id="analytics-ws-scope">
+        <div class="help-label-row"><div class="filter-card-title">Scope</div><span data-help="analytics.wsScope" data-help-label="Scope"></span></div>
+        <p class="analytics-ws-event"><span class="picker-btn-name">${esc(wsComp?wsComp.name:(S.adminSelectedCompetitionName||'This event'))}</span>${compStatusBadge(wsComp)}${compIntBadge}</p>
+        ${slots.length?`
+        <div class="filter-card-section">
+          <label class="mini-label" for="analytics-ws-slot">Session</label>
+          <select id="analytics-ws-slot" class="filter-select" data-change-action="analytics-ws-set-timeslot">
+            <option value="" ${s.scope!=='timeslot'?'selected':''}>Whole event</option>${slots.map(t=>`<option value="${esc(t.id)}" ${s.scope==='timeslot'&&s.timeslotId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
+        </div>`:''}
+      </section>`:'';
+
   setSafeHtml(el, `
     <div class="analytics-filterbar-grid">
-      <section class="filter-card">
+      ${wsScopeHtml||`<section class="filter-card">
         <div class="help-label-row"><div class="filter-card-title">Scope</div><span data-help="analytics.scope" data-help-label="Scope"></span></div>
         <div class="seg-control">
           ${S.isEventAdmin?'':`<button type="button" class="seg ${s.scope==='global'?'seg-active':''}" data-action="analytics-set-scope" data-value="global">Global</button>`}
@@ -333,7 +352,7 @@ export function renderAnalyticsFilterBar(){
           <label class="mini-label">Event tags</label>
           ${_renderTagFilter('comp', s.compTagFilter, S._availableCompTags)}
         </div>`:''}
-      </section>
+      </section>`}
 
       <section class="filter-card">
         <div class="filter-card-title">Challenges</div>

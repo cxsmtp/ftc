@@ -10,7 +10,7 @@ const { test, expect } = require("./isolated-test");
 // The specs below click filter chips directly; the Filters panels start open.
 test.beforeEach(async ({ page }) => { const H = require("./ui-admin-helpers"); await H.openFilterPanels(page); await H.showAllTableColumns(page, "events", H.EVENT_ALL_COLUMNS); });
 const { apiLogin, TEST_DB_PATH, BASE } = require("./helpers");
-const { adminLogin, clickTab, openKebab, viewComp, narrowGroupsTable, rerenderedAfter, narrowEventsTable } = require("./ui-admin-helpers");
+const { adminLogin, clickTab, openKebab, viewComp, narrowGroupsTable, rerenderedAfter, narrowEventsTable, openRowEventMenu } = require("./ui-admin-helpers");
 const { H, uniq } = require("./event-admin-helpers");
 const Database = require("better-sqlite3");
 
@@ -40,11 +40,17 @@ async function narrowEvents(page, query) {
     expect(await tbody.locator("tr").count()).toBe(a);
   }).toPass({ timeout: 8000 });
 }
+// An event's door: Delete event from its row menu, every other one from its
+// workspace ⋯ menu (the Events-row menu keeps only Delete event).
 async function eventKebab(page, name, action) {
+  // An earlier door opened an event's workspace (its doors are there); the
+  // Events list is the way back to the next event's row.
+  if (await page.locator("#admin-workspace:not([hidden]) #ws-record").isVisible().catch(() => false)) await clickTab(page, "Events");
   await narrowEvents(page, name);
   const row = page.locator(`#admin-comp-body tr:has-text("${name}")`).first();
   await row.waitFor({ state: "visible", timeout: 10000 });
-  await openKebab(page, row);
+  if (action === "comp-delete") await openKebab(page, row);
+  else await openRowEventMenu(page, row);
   await page.locator(`#kebab-portal [data-action="${action}"]`).first().click();
 }
 async function confirmModal(page, expectText) {
@@ -134,7 +140,7 @@ test.describe("v8.12.4 — events pane, driven through its own controls", () => 
     await narrowEvents(page, name);
     const row = page.locator(`#admin-comp-body tr:has-text("${name}")`).first();
     await row.waitFor({ state: "visible", timeout: 10000 });
-    await openKebab(page, row);
+    await openRowEventMenu(page, row);
     const pressAt = await startHeldOpen(page, page.locator('#kebab-portal [data-action="comp-start-now"]').first(), /Start Event Now\?/, endOf(before));
     await expect.poll(() => Date.parse(dbGet("SELECT start_time FROM competitions WHERE id=?", id).start_time), { timeout: 10000 })
       .toBeLessThanOrEqual(Date.now() + 5000);

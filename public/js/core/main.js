@@ -15,7 +15,7 @@ import { _analyticsClosePicker, _analyticsParseLocalDate, _analyticsRowCharts, _
 import { _autoFillCityFromTz, leaveJoinedEvent, checkInvitation, confirmParticipantViewProfile, doLogin, doLogout, doRegister, openProfileCompletionGate, openProfileEditor, saveProfile, selectAvatar, toggleJobFunctionOther, updateProfileTimezones, signinCodeRedeem, signinCodeRestart, signinCodeResend, syncLoginEmailHint, loginCodeInstead, openSignInMethodDialog, saveSignInMethod, savePasswordPrompt, keepCodesPrompt, registerCancel, paintRegLocation, regLocationChange, paintCsrfBusy, _paintCodeCells } from "./../features/auth.js";
 import { _renderTaskFormAttachments, tfAddChoice, tfRemoveChoice, tfSetChoiceText, tfSetChoiceCorrect, tfSyncAnswerType, tfAddExtraAnswer, tfRemoveExtraAnswer, tfSetExtraAnswer, _closeAttachPicker, _deleteSavedAttachment, _deleteStagingAttachment, _openAttachPicker, _renameSavedAttachment, _renameStagingAttachment, _uploadAttachmentNow, addTaskTag, fixPublicDomainTag, assignPickedTasks, challengeBulkAssignExecute, challengesBulkAssign, toggleAllChallenges, toggleChallengeSelection, closeTaskForm, closeTaskPreview, deleteAllFeedback, deleteFeedback, deleteTask, editTask, loadAdminTasks, openAddTasksToCompetition, openAssignTaskToComps, openAttemptGrant, openTaskForm, openTaskPickerForCompetition, publishTask, recalculateTaskScores, revealSealedAnswer, removeTaskFromComp, removeTaskTag, renderAdminTasks, restoreTaskVersion, saveTask, saveTaskCompAssignments, sortAdminTasks, toggleTaskDiffFilter, toggleTaskLock, toggleTaskStateFilter, toggleTaskStatusFilter, toggleTaskVisibility, updateAssignSaveBtn, updateTaskPickerCount, viewTaskAsParticipant } from "./../features/challenges-admin.js";
 import { chooseTimeslot, COMP_CATEGORY_LABEL, compDisplayCategory, handleCompetitionsNav, loadMyCompetitions, pickCompetition, renderCompetitionPicker, requestReminder, selectCompetition, setCompFilter, setCompOtherFilter, showCompetitionsPage, showPendingPageForCompetition, showTimeslotPicker, startCompDataPoll, leaveCompetition } from "./../features/competition-picker.js";
-import { closeLateEntriesNow, compareCompsForPicker, compKindSelect, openNewEventPage, openCompetitionForm, compFormDeadlineChanged, toggleNoDeadline, toggleLateEntry, toggleLateAuto, compFormLateDeadlineChanged, addCompFormSession, addCompTag, compFormDurChanged, compFormUpdateEndTime, compRegFieldChanged, deleteCompetition, editCompetition, endNow, loadAdminCompetitions, removeCompCxOne, removeCompTag, renderAdminCompetitions, renderScopeBanner, saveCompCxOne, saveCompetition, saveCompetitionAndPickTasks, setAdminTimeslotScope, showCompetitionDelivery, showCompetitionOrganisers, sortCompetitions, startAdminCompPoll, startNow, toggleCompFilter, toggleCompKindFilter, toggleCompFormMode, toggleCxoneDisabled, updateSessionRemoveBtns } from "./../features/competitions-admin.js";
+import { closeLateEntriesNow, compareCompsForPicker, compKindSelect, openNewEventPage, openCompetitionForm, compFormDeadlineChanged, toggleNoDeadline, toggleLateEntry, toggleLateAuto, compFormLateDeadlineChanged, addCompFormSession, addCompTag, compFormDurChanged, compFormUpdateEndTime, compRegFieldChanged, deleteCompetition, editCompetition, endNow, loadAdminCompetitions, removeCompCxOne, removeCompTag, renderAdminCompetitions, renderScopeBanner, saveCompCxOne, saveCompetition, saveCompetitionAndPickTasks, setAdminTimeslotScope, showCompetitionDelivery, sortCompetitions, startAdminCompPoll, startNow, toggleCompFilter, toggleCompKindFilter, toggleCompFormMode, toggleCxoneDisabled, updateSessionRemoveBtns } from "./../features/competitions-admin.js";
 import { executeConflictImport, exportCompetitionActivityCsv, exportParticipants, exportParticipantsCSV, exportTasks, importParticipantsFile, importTasksFile, onConflictResChange, proceedToConflictCheck, renderImportParticipantRows, setAllConflictResolutions, toggleAllImportParticipants, toggleImportParticipant } from "./../features/export-import.js";
 import { bulkAddToGroup, createGroupDialog, deleteGroup, loadAdminGroups, manageGroupCompetitions, manageGroupMembers, renameGroupDialog, renderAdminGroups } from "./../features/groups-admin.js";
 import { _helpLoadDoc, closeHelpDrawer, openHelpDrawer } from "./../features/help-drawer.js";
@@ -25,7 +25,7 @@ import { loadLeaderboard, sortLeaderboard, sortLeaderboardGroup, sortLeaderboard
 import { openBadgeShare, copyBadgeLink, copyPostAndOpenLinkedIn } from "./../features/badge-share.js";
 import { exitImpersonation, impersonateParticipant, renderImpersonationBanner } from "./../features/impersonation.js";
 import { _endedPopupChannel, filterTasks, fireNavigatedAway, fitAnswerArea, handleStarKeydown, hoverStars, loadTasks, openTask, rearmOpenTask, refreshScore, renderTasks, resetStars, revealHint, setSolveFilter, submitAnswer, submitFeedback, tapChoice, tapChoiceToggled } from "./../features/participant-tasks.js";
-import { addGroup, addTag, adminEditProfile, approveUser, grantEventAdmin, revokeEventAdmin, blockUser, bulkApproveUsers, closeKebab, deleteParticipant, denyUser, inviteParticipantsForCompetition, loadAdminParticipants, openInviteDialog, quickInviteToCompetition, removeGroup, removeTag, renderParticipants, emailSignInCodeForUser, saveAdminProfile, setPStatusFilter, setUserRole, sortParticipants, submitInvitations, toggleAllParticipants, toggleKebab, toggleParticipantSelection, uninviteFromCompetition, unlockUser, updateAdpTimezones, verifyUser, showParticipantCode, deskInvite } from "./../features/participants-admin.js";
+import { addGroup, addTag, adminEditProfile, approveUser, grantEventAdmin, revokeEventAdmin, blockUser, bulkApproveUsers, closeKebab, deleteParticipant, denyUser, inviteParticipantsForCompetition, loadAdminParticipants, openInviteDialog, quickInviteToCompetition, removeGroup, removeTag, renderParticipants, emailSignInCodeForUser, saveAdminProfile, setPStatusFilter, openRolesFor, sortParticipants, submitInvitations, toggleAllParticipants, toggleKebab, toggleParticipantSelection, uninviteFromCompetition, unlockUser, updateAdpTimezones, verifyUser, showParticipantCode, deskInvite } from "./../features/participants-admin.js";
 import { loadAdminLeaderboard, loadAdminRankingsTab, selectAdminRankingsComp, sortRankings, rankingsCopy, exportRankingsCsv, setRankingsHideIdentity, _rkToggleExpanded, _rkRerenderFromCache } from "./../features/rankings-admin.js";
 import { adminShowParticipant, adminShowChallenge, adminShowGroup } from "./../features/admin-crossnav.js";
 import { _copySelfEnrollLink, _copySelfEnrollCode, joinWithCode, openEventCodeDialog, eventCodeApply, eventCodeSignin, _downloadSelfEnrollQr, _renderJoinBanner, clearStoredJoin, enterAfterJoin, joinViaPendingToken, openSelfEnrollOverlay, regenerateSelfEnroll, rehydratePendingJoin, storePendingJoin } from "./../features/self-enroll.js";
@@ -374,7 +374,6 @@ function boot() {
   registerAction('comp-export-activity',     (e, el) => exportCompetitionActivityCsv(el.dataset.compId, el.dataset.compName));
 
   registerAction('comp-delivery',            (e, el) => showCompetitionDelivery(el.dataset.compId, el.dataset.compName));
-  registerAction('comp-organisers',          (e, el) => showCompetitionOrganisers(el.dataset.compId, el.dataset.compName)); // v8.7.0
 
   registerAction('task-view',                  (e, el) => viewTaskAsParticipant(el.dataset.taskId));
 
@@ -438,7 +437,7 @@ function boot() {
 
   registerAction('participant-deny',            (e, el) => denyUser(el.dataset.userId));
 
-  registerAction('participant-role',           (e, el) => setUserRole(el.dataset.userId, el.dataset.newRole, el.dataset.prevRole));
+  registerAction('participant-open-roles',     (e, el) => openRolesFor(el.dataset.email||''));   // role changes live on Roles & permissions
   // v8.7.0 — the per-event organiser grant. Both carry the competition on the
   // element, because the grant is per EVENT and the focused one is what the
   // kebab item named.
@@ -846,6 +845,7 @@ function boot() {
   registerAction('open-competition-form',      () => openNewEventPage());
   registerAction('new-event-start',            (e, el) => openCompetitionForm(null, { kind: el.dataset.kind }));
   registerChange('comp-kind-select',           (e, el) => compKindSelect(el));
+  registerAction('comp-kind-change',           (e, el) => _ns9.compKindChangeToggle(el));   // the form's "Change type"
 
   registerAction('open-invite-dialog',         () => openInviteDialog());
 
@@ -1720,6 +1720,17 @@ function boot() {
     _analyticsScheduleRefetch();
   });
 
+  // Inside an event's workspace the scope is that event: the one choice left
+  // is the whole event or one of its sessions.
+  registerChange('analytics-ws-set-timeslot', (e, el) => {
+    if (!S.adminSelectedCompetitionId) return;
+    _analyticsState.competitionId = S.adminSelectedCompetitionId;
+    _analyticsState.scope = el.value ? 'timeslot' : 'competition';
+    _analyticsState.timeslotId = el.value || null;
+    renderAnalyticsFilterBar();
+    _analyticsScheduleRefetch();
+  });
+
   registerAction('analytics-toggle-difficulty', (e, el) => {
     const d = el.dataset.value;
     const i = _analyticsState.difficulties.indexOf(d);
@@ -1903,7 +1914,6 @@ function boot() {
   registerAction("ws-join-copy",            () => _ns50.wsJoinCopy());
   registerAction("ws-join-toggle",          () => _ns50.wsJoinToggle());
   registerAction("p-columns",               (e, el) => _ns17.openParticipantColumns(el));
-  registerChange("p-include-admins",        (e, el) => { S.pIncludeAdmins = !!el.checked; _ns17.loadAdminParticipants(); });   // RBAC — People: show admin accounts too
   registerChange("p-ws-everyone",          (e, el) => _ns50.setParticipantWsScope(el.checked ? 'all' : 'event'));
   registerAction("comp-top3",               (e, el) => _ns50.downloadTop3(el.dataset.compId, el));
   registerAction("ws-join-full",            () => _ns50.wsJoinFull());

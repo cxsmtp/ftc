@@ -1522,7 +1522,7 @@ export function adminTab(btn,tabId,opts){
   if(tabId==='admin-competitions-tab')loadAdminCompetitions();
   if(tabId==='admin-submissions-tab')loadAdminSubmissions();
   if(tabId==='admin-rankings-tab')loadAdminRankingsTab();
-  if(tabId==='admin-participants-tab')loadAdminParticipants();
+  if(tabId==='admin-participants-tab')loadAdminParticipants({tabEntry:true});
   if(tabId==='admin-groups-tab')loadAdminGroups();
   if(tabId==='admin-tasks-tab')loadAdminTasks();
   if(tabId==='admin-analytics-tab')loadAdminAnalytics();

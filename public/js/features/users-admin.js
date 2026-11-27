@@ -59,6 +59,13 @@ async function _send(method, url, body) {
   return { ok: r.ok, status: r.status, d: d || {} };
 }
 
+/** Open the Users list searched to one person (People's "Change role on Roles &
+ *  permissions": role changes live here only). Called before the page loads. */
+export function showUserInRoles(email) {
+  _st.view = "users";
+  _st.q = String(email || "");
+}
+
 export async function loadUsersPane() {
   const seq = ++_loadSeq;
   const body = document.getElementById("ua-body");
@@ -112,7 +119,10 @@ function _renderUsers() {
   const q = _st.q.trim().toLowerCase();
   const rows = _st.users.filter(u => !q || [u.email, u.first_name, u.last_name, u.nickname, u.role_label, u.role].some(v => String(v || "").toLowerCase().includes(q)));
   if (!rows.length) {
-    setSafeHtml(host, `<p class="ws-empty">${q ? `No platform user matches “${esc(_st.q)}”.` : "No platform users yet."}</p>`);
+    // A participant is not listed here: Add user gives an existing account an
+    // admin role (People's role link lands here on their address).
+    const addHint = q && _has("users.manage") && _addUserRoles().length ? " To give a participant an admin role, use Add user with their address." : "";
+    setSafeHtml(host, `<p class="ws-empty">${q ? `No platform user matches “${esc(_st.q)}”.${addHint}` : "No platform users yet."}</p>`);
     return;
   }
   const myId = S.currentUser && S.currentUser.id;

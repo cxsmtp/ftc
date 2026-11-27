@@ -129,11 +129,13 @@ not see it.
 
 ## Role promotion
 
-Role changes are made on **Roles & permissions** (above). The participant row's
-three-dot menu in People still offers **Promote to Admin** or
-**Promote to Superadmin** for a participant, and demoting uses the same menu.
+Role changes are made on **Roles & permissions** (above), and only there: a
+participant's row in People offers **Change role on Roles & permissions**, which
+opens that page searched to the person. An admin account is changed with its
+row's **Change role**; a participant is given an admin role with **Add user** and
+their address (the account is kept and gets the role).
 
-![Role promotion confirm](../screenshots/superadmin/01-role-promotion.png)
+![A People row menu linking to Roles & permissions](../screenshots/superadmin/01-role-promotion.png)
 
 A role change immediately signs the target out everywhere — they sign in
 again for the new role to take effect. That reaches work already in progress
@@ -154,7 +156,7 @@ one. Moved to event admin or participant, they sign in with an emailed code.
 
 There is a fourth role, **Event admin**: an organiser scoped to specific events.
 It is granted per event from the participant's row (**Make event admin**) or from
-the event's **Organisers** list, and any admin can do that — see the
+the **Organisers** card on the event's Overview, and any admin can do that — see the
 [Admin guide](admin.md) for what the role can and cannot do.
 
 Two parts of it are yours alone:

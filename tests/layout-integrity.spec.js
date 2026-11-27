@@ -468,10 +468,13 @@ test.describe("Picker dialog action row (v7.23.3)", () => {
       if (await burger.isVisible().catch(() => false) && !(await page.locator("#admin-sidebar.mobile-open").count())) await burger.click();
       await page.locator("button.admin-nav-item[data-tab-id=\"admin-competitions-tab\"]").first().evaluate((el) => el.click());
       await page.locator("#admin-comp-body tr").first().waitFor({ state: "visible", timeout: 20000 });
-      await page.locator("#admin-comp-body tr").first().locator(".kebab-btn").click();
+      // The event's ⋯ menu (its workspace; the Events-row menu keeps only Delete event).
+      await page.locator("#admin-comp-body tr").first().locator('[data-action="comp-open"]').first().click();
+      await page.locator("#ws-record").waitFor({ state: "visible", timeout: 20000 });
+      await page.locator("#ws-quick .ws-more-btn").click();
       await page.locator("#kebab-portal.open").waitFor({ state: "visible", timeout: 10000 });
       const item = page.locator("#kebab-portal [data-action=comp-assign-challenges]");
-      expect(await item.count(), "the assign-challenges kebab item must exist, or this test is vacuous").toBeGreaterThan(0);
+      expect(await item.count(), "the Add challenges item must exist, or this test is vacuous").toBeGreaterThan(0);
       await item.click();
       await page.locator(".picker-modal").waitFor({ state: "visible", timeout: 15000 });
 

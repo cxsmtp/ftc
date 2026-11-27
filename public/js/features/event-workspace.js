@@ -376,15 +376,16 @@ function _renderRecord(c) {
     slots.length ? `<span class="ws-fact">${slots.length} session${slots.length === 1 ? '' : 's'}</span>` : '',
     _organiserText() ? `<span class="ws-fact">Run by ${esc(_organiserText())}</span>` : '',
   ].filter(Boolean).join('<span class="ws-facts-sep" aria-hidden="true">·</span>');
-  // ONE primary action (Invite), the approval queue only while somebody waits,
-  // and everything else in ⋯. Each is offered from the same predicates the
-  // Events-row menu uses (the server re-checks every one): a competitor gets
-  // none of the writes, an ended event no roster changes outside its late window.
+  // ONE primary action (Invite, which holds both ways of adding people: an
+  // email invitation and a sign-up at the desk), the approval queue only while
+  // somebody waits, and everything else in ⋯. Each is offered from its route's
+  // predicate (the server re-checks every one): a competitor gets none of the
+  // writes, an ended event no roster changes outside its late window.
   const canRoster = wsInviteOffered(c);
   // Approve opens the event's Participants section on the waiting people.
   const pending = adminCan('participants.approve') && adminCan('participants.view') ? wsPendingCount(c.id) : 0;
   const q = [];
-  if (canRoster) q.push(`<button type="button" class="btn" data-action="ws-invite">${ICO.userPlus} Invite</button>`);
+  if (canRoster) q.push(`<button type="button" class="btn ws-invite-btn" data-action="kebab-toggle" aria-label="Invite — add people to ${esc(c.name)}">${ICO.userPlus} Invite ${ICO.chevronDown}</button><div class="kebab-menu">${wsInviteItemsHtml(c)}</div>`);
   if (pending > 0) q.push(`<button type="button" class="btn secondary" data-action="ws-review-pending">${ICO.userCheck} Approve <span class="ws-badge" aria-label="${pending} waiting">${pending}</span></button>`);
   q.push(`<button type="button" class="btn secondary ws-more-btn" data-action="kebab-toggle" aria-label="More actions for ${esc(c.name)}">${ICO.more}<span class="ws-more-label">More</span></button><div class="kebab-menu">${wsMenuItemsHtml(c)}</div>`);
   const joinHtml = _joinPillHtml(c);
@@ -462,20 +463,38 @@ function _refocusHeaderControl(prev) {
  * The header's Invite: offered while the event takes new members (live,
  * upcoming, or ended with its late-entry window open: the invite dialog lists
  * exactly those), the viewer does not compete in it, and the role may invite
- * (`participants.enrol`, the route's permission). The ONE predicate for every
- * door that stands for it (the header button, the command palette).
+ * (`participants.enrol`, the route's permission of both its choices). The ONE
+ * predicate for every door that stands for it (the header button, its two
+ * choices, the command palette).
  */
 export function wsInviteOffered(c) {
   return !!c && compAcceptsNewMembers(c) && !c.competing && adminCan('participants.enrol');
 }
 
 /**
- * The header's ⋯ menu: every event door in ONE place, in the order organisers
- * reach for them, read-only doors next, and the irreversible ones LAST, quiet
- * (`km-danger`) and each behind its own confirm. A second builder beside the
- * Events-row menu (`compMenuItemsHtml`): the doors both offer take the same
- * predicates, locked equal by tests/menu-door-parity.spec.js, so change a
- * shared one in both; the server re-checks every door.
+ * The header Invite's two choices (owner's decision, 27 Nov 2026: ONE control
+ * for adding people, where the header's Invite, the ⋯ menu's "Sign up at the
+ * desk" and the Participants section's Invite and At the desk were four doors to
+ * two acts). Both take `wsInviteOffered`; the desk sign-up is withheld WITH THE
+ * REASON while approval is required and this role cannot approve the account it
+ * would make (sweep #501).
+ */
+export function wsInviteItemsHtml(c) {
+  if (!wsInviteOffered(c)) return '';
+  const id = esc(c.id), nm = esc(c.name);
+  const desk = deskApprovalWithheld()
+    ? `<div class="kebab-note" role="presentation">${ICO.lock} ${esc(DESK_APPROVAL_REASON)}</div>`
+    : `<button data-action="desk-invite" data-comp-id="${id}" data-comp-name="${nm}">${ICO.userCheck} Sign up at the desk</button>`;
+  return `<button data-action="ws-invite" data-comp-id="${id}" data-comp-name="${nm}">${ICO.send} Email invitation</button>${desk}`;
+}
+
+/**
+ * The header's ⋯ menu: every event door in ONE place (the people doors are the
+ * header's Invite), in the order organisers reach for them, read-only doors
+ * next, and the irreversible ones LAST, quiet (`km-danger`) and each behind its
+ * own confirm. The Events-row menu (`compMenuItemsHtml`) keeps only Delete
+ * event, with this menu's predicate, locked equal by
+ * tests/menu-door-parity.spec.js; the server re-checks every door.
  */
 export function wsMenuItemsHtml(c) {
   const status = computeCompStatus(c);
@@ -495,11 +514,6 @@ export function wsMenuItemsHtml(c) {
   // The full export needs `export.data` (the route's permission).
   if (!competing && adminCan('export.data')) items.push(b('ws-export-zip', ICO.download, 'Export everything'));
   if ((status === 'live' || status === 'ended') && adminCan('export.data')) items.push(b('comp-export-activity', ICO.download, 'Export activity (CSV)'));
-  if ((status !== 'ended' || late) && !competing && adminCan('participants.enrol')) {
-    // Sweep #501: withheld with the reason while approval is required and this
-    // role cannot approve the account it would make.
-    items.push(deskApprovalWithheld() ? `<div class="kebab-note" role="presentation">${ICO.lock} ${esc(DESK_APPROVAL_REASON)}</div>` : b('desk-invite', ICO.userCheck, 'Sign up at the desk'));
-  }
   // `templates.manage`, which the built-in event admin does not hold (the
   // server tells them "You can clone your own event instead"). Withheld from a
   // competitor as Clone is, by the same `!competing` and with the menu's note
@@ -508,7 +522,8 @@ export function wsMenuItemsHtml(c) {
   if ((status !== 'ended' || late) && adminCan('events.join_link')) items.push(b('comp-self-enroll', ICO.link, 'Join-link settings'));
   if (canEdit) items.push(b('comp-edit', ICO.edit, 'Edit settings'));
   items.push(b('comp-history', ICO.clock, 'History'));
-  items.push(b('comp-organisers', ICO.users, 'Organisers'));
+  // No Organisers item: the Overview's Organisers card is the one place for
+  // who runs the event (owner's decision, 27 Nov 2026).
   items.push(b('comp-delivery', ICO.mailCheck, 'Email delivery'));
   if (status === 'upcoming' && !(c.timeslots || []).length && !competing && adminCan('events.edit')) items.push(b('comp-start-now', ICO.play, 'Start now'));
   const danger = [];
@@ -1335,7 +1350,7 @@ export function wsTaskFacts(el) {
 /** "Show me": move focus to the header control that does this (Invite, the
  *  join pill) instead of repeating it on the page. */
 export function wsPoint(el) {
-  const sel = el && el.dataset.target === 'join' ? '#ws-join .ws-join-pill' : '#ws-quick [data-action="ws-invite"]';
+  const sel = el && el.dataset.target === 'join' ? '#ws-join .ws-join-pill' : '#ws-quick .ws-invite-btn';
   const t = document.querySelector(sel);
   if (!t) return;
   const calm = _reducedMotion();
@@ -2156,7 +2171,7 @@ export function loadEventSettings() {
     pol.group_leaderboard !== 'forbidden' ? row('Team leaderboard', yes(c.group_leaderboard_enabled)) : '',
     pol.late_entry === 'allowed' ? row('Late entry', yes(c.late_entry_enabled)) : '',
     row('Staff compete', yes(c.staff_compete)),
-    row('Checkmarx One accounts', c.cxone_disabled ? 'Not created' : 'Created on enrolment'),
+    row('Checkmarx One accounts', policyOrDefault(c.policy).cxone_provisioning !== 'allowed' ? 'Never created for this type of event' : c.cxone_disabled ? 'Not created' : 'Created on enrolment'),
     row('Tags', (c.tags || []).length ? (c.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join(' ') : '—'),
   ].join('');
   // One place per action: this pane's only door is Edit settings. History,
@@ -2373,6 +2388,7 @@ function _ownKeyAccountsOffNote(c, target) {
 const FORCED_TEXT = {
   trusted_network_ips: 'trusted network IPs (a venue address is never copied)',
   cxone_disabled: 'Checkmarx One accounts (turned off: the event used its own Checkmarx One key, which is never copied)',
+  cxone_provisioning: 'Checkmarx One accounts (turned off: the new type never creates them)',
   cxone_group_name: 'the Checkmarx One group (it belonged to the event\'s own key)',
   late_entry_deadline_at: 'the pinned late-entry deadline (it did not fit the new end)',
   late_entry_closed: 'the early close of late entries (the copy takes late entries for the usual time after its end)',

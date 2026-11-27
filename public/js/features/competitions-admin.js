@@ -799,112 +799,28 @@ export function _compEffectiveBounds(c){
 // the same for the same event and viewer, which tests/menu-door-parity.spec.js
 // locks across a matrix of states. Change a shared predicate in both.
 export function compMenuItemsHtml(c){
-  const status=computeCompStatus(c);
-  let km='';
-  // v8.12.7 — in practice always false, and NOT "closed early, still editable
-  // until the original end": `competitionEffectiveEnd` clamps an ended event to
-  // MIN(ended_at, scheduled end), so the effective end of anything the server
-  // calls `ended` has already passed when the list is built (End Now included —
-  // its `ended_at` is the moment it ran). It reads true only while this
-  // browser's clock lags the server's. The PUT's matching allowance (a regular
-  // admin may edit an ended event whose effective end is still ahead) is just as
-  // unreachable. Kept so this gate, the Join Link dialog and that 403 agree.
-  const endedButFuture=status==='ended'&&c.effective_end&&new Date(c.effective_end)>new Date();
-  // v8.12.0 — THE ACTOR COMPETES IN THIS EVENT. Every mutating door on it
-  // refuses them (server: `competitorEditDenied`, all tiers), so the controls
-  // that reach those doors are withheld WITH THE REASON (v7.14.2) rather than
-  // offered and refused. The read-only items — Focus, History, Organisers,
-  // Email Delivery, Export Activity — stay; viewing is not editing. The
-  // server sends `competing` per row, computed from the same predicate the
-  // routes enforce, so the menu and the refusal cannot disagree.
-  const competing=!!c.competing;
-  if(competing)km+=`<div class="kebab-note" role="presentation">${ICO.lock} You are competing in this event — you can view it, not change it</div>`;
-  // RBAC — every door also asks the permission of the route it ends at (ui/nav.js
-  // adminCan; the built-in roles answer exactly as before). The workspace's ⋯
-  // menu (wsMenuItemsHtml) asks the same, door for door.
-  const canEdit=!competing&&(status!=='ended'||S.isSuperAdmin||endedButFuture)&&adminCan('events.edit');
-  const isLive=status==='live';
-  // Severity: live competitions make Edit/Assign Challenges elevated (warning); normal otherwise
-  const editCls=isLive?'km-warning':'';
-  const assignChallengesCls=isLive?'km-warning':'';
-  // Every button's onclick= has been migrated to data-action + data-comp-id.
-  // The dispatcher auto-calls closeKebab() for any click inside .kebab-menu.
-  // The compName values go through esc() once (HTML escape only) — no more
-  // nested-quote escaping like '${esc(c.name).replace(/'/g,"\\'")}' that
-  // used to fight two escape contexts at once.
-  if(canEdit){
-    km+=`<button class="${editCls}" data-action="comp-edit" data-comp-id="${esc(c.id)}">${ICO.edit} Edit</button>`;
-  }
-  km+=`<button data-action="comp-history" data-comp-id="${esc(c.id)}">${ICO.clock} History</button>`;
-  // v8.7.0 — WHO ELSE ORGANISES THIS EVENT. Offered to every admin tier: an
-  // event admin sharing a stand needs to know who their colleagues are, and
-  // the route is scope-checked, so on their own event it answers and anywhere
-  // else it refuses. Read-only from here — granting is admin-and-above and
-  // lives on the participant's row, where the person being granted is.
-  km+=`<button data-action="comp-organisers" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.users} Organisers</button>`;
-  // v8.1.0 — the delivery panel (see showCompetitionDelivery). A read-only
-  // diagnostic, so it sits with History and the activity export rather than
-  // among the state-changing actions.
+  // THE EVENTS-LIST ROW MENU HOLDS ONLY WHAT THE LIST ITSELF NEEDS (owner's
+  // decision, 27 Nov 2026: "remove only true duplication"). Every event is run
+  // from its workspace (Open, or the name cell), whose header and ⋯ menu
+  // (event-workspace.js `wsMenuItemsHtml`) hold every door the event has: Edit
+  // settings, History, Email delivery, Export activity, Add challenges, the
+  // Participants section, Join-link settings, Start now, End now and Close late
+  // entries now. Repeating them here gave two menus of the same doors whose
+  // labels had already drifted apart. What stays is housekeeping done FROM the
+  // list without opening each event: Delete event (the workspace's own door,
+  // same predicate and the same label; tests/menu-door-parity.spec.js holds the
+  // two equal). Top 3 and Open are the row's own buttons.
   //
-  // Deliberately NOT gated on `status`, unlike the export below. The moment an
-  // organiser most wants these numbers is the night before, while people are
-  // still registering through the join link — a live/ended gate would hide it
-  // exactly then, and it would also make the menu's shape depend on lifecycle
-  // for a request that has no lifecycle rule behind it.
-  km+=`<button data-action="comp-delivery" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.mailCheck} Email Delivery</button>`;
-  // v7.23.0 — challenge-activity CSV. Live or ended only: nothing has happened
-  // in a competition that has not started, so the file would be all-No by
-  // construction. Gated on the EXISTING `status` local (line ~622), which
-  // prefers the server-computed, timeslot-aware `c.status` — the same value
-  // the endpoint re-checks, so the menu and the refusal cannot disagree.
-  if((status==='live'||status==='ended')&&adminCan('export.data')){
-    km+=`<button data-action="comp-export-activity" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.download} Export Activity (CSV)</button>`;
-  }
-  // v8.12.6 — an ended Booth Event still taking LATE ENTRIES is open to new
-  // members at every admin door (the server's `competitionAdmission`), so its
-  // Manage Participants entry point stays. Assign Challenges does NOT follow it:
-  // a challenge list freezes once the event has ended (FROZEN_REMEDY), whatever
-  // the late window says — only the ROSTER is open, which is the whole point.
-  const _lateOpen=isLateEntryOpen(c);
-  if(status!=='ended'&&!competing&&adminCan('challenges.assign')&&adminCan('challenges.view')){
-    km+=`<button class="${assignChallengesCls}" data-action="comp-assign-challenges" data-comp-id="${esc(c.id)}">${ICO.clipboardCheck} Assign Challenges</button>`;
-  }
-  if((status!=='ended'||_lateOpen)&&!competing&&adminCan('participants.view')){
-    km+=`<button data-action="comp-manage-participants" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.users} Manage Participants</button>`;
-  }
-  // v8.12.0 — the Join Link is a READ (the reveal route is `requireAdmin` and
-  // changes nothing), so a competitor keeps it: the dialog opens READ-ONLY for
-  // them — link, QR and code shown, the toggle and Regenerate withheld
-  // with the reason (the operator's ruling, 19 Sep 2026). An organiser
-  // competing in their own event still needs the link on the signage.
-  // v8.12.6 — and it stays offered through the late-entry window, because the
-  // link, QR and code keep WORKING until the late-entry deadline and the
-  // organiser needs them for the signage then too. The dialog says which of its
-  // settings can still be changed on a finished event (openSelfEnrollOverlay).
-  if((status!=='ended'||_lateOpen)&&adminCan('events.join_link')){
-    km+=`<button data-action="comp-self-enroll" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.link} Join Link</button>`;
-  }
-  // v8.12.8 — close a finished Booth Event's late-entry window NOW, to the
-  // second, without a superadmin. Gated on the SERVER's flag ONLY — the route's
-  // own predicate (`lateEntryCloseState`) plus the competitor lock — and never
-  // on `_lateOpen && !competing`: a client re-derivation would outlive the next
-  // server-side condition and offer a control the route refuses (v7.14.2). A
-  // competitor is withheld it with the reason the note at the top already gives.
-  // The hourglass, not End Now's stop icon (a different act) and not the lock
-  // (which means "cannot change" in every note on this screen).
-  if(c.can_close_late_entries&&adminCan('events.run')){
-    km+=`<button class="km-danger" data-action="comp-close-late-entries" data-comp-id="${esc(c.id)}">${ICO.hourglass} Close late entries now</button>`;
-  }
-  const isUpcomingSingle=status==='upcoming'&&(c.timeslots||[]).length===0;
-  if(isUpcomingSingle&&!competing&&adminCan('events.edit')){
-    // Start Now is elevated (warning) — user explicitly requested
-    km+=`<button class="km-warning" data-action="comp-start-now" data-comp-id="${esc(c.id)}">${ICO.play} Start Now</button>`;
-  }
-  if(isLive&&!competing&&adminCan('events.run')){
-    km+=`<button class="km-danger" data-action="comp-end-now" data-comp-id="${esc(c.id)}">${ICO.stop} End Now</button>`;
-  }
+  // THE ACTOR COMPETES IN THIS EVENT: every mutating door refuses them (server:
+  // `competitorEditDenied`, all tiers), so Delete is withheld WITH THE REASON
+  // (v7.14.2) rather than offered and refused. The server sends `competing` per
+  // row, from the predicate the routes enforce.
+  const competing=!!c.competing;
+  let km='';
+  if(competing)km+=`<div class="kebab-note" role="presentation">${ICO.lock} You are competing in this event — you can view it, not change it</div>`;
+  // RBAC — the door asks the permission of the route it ends at (ui/nav.js adminCan).
   if(adminCan('events.delete')&&!competing){
-    km+=`<button class="km-danger" data-action="comp-delete" data-comp-id="${esc(c.id)}">${ICO.trash} Delete</button>`;
+    km+=`<button class="km-danger" data-action="comp-delete" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.trash} Delete event</button>`;
   }
   return km;
 }
@@ -1094,7 +1010,8 @@ export function renderAdminCompetitions(){
     const km=compMenuItemsHtml(c);
     const competing=!!c.competing;
     // Primary action: OPEN the event's workspace. The whole name cell opens it
-    // too; every state-dependent door (Edit, End Now, Delete, ...) is in the menu.
+    // too; every door of the event is in its workspace (the row menu keeps only
+    // Delete event: see compMenuItemsHtml).
     // An ENDED, ranked event offers its top three certificates in one click
     // (event-workspace.js `downloadTop3`; the one predicate, `top3Offered`, which
     // also asks the role for `certificates.view`). Secondary, never gold: one row
@@ -1113,9 +1030,9 @@ export function renderAdminCompetitions(){
       <td>${participants}</td>
       <td>${tasks}</td>
       <td>${sessionInfo}</td>
-      <td><div class="action-cell comp-actions" style="gap:4px">${primaryBtn}</div>
+      <td><div class="action-cell comp-actions" style="gap:4px">${primaryBtn}</div>${km?`
         <button class="kebab-btn kebab-always" aria-label="More actions" data-action="kebab-toggle">⋮</button>
-        <div class="kebab-menu">${km}</div>
+        <div class="kebab-menu">${km}</div>`:''}
       </td>
     </tr>`;
   }).join(''));
@@ -1190,7 +1107,20 @@ export async function compKindSelect(el){
   const template=ov?ov._template||null:null;
   ov?.remove();
   openCompetitionForm(null,{kind,carry,template});
-  setTimeout(()=>document.querySelector(`input[name="comp-kind-seg"][value="${CSS.escape(kind)}"]`)?.focus(),0);
+  // Focus returns to the control that changed it (the choice closes again on
+  // the re-rendered form).
+  setTimeout(()=>document.querySelector('#comp-form-overlay .comp-kind-change')?.focus(),0);
+}
+
+// "Change type": open (or close) the choice of type under the chip. Picking one
+// goes through `compKindSelect`, today's confirms included.
+export function compKindChangeToggle(el){
+  const box=document.getElementById('comp-kind-seg-box');
+  if(!box||!el)return;
+  const open=box.hidden;
+  box.hidden=!open;
+  el.setAttribute('aria-expanded',open?'true':'false');
+  if(open)(box.querySelector('input[name="comp-kind-seg"]:checked')||box.querySelector('input[name="comp-kind-seg"]'))?.focus();
 }
 
 // The type change on an EDIT: confirmed, naming the settings the new type
@@ -1245,6 +1175,7 @@ export async function compKindPick(kind,editId){
     // `#comp-dur-box` alive on a Program.
     document.getElementById('comp-form-overlay')?.remove();
     openCompetitionForm(editId,{kind});
+    setTimeout(()=>document.querySelector('#comp-form-overlay .comp-kind-change')?.focus(),0);
     return;
   }
   document.getElementById('comp-form-overlay')?.remove();
@@ -1360,6 +1291,10 @@ export function openCompetitionForm(editId,opts){
   // control that appears to work into one that is simply absent.
   const showTieBreak=showPresence&&pol.ranking_enabled!==false;
   const showTrusted=pol.trusted_networks!=='never';        // trusted_networks_forbidden
+  // Checkmarx One accounts: a kind that never creates them (a Booth Event) shows
+  // no section at all, so the save sends no `cxone_disabled` and the server
+  // stores them off (`cxone_provisioning_forbidden` for anything else).
+  const showCxone=pol.cxone_provisioning==='allowed';
   // The kind's own CREATE-time default for the CxOne opt-out. Until v8.2.0 the
   // form sent this field unconditionally, so `cxoneDisabledDefault` was dead for
   // every event made in a browser and a Booth Event arrived provisioning an
@@ -1392,14 +1327,19 @@ export function openCompetitionForm(editId,opts){
         ? `Changing to <strong>${esc(_kindLabel)}</strong> — not saved until you press Save.`
         : (_lockReason?_lockNote:'The type can be changed until the event starts.'))
     : 'You can change the type until the event starts.';
-  // THE TYPE IS A FIELD: one radio per kind, from the shell's vocabulary (never
-  // a client list). Disabled with the reason where the server would refuse a
-  // change. The selected kind's blurb says what it means in a sentence.
+  // THE TYPE IS A FIELD, SHOWN AS WHAT WAS CHOSEN (owner's decision, 27 Nov
+  // 2026): the New event page's kind card already asked, so the form names the
+  // type as a chip and does not ask again. "Change type" opens the choice (one
+  // radio per kind, from the shell's vocabulary, never a client list), whose
+  // pick goes through today's confirms (`compKindSelect`, `compKindPick`). Where
+  // the server would refuse a change, no Change type is offered and the note
+  // says why. The selected kind's blurb says what it means in a sentence.
   const _kindLocked=!!(comp&&_lockReason&&!_kindChanged);
   const _kindEntry=_kinds.find(k=>k.value===kind)||null;
   const kindChooserHtml=`<div class="form-group comp-kind-field">
          <span class="comp-field-label" id="comp-kind-label">Event type</span><span data-help="event.kind" data-help-label="Event type"></span>
-         <div class="kind-seg" role="radiogroup" aria-labelledby="comp-kind-label" aria-describedby="comp-kind-note">${
+         <div class="comp-kind-current">${eventKindChipHtml(kind)}${_kindLocked?'':`<button type="button" class="link-btn comp-kind-change" data-action="comp-kind-change" aria-expanded="false" aria-controls="comp-kind-seg-box">Change type</button>`}</div>
+         <div class="kind-seg" id="comp-kind-seg-box" role="radiogroup" aria-labelledby="comp-kind-label" aria-describedby="comp-kind-note" hidden>${
            _kinds.map(k=>`<label class="kind-seg-opt"><input type="radio" name="comp-kind-seg" value="${esc(k.value)}" data-change-action="comp-kind-select" ${k.value===kind?'checked':''} ${_kindLocked?'disabled':''}/><span>${esc(k.label)}</span></label>`).join('')
          }</div>
          <p class="comp-kind-blurb" id="comp-kind-blurb">${_kindEntry&&_kindEntry.blurb?esc(_kindEntry.blurb):''}</p>
@@ -1460,7 +1400,7 @@ export function openCompetitionForm(editId,opts){
   // server intentionally never sends (see GET /api/admin/competitions).
   const cxConfigured=!!comp?.cxone_configured;
   const cxGroup=comp?.cxone_group_name||'';
-  let cxoneSection=`
+  let cxoneSection=!showCxone?'':`
       <div class="help-label-row comp-form-head-row"><h3 class="comp-form-cxone-heading">CxOne Integration</h3><span data-help="event.cxone" data-help-label="Checkmarx One"></span></div>
       <div class="form-group">
         <label class="checkbox-row" style="cursor:pointer">
@@ -1863,12 +1803,12 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
       <div class="picker-rows comp-ch-list" id="comp-ch-list"></div>
     </div>`}
 
-    <!-- ADVANCED: the rarely changed settings, collapsed on a create (open on an
-         edit, where an organiser came to change something specific). Nothing in
-         here is hidden from the save: the collector reads every control whether
-         the section is open or not. -->
-    <details class="comp-form-advanced" id="comp-advanced"${comp?' open':''}>
-      <summary class="comp-form-advanced-summary"><span class="comp-form-advanced-title">Advanced settings</span><span class="comp-form-advanced-sub">Team board, staff, time on platform, test runs${showRegFields?', sign-up form':''}${showLateEntry?', late entries':''}${showTrusted?', venue network':''}, <span id="comp-advanced-cxone"></span></span></summary>
+    <!-- ADVANCED: the rarely changed settings, collapsed on a create AND on an
+         edit (owner's decision, 27 Nov 2026: rarely changed either way). Nothing
+         in here is hidden from the save: the collector reads every control
+         whether the section is open or not. -->
+    <details class="comp-form-advanced" id="comp-advanced">
+      <summary class="comp-form-advanced-summary"><span class="comp-form-advanced-title">Advanced settings</span><span class="comp-form-advanced-sub">Team board, staff, time on platform, dry runs${showRegFields?', sign-up form':''}${showLateEntry?', late entries':''}${showTrusted?', venue network':''}${showCxone?', <span id="comp-advanced-cxone"></span>':''}</span></summary>
       <div class="comp-form-advanced-body">
 
     <!-- v7.11.7 — enable the group/team leaderboard. Off by default. Even when on,
@@ -1937,10 +1877,10 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
     <div class="form-group" style="margin-top:12px">
       <label class="checkbox-row" style="cursor:pointer">
         <input type="checkbox" id="comp-internal" ${(src?.tags||[]).includes(DRY_RUN_TAG)?'checked':''}/>
-        <span>Mark as test / dry run</span>
-      </label><span data-help="event.dryrun" data-help-label="Test / dry run"></span>
+        <span>Dry run</span>
+      </label><span data-help="event.dryrun" data-help-label="Dry run"></span>
       <p class="comp-form-reveal-hint">
-        Events marked as a test / dry run are excluded from Analytics by default and flagged in the admin list. Use for rehearsals and test runs.
+        The same as the event's <strong>${esc(DRY_RUN_TAG)}</strong> tag: ticking it adds the tag, and removing the tag anywhere unticks it. Dry runs are left out of Analytics by default and flagged in the admin list. Use for rehearsals and test runs.
       </p>
     </div>
 
@@ -4036,59 +3976,6 @@ function _deliveryPanelHtml(d){
       with no email at all.</p>`;
 }
 
-// The event's organiser list (the Events-row menu's Organisers). Read-only:
-// organisers are added and removed in the event workspace's Overview, on its
-// Organisers card (and from a participant's row), both behind the route's
-// requireGlobalAdmin.
-export async function showCompetitionOrganisers(compId,compName){
-  if(!compId)return;
-  let body;
-  showLoading();
-  // The showCompetitionDelivery shape below, for its reasons: own the error path
-  // (the dispatcher's try/catch is synchronous-only, so a rejection would escape
-  // unlogged AND strand the reference-counted overlay), and let the deadline
-  // cover the BODY read, not just the headers (v7.15.15).
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),20000);
-  try{
-    const r=await fetch(`/api/admin/competitions/${encodeURIComponent(compId)}/admins`,{signal:ctrl.signal});
-    if(!r.ok){
-      const d=await r.json().catch(()=>({}));
-      body=`<p class="muted">${esc(d.error||'Could not load the organisers for this event.')}</p>`;
-    }else{
-      const d=await r.json();
-      const admins=Array.isArray(d.admins)?d.admins:null;
-      if(!admins){
-        // A 200 whose shape we do not recognise is a FAILURE, not an empty list
-        // — rendering "none" would be the same lie as the error branch.
-        body=`<p class="muted">Could not read the organiser list for this event.</p>`;
-      }else if(!admins.length){
-        body=`<p class="muted">No event admins organise this event. Administrators and superadmins can always manage it.${S.isEventAdmin?'':' Add one from the Organisers card on the Overview of this event.'}</p>`;
-      }else{
-        body=`<ul style="margin:0;padding-left:18px">`+admins.map(a=>{
-          const who=[a.first_name,a.last_name].filter(Boolean).join(' ')||a.nickname||a.email||a.id;
-          return `<li style="margin-bottom:6px"><strong>${esc(who)}</strong>`
-            +(a.email?`<br><span class="sub">${esc(a.email)}</span>`:'')
-            +(a.granted_at?`<br><span class="sub">added ${esc(fmtDt(a.granted_at))}${a.granted_by?` by ${esc(a.granted_by)}`:''}</span>`:'')
-            +`</li>`;
-        }).join('')+`</ul>`
-        +`<p class="muted" style="margin-top:10px">${S.isEventAdmin?'Only an administrator can add or remove an organiser.':'To add or remove an organiser, open this event and use the Organisers card on its Overview.'}</p>`;
-      }
-    }
-  }catch(e){
-    body=`<p class="muted">${e&&e.name==='AbortError'?'The request timed out.':'Could not load the organisers for this event.'}</p>`;
-  }finally{
-    clearTimeout(timer);
-    hideLoading();
-  }
-  await showModal({
-    title:compName?`Organisers: ${compName}`:'Organisers',
-    message:body,
-    confirmText:'Close',
-    confirmClass:'',
-    cancelText:'',
-  });
-}
 
 export async function showCompetitionDelivery(compId,compName){
   if(!compId)return;

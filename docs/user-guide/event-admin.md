@@ -160,10 +160,9 @@ challenge's History, naming them and the view they were in.
 
 ### Who else organises this event
 
-An event's row menu includes **Organisers**, which lists everybody who
-administers it — useful when you share a stand with a colleague — and the same
-list is on the **Organisers** card of the event's Overview (under **Show
-challenges, activity and organisers**). You cannot add or
+The **Organisers** card of the event's Overview (under **Show challenges,
+activity and organisers**) lists everybody who administers it — useful when you
+share a stand with a colleague. You cannot add or
 remove an organiser yourself (the card says so where an administrator sees
 **Add an organiser**); that is an administrator's decision, and it is what stops
 the role spreading on its own.
@@ -200,11 +199,11 @@ This is the same lock every tier meets — administrators and superadmins includ
 — and it covers every change to the event: its settings, schedule and sessions,
 its tags, its join link, ending it, who is in it — which includes a group bound
 to it, whose members you cannot change and which you cannot delete while you
-compete there — and every challenge assigned to it. The row menu says so —
-**You are competing in this event — you can view it, not change it** — and keeps
-only the items that read rather than write: History, Organisers, Email
-Delivery, Export Activity once the event is live or has finished (as on any
-event), and Join Link, which opens read-only — the link, the QR code and the
+compete there — and every challenge assigned to it. The event's **⋯** menu says
+so — **You are competing in this event — you can view it, not change it** — and
+keeps only the items that read rather than write: History, Email delivery,
+Export activity once the event is live or has finished (as on any event), and
+Join-link settings, which opens read-only — the link, the QR code and the
 short code are there to copy, while the toggle and Regenerate are withheld with
 a note saying why. On the Participants tab, with that event open, only your own row
 offers **Remove**, and in every dialog that assigns people or challenges to
@@ -500,8 +499,8 @@ that:
 
 - Administrator accounts enrolled in your events (an administrator competing in
   one) are left out of the list. Clicking one on a leaderboard or in the
-  submissions shows them, with **Show admin accounts** ticked; untick it to leave
-  them out again.
+  submissions shows them for that visit, with a note above the table saying so;
+  the next time you open People they are left out again.
 - Inside an event, **Show people from your other events** lists the people of
   your other events too (never anybody else's), so you can add one of them with
   **Add to event**.
@@ -566,13 +565,16 @@ superadmin first. Once late entry closes, nobody can be removed.
 ### Inviting people
 
 **Invite** (the **Invite Participants** dialog) and the **At the desk** shortcut
-both work, and both require you to name at least one of your events. You are
+both work, and both require you to name at least one of your events. Inside one
+of your events they are the header's **Invite** menu (**Email invitation** and
+**Sign up at the desk**); on the People page, its toolbar's **Invite** and **At
+the desk**. You are
 inviting somebody *into your event* — there is no way to create an account on the
 platform that is not attached to one of yours. A Booth Event of yours still
 taking late entries counts: it is listed with a **Late entry open** badge, and
 anyone added to it joins as a late entrant. A finished event that is not taking
-late entries does not — the at-desk shortcut says so before it asks for an
-address, so open another of your events. If you are removed as an organiser of
+late entries does not — its header offers no **Invite** — so open another of
+your events. If you are removed as an organiser of
 that event while the at-desk shortcut is creating the account, nothing is created
 and no sign-in code is shown.
 
@@ -677,7 +679,9 @@ All three start from your events.
   session you picked); **Live rankings** in the sidebar shows the live events
   you organise.
 - **Analytics** — pick one of your events or sessions. There is no
-  platform-wide option: it would aggregate events that are not yours. The tag
+  platform-wide option: it would aggregate events that are not yours. Inside an
+  event, its **Analytics** section is that event alone (Whole event, or one of
+  its sessions), with no event picker. The tag
   and group lists you can filter by are likewise drawn only from participants you
   can see.
 

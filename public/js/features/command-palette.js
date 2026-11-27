@@ -192,7 +192,12 @@ function _actionItems() {
       // The header's own Invite predicate (the role's `participants.enrol`
       // included): an event that takes no new members (ended, its late window
       // shut) is not offered, as the dialog lists none.
-      if (wsInviteOffered(c)) act("ws:invite", "Invite people", () => _dispatch("ws-invite"), `To ${c.name}`);
+      if (wsInviteOffered(c)) {
+        act("ws:invite", "Invite people", () => _dispatch("ws-invite"), `To ${c.name}`);
+        // The header Invite's second choice, by the same predicate; withheld
+        // while it would be refused (sweep #501), as the menu says why.
+        if (!deskApprovalWithheld()) act("ws:desk-invite", "Sign up at the desk", () => _dispatch("desk-invite"), `In ${c.name}`);
+      }
       const doc = document.implementation.createHTMLDocument("");
       const box = doc.createElement("div");
       setSafeHtml(box, wsMenuItemsHtml(c));

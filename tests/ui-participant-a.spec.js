@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").openFi
 // Rows are read and clicked across every Participants column; the default is six.
 test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").showAllParticipantColumns(page); });
 const { registerPost } = require("./helpers");
-const { fillBreakGlass, submitLogin, signUpViaUi, narrowEventsTable } = require("./ui-admin-helpers");
+const { fillBreakGlass, submitLogin, signUpViaUi, narrowEventsTable, openRowEventMenu } = require("./ui-admin-helpers");
 const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, TEST_DB_PATH, gradingHashFor, codeLogin } = require("./helpers");
 
 // v8.7.5 — resolve an admin tab by its `data-tab-id`, never by its visible
@@ -1138,7 +1138,7 @@ test.describe("Superadmin UI", () => {
     await sa2.dispose();
   });
 
-  test("Open primary button visible for ended events, edit accessible in kebab", async ({ page }) => {
+  test("Open primary button visible for ended events, edit accessible in its workspace menu", async ({ page }) => {
     await adminLogin(page);
     await clickTab(page, "Events");
     await expect(page.locator(".status-badge.live").first()).toBeVisible({ timeout: 10000 });
@@ -1158,8 +1158,11 @@ test.describe("Superadmin UI", () => {
     // Open is the universal primary action for events (opens the event's workspace)
     await expect(endedRow.locator(".comp-actions button.btn[data-action='comp-open']").first()).toBeVisible({ timeout: 5000 });
     await expect(endedRow.locator(".comp-actions button.btn[data-action='comp-open']").first()).toContainText("Open");
-    // Edit still accessible via the kebab menu (superadmin override allows editing ended comps)
-    await expect(endedRow.locator(".kebab-menu button:has-text('Edit')")).toHaveCount(1);
+    // Edit settings is the event's workspace ⋯ menu's (the row menu keeps only
+    // Delete event); a superadmin may edit an ended event.
+    await expect(endedRow.locator(".kebab-menu [data-action='comp-edit']"), "not on the row").toHaveCount(0);
+    const portal = await openRowEventMenu(page, endedRow);
+    await expect(portal.locator("[data-action='comp-edit']")).toHaveCount(1);
   });
 });
 

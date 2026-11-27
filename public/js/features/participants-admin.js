@@ -17,7 +17,8 @@ import { applyColumnFilters, applyColumnSort, columnSortActive, hasColumnFilters
 import { hideLoading, showLoading } from "../ui/loading.js";
 import { overlayDismiss, showModal } from "../ui/modal.js";
 import { showPrompt, showToast } from "../ui/toast.js";
-import { adminCan, deskApprovalWithheld, DESK_APPROVAL_REASON } from "../ui/nav.js"; // RBAC — the one permission predicate (read inside functions only)
+import { adminCan, adminPageOffered, deskApprovalWithheld, DESK_APPROVAL_REASON } from "../ui/nav.js";
+import { showUserInRoles } from "./users-admin.js"; // RBAC — the one permission predicate (read inside functions only)
 
 /**
  * v8.7.4 — ONE definition of "the acting admin may not manage this account".
@@ -183,9 +184,11 @@ export function isCompEffectivelyActive(comp){
   return false;
 }
 
+// The selection bar is the ONE door for acting on ticked people: assigning them
+// to events was also a toolbar button, the same action on the same selection
+// (owner's decision, 27 Nov 2026: removed).
 export function updateSelectionBar(){
   const bar=document.getElementById('participants-selection-bar');
-  const topBtn=document.getElementById('assign-to-comp-btn');
   const barBtn=document.getElementById('selection-bar-assign-btn');
   const count=S.selectedParticipants.size;
   const comp=S.adminSelectedCompetitionId?S.adminCompetitionsData.find(c=>c.id===S.adminSelectedCompetitionId):null;
@@ -209,9 +212,6 @@ export function updateSelectionBar(){
     // bottom-of-page focusables aren't trapped under it (see styles.css).
     document.body.classList.add('selection-bar-open');
     document.getElementById('selection-count').textContent=count+' selected';
-    topBtn.style.display=canAssign?'':'none';
-    topBtn.textContent=label;
-    topBtn.onclick=handler;
     barBtn.textContent=label;
     barBtn.onclick=handler;
     // Only show approve button if selected participants include pending users
@@ -233,7 +233,6 @@ export function updateSelectionBar(){
   }else{
     bar.style.display='none';
     document.body.classList.remove('selection-bar-open');
-    topBtn.style.display='none';
   }
 }
 
@@ -756,35 +755,15 @@ export function renderParticipants(){
       : '';
     const pRole=p.role||'participant';
     const isSelf=S.currentUser&&S.currentUser.id===p.id;
+    // ROLE CHANGES LIVE ON ROLES & PERMISSIONS ONLY (owner's decision, 27 Nov
+    // 2026): the row's Promote/Demote items are gone, and the row links there
+    // instead, for the viewer who could make the change (a superadmin, not on
+    // their own row, not on a rival's: the role route is a rival door). That page
+    // lists the admin accounts with Change role, and Add user gives an existing
+    // participant an admin role; it opens searched to this person.
     let roleKm='';
-    if(S.isSuperAdmin&&!isSelf&&!_rival){
-      if(pRole==='participant'){
-        roleKm=`<button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="admin" data-prev-role="${esc(pRole)}">${ICO.arrowUp} Promote to Admin</button><button class="km-danger" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="superadmin" data-prev-role="${esc(pRole)}">${ICO.star} Promote to Superadmin</button>`;
-      }else if(pRole==='admin'){
-        roleKm=`<button class="km-danger" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="superadmin" data-prev-role="${esc(pRole)}">${ICO.star} Promote to Superadmin</button><button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="participant" data-prev-role="${esc(pRole)}">${ICO.arrowDown} Demote to Participant</button>`;
-      }else if(pRole==='superadmin'){
-        roleKm=`<button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="admin" data-prev-role="${esc(pRole)}">${ICO.arrowDown} Demote to Admin</button><button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="participant" data-prev-role="${esc(pRole)}">${ICO.arrowDown} Demote to Participant</button>`;
-      }else if(pRole==='event_admin'){
-        // v8.7.4 — THE TIER HAD NO ROLE CONTROL AT ALL. The chain above had no
-        // `event_admin` branch and no `else`, so `roleKm` stayed empty and a
-        // superadmin had NO WAY to demote an event admin from any screen —
-        // while the role route accepts the move in both directions and cascades
-        // every grant away on the way out, and ROLES_AND_PERMISSIONS states the
-        // capability as one the operator requires. Reachable only with curl,
-        // which by this codebase's doctrine is not shipped at all.
-        //
-        // "Remove as event admin of <event>" is NOT a substitute and must not be
-        // read as one: it revokes ONE grant and deliberately leaves the role in
-        // place (the fail-closed zero-grant state). Demoting altogether is this
-        // control, and only this one.
-        //
-        // The tier is deliberately NOT offered as a promotion TARGET here: the
-        // scope is granted per EVENT, from the focused event's own kebab item,
-        // and a role-menu promotion would mint an organiser with nothing to
-        // organise. Every other role control is global; this one names an event,
-        // which is why it lives there rather than here.
-        roleKm=`<button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="admin" data-prev-role="${esc(pRole)}">${ICO.arrowUp} Promote to Admin</button><button class="km-danger" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="superadmin" data-prev-role="${esc(pRole)}">${ICO.star} Promote to Superadmin</button><button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="participant" data-prev-role="${esc(pRole)}">${ICO.arrowDown} Demote to Participant</button>`;
-      }
+    if(S.isSuperAdmin&&!isSelf&&!_rival&&adminPageOffered('admin-users-tab')){
+      roleKm=`<button data-action="participant-open-roles" data-user-id="${esc(p.id)}" data-email="${esc(p.email||'')}">${ICO.key} Change role on Roles &amp; permissions</button>`;
     }
     // v8.7.0 — MAKE / REMOVE EVENT ADMIN, for the focused event.
     //
@@ -1165,6 +1144,11 @@ export async function loadAdminParticipants(opts){
   // focused event changed state under an open table) keeps their page and their
   // ticked rows; every other caller is a navigation or an action and resets both.
   const _keepView=!!(opts&&opts.keepView===true);
+  // ADMIN ACCOUNTS ARE NOT PEOPLE (owner's decision, 27 Nov 2026: "Show admin
+  // accounts" is gone; admins live on Roles & permissions). Only a cross-page
+  // link to one (admin-crossnav.js `widenPeopleToAdmins`: a competing admin on a
+  // board) lists them, until People is next entered; the list says so.
+  if(opts&&opts.tabEntry){ S.pIncludeAdmins=!!S._pWidenOnce; S._pWidenOnce=false; }
   // RBAC — a role that may not read people sends no read (every refusal toasts
   // and counts towards the address's scanner block).
   if(!adminCan('participants.view'))return;
@@ -1220,9 +1204,8 @@ export async function loadAdminParticipants(opts){
     // RBAC — People is participants; an event workspace asks for every role so
     // the event's roster keeps the staff who compete in it.
     const _kind=(S.adminSelectedCompetitionId||S.pIncludeAdmins)?'&kind=all':'';
-    { const off=!!(S.adminSelectedCompetitionId||(S.isEventAdmin&&!S.pIncludeAdmins));
-      const sc=document.getElementById('p-admins-scope'); if(sc)sc.hidden=off;
-      const tip=document.getElementById('p-admins-scope-help'); if(tip)tip.hidden=off; }
+    { const note=document.getElementById('p-admins-note'); if(note)note.hidden=!!S.adminSelectedCompetitionId||!S.pIncludeAdmins;
+      const roles=document.getElementById('p-admins-note-roles'); if(roles)roles.hidden=!adminPageOffered('admin-users-tab'); }
     try{ const _r=await fetch(`/api/admin/participants?limit=5000&page=${page}${_kind}`); if(_r.ok) raw=await _r.json(); }catch(e){ console.warn('Could not load participants page',page,e); }
     if(raw===null){
       // v8.12.6 (review) — BOTH exits release the loading count this call took.
@@ -1263,7 +1246,11 @@ export async function loadAdminParticipants(opts){
   // them, `events.view`), At the desk (`participants.enrol`), the file exports
   // (`export.data`); the Export menu goes when it holds nothing, and a hidden
   // door's "?" tip goes with it.
-  { const enrol=adminCan('participants.enrol'), exp=adminCan('export.data');
+  // Inside an event's workspace neither people door is here: the workspace
+  // header's Invite holds both (an email invitation, a sign-up at the desk;
+  // owner's decision, 27 Nov 2026). The People page keeps its toolbar.
+  { const inWs=!!S.adminSelectedCompetitionId;
+    const enrol=adminCan('participants.enrol')&&!inWs, exp=adminCan('export.data');
     const show=(el,on)=>{ if(el)el.style.display=on?'':'none'; };
     show(document.getElementById('invite-participants-btn'),enrol&&(!S.isEventAdmin||adminCan('events.view')));
     show(document.getElementById('desk-invite-btn'),enrol);
@@ -1572,47 +1559,13 @@ export async function verifyUser(id){
   loadAdminParticipants();showToast('User verified!','success');
 }
 
-export async function setUserRole(userId,role,currentRole){
-  // v8.7.4 — `event_admin` joins BOTH maps, and the rank one is not cosmetic.
-  // Without a label the confirm read "Promote to undefined"; without a rank the
-  // tier scored 0, the same as a participant, so demoting an organiser to
-  // participant compared 0 < 0 and announced itself as a PROMOTION. The tier
-  // sits between participant and admin — scoped to some events rather than all
-  // of them — which keeps every pre-existing transition's verb unchanged.
-  const labels={admin:'Admin',superadmin:'Superadmin',participant:'Participant',event_admin:'Event Admin'};
-  const rank={participant:0,event_admin:1,admin:2,superadmin:3};
-  const action=(rank[role]||0)<(rank[currentRole]||0)?'Demote':'Promote';
-  const isDemotion=action==='Demote';
-  const promotingToSuperadmin=!isDemotion&&role==='superadmin';
-  // Severity: demotion + promoting to superadmin = danger; other promotions = warning
-  const confirmClass=(isDemotion||promotingToSuperadmin)?'danger':'warning';
-  // LEAVING the event-admin tier drops every event grant, in the same
-  // transaction as the role write. That is what "demote altogether" means, and
-  // it is not recoverable by putting the role back — the grants are gone and
-  // must be re-issued per event. An operator must be told BEFORE clicking.
-  const leavingEventAdmin=currentRole==='event_admin'&&role!=='event_admin';
-  // The COUNT comes from the row the operator is looking at — `event_admin_for`
-  // rides the participant payload — because the superadmin guide promises the
-  // confirmation says how many events go. It is a poll old at worst, so the
-  // toast below reports the server's authoritative figure once it is known.
-  const _eaCount=leavingEventAdmin
-    ?((S.adminParticipantsData||[]).find(u=>u.id===userId)?.event_admin_for||[]).length
-    :0;
-  const extra=(promotingToSuperadmin?'<br><br><strong>Note:</strong> Superadmins have full control over the platform, including the ability to delete data and change other users\' roles.':'')
-    +(leavingEventAdmin?`<br><br><strong>Note:</strong> This also removes every event they organise${_eaCount?` (${_eaCount})`:''}. Putting the role back does not restore them — each event has to be granted again.`:'');
-  const ok=await showModal({title:`${action} to ${labels[role]}`,message:`This will change ${_pLabel(userId)}'s role to <strong>${labels[role]}</strong>.${extra}`,confirmText:action,confirmClass});
-  if(!ok)return;
-  const r=await fetch(`/api/admin/participants/${userId}/role`,{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({role})});
-  const d=await r.json();
-  if(!r.ok){showToast(d.error||'Failed.','error');return;}
-  // The server's own count, not the row's: a grant made between the render and
-  // the click would otherwise be cleared silently. A skip/clear counter with no
-  // human consumer is the v7.21.2 defect, and this one records an irreversible
-  // step — the grants have to be re-issued per event.
-  const _cleared=Number(d.event_admin_grants_cleared)||0;
-  showToast(`Role updated to ${labels[role]||role}.`
-    +(_cleared?` ${_cleared} event grant${_cleared===1?'':'s'} cleared.`:''),'success');
-  loadAdminParticipants();
+// The row's link to Roles & permissions, where a role is changed (the page
+// opens searched to this person's address).
+export function openRolesFor(email){
+  const item=document.querySelector('.admin-nav-item[data-tab-id="admin-users-tab"]');
+  if(!item){showToast('Your role cannot open Roles & permissions.','info');return;}
+  showUserInRoles(email);
+  item.click();
 }
 
 // v8.7.0 — GRANT / REVOKE the event-admin role for ONE event.

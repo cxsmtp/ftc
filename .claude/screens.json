@@ -1274,7 +1274,7 @@
       "route": "/",
       "visual_anchor": "#hist-overlay",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; click #admin-comp-body tr:first-child .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-history] ; waitFor #hist-overlay",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-history] ; waitFor #hist-overlay",
       "files": {
         "markup": {
           "path": "public/js/features/history.js",
@@ -1382,7 +1382,8 @@
           "path": "public/styles.css",
           "grep": "\\.kebab-|\\.km-danger|\\.km-warning|#kebab-portal"
         }
-      }
+      },
+      "note": "The Events-row menu holds only Delete event (owner's decision, 27 Nov 2026); the event's other doors are its workspace's ⋯ menu (ws-more-menu)."
     },
     {
       "screen": "participant-picker-dialog",
@@ -1391,7 +1392,7 @@
       "route": "/",
       "visual_anchor": "#admin-participants-tab",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-competitions-tab ; waitFor #admin-comp-body tr ; fill #comp-search Test Upcoming ; click #admin-comp-body tr:has-text('Test Upcoming') .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-manage-participants] ; waitFor #admin-participants-tab",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Upcoming ; click #admin-comp-body tr:has-text('Test Upcoming') td:nth-child(1) ; waitFor #ws-record ; section admin-participants-tab ; waitFor #admin-participants-tab",
       "files": {
         "markup": null,
         "behaviour": {
@@ -1453,7 +1454,7 @@
       "route": "/",
       "visual_anchor": "#self-enroll-overlay",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-competitions-tab ; waitFor #admin-comp-body tr ; click #admin-comp-body tr:first-child .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-self-enroll] ; waitFor #self-enroll-overlay",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-self-enroll] ; waitFor #self-enroll-overlay",
       "files": {
         "markup": null,
         "behaviour": {
@@ -1493,7 +1494,7 @@
       "route": "/",
       "visual_anchor": ".picker-modal",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-competitions-tab ; waitFor #admin-comp-body tr ; fill #comp-search Test Upcoming ; click #admin-comp-body tr:has-text('Test Upcoming') .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-assign-challenges] ; waitFor .picker-modal",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Upcoming ; click #admin-comp-body tr:has-text('Test Upcoming') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-assign-challenges] ; waitFor .picker-modal",
       "files": {
         "markup": {
           "path": "public/js/features/challenges-admin.js",
@@ -2575,7 +2576,7 @@
       "route": "/",
       "visual_anchor": "div:has(> .card #prompt-input)",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=desk-invite] ; waitFor #prompt-input",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-invite-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=desk-invite] ; waitFor #prompt-input",
       "files": {
         "behaviour": {
           "path": "public/js/features/participants-admin.js",
@@ -2589,7 +2590,7 @@
           "grep": "\\.desk-code"
         }
       },
-      "note": "Sign up at the desk, from the ⋯ menu: the address prompt (ui/toast.js showPrompt, an overlay with no id, styled inline). Pressing \"Create and show code\" leads to the Sign-in code dialog (#modal-overlay, .desk-code), not captured here because it creates an account."
+      "note": "Sign up at the desk, from the workspace header's Invite menu (its second choice beside Email invitation): the address prompt (ui/toast.js showPrompt, an overlay with no id, styled inline). Pressing \"Create and show code\" leads to the Sign-in code dialog (#modal-overlay, .desk-code), not captured here because it creates an account."
     },
     {
       "screen": "ws-email-delivery",
@@ -2609,25 +2610,6 @@
         }
       },
       "note": "Email delivery, from the ⋯ menu: enrolled, verified and email-failed counts for the seeded live event, in the shared modal. The panel is styled inline in competitions-admin.js."
-    },
-    {
-      "screen": "ws-organisers",
-      "status": "pending",
-      "route": "/",
-      "visual_anchor": "#modal-overlay",
-      "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; fixture wsLive ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search {{wsLive.name}} ; click #admin-comp-body tr:has-text('{{wsLive.name}}') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-organisers] ; waitFor #modal-overlay.open ; waitFor #modal-body li",
-      "files": {
-        "behaviour": {
-          "path": "public/js/features/competitions-admin.js",
-          "grep": "export async function showCompetitionOrganisers"
-        },
-        "styles": {
-          "path": "public/styles.css",
-          "grep": "#modal-overlay|#modal-box"
-        }
-      },
-      "note": "Organisers, from the ⋯ menu: the read-only list of the event's organisers (fixture wsLive grants two), in the shared modal. Styled inline in competitions-admin.js."
     },
     {
       "screen": "ws-certificates",
@@ -2904,6 +2886,69 @@
         }
       },
       "note": "The admin sidebar. On a phone it is a drawer behind the section bar: the `drawer` step opens it there (and does nothing on a wide screen). The anchor's :not([inert]) keeps a closed drawer, off-canvas but still a box, from passing as the sidebar."
+    },
+    {
+      "screen": "ws-analytics",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-analytics-tab",
+      "auth": "superadmin",
+      "note": "Analytics inside an event's workspace: that event only, no Global/Event switch and no event picker; a session select where the event has sessions.",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; section admin-analytics-tab ; waitFor #analytics-filterbar .filter-card",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "#admin-analytics-tab|analytics-filterbar"
+        },
+        "behaviour": {
+          "path": "public/js/features/analytics-admin.js",
+          "grep": "renderAnalyticsFilterBar|_analyticsAdoptFocusedScope"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.analytics-|\\.filter-card"
+        }
+      }
+    },
+    {
+      "screen": "competition-form-booth",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#comp-form-overlay",
+      "auth": "superadmin",
+      "note": "The create form for a Booth Event with Advanced settings open: the type as a chip with Change type, and no Checkmarx One section (a Booth Event never creates Checkmarx One accounts).",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; click [data-action=open-competition-form] ; waitFor #admin-templates-tab ; click #tpl-kind-cards [data-action=new-event-start][data-kind=\"booth\"] ; waitFor #comp-form-overlay ; waitFor #comp-name ; click #comp-advanced summary",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/competitions-admin.js",
+          "grep": "openCompetitionForm|comp-kind-change|comp-advanced"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.comp-form-|\\.comp-kind-"
+        }
+      }
+    },
+    {
+      "screen": "ws-invite-menu",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#kebab-portal",
+      "auth": "superadmin",
+      "note": "The workspace header's Invite: one control for adding people, its menu offering Email invitation and Sign up at the desk (owner's decision, 27 Nov 2026).",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-invite-btn ; waitFor #kebab-portal.open",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/event-workspace.js",
+          "grep": "wsInviteItemsHtml|ws-invite-btn"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#ws-quick|\\.ws-more-btn"
+        }
+      }
     }
   ],
   "_module_graph_note": "public/app.js DOES NOT EXIST — the SPA was split into public/js/** ES modules in v7.0.0. Module bodies are side-effect-free; all boot wiring lives in core/main.js boot(). public/help.js, public/help-renderer.js, public/theme-boot.js and public/asset-versions.js are standalone CLASSIC scripts, outside the module graph.",

@@ -136,7 +136,12 @@ role holding `data.import` reaches it: an importer who is not a superadmin has a
 row skipped and counted (`privileged_skipped`) when it would give a role beyond
 their own, or overwrite an account that is a privileged target for them (§9.6). The role change itself is ONE handler behind two
 doors: `POST /api/admin/participants/:id/role` (superadmin tier, unchanged) and
-`PATCH /api/admin/users/:id/role` (`users.manage`). `POST /api/admin/users` creates
+`PATCH /api/admin/users/:id/role` (`users.manage`). In the app the role is
+changed in one place, Roles & permissions (operator decision, 27 Nov 2026): a
+People row offers no role control, only **Change role on Roles & permissions**,
+a link that opens that page searched to the person (offered to a superadmin,
+never on their own row or a rival's, and only while the page is one they may
+open); the participants route stays for API callers. `POST /api/admin/users` creates
 a new account holding a role (verified, approved, no password: it signs in by its
 role's default method, §1, so an account given an unscoped role signs in first
 with an emailed code and is asked to set a password) and re-asks `users.manage`
@@ -188,11 +193,12 @@ withholds **Change role** on that row with the reason: the role change is a riva
 door (§9.8).
 
 **People and the sidebar.** `GET /api/admin/participants` (no `competitionId`)
-leaves out the unscoped (class `all`) admin accounts unless `?kind=all` (People's
-**Show admin accounts**, and every event workspace); participants and
-grant-scoped organisers stay. For an event admin `?kind=all` is still narrowed to
-their events, and the box shows only while a "show me this person" link has
-ticked it (an administrator competing in one of their events). The admin sidebar shows an item only when the
+leaves out the unscoped (class `all`) admin accounts unless `?kind=all` (every
+event workspace, and People for one visit after a "show me this person" link,
+with a note above the table saying so; People has no switch of its own: admin
+accounts are managed on Roles & permissions, operator decision 27 Nov 2026);
+participants and grant-scoped organisers stay. For an event admin `?kind=all` is
+still narrowed to their events. The admin sidebar shows an item only when the
 role holds the permission its pane reads (`public/js/ui/nav.js`
 `ADMIN_NAV_PERMISSIONS`), so a custom role sees exactly the pages it may use.
 The panel opens on Events only for a role holding `events.view`, any other on
@@ -210,8 +216,8 @@ opens read-only with the reason (a group's Members and Events, the join-link
 toggles, a template the role may not start an event from, Add user when the
 role may give no role). While **Require admin approval for new accounts** is on,
 a role that may invite but not approve keeps People's **At the desk** in its
-place, its tooltip and press giving the reason, sees the reason in place of the
-event ⋯ menu's **Sign up at the desk**, finds no desk action in the command
+place, its tooltip and press giving the reason, sees the reason in place of
+**Sign up at the desk** in the event header's **Invite** menu, finds no desk action in the command
 palette, and is told in the **Invite** dialog that someone new it invites waits
 for an administrator's approval. A name on a board or in a list links into another page
 only when the role may open that page. These are held door by door
@@ -652,7 +658,7 @@ route's own tier guard.
 
 | Surface | Event admin |
 |---|---|
-| **Events** | Sees only granted events, at any status. Full per-event control equal to a normal admin: edit, sessions, tags, CxOne override, join link, end now, **close late entries now** (a Booth Event whose late-entry window is open — §9.9), export activity — **unless they compete in it** (v8.12.0): an organiser enrolled in an event whose **Staff can compete** switch is on can view that event and not change it, whatever their tier — the reads stay (Open, History, Organisers, Email Delivery, Export Activity, a rival's person export, and the **Join Link** dialog, which opens read-only: link, QR and code shown, the toggle and Regenerate withheld), only the mutating controls go — until they remove themselves, which they can do while the event has not ended (§9.8). **Cannot create an event from scratch**, and cannot delete one (superadmin). Since v8.15.0 they can **clone** an event they organise and **spawn** an event template; either makes them the new event's organiser, and neither copies participants, answers or the join link. Templates themselves are managed by administrators only. The **full event export** and the **person export** are scoped like every other read: their own events only, and a person's export narrowed to rows about those events. |
+| **Events** | Sees only granted events, at any status. Full per-event control equal to a normal admin: edit, sessions, tags, CxOne override, join link, end now, **close late entries now** (a Booth Event whose late-entry window is open — §9.9), export activity — **unless they compete in it** (v8.12.0): an organiser enrolled in an event whose **Staff can compete** switch is on can view that event and not change it, whatever their tier — the reads stay (Open, History, the Overview's Organisers card, Email delivery, Export activity, a rival's person export, and the **Join Link** dialog, which opens read-only: link, QR and code shown, the toggle and Regenerate withheld), only the mutating controls go — until they remove themselves, which they can do while the event has not ended (§9.8). **Cannot create an event from scratch**, and cannot delete one (superadmin). Since v8.15.0 they can **clone** an event they organise and **spawn** an event template; either makes them the new event's organiser, and neither copies participants, answers or the join link. Templates themselves are managed by administrators only. The **full event export** and the **person export** are scoped like every other read: their own events only, and a person's export narrowed to rows about those events. |
 | **Challenges** | **Creates** freely. **Sees** challenges they created, challenges used by one of their events, and `public-domain` ones. The per-row events column shows only their events (v8.8.8), with a count of any others holding it. **Edits / publishes / hides / tags** only their own — and on a **sealed** challenge those four are its author's alone whatever the tier (a superadmin who has revealed it aside), because the seal names an account rather than a tier (§9.7). **Assigns** any challenge they can see to any event they manage — but an event where staff compete admits only a **sealed** challenge, and never one its author competes in (§9.8). **Unassigns** only what they themselves assigned. Cannot hard-delete (superadmin), lock, or recalculate. A challenge held by an event they compete in is read-only for them, hint included (§9.8). |
 | **Participants** | Sees only people enrolled in one of their events, plus an account waiting for an administrator's approval whose live invitation names one of their events (signed up through an invitation whose inviter cannot approve accounts, §1): its row names only those of their events it was invited to, so they can ask an administrator to approve it, and they can view it but neither approve it nor take any other row action on it, as it is in none of their events (operator ruling, 23 Nov 2026; their pending count still counts members only). The per-row events column shows only their events, and so does a participant's History (v8.8.4). Invites (including at the desk) only into their events, and an invitation must name at least one of them that is live, upcoming or taking late entries — one naming none is refused. The **Invite Participants** dialog lists exactly those events (one they compete in is listed, marked **You compete here**, and cannot be ticked) and will not send with none ticked; when only one can be ticked it is ticked for them, marked **Always included**, and cannot be unticked; when none can be, the dialog says why — in place of the list when it has no events to show, under the events they compete in otherwise — and **Send Invitations** is disabled. CSV export covers only what they can see. A Booth Event of theirs that has ended but is still inside its **late-entry window** stays open to every door that adds people — invite, assign, **At the desk**, a bound group — and whoever is added joins as a late entrant; only late entrants can then be removed from it (§9.9). Per-participant actions as a normal admin — approve, deny, block, unlock, email or show a sign-in code, tags, impersonate (participants only, in their participant view — read-only, narrowed to your events — §9.5b; viewing a fellow organiser's panel is an administrator's door, §9.5d). An invitation of theirs approves an existing account waiting for approval only as **Approve** would: when the invitation puts it into one of their events as a participant (an organiser's or administrator's waiting account never). One whose every enrolment was skipped stays waiting, and the **Invite Participants** dialog says so and keeps those addresses in the box. **Cannot** change a role, verify or delete. |
 | **Groups** | Creates freely. Sees groups they created or that are bound to one of their events. **Deletes only groups they created.** Cannot edit a group that is also bound to somebody else's event (§9.2), nor change the membership of one bound to an event they **compete in** — a group change reconciles onto that board (§9.8; any tier, and a rename stays open). |
@@ -803,7 +809,7 @@ role badge alone.
 **The states still DIFFER in the payload** — `event_admin_for` is empty for a
 zero-grant organiser and non-empty for one whose events have all finished — so
 nothing is lost, only unrendered. A reader who wants that difference on screen
-should reach for the participant's History or the event's Organisers list, not
+should reach for the participant's History or the Organisers card on the event's Overview, not
 for a label in this cell. Locked, with each empty state as the other's control
 and a badged row as the anti-vacuity control, in
 `tests/event-admin-role-badges.spec.js`.

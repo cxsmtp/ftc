@@ -374,12 +374,12 @@ test.describe("RBAC — a custom role in the browser", () => {
     await expect.poll(() => wsTabsShown(page), { message: "only the sections events.view reads", timeout: 15000 })
       .toEqual(["admin-event-overview-tab", "admin-event-team-tab", "admin-event-settings-tab"]);
     // The header: no Invite, no join pill; the ⋯ menu holds only the reads.
-    await expect(page.locator('#ws-quick [data-action="ws-invite"]')).toHaveCount(0);
+    await expect(page.locator('#ws-quick .ws-invite-btn')).toHaveCount(0);
     await expect(page.locator(".ws-join-pill")).toHaveCount(0);
     await page.locator("#ws-quick .ws-more-btn").click();
     await expect(page.locator("#kebab-portal")).toBeVisible();
     const items = await page.locator("#kebab-portal [data-action]").evaluateAll((els) => els.map((e) => e.dataset.action));
-    expect(items, "only the doors events.view opens").toEqual(["comp-history", "comp-organisers", "comp-delivery"]);
+    expect(items, "only the doors events.view opens").toEqual(["comp-history", "comp-delivery"]);
     await page.keyboard.press("Escape");
     // The palette inherits the same gates (Invite and every workspace write).
     await openPalette(page);
@@ -396,15 +396,12 @@ test.describe("RBAC — a custom role in the browser", () => {
     await expect(page.locator("#admin-event-settings-tab")).toContainText("Your role can view this event's settings, not change them.");
     await expect(page.locator('#admin-event-settings-tab [data-action="comp-edit"]')).toHaveCount(0);
     await expect(page.locator('#admin-event-settings-tab [data-action="event-look-save"]')).toHaveCount(0);
-    // The Events row menu asks the same permissions.
+    // The Events row menu holds only Delete event, which this role is not
+    // granted: the row draws no ⋮ at all.
     await page.locator("#ws-record [data-action='scope-clear'], [data-action='scope-clear']").first().click();
     const row = page.locator("#admin-comp-body tr", { hasText: comp.name }).first();
     await expect(row).toBeVisible({ timeout: 15000 });
-    await openKebab(page, row);
-    const rowItems = await page.locator("#kebab-portal [data-action]").evaluateAll((els) => els.map((e) => e.dataset.action));
-    for (const gone of ["comp-edit", "comp-assign-challenges", "comp-manage-participants", "comp-self-enroll", "comp-end-now", "comp-delete", "comp-export-activity"]) {
-      expect(rowItems, `${gone} is not offered`).not.toContain(gone);
-    }
+    await expect(row.locator(".kebab-btn"), "no row menu without events.delete").toHaveCount(0);
     for (const p of ["/api/admin/submissions", "/api/admin/leaderboard", "/api/admin/tasks", "/api/admin/participants"]) {
       expect(t.reads.filter((x) => x === `GET ${p}`), `the workspace read no ${p}`).toEqual([]);
     }
@@ -421,7 +418,8 @@ test.describe("RBAC — a custom role in the browser", () => {
     await openKebab(page, row);
     const del = page.locator('#kebab-portal [data-action="comp-delete"]');
     await expect(del, "the permission it was granted is offered").toHaveCount(1);
-    await expect(page.locator('#kebab-portal [data-action="comp-edit"]'), "control: no Edit without events.edit").toHaveCount(0);
+    expect(await page.locator("#kebab-portal [data-action]").evaluateAll((els) => els.map((e) => e.dataset.action)),
+      "the row menu holds Delete event alone").toEqual(["comp-delete"]);
     await del.click();
     const box = page.locator("#modal-overlay.open");
     await expect(box).toBeVisible();
@@ -640,7 +638,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     await showAllParticipantColumns(page);
     await signIn(page, regAdmin);
     await page.evaluate(() => window.adminTab(null, "admin-participants-tab"));
-    await page.locator("#p-include-admins").check();
+    await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
     await narrowPeopleTable(page, U.desk.email);
     const all = page.locator("#admin-participants-body tr", { hasText: U.desk.email }).first();
     await expect(all, "PRECONDITION: the unscoped holder is listed with admin accounts shown").toBeVisible({ timeout: 15000 });

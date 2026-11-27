@@ -11,7 +11,7 @@
 // future change to any visibility condition, on either tier, fails loudly here
 // rather than being discovered by an operator.
 const { test, expect } = require("./isolated-test");
-const { narrowPeopleTable } = require("./ui-admin-helpers"); // v9.2.5 — the one way to type into the admin search boxes
+const { narrowPeopleTable, peopleWithAdminAccounts } = require("./ui-admin-helpers"); // v9.2.5 — the one way to type into the admin search boxes
 const { registerPost } = require("./helpers");
 const Database = require("better-sqlite3");
 const { apiLogin, freshCtx, getSuperadminPass, PARTICIPANT_PASS, BASE, TEST_DB_PATH, codeLogin } = require("./helpers");
@@ -45,14 +45,10 @@ async function adminTab(page, who) {
   await btn.evaluate((el) => el.click());
   await page.locator("#admin-participants-tab").waitFor({ state: "visible", timeout: 5000 });
   // RBAC — People lists participants and organisers; this matrix also acts on
-  // admin and superadmin rows, which People shows only with "Show admin
-  // accounts" ticked (global admins; an event admin never has the box).
-  const inc = page.locator("#p-include-admins");
-  if (await inc.isVisible().catch(() => false) && !(await inc.isChecked())) {
-    const reload = page.waitForResponse((r) => r.url().includes("/api/admin/participants?") && r.url().includes("kind=all"));
-    await inc.check();
-    await reload;
-  }
+  // admin and superadmin rows, which People lists only after a link to one
+  // (admin accounts live on Roles & permissions; owner's decision, 27 Nov 2026):
+  // `peopleWithAdminAccounts` takes that path, for a global admin.
+  if (!(await page.evaluate(() => !!window.isEventAdmin))) await peopleWithAdminAccounts(page);
 }
 
 /** Open the kebab for `email` and return its visible item labels (+ any note). */
@@ -272,7 +268,7 @@ test.describe("v7.14.2 — participant row-action matrix", () => {
       expect(items.some(i => i.includes(label)), `regular admin sees "${label}" — got ${JSON.stringify(items)}`).toBe(true);
     }
     // And nothing superadmin-only leaks in.
-    for (const label of ["Delete", "Promote", "Demote", "Verify"]) {
+    for (const label of ["Delete", "Promote", "Demote", "Change role", "Verify"]) {
       expect(items.some(i => i.includes(label)), `regular admin must NOT see "${label}"`).toBe(false);
     }
     await closeKebab(page);
@@ -281,8 +277,12 @@ test.describe("v7.14.2 — participant row-action matrix", () => {
   test("SUPERADMIN sees the regular-admin set plus the superadmin-only actions", async ({ page }) => {
     await adminTab(page, "superadmin");
     const { items } = await kebabFor(page, ST.plain.email);
-    for (const label of ["View profile", "Edit Profile", "History", "Impersonate", "Block", "Email sign-in code", "Promote to Admin", "Promote to Superadmin", "Delete"]) {
+    for (const label of ["View profile", "Edit Profile", "History", "Impersonate", "Block", "Email sign-in code", "Change role on Roles & permissions", "Delete"]) {
       expect(items.some(i => i.includes(label)), `superadmin sees "${label}" — got ${JSON.stringify(items)}`).toBe(true);
+    }
+    // Roles are changed on Roles & permissions only (owner's decision, 27 Nov 2026).
+    for (const label of ["Promote", "Demote"]) {
+      expect(items.some(i => i.includes(label)), `no "${label}" on the People row`).toBe(false);
     }
     await closeKebab(page);
   });
@@ -301,7 +301,7 @@ test.describe("v7.14.2 — participant row-action matrix", () => {
       // The read-only profile card is a read, so every row keeps it.
       expect(items.some(i => i.includes("View profile")), `View profile on a privileged peer — got ${JSON.stringify(items)}`).toBe(true);
       // The peer-admin doctrine still holds: no state-changing action offered.
-      for (const label of ["Block", "Unblock", "Email sign-in code", "Impersonate", "Delete", "Promote", "Demote"]) {
+      for (const label of ["Block", "Unblock", "Email sign-in code", "Impersonate", "Delete", "Promote", "Demote", "Change role"]) {
         expect(items.some(i => i.includes(label)), `regular admin must NOT get "${label}" on a privileged peer`).toBe(false);
       }
       await closeKebab(page);
@@ -521,7 +521,7 @@ test.describe("v7.14.2 — participant row-action matrix", () => {
     await expect(page.locator("#impersonation-banner")).toHaveCount(0);
   });
 
-  test("superadmin-only actions work from the UI: Verify, Approve, Promote/Demote, Delete", async ({ page }) => {
+  test("superadmin-only actions work from the UI: Verify, Approve, the role link, Delete", async ({ page }) => {
     const { api, csrf } = await apiLogin("superadmin");
     const H = h(csrf);
     const email = `pam-sa-${ST.stamp}@acme.com`;
@@ -563,19 +563,18 @@ test.describe("v7.14.2 — participant row-action matrix", () => {
     if (await page.locator("#modal-overlay.open").count()) await page.locator("#modal-confirm-btn").click();
     await expect.poll(() => dbGet("SELECT approved FROM users WHERE id=?", uid).approved, { timeout: 10000 }).toBe(1);
 
-    // Promote to Admin, then Demote to Participant.
+    // The role link: Roles & permissions, searched to this person (a
+    // participant is not listed there; Add user gives one an admin role). It
+    // changes nothing by itself.
     await kebabFor(page, email);
-    await page.locator("#kebab-portal button:has-text('Promote to Admin')").first().click();
-    await page.locator("#modal-overlay.open").waitFor({ state: "visible", timeout: 5000 });
-    await page.locator("#modal-confirm-btn").click();
-    await expect.poll(() => dbGet("SELECT role FROM users WHERE id=?", uid).role, { timeout: 10000 }).toBe("admin");
-    await kebabFor(page, email);
-    await page.locator("#kebab-portal button:has-text('Demote to Participant')").first().click();
-    await page.locator("#modal-overlay.open").waitFor({ state: "visible", timeout: 5000 });
-    await page.locator("#modal-confirm-btn").click();
-    await expect.poll(() => dbGet("SELECT role FROM users WHERE id=?", uid).role, { timeout: 10000 }).toBe("participant");
+    await page.locator("#kebab-portal button:has-text('Change role on Roles & permissions')").first().click();
+    await expect(page.locator("#admin-users-tab")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#ua-search")).toHaveValue(email, { timeout: 15000 });
+    await expect(page.locator("#ua-users-list")).toContainText("To give a participant an admin role, use Add user with their address.");
+    expect(dbGet("SELECT role FROM users WHERE id=?", uid).role, "the link changed nothing").toBe("participant");
 
     // Delete.
+    await adminTab(page, "superadmin");
     await kebabFor(page, email);
     await page.locator("#kebab-portal button:has-text('Delete')").first().click();
     await page.locator("#modal-overlay.open").waitFor({ state: "visible", timeout: 5000 });
@@ -636,12 +635,13 @@ test.describe("v7.14.2 — participant row-action matrix", () => {
     });
   }
 
-  test("v8.7.4 — a SUPERADMIN can move an EVENT ADMIN out of the tier from the row", async ({ page }) => {
+  test("v8.7.4 — a SUPERADMIN reaches an EVENT ADMIN's role from the row (it changes on Roles & permissions)", async ({ page }) => {
     await adminTab(page, "superadmin");
     const { items } = await kebabFor(page, ST.peerEventAdmin.email);
-    for (const label of ["Promote to Admin", "Promote to Superadmin", "Demote to Participant"]) {
-      expect(items.some(i => i.includes(label)),
-        `superadmin sees "${label}" on an event-admin row — got ${JSON.stringify(items)}`).toBe(true);
+    expect(items.some(i => i.includes("Change role on Roles & permissions")),
+      `superadmin is offered the role link on an event-admin row — got ${JSON.stringify(items)}`).toBe(true);
+    for (const label of ["Promote", "Demote"]) {
+      expect(items.some(i => i.includes(label)), `no "${label}" on the People row`).toBe(false);
     }
     // The per-EVENT revoke is a different control and is NOT a substitute: it
     // drops one grant and deliberately leaves the role in place. Asserting both
@@ -663,22 +663,21 @@ test.describe("v7.14.2 — participant row-action matrix", () => {
     expect(dbGet("SELECT COUNT(*) AS n FROM competition_admins WHERE user_id=?", uid).n,
       "precondition: …with a real event grant").toBeGreaterThan(0);
 
+    // From the People row to Roles & permissions, where the role changes.
     await adminTab(page, "superadmin");
     await kebabFor(page, ST.peerEventAdmin.email);
-    await page.locator("#kebab-portal button:has-text('Demote to Participant')").first().click();
-    await page.locator("#modal-overlay.open").waitFor({ state: "visible", timeout: 5000 });
-
-    // The verb, and the warning. `rank` had no entry for the tier, so it scored
-    // 0 — the same as a participant — and this demotion announced itself as
-    // "Promote to undefined" on both counts.
-    await expect(page.locator("#modal-title")).toContainText("Demote to Participant");
-    await expect(page.locator("#modal-body"),
-      "the operator is told the events go, before clicking").toContainText("removes every event they organise");
-    // The COUNT, which the superadmin guide promises the confirmation gives.
-    await expect(page.locator("#modal-body"),
-      "…and how many, from the row they are looking at").toContainText("(1)");
-
-    await page.locator("#modal-confirm-btn").click();
+    await page.locator("#kebab-portal button:has-text('Change role on Roles & permissions')").first().click();
+    await expect(page.locator("#ua-search")).toHaveValue(ST.peerEventAdmin.email, { timeout: 15000 });
+    const urow = page.locator("#ua-users-list tr", { hasText: ST.peerEventAdmin.email });
+    await expect(urow, "the event admin is listed there").toHaveCount(1);
+    await urow.locator('[data-action="ua-change-role"]').click();
+    const dlg = page.locator("#ua-role-change");
+    await expect(dlg).toBeVisible({ timeout: 10000 });
+    await dlg.locator("#ua-rc-role").selectOption("participant");
+    // The warning, before clicking, with the COUNT the superadmin guide promises.
+    await expect(dlg.locator("#ua-rc-grants"), "the operator is told the events go").toContainText("removes every event they organise");
+    await expect(dlg.locator("#ua-rc-grants"), "…and how many").toContainText("(1)");
+    await dlg.locator('button[type="submit"]').click();
     await expect.poll(() => dbGet("SELECT role FROM users WHERE id=?", uid).role, { timeout: 10000 })
       .toBe("participant");
     await expect.poll(() => dbGet("SELECT COUNT(*) AS n FROM competition_admins WHERE user_id=?", uid).n,
@@ -715,7 +714,7 @@ test.describe("v7.14.2 — participant row-action matrix", () => {
 
     await adminTab(page, ST.viewerAdmin.email);
     const { items } = await kebabFor(page, fresh);
-    for (const label of ["Promote", "Demote"]) {
+    for (const label of ["Promote", "Demote", "Change role"]) {
       expect(items.some(i => i.includes(label)),
         `a regular admin must NOT see "${label}" — got ${JSON.stringify(items)}`).toBe(false);
     }

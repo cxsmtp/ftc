@@ -1006,8 +1006,6 @@
           <!-- RBAC — People lists participants and organisers; the platform's
                admin accounts are on Users & roles. Ticking this lists them here
                too (global admins only). -->
-          <label class="checkbox-row p-ws-everyone" id="p-admins-scope" hidden><input type="checkbox" id="p-include-admins" data-change-action="p-include-admins"/> Show admin accounts</label>
-          <span data-help="people.admins" data-help-label="Show admin accounts" id="p-admins-scope-help" hidden></span>
           <button type="button" class="btn sm secondary filters-btn" id="p-filters-btn" data-action="filters-toggle" data-panel="p-filters-panel" aria-expanded="false" aria-controls="p-filters-panel">Filters</button>
           <span data-help="lists.filters" data-help-label="Filters"></span>
           <span class="filters-active" id="p-filters-panel-active"></span>
@@ -1036,7 +1034,6 @@
                open their inbox, this hands the organiser a code to read out. -->
           <button class="btn sm secondary" id="desk-invite-btn" data-action="desk-invite" title="Create an account and show a sign-in code, with no email">At the desk</button>
           <span data-help="people.desk" data-help-label="At the desk"></span>
-          <button class="btn sm" id="assign-to-comp-btn" style="display:none">Assign to Events</button>
           <span class="p-toolbar-gap" aria-hidden="true"></span>
           <span class="p-export-wrap"><button type="button" class="btn sm secondary" id="p-export-menu-btn" data-action="kebab-toggle" aria-label="Export — CSV, JSON or import">Export <span aria-hidden="true">▾</span></button><span class="kebab-menu">
             <button id="export-csv-btn" data-action="export-participants-csv">Export CSV</button>
@@ -1047,6 +1044,7 @@
           <button type="button" class="btn sm secondary" id="p-columns-btn" data-action="p-columns" aria-haspopup="dialog" aria-expanded="false">Columns</button>
           <span data-help="people.columns" data-help-label="Columns"></span>
         </div>
+        <p class="p-admins-note" id="p-admins-note" role="status" hidden>This list also shows administrator accounts, because you followed a link to one. Admin accounts are managed on Roles &amp; permissions. <button type="button" class="link-btn-inline" id="p-admins-note-roles" data-action="participant-open-roles" data-email="">Open Roles &amp; permissions</button></p>
         <div class="card table-card p-table-card">
           <table class="dense" id="p-table" data-tcols="participants">
             <thead><tr>
