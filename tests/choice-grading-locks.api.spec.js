@@ -11,6 +11,7 @@
 // the guarded line exists for.
 const { test, expect } = require("./isolated-test");
 const { BASE, apiLogin } = require("./helpers");
+const { withLegacySharedAssign } = require("./event-admin-helpers");
 const {
   H, uniq, makeParticipant, makeCompetition, assignTask, grantEventAdmin,
   dbAll, dbGet, dbRun, storedTask, storedIds, signIn, asPlayer, mkTask, mkChoice, liveEvent, playerIn,
@@ -36,10 +37,11 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     // answers to a locked challenge were graded and scored.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("lock");
-    const choice = await mkChoice(sa, csrf, [{ text: `R_${T}`, correct: true }, { text: `W_${T}` }]);
-    const text = await mkTask(sa, csrf, { answer_type: "text", correct_answer: `KEY_${T}` });
-    const anyId = await mkTask(sa, csrf, { answer_type: "any" });
-    const ev = await liveEvent(sa, csrf, "lock", [choice, text, anyId]);
+    const choiceBank = await mkChoice(sa, csrf, [{ text: `R_${T}`, correct: true }, { text: `W_${T}` }]);
+    const textBank = await mkTask(sa, csrf, { answer_type: "text", correct_answer: `KEY_${T}` });
+    const anyIdBank = await mkTask(sa, csrf, { answer_type: "any" });
+    const ev = await liveEvent(sa, csrf, "lock", [choiceBank, textBank, anyIdBank]);
+    const [choice, text, anyId] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "lock", [ev.id]);
     const s = await asPlayer(p.email, ev.id);
     // Read every grading token BEFORE locking: a locked read is not the subject.
@@ -80,10 +82,11 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     };
     const slotA = await slot("A", 60_000);
     const slotB = await slot("B", 30_000);
-    const single = await mkChoice(sa, csrf, [{ text: `S1_${T}`, correct: true }, { text: `S2_${T}` }, { text: `S3_${T}` }]);
-    const multi = await mkChoice(sa, csrf, [{ text: `M1_${T}`, correct: true }, { text: `M2_${T}` }, { text: `M3_${T}`, correct: true }]);
-    await assignTask(sa, csrf, single, [ev.id]);
-    await assignTask(sa, csrf, multi, [ev.id]);
+    const singleBank = await mkChoice(sa, csrf, [{ text: `S1_${T}`, correct: true }, { text: `S2_${T}` }, { text: `S3_${T}` }]);
+    const multiBank = await mkChoice(sa, csrf, [{ text: `M1_${T}`, correct: true }, { text: `M2_${T}` }, { text: `M3_${T}`, correct: true }]);
+    // The event's own copies (lib/event-copies.js): the ended session freezes those.
+    const single = (await assignTask(sa, csrf, singleBank, [ev.id])).copies[0].task_id;
+    const multi = (await assignTask(sa, csrf, multiBank, [ev.id])).copies[0].task_id;
     const end = await sa.post(`/api/admin/competitions/${ev.id}/timeslots/${slotA}/end-now`, { headers: H(csrf) });
     expect(end.ok(), `end session A: ${await end.text()}`).toBeTruthy();
     const comp = (await (await sa.get("/api/admin/competitions")).json()).find((c) => c.id === ev.id);
@@ -135,8 +138,9 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     // `correct = !!s.is_correct` — Recalculate then kept every old verdict.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("rc");
-    const id = await mkChoice(sa, csrf, [{ text: `A_${T}`, correct: true }, { text: `B_${T}` }, { text: `C_${T}` }]);
-    const ev = await liveEvent(sa, csrf, "rc", [id]);
+    const idBank = await mkChoice(sa, csrf, [{ text: `A_${T}`, correct: true }, { text: `B_${T}` }, { text: `C_${T}` }]);
+    const ev = await liveEvent(sa, csrf, "rc", [idBank]);
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p1 = await playerIn(sa, csrf, "rc1", [ev.id]);
     const p2 = await playerIn(sa, csrf, "rc2", [ev.id]);
     const s1 = await asPlayer(p1.email, ev.id);
@@ -157,8 +161,9 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     // which graded an ambiguous label as whichever option came last.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("leg");
-    const id = await mkChoice(sa, csrf, [{ text: `Alpha${T}`, correct: true }, { text: `Beta${T}` }, { text: `Gamma${T}` }]);
-    const ev = await liveEvent(sa, csrf, "leg", [id]);
+    const idBank = await mkChoice(sa, csrf, [{ text: `Alpha${T}`, correct: true }, { text: `Beta${T}` }, { text: `Gamma${T}` }]);
+    const ev = await liveEvent(sa, csrf, "leg", [idBank]);
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p1 = await playerIn(sa, csrf, "leg1", [ev.id]);
     const p2 = await playerIn(sa, csrf, "leg2", [ev.id]);
     const s1 = await asPlayer(p1.email, ev.id);
@@ -185,8 +190,9 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     // challenge is no longer a choice one, which left them on their old verdicts.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("sw");
-    const id = await mkChoice(sa, csrf, [{ text: `Paris${T}`, correct: true }, { text: `Rome${T}` }]);
-    const ev = await liveEvent(sa, csrf, "sw", [id]);
+    const idBank = await mkChoice(sa, csrf, [{ text: `Paris${T}`, correct: true }, { text: `Rome${T}` }]);
+    const ev = await liveEvent(sa, csrf, "sw", [idBank]);
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p1 = await playerIn(sa, csrf, "sw1", [ev.id]);
     const p2 = await playerIn(sa, csrf, "sw2", [ev.id]);
     const s1 = await asPlayer(p1.email, ev.id);
@@ -209,8 +215,9 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     // empty stored selection is what marks it: an option may carry that text.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("anysw");
-    const id = await mkChoice(sa, csrf, [{ text: `Paris${T}`, correct: true }, { text: `Rome${T}` }, { text: "(nothing selected)" }]);
-    const ev = await liveEvent(sa, csrf, "anysw", [id]);
+    const idBank = await mkChoice(sa, csrf, [{ text: `Paris${T}`, correct: true }, { text: `Rome${T}` }, { text: "(nothing selected)" }]);
+    const ev = await liveEvent(sa, csrf, "anysw", [idBank]);
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "anysw", [ev.id]);
     const s = await asPlayer(p.email, ev.id);
     for (const texts of [[`Rome${T}`], ["(nothing selected)"], [`Paris${T}`, `Rome${T}`], [`Rome${T}`, "(nothing selected)"]]) {
@@ -281,8 +288,9 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     // of the refusal has its own cases: the empty-pick ones and the not-an-option ones.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("ref");
-    const id = await mkChoice(sa, csrf, [{ text: `Paris${T}`, correct: true }, { text: `Rome${T}` }], { attempt_cap: 1 });
-    const ev = await liveEvent(sa, csrf, "ref", [id]);
+    const idBank = await mkChoice(sa, csrf, [{ text: `Paris${T}`, correct: true }, { text: `Rome${T}` }], { attempt_cap: 1 });
+    const ev = await liveEvent(sa, csrf, "ref", [idBank]);
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "ref", [ev.id]);
     const s = await asPlayer(p.email, ev.id);
     const { byText } = storedIds(id);
@@ -339,9 +347,10 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     // Survived before: describeSelection writing the texts in author order.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("txt");
-    const id = await mkChoice(sa, csrf, [
+    const idBank = await mkChoice(sa, csrf, [
       { text: `Aa${T}`, correct: true }, { text: `Bb${T}` }, { text: `Cc${T}`, correct: true }]);
-    const ev = await liveEvent(sa, csrf, "txt", [id]);
+    const ev = await liveEvent(sa, csrf, "txt", [idBank]);
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "txt", [ev.id]);
     const s = await asPlayer(p.email, ev.id);
     const { byText } = storedIds(id);
@@ -368,9 +377,14 @@ test.describe("v8.14.5 — interpreting, storing and re-grading a multiple-choic
     const opts = [{ text: `R_${T}`, correct: true }, { text: `W_${T}` }];
     const shared = await mkChoice(ea.api, ea.csrf, opts);
     const own = await mkChoice(ea.api, ea.csrf, opts);
-    await assignTask(ea.api, ea.csrf, shared, [mine.id]);
+    // ONE row held by both events — the shape a database from before event-owned
+    // copies holds (built through the real doors in the previous model's mode).
+    // Event copies are never shared, so this is the only way a challenge is.
+    await withLegacySharedAssign(sa, csrf, async () => {
+      await assignTask(ea.api, ea.csrf, shared, [mine.id]);
+      await assignTask(sa, csrf, shared, [theirs.id]);
+    });
     await assignTask(ea.api, ea.csrf, own, [mine.id]);
-    await assignTask(sa, csrf, shared, [theirs.id]);
 
     const retext = (taskId) => {
       const { opts: o, correct } = storedIds(taskId);

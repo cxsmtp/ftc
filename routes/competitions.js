@@ -4,6 +4,9 @@
 // and the per-competition CxOne override. allParticipantsSolvedAll stays in
 // server.js (test-pinned) and is injected. (v7.0.0 refactor: route split.)
 
+const fs = require("fs");
+const path = require("path");
+const { DATA_DIR } = require("../lib/config");   // an event DELETE unlinks the attachment files of the questions it owned
 const { v4: uuid } = require("uuid");
 const db = require("../db");
 const { validateBody, allOptional } = require("../lib/validate");
@@ -2379,10 +2382,28 @@ app.delete("/api/admin/competitions/:id", requireAdmin, requireSuperAdmin, destr
     // and would orphan forever. Delete them first (badge images are referenced
     // only by achievement_badges; a newer certificate names none, sweep #43).
     db.prepare("DELETE FROM images WHERE id IN (SELECT image_id FROM achievement_badges WHERE competition_id=?)").run(req.params.id);
+    // The questions this event OWNS (lib/event-copies.js) go with it, after its
+    // answers, hints and analytics above: nothing else lists them. One a template
+    // names (or another event's row still names) is released into the library.
+    deleteCompTxn._owned = removeEventOwnedQuestions(db, req.params.id);
     _invalidateCompetitionCache(req.params.id);
     db.prepare("DELETE FROM competitions WHERE id=?").run(req.params.id);
   });
   deleteCompTxn();
+  const _owned = deleteCompTxn._owned || { deleted: 0, released: 0, attachmentPaths: [] };
+  counts.owned_questions = _owned.deleted;
+  if (_owned.released) counts.owned_questions_released = _owned.released;
+  // Post-commit: the deleted questions' attachment files, each only once no row
+  // names it (a copy shares its bank question's files). Unreferenced files are
+  // also reaped by the attachment sweeps.
+  for (const rel of [...new Set(_owned.attachmentPaths)]) {
+    if (db.prepare("SELECT 1 FROM task_attachments WHERE storage_path=? LIMIT 1").get(rel)) continue;
+    // Inline path-containment guard (Checkmarx-recognized sanitizer), as at every
+    // attachment sink (lib/attachments.js): unlink only strictly inside DATA_DIR.
+    const _base = path.resolve(DATA_DIR);
+    const abs = path.resolve(path.join(DATA_DIR, String(rel || "")));
+    if (abs.startsWith(_base + path.sep)) fs.unlink(abs, (e) => { if (e && e.code !== "ENOENT") swallowed("competitions:owned-question-unlink", e); });
+  }
   // v8.13.3 — the transaction above deleted this event's competition_users rows
   // (and its organiser grants, by cascade), and the admin participants page embeds
   // both as each row's `competitions[]` / `event_admin_for`. Unbusted, the pane kept
@@ -3073,7 +3094,7 @@ const { DEADLINE_MAX_SPAN_MINUTES } = require("../lib/competitions");
 const { taskViewDenied, isEventAdmin } = require("../lib/event-admin");
 const { unsealedAssignmentDenied, competitorEventsForTask } = require("../lib/staff-compete");
 const { QUALIFYING_PREFIX, DEFAULT_QUALIFYING, qualifyingKeyFromTags } = require("../lib/qualifying");
-const { copyForNewEvent } = require("../lib/event-copies");   // a clone or spawn gets fresh copies
+const { copyForNewEvent, removeEventOwnedQuestions } = require("../lib/event-copies");   // a clone or spawn gets fresh copies; an event DELETE takes its own questions
 
 // The template settings are the create form's own fields, so the SAME rules
 // validate them (`COMPETITION_FIELD_SCHEMA`, picked rather than retyped). Two

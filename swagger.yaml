@@ -5420,7 +5420,11 @@ paths:
         Emits a `source:"audit"` row to `app.jsonl` with `scope:"competition"`,
         `event_type:"deleted"`, and a `cascaded` object counting child rows
         removed in the same transaction (the competition_events table row can't
-        survive the cascade, so the audit trail lives in the log file). A
+        survive the cascade, so the audit trail lives in the log file). The
+        questions the event OWNS (its copies of bank questions, and any created
+        in it) are deleted too, with their attachment files no other row names
+        (`cascaded.owned_questions`); one an event template names is released
+        into the library instead (`cascaded.owned_questions_released`). A
         Checkmarx One provisioning job still in flight for the event stops at its
         next check; nothing already created in the realm is removed.
       parameters:

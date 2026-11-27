@@ -54,12 +54,15 @@ async function seedTaggedChallenge(sa, saCsrf, tags) {
     },
   });
   expect(cr.ok(), `create task: ${cr.status()} ${await cr.text()}`).toBeTruthy();
-  const taskId = (await cr.json()).id;
+  const bankId = (await cr.json()).id;
 
-  const asg = await sa.post(`/api/admin/tasks/${taskId}/competitions`, {
+  const asg = await sa.post(`/api/admin/tasks/${bankId}/competitions`, {
     headers: H(saCsrf), data: { competitionIds: [live.id] },
   });
   expect(asg.ok(), `assign to live: ${asg.status()} ${await asg.text()}`).toBeTruthy();
+  // The live event's OWN copy (lib/event-copies.js): the challenge its participants
+  // read, and so the one tagged below.
+  const taskId = (await asg.json()).copies[0].task_id;
 
   let adminTags = [];
   for (const tag of tags) {

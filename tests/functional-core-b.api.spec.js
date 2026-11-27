@@ -11675,8 +11675,11 @@ test.describe("Event tags (v6.6.0)", () => {
     });
     expect(_taskR.ok(), `create task: ${await _taskR.text()}`).toBeTruthy();
     const _taskBody = await _taskR.json();
-    const _taskId = _taskBody.task ? _taskBody.task.id : _taskBody.id;
-    expect((await api.post(`/api/admin/tasks/${_taskId}/competitions`, { headers: h, data: { competitionIds: [_compId] } })).ok()).toBeTruthy();
+    const _bankId = _taskBody.task ? _taskBody.task.id : _taskBody.id;
+    const _asgT = await api.post(`/api/admin/tasks/${_bankId}/competitions`, { headers: h, data: { competitionIds: [_compId] } });
+    expect(_asgT.ok(), await _asgT.text()).toBeTruthy();
+    // The event's own copy (lib/event-copies.js): what is answered there, and the row its analytics list.
+    const _taskId = (await _asgT.json()).copies[0].task_id;
 
     const _email = `tagan-${_t}@company.example`;
     const _reg = await registerPost(api, "/api/register", {
@@ -11793,7 +11796,9 @@ test.describe("Event tags (v6.6.0)", () => {
         title: `Analytics internal task ${uniq}`, description: "<p>x</p>", difficulty: "easy",
         answer_type: "text", correct_answer: "win", status: "published",
       } })).json()).id;
-      await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+      const _asg = await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+      expect(_asg.ok(), await _asg.text()).toBeTruthy();
+      taskId = (await _asg.json()).copies[0].task_id;   // the event's own copy: what is answered there and listed by its analytics
       // A DEDICATED participant, not the shared alice: earlier tests in this file
       // tag the shared fixtures, and analytics excludes `staff` participants by
       // default — so a stray tag makes this competition's activity invisible in
@@ -11878,7 +11883,7 @@ test.describe("Event tags (v6.6.0)", () => {
     //    is whatever the admin list happens to return first and may have no
     //    activity, in which case per_challenge is empty and the loop is vacuous.
     const TAG = `v68-incl-${Date.now().toString(36)}`;
-    const target = S.easy1;
+    const target = S.liveTask("Challenge easy1");   // the Live event's own copy: the row alice's seeded solve is under
     expect(target, "seed fixture: Challenge easy1 must exist").toBeTruthy();
     try {
       const tagRes = await api.post(`/api/admin/tasks/${target.id}/tags`, { headers: h, data: { tag: TAG } });

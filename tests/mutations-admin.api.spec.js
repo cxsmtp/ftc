@@ -17,11 +17,14 @@ async function ensureState() {
   S.upcomingComp = comps.find(c => c.name === "Test Upcoming");
   S.endedComp = comps.find(c => c.name === "Test Ended");
   const tasks = await (await api.get("/api/admin/tasks")).json();
+  // The seeded challenges the Live event HOLDS: its own copies (lib/event-copies.js),
+  // what its participants answer, rate and download; draft1 is in no event (the library row).
+  const inLive = (title) => tasks.find(t => t.title === title && t.owner_competition_id === S.liveComp.id);
   S.tasks = tasks;
-  S.easy1 = tasks.find(t => t.title === "Challenge easy1");
-  S.med1 = tasks.find(t => t.title === "Challenge med1");
-  S.hard1 = tasks.find(t => t.title === "Challenge hard1");
-  S.draft1 = tasks.find(t => t.title === "Challenge draft1");
+  S.easy1 = inLive("Challenge easy1");
+  S.med1 = inLive("Challenge med1");
+  S.hard1 = inLive("Challenge hard1");
+  S.draft1 = tasks.find(t => t.title === "Challenge draft1" && !t.owner_competition_id);
   const parts = (await (await api.get("/api/admin/participants?limit=200")).json()).participants;
   S.alice = parts.find(p => p.email === "alice@acme.com");
   S.bob = parts.find(p => p.email === "bob@acme.com");

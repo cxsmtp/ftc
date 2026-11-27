@@ -31,8 +31,8 @@ test.describe("a session that ends while its file answer is in flight", () => {
     ({ api: sa, csrf: saCsrf } = await apiLogin("superadmin"));
     compId = (await makeCompetition(sa, saCsrf, "pis")).id;
     // A FILE answer: `submit-read-delay` parks inside the file branch only.
-    taskId = (await makeTask(sa, saCsrf, "pisf", { answer_type: "file", correct_answer: "win" })).id;
-    await assignTask(sa, saCsrf, taskId, [compId]);
+    const bank = (await makeTask(sa, saCsrf, "pisf", { answer_type: "file", correct_answer: "win" })).id;
+    taskId = (await assignTask(sa, saCsrf, bank, [compId])).copies[0].task_id;   // the event's own copy: the row an answer names
     // A bystander who never answers, so a correct submission can never be the
     // one that finishes the event (fixture checklist item 1).
     const by = await makeParticipant(sa, saCsrf, "pisby");

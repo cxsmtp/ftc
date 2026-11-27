@@ -101,8 +101,10 @@ test("v7.21.3: selecting an UPCOMING competition leaves the clock unset, and the
   // Starts 3 s out: genuinely UPCOMING at select time, LIVE a moment later —
   // the real lobby path, not a simulation of it.
   const compId = await createComp(api, csrf, `Clock Lobby ${tag}`, 3000, 180);
-  const task = await createTask(api, csrf, `Clock Task ${tag}`);
-  await api.post(`/api/admin/tasks/${task}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
+  const taskBank = await createTask(api, csrf, `Clock Task ${tag}`);
+  const taskAssign = await api.post(`/api/admin/tasks/${taskBank}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
+  expect(taskAssign.ok(), await taskAssign.text()).toBeTruthy();
+  const task = (await taskAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is answered there
   const p = await makeParticipant(api, csrf, tag);
   await assignUsers(api, csrf, [p.id], compId);
   await api.dispose();
@@ -183,8 +185,10 @@ test("v7.21.3: IMPERSONATION does not start the target's clock", async () => {
   const { api, csrf } = await apiLogin("superadmin");
   const tag = uniq();
   const compId = await createComp(api, csrf, `Clock Imp ${tag}`, -60_000, 180);
-  const task = await createTask(api, csrf, `Clock Imp Task ${tag}`);
-  await api.post(`/api/admin/tasks/${task}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
+  const taskBank = await createTask(api, csrf, `Clock Imp Task ${tag}`);
+  const taskAssign = await api.post(`/api/admin/tasks/${taskBank}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
+  expect(taskAssign.ok(), await taskAssign.text()).toBeTruthy();
+  const task = (await taskAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is answered there
   const p = await makeParticipant(api, csrf, `i${tag}`);
   await assignUsers(api, csrf, [p.id], compId);
 
@@ -228,8 +232,10 @@ test("v7.21.3: a login_time later than the reference end yields 0, never a negat
   const { api, csrf } = await apiLogin("superadmin");
   const tag = uniq();
   const compId = await createComp(api, csrf, `Clock Neg ${tag}`, -120 * 60_000, 180);
-  const task = await createTask(api, csrf, `Clock Neg Task ${tag}`);
-  await api.post(`/api/admin/tasks/${task}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
+  const taskBank = await createTask(api, csrf, `Clock Neg Task ${tag}`);
+  const taskAssign = await api.post(`/api/admin/tasks/${taskBank}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
+  expect(taskAssign.ok(), await taskAssign.text()).toBeTruthy();
+  const task = (await taskAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is answered there
 
   const early = await makeParticipant(api, csrf, `f${tag}`);  // entered long before the new end
   const late = await makeParticipant(api, csrf, `b${tag}`);   // enters now, i.e. after the new end

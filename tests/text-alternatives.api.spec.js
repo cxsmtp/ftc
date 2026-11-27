@@ -102,10 +102,12 @@ async function makeFixture(api, csrf, { taskSpecs = [{ answer_type: "text", corr
     // an EARLIER test in this file created (the attempt-caps lesson).
     const { id: tid } = await tr.json();
     expect(tid, "the create returns the new challenge's id").toBeTruthy();
-    const t = { id: tid, title };
-    tasks.push(t);
-    const asg = await api.post(`/api/admin/tasks/${t.id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+    const asg = await api.post(`/api/admin/tasks/${tid}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign task ${i}: ${await asg.text()}`).toBeTruthy();
+    // The event holds its OWN copy (lib/event-copies.js): the question its
+    // participants answer and every edit below is made to. `bankId` is the library row.
+    const t = { id: (await asg.json()).copies[0].task_id, bankId: tid, title };
+    tasks.push(t);
   }
 
   const users = [];
@@ -356,19 +358,22 @@ test.describe("text grading — answer alternatives (v8.9.0)", () => {
     const compId = (await compR.json()).competition.id;
     const created = await createTask(adm, ac, { answer_type: "text", correct_answer: "abc" });
     expect(created.status, `create: ${JSON.stringify(created.body)}`).toBe(200);
-    const taskId = created.id;
+    const bankId = created.id;
 
     // Plant the legacy shape. The API stores this key canonical ("abc"), so a
     // PADDED stored value is reachable only by a direct write — exactly the
     // corpus every pre-v8.9.0 deployment carries (the admin form never trimmed).
     withDb((db) => {
-      const r = db.prepare("UPDATE tasks SET correct_answer=' abc ' WHERE id=?").run(taskId);
+      const r = db.prepare("UPDATE tasks SET correct_answer=' abc ' WHERE id=?").run(bankId);
       expect(r.changes, "the legacy value was planted").toBe(1);
     }, { readonly: false });
-    expect(storedTask(taskId).correct_answer, "precondition: the stored key is padded").toBe(" abc ");
+    expect(storedTask(bankId).correct_answer, "precondition: the stored key is padded").toBe(" abc ");
 
-    const asg = await adm.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(ac), data: { competitionIds: [compId] } });
+    const asg = await adm.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(ac), data: { competitionIds: [compId] } });
     expect(asg.ok(), `assign: ${asg.status()} ${await asg.text()}`).toBeTruthy();
+    // The event's own copy is the frozen challenge; it carries the padded key verbatim.
+    const taskId = (await asg.json()).copies[0].task_id;
+    expect(storedTask(taskId).correct_answer, "precondition: the event's copy holds the padded key too").toBe(" abc ");
     const end = await adm.post(`/api/admin/competitions/${compId}/end-now`, { headers: { "x-csrf-token": ac } });
     expect(end.ok(), `end-now: ${end.status()} ${await end.text()}`).toBeTruthy();
 

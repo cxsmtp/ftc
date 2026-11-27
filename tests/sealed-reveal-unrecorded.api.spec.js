@@ -144,10 +144,12 @@ test.afterAll(async () => {
 /** An ENDED event with answer reveal on, holding a fresh sealed pair by `owner`. */
 async function endedWorld(label, owner = author) {
   const T = tag(label);
-  const { sealedId, openId } = await makePair(owner, T);
+  const { sealedId: sealedBank, openId: openBank } = await makePair(owner, T);
   const comp = await makeCompetition(sa, saCsrf, label, { reveal_answers_on_end: true });
-  await assignTask(owner.api, owner.csrf, sealedId, [comp.id]);
-  await assignTask(owner.api, owner.csrf, openId, [comp.id]);
+  // The event's OWN copies (lib/event-copies.js): what its participants read and
+  // buy hints on, and so where every reveal is recorded.
+  const sealedId = (await assignTask(owner.api, owner.csrf, sealedBank, [comp.id])).copies[0].task_id;
+  const openId = (await assignTask(owner.api, owner.csrf, openBank, [comp.id])).copies[0].task_id;
   await enrol(sa, saCsrf, comp.id, [stander.id, target.id]);
   const e = await sa.post(`/api/admin/competitions/${comp.id}/end-now`, { headers: H(saCsrf) });
   expect(e.ok(), `end-now: ${await e.text()}`).toBeTruthy();
@@ -156,10 +158,12 @@ async function endedWorld(label, owner = author) {
 /** A LIVE event (two enrollees who never solve keep the all-solved auto-end from firing). */
 async function liveWorld(label, type) {
   const T = tag(label);
-  const { sealedId, openId } = await makePair(author, T, type);
+  const { sealedId: sealedBank, openId: openBank } = await makePair(author, T, type);
   const comp = await makeCompetition(sa, saCsrf, label);
-  await assignTask(author.api, author.csrf, sealedId, [comp.id]);
-  await assignTask(author.api, author.csrf, openId, [comp.id]);
+  // The event's OWN copies (lib/event-copies.js): what its participants read and
+  // buy hints on, and so where every reveal is recorded.
+  const sealedId = (await assignTask(author.api, author.csrf, sealedBank, [comp.id])).copies[0].task_id;
+  const openId = (await assignTask(author.api, author.csrf, openBank, [comp.id])).copies[0].task_id;
   await enrol(sa, saCsrf, comp.id, [stander.id, target.id]);
   return { T, sealedId, openId, comp };
 }

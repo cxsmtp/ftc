@@ -643,8 +643,8 @@ test.describe("v8.12.6 (review fix) — an admin revoked while impersonating can
     ({ api: sa, csrf: saCsrf } = await apiLogin("superadmin"));
     compId = (await makeCompetition(sa, saCsrf, "f1imp")).id;
     // A FILE answer: `submit-read-delay` parks inside the file branch only.
-    fileTaskId = await makeTask(sa, saCsrf, { answer_type: "file", correct_answer: "win", status: "published" });
-    await assignTask(sa, saCsrf, fileTaskId, [compId]);
+    const fileBank = await makeTask(sa, saCsrf, { answer_type: "file", correct_answer: "win", status: "published" });
+    fileTaskId = (await assignTask(sa, saCsrf, fileBank, [compId])).copies[0].task_id;   // the event's own copy: the row an answer names
     // A bystander who never answers, so the control's correct submission can
     // never be the one that finishes the event (fixture checklist item 1).
     const by = await makeParticipant(sa, saCsrf, "f1impby");

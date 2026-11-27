@@ -33,7 +33,10 @@ const { qualifyingKeysFromTags, qualifyingKeyHeldDenied, answeredOptionsChangeDe
 const { rescoreAfterQualifyingFlip } = require("../lib/qualifying-rescore");
 // A question added to an event lives in that event: the assign doors put the
 // event's own copy in (lib/event-copies.js), never the bank question itself.
-const { eventTaskFor, assignedEventTaskId, eventsHolding } = require("../lib/event-copies");
+const { eventTaskFor, eventTaskTarget, assignedEventTaskId, eventsHolding, resolveEventTaskParam } = require("../lib/event-copies");
+// A bank question id named in the session's event means that event's own copy, on the
+// participant's attachment download too (its siblings: routes/participant.js, the submit).
+const _resolveEventTaskForAttachment = resolveEventTaskParam(db, "taskId");
 const { validateUrl } = require("../lib/util");
 const { validateBody } = require("../lib/validate");
 const { now } = require("../lib/time");
@@ -182,6 +185,26 @@ function _resolveAttemptCap(raw) {
 // `tagCache` is threaded by the bulk route, which is bounded at
 // BULK_ADMIN_MAX challenges x BULK_ADMIN_MAX competitions — without it the same
 // challenge's tags would be re-read once per target event.
+// THE ROW AN ADD PUTS IN (lib/event-copies.js `eventTaskTarget`): re-adding a
+// bank question to an event that still holds its copy (unassigned since, perhaps
+// edited there) reuses that copy, so the assign doors ask every refusal (draft,
+// lock, fit, seal, qualifying key) of the copy, never of the bank row. A new copy
+// is made from the named row and is identical to it, so that row answers then.
+function _assignTarget(task, cid) {
+  const tid = eventTaskTarget(db, task.id, cid);
+  if (!tid || tid === task.id) return task;
+  return db.prepare("SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed FROM tasks WHERE id=?").get(tid) || task;
+}
+// The named question's own draft and lock gates, asked again of an existing copy
+// the add would reuse (the named row passed them already). `kind` names the
+// bulk door's ledger key.
+function _assignTargetStateRefusal(task, tgt, isSuperAdmin) {
+  if (tgt === task) return null;
+  if (tgt.status !== "published") return { kind: "draft", message: "This event's own copy of the challenge is not published; publish it in the event to add it back." };
+  if (tgt.locked && !isSuperAdmin) return { kind: "locked", message: "This event's own copy of the challenge is locked. Only a superadmin can change event assignments." };
+  return null;
+}
+
 function _fitError(task, comp, tagCache) {
   if (!eventConstrainsChallenges(comp)) return null;
   let tags = tagCache && tagCache.get(task.id);
@@ -489,7 +512,8 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
         const comp = db.prepare("SELECT id, name, event_kind, start_time, duration_minutes, ended_at, staff_compete FROM competitions WHERE id=?").get(cid);
         // An ended event keeps its own (older) refusal from the loop below.
         if (!comp || competitionStatus(comp) === "ended" || competitionAnySlotEnded(comp)) continue;
-        const _seal = unsealedAssignmentDenied(task, comp) || authorCompetesDenied(db, task, comp);
+        const _tgt = _assignTarget(task, cid);
+        const _seal = unsealedAssignmentDenied(_tgt, comp) || authorCompetesDenied(db, _tgt, comp);
         if (_seal) {
           _firstSeal = _firstSeal || _seal;
           _refusedAll.push({ task_id: task.id, title: task.title, competition_id: comp.id, competition_name: comp.name, reason: _seal.reason, message: _seal.message });
@@ -509,7 +533,10 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
       // so a batch that names one unfit competition assigns NOTHING. Partial
       // success here would be the v7.21.19 F1 defect (a refused bulk action that
       // still mutated) in a new place.
-      const _fit = _fitError(task, comp);
+      // The row that goes in: an existing copy this event holds is judged itself.
+      const _tgt = _assignTarget(task, cid);
+      { const _st = _assignTargetStateRefusal(task, _tgt, !!req.session.isSuperAdmin); if (_st) throw _assignRefusal(_st.message); }
+      const _fit = _fitError(_tgt, comp);
       if (_fit) throw _assignRefusal(_fit.message);
       // v8.12.0 — THE SEAL INVARIANT AT THE ASSIGNMENT DOOR. An event that lets
       // staff compete admits only SEALED challenges (a competing admin can read
@@ -521,7 +548,7 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
       // the identical predicate over the identical (deduped) set inside the same
       // synchronous transaction, so nothing can change between them. Declared
       // defence in depth — a mutation dropping this marker survives every test.
-      const _seal = unsealedAssignmentDenied(task, comp) || authorCompetesDenied(db, task, comp);
+      const _seal = unsealedAssignmentDenied(_tgt, comp) || authorCompetesDenied(db, _tgt, comp);
       if (_seal) {
         throw _assignRefusal(_seal.message, { code: _seal.code, refused: [{ task_id: task.id, title: task.title, competition_id: comp.id, competition_name: comp.name, reason: _seal.reason, message: _seal.message }] });
       }
@@ -529,9 +556,11 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
       // QUESTION ONCE: another event's may be shared, never one whose key this
       // event already holds (lib/qualifying.js). Asked inside the transaction, so
       // two same-key challenges sent at once cannot both land; an assignment
-      // that already exists is not a change and is not asked about.
-      if (_qKeys.length && !db.prepare("SELECT 1 FROM competition_tasks WHERE competition_id=? AND task_id=?").get(cid, task.id)) {
-        const _dup = qualifyingKeyHeldDenied(db, comp, task.id, _qKeys);
+      // that already exists is not a change and is not asked about. Of the row
+      // that goes in: a reused copy carries its own tags.
+      const _tqKeys = _tgt === task ? _qKeys : qualifyingKeysFromTags(db.prepare("SELECT tag FROM task_tags WHERE task_id=?").all(_tgt.id).map(r => r.tag));
+      if (_tqKeys.length && !db.prepare("SELECT 1 FROM competition_tasks WHERE competition_id=? AND task_id=?").get(cid, _tgt.id)) {
+        const _dup = qualifyingKeyHeldDenied(db, comp, _tgt.id, _tqKeys);
         if (_dup) throw _assignRefusal(_dup.message, { code: _dup.code });
       }
       // The event's own question: this event's copy of a bank question (made
@@ -698,17 +727,20 @@ app.post("/api/admin/tasks/assign-competitions", requireAdmin, bulkAdminLimit, c
       if (task.locked && !isSuper) { skipped.locked++; continue; }       // locked-task doctrine (regular admin)
       const qKeys = qualifyingKeysFromTags(selTags.all(task.id).map(r => r.tag));
       for (const comp of validComps) {
+        // The row that goes in: an existing copy this event holds is judged itself.
+        const tgt = _assignTarget(task, comp.id);
+        { const _st = _assignTargetStateRefusal(task, tgt, isSuper); if (_st) { skipped[_st.kind]++; continue; } }
         // v8.1.0 (PR 30) — per (challenge, event), because fit is a property of
         // the PAIR: the same challenge is fine in a Competition and refused at a
         // Booth Event in the same request.
-        const fit = _fitError(task, comp, tagCache);
+        const fit = _fitError(tgt, comp, tagCache);
         if (fit) {
           skipped.unfit++;
           if (unfitReasons.length < 5) unfitReasons.push(fit.message);
           continue;
         }
         // v8.12.0 — the seal invariant, per pair (see the single-assign twin).
-        const _seal = unsealedAssignmentDenied(task, comp) || authorCompetesDenied(db, task, comp);
+        const _seal = unsealedAssignmentDenied(tgt, comp) || authorCompetesDenied(db, tgt, comp);
         if (_seal) {
           if (_seal.reason === "unsealed") skipped.unsealed++; else skipped.authorCompetes++;
           refused.push({ task_id: task.id, title: task.title, competition_id: comp.id, competition_name: comp.name, reason: _seal.reason, message: _seal.message });
@@ -717,7 +749,8 @@ app.post("/api/admin/tasks/assign-competitions", requireAdmin, bulkAdminLimit, c
         // Ruling N7 — read inside this transaction, so an earlier challenge of the
         // same batch already put into the event counts (only one of two same-key
         // questions lands). An existing assignment is not a change.
-        if (qKeys.length && !isIn.get(comp.id, task.id) && qualifyingKeyHeldDenied(db, comp, task.id, qKeys)) {
+        const tqKeys = tgt === task ? qKeys : qualifyingKeysFromTags(selTags.all(tgt.id).map(r => r.tag));
+        if (tqKeys.length && !isIn.get(comp.id, tgt.id) && qualifyingKeyHeldDenied(db, comp, tgt.id, tqKeys)) {
           skipped.qualifyingHeld++;
           continue;
         }
@@ -972,7 +1005,8 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
         const comp = db.prepare("SELECT id, name, event_kind, start_time, duration_minutes, ended_at, staff_compete FROM competitions WHERE id=?").get(cid);
         // An ended event keeps its own (older) refusal from the loop below.
         if (!comp || competitionStatus(comp) === "ended" || competitionAnySlotEnded(comp)) continue;
-        const _seal = unsealedAssignmentDenied(task, comp) || authorCompetesDenied(db, task, comp);
+        const _tgt = _assignTarget(task, cid);
+        const _seal = unsealedAssignmentDenied(_tgt, comp) || authorCompetesDenied(db, _tgt, comp);
         if (_seal) {
           _firstSeal = _firstSeal || _seal;
           _refusedAll.push({ task_id: task.id, title: task.title, competition_id: comp.id, competition_name: comp.name, reason: _seal.reason, message: _seal.message });
@@ -995,7 +1029,10 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
       // refusing to REMOVE an unfit challenge would trap it in the event it does
       // not belong in — the frozen-competition trap (v7.29.0) rebuilt exactly.
       if (comp && toAdd.includes(cid)) {
-        const fit = _fitError(task, comp);
+        // The row that goes in: an existing copy this event holds is judged itself.
+        const _tgt = _assignTarget(task, cid);
+        { const _st = _assignTargetStateRefusal(task, _tgt, !!req.session.isSuperAdmin); if (_st) throw _assignRefusal(_st.message); }
+        const fit = _fitError(_tgt, comp);
         if (fit) throw _assignRefusal(fit.message);
         // v8.12.0 — the seal invariant, ADDITIONS only for the same reason: a
         // challenge already in a compete event stays removable whatever its seal
@@ -1004,14 +1041,15 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
         // v8.13.3 — UNREACHABLE today (the pre-pass above refuses the same pairs
         // first, in the same transaction); marked anyway, declared as defence in
         // depth for the reason the POST twin's in-loop check gives.
-        const _seal = unsealedAssignmentDenied(task, comp) || authorCompetesDenied(db, task, comp);
+        const _seal = unsealedAssignmentDenied(_tgt, comp) || authorCompetesDenied(db, _tgt, comp);
         if (_seal) {
           throw _assignRefusal(_seal.message, { code: _seal.code, refused: [{ task_id: task.id, title: task.title, competition_id: comp.id, competition_name: comp.name, reason: _seal.reason, message: _seal.message }] });
         }
         // Operator ruling N7 (14 Nov 2026) — an event asks each qualifying
         // question once: ADDITIONS only (taking one out is always allowed).
-        if (_qKeys.length) {
-          const _dup = qualifyingKeyHeldDenied(db, comp, task.id, _qKeys);
+        const _tqKeys = _tgt === task ? _qKeys : qualifyingKeysFromTags(db.prepare("SELECT tag FROM task_tags WHERE task_id=?").all(_tgt.id).map(r => r.tag));
+        if (_tqKeys.length) {
+          const _dup = qualifyingKeyHeldDenied(db, comp, _tgt.id, _tqKeys);
           if (_dup) throw _assignRefusal(_dup.message, { code: _dup.code });
         }
       }
@@ -4014,7 +4052,7 @@ app.delete("/api/admin/attachment-staging/:id", requireAdmin, csrfProtection, (r
 // Linux via sendfile(2).
 
 app.get("/api/tasks/:taskId/attachments/:aid",
-  requireParticipant, requireCompetitionContext, requireParticipantInCompetition,
+  requireParticipant, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTaskForAttachment,
   rateLimit(60_000, 120, "attach-dl"),
   (req, res) => {
     const compId = req.session.competitionId;
@@ -4028,9 +4066,23 @@ app.get("/api/tasks/:taskId/attachments/:aid",
     if (!inComp) return res.status(404).end();
     const task = db.prepare("SELECT id, active, status FROM tasks WHERE id=?").get(req.params.taskId);
     if (!task || !task.active || task.status !== "published") return res.status(404).end();
-    const att = db.prepare(
+    let att = db.prepare(
       "SELECT id, display_name, storage_path FROM task_attachments WHERE id=? AND task_id=? AND detached_at IS NULL"
     ).get(req.params.aid, task.id);
+    // A BANK question's attachment id, named for the event's own copy (a link or
+    // tab from before the copy, lib/event-copies.js): the copy's own row naming
+    // the same file answers, while the copy still shows it. Only the attachments
+    // of the bank question THIS copy came from are looked up.
+    if (!att) {
+      const _src = db.prepare(
+        "SELECT a.storage_path FROM task_attachments a JOIN tasks t ON t.copied_from_task_id = a.task_id WHERE a.id=? AND t.id=? AND t.owner_competition_id=?"
+      ).get(req.params.aid, task.id, compId);
+      if (_src) {
+        att = db.prepare(
+          "SELECT id, display_name, storage_path FROM task_attachments WHERE task_id=? AND storage_path=? AND detached_at IS NULL ORDER BY order_idx, created_at LIMIT 1"
+        ).get(task.id, _src.storage_path);
+      }
+    }
     if (!att) return res.status(404).end();
     const _base = path.resolve(DATA_DIR);
     const abs = path.resolve(path.join(DATA_DIR, String(att.storage_path || "")));

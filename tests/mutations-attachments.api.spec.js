@@ -17,8 +17,11 @@ async function ensureState() {
   S.upcomingComp = comps.find(c => c.name === "Test Upcoming");
   S.endedComp = comps.find(c => c.name === "Test Ended");
   const tasks = await (await api.get("/api/admin/tasks")).json();
-  S.easy1 = tasks.find(t => t.title === "Challenge easy1");
-  S.med1 = tasks.find(t => t.title === "Challenge med1");
+  // The seeded challenges the Live event HOLDS: its own copies (lib/event-copies.js),
+  // what its participants answer, rate and download; draft1 is in no event (the library row).
+  const inLive = (title) => tasks.find(t => t.title === title && t.owner_competition_id === S.liveComp.id);
+  S.easy1 = inLive("Challenge easy1");
+  S.med1 = inLive("Challenge med1");
   await api.dispose();
   S.ready = true;
 }
@@ -164,10 +167,13 @@ async function uploadAttachment(api, csrf, taskId, { name = "bundle.zip", displa
   return r;
 }
 
+/** Assign to Live; answers the question Live now holds — its OWN copy of a bank question (lib/event-copies.js). */
 async function assignTaskToLive(api, csrf, taskId) {
-  await api.post(`/api/admin/tasks/${taskId}/competitions`, {
+  const r = await api.post(`/api/admin/tasks/${taskId}/competitions`, {
     headers: h(csrf), data: { competitionIds: [S.liveComp.id] },
   });
+  expect(r.ok(), `assign to Live: ${r.status()} ${await r.text()}`).toBeTruthy();
+  return (await r.json()).copies[0].task_id;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -352,8 +358,8 @@ test.describe("Participant — attachment downloads", () => {
   test("download streams zip with correct headers + bytes", async () => {
     await ensureState();
     const { api: adminApi, csrf: adminCsrf } = await apiLogin("superadmin");
-    const tid = await createTask(adminApi, adminCsrf);
-    await assignTaskToLive(adminApi, adminCsrf, tid);
+    // The Live event's own copy: what its participants download (attachments go on it).
+    const tid = await assignTaskToLive(adminApi, adminCsrf, await createTask(adminApi, adminCsrf));
     const zipBuf = validZipBuffer("readme.txt", "payload");
     const up = await (await adminApi.post(`/api/admin/tasks/${tid}/attachments`, {
       headers: { "x-csrf-token": adminCsrf },
@@ -380,8 +386,8 @@ test.describe("Participant — attachment downloads", () => {
   test("GET /api/tasks/:id includes attachments array without sha256", async () => {
     await ensureState();
     const { api: adminApi, csrf: adminCsrf } = await apiLogin("superadmin");
-    const tid = await createTask(adminApi, adminCsrf);
-    await assignTaskToLive(adminApi, adminCsrf, tid);
+    // The Live event's own copy: what its participants download (attachments go on it).
+    const tid = await assignTaskToLive(adminApi, adminCsrf, await createTask(adminApi, adminCsrf));
     await uploadAttachment(adminApi, adminCsrf, tid, { displayName: "Bundle A" });
     await adminApi.dispose();
 
@@ -429,8 +435,8 @@ test.describe("Participant — attachment downloads", () => {
   test("unauthenticated user gets 401 on download", async () => {
     await ensureState();
     const { api: adminApi, csrf: adminCsrf } = await apiLogin("superadmin");
-    const tid = await createTask(adminApi, adminCsrf);
-    await assignTaskToLive(adminApi, adminCsrf, tid);
+    // The Live event's own copy: what its participants download (attachments go on it).
+    const tid = await assignTaskToLive(adminApi, adminCsrf, await createTask(adminApi, adminCsrf));
     const up = await (await uploadAttachment(adminApi, adminCsrf, tid, { displayName: "pack" })).json();
     await adminApi.dispose();
 
@@ -444,8 +450,8 @@ test.describe("Participant — attachment downloads", () => {
   test("soft-detached attachment returns 404 on direct download", async () => {
     await ensureState();
     const { api: adminApi, csrf: adminCsrf } = await apiLogin("superadmin");
-    const tid = await createTask(adminApi, adminCsrf);
-    await assignTaskToLive(adminApi, adminCsrf, tid);
+    // The Live event's own copy: what its participants download (attachments go on it).
+    const tid = await assignTaskToLive(adminApi, adminCsrf, await createTask(adminApi, adminCsrf));
     const up = await (await uploadAttachment(adminApi, adminCsrf, tid, { displayName: "detachable" })).json();
     await adminApi.delete(`/api/admin/tasks/${tid}/attachments/${up.id}`, { headers: { "x-csrf-token": adminCsrf } });
     await adminApi.dispose();
@@ -686,8 +692,8 @@ test.describe("Attachment version history + restore", () => {
   test("restore after delete brings back name AND content (bytes identical)", async () => {
     await ensureState();
     const { api, csrf } = await apiLogin("superadmin");
-    const tid = await createTask(api, csrf);
-    await assignTaskToLive(api, csrf, tid);
+    // The Live event's own copy: what its participants download (attachments go on it).
+    const tid = await assignTaskToLive(api, csrf, await createTask(api, csrf));
     const zipBuf = validZipBuffer("seed.txt", "original-content-" + crypto.randomBytes(4).toString("hex"));
     const up = await (await api.post(`/api/admin/tasks/${tid}/attachments`, {
       headers: { "x-csrf-token": csrf },
@@ -953,7 +959,7 @@ test.describe("JSON export/import — attachments round-trip", () => {
 
     // Find the re-created task + verify the attachment bytes match
     const tasks = await (await api.get("/api/admin/tasks")).json();
-    const recreated = tasks.find(t => t.title === origTitle);
+    const recreated = tasks.find(t => t.title === origTitle && !t.owner_competition_id);   // the library row, not the Live event's old copy
     expect(recreated).toBeTruthy();
     const list = await (await api.get(`/api/admin/tasks/${recreated.id}/attachments`)).json();
     expect(list.length).toBe(1);

@@ -425,8 +425,10 @@ function enrolledIn(row, compId) {
 function rowsFor(userId) {
   return withDb(db => new Set(db.prepare("SELECT competition_id FROM competition_users WHERE user_id=?").all(userId).map(r => r.competition_id)));
 }
+// The question is in the event: itself, or (for a bank question) the event's own
+// copy of it, which is what every assign door puts in (lib/event-copies.js).
 function taskHeldBy(db, taskId, compId) {
-  return !!db.prepare("SELECT 1 FROM competition_tasks WHERE task_id=? AND competition_id=?").get(taskId, compId);
+  return !!db.prepare("SELECT 1 FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=? AND (t.id=? OR (t.copied_from_task_id=? AND t.owner_competition_id=ct.competition_id))").get(compId, taskId, taskId);
 }
 const groupMember = (gid, uid) => !!withDb(db => db.prepare("SELECT 1 FROM group_members WHERE group_id=? AND user_id=?").get(gid, uid));
 const groupBound  = (gid, cid) => !!withDb(db => db.prepare("SELECT 1 FROM competition_groups WHERE group_id=? AND competition_id=?").get(gid, cid));
@@ -469,7 +471,9 @@ test.beforeAll(async () => {
     answer_sealed: true, hint: HINT_T, correct_answer: KEY_T, explanation: `<p>${EXPL_T}</p>`,
     attempt_cap: 3,                        // so an attempt-grant CONTROL can succeed
   });
-  await assignTask(sa, saCsrf, T.id, [E.id]);
+  // T is E's OWN copy of the sealed question (lib/event-copies.js): the challenge
+  // the event holds, its participants answer and rate, and every door below acts on.
+  T = { ...T, bankId: T.id, id: (await assignTask(sa, saCsrf, T.id, [E.id])).copies[0].task_id };
   U = await makeTask(sa, saCsrf, "plain", { hint: HINT_U, correct_answer: KEY_U });
   await assignTask(sa, saCsrf, U.id, [F.id]);
 
@@ -1764,8 +1768,8 @@ test.describe("v8.12.0 — the competitor edit lock", () => {
     // auto-end trap). E11: Pq competes, SA10 holds no row — the narrowness control.
     const E10 = await makeCompetition(sa, saCsrf, "imp-on",  { staff_compete: true });
     const E11 = await makeCompetition(sa, saCsrf, "imp-far", { staff_compete: true });
-    const T10 = await makeTask(S2.api, S2.csrf, "imp-sealed", { answer_sealed: true, hint: "h", correct_answer: "k" });
-    await assignTask(sa, saCsrf, T10.id, [E10.id]);
+    const T10bank = await makeTask(S2.api, S2.csrf, "imp-sealed", { answer_sealed: true, hint: "h", correct_answer: "k" });
+    const T10 = { ...T10bank, id: (await assignTask(sa, saCsrf, T10bank.id, [E10.id])).copies[0].task_id };   // E10's own copy
     const R1 = await makeParticipant(sa, saCsrf, "imp-rival");
     const R2 = await makeParticipant(sa, saCsrf, "imp-rival2");
     const Pq = await makeParticipant(sa, saCsrf, "imp-far-p");

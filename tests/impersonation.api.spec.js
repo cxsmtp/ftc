@@ -61,9 +61,10 @@ async function mkTask(api, H, compId, title, answer) {
     title, description: "<p>x</p>", difficulty: "easy",
     answer_type: "text", correct_answer: answer, explanation: "<p>e</p>", hint: "a hint", status: "published",
   }});
-  const taskId = (await r.json()).id;
-  await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H, data: { competitionIds: [compId] } });
-  return taskId;
+  const bankId = (await r.json()).id;
+  const a = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H, data: { competitionIds: [compId] } });
+  if (!a.ok()) throw new Error(`assign ${title}: ${a.status()} ${await a.text()}`);
+  return (await a.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is answered in it
 }
 
 // Impersonate `targetId` from a fresh session logged in as `email`

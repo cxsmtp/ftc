@@ -213,7 +213,12 @@
 //                                              throws on E.
 const { test, expect } = require("./isolated-test");
 const { apiLogin, PARTICIPANT_PASS, TEST_DB_PATH } = require("./helpers");
-const { H, uniq, makeParticipant, makeTask, assignTask, enrol, grantEventAdmin } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeTask, assignTask, enrol, grantEventAdmin, eventCopyOf, withLegacySharedAssign } = require("./event-admin-helpers");
+// ONE row held by several events: the shape a database from before event-owned
+// copies holds (lib/event-copies.js), built through the real doors in the previous
+// model's mode. An event's own copy is held by that event alone, so a refusal that
+// names several events (or counts the out-of-scope ones) is about such a row.
+const sharedAssign = (fn) => withLegacySharedAssign(sa, saCsrf, fn);
 
 // better-sqlite3 is opened INSIDE the callback, never at module scope: per-file
 // isolation recreates the database in a `beforeAll`, so a handle taken at require
@@ -855,9 +860,11 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
     const ea = await makeEventAdmin(sa, saCsrf, E.id, "ea-unseal");
     try {
       const Sea = await sealedTask(ea, "ea-unseal");
-      await assignTask(ea.api, ea.csrf, Sea.id, [E.id]);
-      // The built-in puts it into the far event — ea could not (out of scope).
-      await assignTask(sa, saCsrf, Sea.id, [G.id]);
+      await sharedAssign(async () => {
+        await assignTask(ea.api, ea.csrf, Sea.id, [E.id]);
+        // The built-in puts it into the far event — ea could not (out of scope).
+        await assignTask(sa, saCsrf, Sea.id, [G.id]);
+      });
       expect((await taskRow(sa, Sea.id)).competitions.map(c => c.id).sort(), "PRECONDITION: both compete events hold it").toEqual([E.id, G.id].sort());
 
       const r = await ea.api.put(`/api/admin/tasks/${Sea.id}`, { headers: H(ea.csrf), data: { answer_sealed: false } });
@@ -874,7 +881,7 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
       // CONTROL — a GLOBAL-admin author on the same two events is named both,
       // with no count: the narrowing is the scope's doing, not the seal's.
       const Sx = await sealedTask(X, "global-unseal");
-      await assignTask(X.api, X.csrf, Sx.id, [E.id, G.id]);
+      await sharedAssign(() => assignTask(X.api, X.csrf, Sx.id, [E.id, G.id]));
       const rx = await X.api.put(`/api/admin/tasks/${Sx.id}`, { headers: H(X.csrf), data: { answer_sealed: false } });
       expect(rx.status(), `X unseal: ${await rx.text()}`).toBe(409);
       const bx = await rx.json();
@@ -1038,7 +1045,7 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
     expect(b.skippedPrivileged, "a superadmin may enrol an admin").toBe(0);
     expect(b.skippedAuthors).toEqual([{
       userId: X.id, nickname: X.nickname, competitionId: E.id, competitionName: E.name,
-      tasks: [{ id: SI.id, title: SI.title }],
+      tasks: [{ id: eventCopyOf(SI.id, E.id), title: SI.title }],   // the event's own copy
     }]);
     // BY VALUE: Z competes there, X does not.
     expect((await compRow(Z.api, E.id)).competing, "Z holds a row").toBe(true);
@@ -1057,7 +1064,7 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
     expect(sb.skippedStaff).toBe(0);
     expect(sb.skippedAuthors, "…and is skipped as the author, by name").toEqual([{
       userId: X.id, nickname: X.nickname, competitionId: E.id, competitionName: E.name,
-      tasks: [{ id: SI.id, title: SI.title }],
+      tasks: [{ id: eventCopyOf(SI.id, E.id), title: SI.title }],   // the event's own copy
     }]);
     expect((await compRow(X.api, E.id)).competing, "X still does not compete in E").toBe(false);
 
@@ -1094,7 +1101,7 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
       expect(bE.assigned).toBe(0);
       expect(bE.skippedAuthors).toEqual([{
         userId: ea.id, nickname: ea.nickname, competitionId: E.id, competitionName: E.name,
-        tasks: [{ id: Sea.id, title: Sea.title }],
+        tasks: [{ id: eventCopyOf(Sea.id, E.id), title: Sea.title }],   // the event's own copy
       }]);
       expect(holdsRow(E.id, ea.id), "no row on the compete event").toBe(false);
     } finally {
@@ -1138,7 +1145,7 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
       // `userId` on the assign door's `skippedAuthors` (pinned in the enrolment
       // test above) — two spellings for one idea, pinned as they are so a
       // rename on either side is a decision rather than drift.
-      expect(b.participants).toEqual([{ id: ea.id, nickname: ea.nickname, tasks: [{ id: Sea.id, title: Sea.title }] }]);
+      expect(b.participants).toEqual([{ id: ea.id, nickname: ea.nickname, tasks: [{ id: eventCopyOf(Sea.id, F.id), title: Sea.title }] }]);
       expect(b.error, "the sentence names the author").toContain(ea.nickname);
       expect(b.error, "…and the event").toContain(F.name);
       expect(b.challenges, "not the unsealed-challenges shape").toBeUndefined();
@@ -1161,7 +1168,7 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
       expect(rG.status()).toBe(400);
       const bG = await rG.json();
       expect(bG.code, "the unsealed challenge is reported before the enrolled author").toBe("staff_compete_unsealed_challenges");
-      expect(bG.challenges.map(t => t.id), "…naming it").toEqual([Ug.id]);
+      expect(bG.challenges.map(t => t.id), "…naming it (G's own copy)").toEqual([eventCopyOf(Ug.id, G.id)]);
       expect(bG.participants, "the author refusal is not reached").toBeUndefined();
       expect(!!(await compRow(sa, G.id)).staff_compete).toBe(false);
 
@@ -1206,7 +1213,7 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
     const Elive = await mkEvent("E-live", { on: true });
     const Eup   = await mkEvent("E-upcoming", { on: true, when: "upcoming" });
     const F     = await mkEvent("F", { on: false });
-    const d = await assignTask(X.api, X.csrf, S3.id, [Elive.id, Eup.id, F.id]);
+    const d = await sharedAssign(() => assignTask(X.api, X.csrf, S3.id, [Elive.id, Eup.id, F.id]));
     expect(d.assigned).toBe(3);
 
     const unseal = (task) => X.api.put(`/api/admin/tasks/${task.id}`, { headers: H(X.csrf), data: { answer_sealed: false } });
@@ -1310,7 +1317,7 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
     // Assignment refuses an ended event, so the expired one's row is planted;
     // the live one takes it through the door.
     plantTask(Expired, S5);
-    await assignTask(X.api, X.csrf, S5.id, [Elive.id]);
+    await sharedAssign(() => assignTask(X.api, X.csrf, S5.id, [Elive.id]));
     expect((await heldBy(X.api, S5.id)).sort(), "PRECONDITION: both hold it").toEqual([Expired.id, Elive.id].sort());
 
     const unseal = (task) => X.api.put(`/api/admin/tasks/${task.id}`, { headers: H(X.csrf), data: { answer_sealed: false } });
@@ -1440,12 +1447,13 @@ test.describe("v8.12.0 — a compete event admits only sealed challenges, and ne
     // short-circuits — no one-millisecond window. Assignment is OPEN while both
     // sessions are live or upcoming, so this one takes the challenge through
     // the door rather than by planting.
-    const S9 = await sealedTask(X, "slots-manual");
+    const S9bank = await sealedTask(X, "slots-manual");
     const T3 = await mkEvent("E-slots-manual", { on: true });
     expect((await mkSlot(T3, "A", -60_000, 600)).ok()).toBeTruthy();
     expect((await mkSlot(T3, "B", 3600_000, 60)).ok()).toBeTruthy();
     expect((await compRow(sa, T3.id)).status, "PRECONDITION: live").toBe("live");
-    await assignTask(X.api, X.csrf, S9.id, [T3.id]);
+    // The event's own copy is the challenge it holds, and the one whose unseal is refused.
+    const S9 = { ...S9bank, id: (await assignTask(X.api, X.csrf, S9bank.id, [T3.id])).copies[0].task_id };
     const r3 = await unseal(S9);
     expect(r3.status(), "CONTROL: it blocks while a session is live").toBe(409);
     expect((await r3.json()).competitions.map(c => c.id)).toEqual([T3.id]);

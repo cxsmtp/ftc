@@ -31,6 +31,7 @@
 // guard defending nothing.
 const { test, expect } = require("./isolated-test");
 const { apiLogin, PARTICIPANT_PASS, TEST_DB_PATH, gradingHashFor } = require("./helpers");
+const { withLegacySharedAssign } = require("./event-admin-helpers");
 const Database = require("better-sqlite3");
 
 const H = (csrf) => ({ "x-csrf-token": csrf, "content-type": "application/json" });
@@ -58,11 +59,13 @@ async function createTask(api, csrf, title, difficulty = "easy", correct = "yes"
   return (await r.json()).id;
 }
 
+/** Assign; answers the question the event now holds — its OWN copy of a bank question (lib/event-copies.js). */
 async function assignTask(api, csrf, taskId, compId) {
   const r = await api.post(`/api/admin/tasks/${taskId}/competitions`, {
     headers: H(csrf), data: { competitionIds: [compId] },
   });
   expect(r.status(), await r.text()).toBe(200);
+  return (await r.json()).copies[0].task_id;
 }
 
 async function assignUsers(api, csrf, userIds, compId) {
@@ -123,10 +126,10 @@ test("v7.21.1: hiding a challenge in an ENDED competition re-orders its final ra
   // the same TWO (identical scores, 50 + 50), and neither solves the third — so
   // while all three count, NOBODY is allSolved.
   const comp = await createComp(api, csrf, "FZ-harm", -180 * MIN, 300);
-  const tA = await createTask(api, csrf, "FZ-harm-A", "easy", "aaa");
-  const tB = await createTask(api, csrf, "FZ-harm-B", "easy", "bbb");
-  const tC = await createTask(api, csrf, "FZ-harm-C", "easy", "ccc");
-  for (const t of [tA, tB, tC]) await assignTask(api, csrf, t, comp.id);
+  // The event's own copies: what is solved, frozen and (attempted to be) hidden.
+  const tA = await assignTask(api, csrf, await createTask(api, csrf, "FZ-harm-A", "easy", "aaa"), comp.id);
+  const tB = await assignTask(api, csrf, await createTask(api, csrf, "FZ-harm-B", "easy", "bbb"), comp.id);
+  const tC = await assignTask(api, csrf, await createTask(api, csrf, "FZ-harm-C", "easy", "ccc"), comp.id);
   await assignUsers(api, csrf, [alice.id, bob.id], comp.id);
 
   await solveAs("alice@acme.com", comp.id, [{ id: tA, answer: "aaa" }, { id: tB, answer: "bbb" }]);
@@ -203,14 +206,20 @@ test("v7.21.1: hiding a challenge in an ENDED competition re-orders its final ra
 //    refusal half.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** A frozen comp (created live, task assigned, then ended) + a still-live one. */
-async function frozenAndLive(api, csrf, tag, difficulty = "easy") {
+/**
+ * A frozen comp (created live, task assigned, then ended) + a still-live one.
+ * `frozenTask`/`liveTask` are the question each event HOLDS: its own copy
+ * (lib/event-copies.js) — or, with `legacy`, the bank question itself assigned
+ * as the previous release did (the import overwrite reaches only library rows,
+ * so its freeze skip is about such a row: a database from before the copies).
+ */
+async function frozenAndLive(api, csrf, tag, difficulty = "easy", { legacy = false } = {}) {
   const ended = await createComp(api, csrf, `FZ-${tag}-ended`, -30 * MIN, 180);
   const live = await createComp(api, csrf, `FZ-${tag}-live`, -30 * MIN, 180);
-  const frozenTask = await createTask(api, csrf, `FZ-${tag}-frozen`, difficulty, "zzz");
-  const liveTask = await createTask(api, csrf, `FZ-${tag}-open`, difficulty, "zzz");
-  await assignTask(api, csrf, frozenTask, ended.id);
-  await assignTask(api, csrf, liveTask, live.id);
+  const frozenBank = await createTask(api, csrf, `FZ-${tag}-frozen`, difficulty, "zzz");
+  const liveBank = await createTask(api, csrf, `FZ-${tag}-open`, difficulty, "zzz");
+  const put = async () => [await assignTask(api, csrf, frozenBank, ended.id), await assignTask(api, csrf, liveBank, live.id)];
+  const [frozenTask, liveTask] = legacy ? await withLegacySharedAssign(api, csrf, put) : await put();
   await endNow(api, csrf, ended.id);
   return { endedId: ended.id, liveId: live.id, frozenTask, liveTask };
 }
@@ -288,7 +297,7 @@ test("v7.21.1: the task PUT freezes `active` too, and still edits an unfrozen ch
 
 test("v7.21.1: an import OVERWRITE skips a frozen challenge and applies to an unfrozen one", async () => {
   const { api, csrf } = await apiLogin("superadmin");
-  const f = await frozenAndLive(api, csrf, "imp");
+  const f = await frozenAndLive(api, csrf, "imp", "easy", { legacy: true });
   const titles = withDb(db => ({
     frozen: db.prepare("SELECT title FROM tasks WHERE id=?").get(f.frozenTask).title,
     live: db.prepare("SELECT title FROM tasks WHERE id=?").get(f.liveTask).title,
@@ -339,9 +348,14 @@ test("v7.21.1: recalculate re-grades the live competition and leaves the ended o
   // would leave a superadmin unable to fix today's event.
   const ended = await createComp(api, csrf, "FZ-recalc-ended", -60 * MIN, 180);
   const live = await createComp(api, csrf, "FZ-recalc-live", -30 * MIN, 180);
+  // ONE row held by both events: a database from before event-owned copies (the
+  // previous model's mode, through the test hook) — the only way a challenge is
+  // shared now, and the reason recalculate stays scoped per event.
   const task = await createTask(api, csrf, "FZ-recalc-task", "easy", "right");
-  await assignTask(api, csrf, task, ended.id);
-  await assignTask(api, csrf, task, live.id);
+  await withLegacySharedAssign(api, csrf, async () => {
+    await assignTask(api, csrf, task, ended.id);
+    await assignTask(api, csrf, task, live.id);
+  });
   // A second, never-solved challenge in each competition. Without it the sole
   // participant solves EVERYTHING and the all-solved auto-end fires — the
   // "ended" competition then ends for the wrong reason (and `end-now` 400s),

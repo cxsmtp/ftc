@@ -281,9 +281,10 @@ test.describe("v8.8.9 — a deferred emit carries the requester's IP", () => {
         title: `EvSub task ${Date.now()}`, description: "d", difficulty: "easy",
         answer_type: "text", correct_answer: "yes", status: "published" } });
       expect(tr.ok(), `create task: ${await tr.text()}`).toBeTruthy();
-      taskId = (await tr.json()).id;
-      const ar = await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h(sc), data: { competitionIds: [comp] } });
+      const bankId = (await tr.json()).id;
+      const ar = await sa.post(`/api/admin/tasks/${bankId}/competitions`, { headers: h(sc), data: { competitionIds: [comp] } });
       expect(ar.ok(), `assign: ${await ar.text()}`).toBeTruthy();
+      taskId = (await ar.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what a submission records
       // ASSERT the assign, because it SKIPS an ineligible user in silence.
       const as = await sa.post("/api/admin/competitions/assign", { headers: h(sc), data: { userIds: [p.id], competitionIds: [comp] } });
       expect(as.ok(), `enrol: ${await as.text()}`).toBeTruthy();

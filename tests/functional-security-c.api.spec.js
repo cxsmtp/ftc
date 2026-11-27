@@ -3462,7 +3462,7 @@ test.describe("v6.13.18 — auditor invariants", () => {
     // point in the suite. Same throwaway-user pattern as the v6.13.17
     // block test at line 5215.
     await ensureState();
-    const med1 = S.tasks.find(t => t.title === "Challenge med1");
+    const med1 = S.liveTask("Challenge med1");
     expect(med1, "Challenge med1 in seed").toBeTruthy();
     const { api: sa, csrf: saCsrf } = await apiLogin("superadmin");
     const saJsonH = { "x-csrf-token": saCsrf, "content-type": "application/json" };
@@ -4724,6 +4724,7 @@ test.describe("v6.16.4 — auditor invariants", () => {
         headers: saJsonH, data: { competitionIds: [compId] },
       });
       expect(assignR.ok()).toBeTruthy();
+      taskId = (await assignR.json()).copies[0].task_id;   // the event's own copy: the question the ended session freezes
       await sa.post(`/api/admin/competitions/${compId}/end-now`, { headers: saH });
       const ansR = await sa.put(`/api/admin/tasks/${taskId}`, { headers: saJsonH, data: { correct_answer: "rotated" } });
       expect(ansR.status()).toBe(409);
@@ -5639,7 +5640,8 @@ test.describe("v6.16.22 — security audit batch", () => {
       await sa.post(`/api/admin/participants/${regAdminId}/role`, { headers: saH, data: { role: "admin" } });
       // Pick an unassigned task we can lock + assign cleanly.
       const tasks = await (await sa.get("/api/admin/tasks")).json();
-      const candidate = tasks.find(t => t.status === "published" && t.title === "Challenge easy2");
+      // The library row of easy2 (each seeded event holds its own same-titled copy).
+      const candidate = tasks.find(t => t.status === "published" && t.title === "Challenge easy2" && !t.owner_competition_id);
       lockedTaskId = candidate.id;
       // Clear any pre-existing assignments on this task (test seed
       // pre-assigned easy2 to upcomingComp; unassign first so we can
@@ -5653,6 +5655,9 @@ test.describe("v6.16.22 — security audit batch", () => {
         headers: saH, data: { competitionIds: [upcomingCompId] },
       });
       expect(ar.ok()).toBeTruthy();
+      // The upcoming event holds its OWN copy (lib/event-copies.js): that is the
+      // challenge locked and unassigned below.
+      lockedTaskId = (await ar.json()).copies[0].task_id;
       // Lock it (superadmin-only).
       const lr = await sa.post(`/api/admin/tasks/${lockedTaskId}/lock`, { headers: saH, data: { locked: true } });
       expect(lr.ok()).toBeTruthy();
@@ -5699,7 +5704,8 @@ test.describe("v6.16.22 — security audit batch", () => {
     try {
       compId = S.liveComp.id;
       const tasks = await (await sa.get("/api/admin/tasks")).json();
-      taskId = tasks.find(t => t.title === "Challenge easy1").id;
+      // The live event's own copy of easy1: the question its rows name.
+      taskId = tasks.find(t => t.title === "Challenge easy1" && t.owner_competition_id === compId).id;
       userId = S.alice.id;
       const dbW = new Database(TEST_DB_PATH);
       try {

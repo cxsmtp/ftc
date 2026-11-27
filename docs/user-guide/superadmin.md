@@ -229,7 +229,12 @@ comes from its sessions, so edit the session times there.
 The three-dot menu on an event row includes **Delete**. After you
 confirm, it removes the event and everything attached to it —
 assignments, tags, per-event CxOne override, sessions, events,
-submissions, and reminders — in one all-or-nothing operation. Regular admins
+submissions, and reminders — in one all-or-nothing operation. The event's own
+questions (the copies made when library questions were added to it, and any
+written inside it) are deleted with it, together with their files unless a
+library question still uses the same file; the library questions themselves are
+untouched. An event question that an event template still names is kept and
+moves into the library instead, so the template keeps working. Regular admins
 don't see this option, and the platform refuses it for them.
 
 **A live event can only be deleted while nothing has happened in it** — the

@@ -40,9 +40,10 @@ test.describe("v8.14.5 — a multiple-choice key stays where it belongs", () => 
     // (routes/participant.js), which spreads every selected column onto the wire.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("list");
-    const choiceId = await mkChoice(sa, csrf, [{ text: `RIGHT_${T}`, correct: true }, { text: `WRONG_${T}` }]);
-    const textId = await mkTask(sa, csrf, { answer_type: "text", correct_answer: `TEXTKEY_${T}\nALTKEY_${T}` });
-    const ev = await liveEvent(sa, csrf, "list", [choiceId, textId]);
+    const choiceIdBank = await mkChoice(sa, csrf, [{ text: `RIGHT_${T}`, correct: true }, { text: `WRONG_${T}` }]);
+    const textIdBank = await mkTask(sa, csrf, { answer_type: "text", correct_answer: `TEXTKEY_${T}\nALTKEY_${T}` });
+    const ev = await liveEvent(sa, csrf, "list", [choiceIdBank, textIdBank]);
+    const [choiceId, textId] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const p = await playerIn(sa, csrf, "list", [ev.id]);
     const { correct } = storedIds(choiceId);
 
@@ -323,8 +324,9 @@ test.describe("v8.14.5 — a multiple-choice key stays where it belongs", () => 
     // a key change it handed the new answer out mid-event.
     const { api: sa, csrf } = await apiLogin("superadmin");
     const T = tagOf("chg");
-    const id = await mkChoice(sa, csrf, [{ text: `A_${T}`, correct: true }, { text: `B_${T}` }, { text: `C_${T}` }]);
-    const ev = await liveEvent(sa, csrf, "chg", [id], { reveal_answers_on_end: true });
+    const idBank = await mkChoice(sa, csrf, [{ text: `A_${T}`, correct: true }, { text: `B_${T}` }, { text: `C_${T}` }]);
+    const ev = await liveEvent(sa, csrf, "chg", [idBank], { reveal_answers_on_end: true });
+    const [id] = ev.ids;   // the event's own copies (lib/event-copies.js)
     const early = await playerIn(sa, csrf, "chg-early", [ev.id]);
     const late = await playerIn(sa, csrf, "chg-late", [ev.id]);
     const legacy = await playerIn(sa, csrf, "chg-legacy", [ev.id]);

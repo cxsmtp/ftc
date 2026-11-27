@@ -293,7 +293,7 @@ test.describe("v6.9.18: CSRF matrix across mutating + multipart routes", () => {
     await ensureState();
     const { api, csrf } = await apiLogin("alice@acme.com", PARTICIPANT_PASS);
     await api.post("/api/select-competition", { headers: { "x-csrf-token": csrf, "content-type": "application/json" }, data: { competitionId: S.liveComp.id } });
-    const easy = S.tasks.find(t => t.title === "Challenge easy1");
+    const easy = S.liveTask("Challenge easy1");
     // Count uploads/ files BEFORE the request — if multer ran ahead of
     // csrfProtection we'd see a stranded temp file here.
     const fs = require("fs");
@@ -2411,7 +2411,7 @@ test.describe("v7.20.9 (F1) — the grading token discloses nothing, and submit 
       headers: _v8h(saCsrf), data: { competitionIds: [S.liveComp.id] },
     });
     expect(asg.ok(), `assign to the live competition: ${asg.status()} ${await asg.text()}`).toBeTruthy();
-    return id;
+    return (await asg.json()).copies[0].task_id;   // the live event's own copy (lib/event-copies.js)
   }
 
   /**

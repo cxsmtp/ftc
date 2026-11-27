@@ -115,11 +115,13 @@ test.describe("Participant", () => {
         explanation: "—", status: "published",
       },
     });
-    const newTaskId = (await cr.json()).id;
-    const ar = await sa.post(`/api/admin/tasks/${newTaskId}/competitions`, {
+    const bankTaskId = (await cr.json()).id;
+    const ar = await sa.post(`/api/admin/tasks/${bankTaskId}/competitions`, {
       headers: saH, data: { competitionIds: [S.liveComp.id] },
     });
     expect(ar.ok()).toBeTruthy();
+    // The event's own copy is what its participants are served (lib/event-copies.js).
+    const newTaskId = (await ar.json()).copies[0].task_id;
     await sa.dispose();
     // Drive numbering by hitting /api/tasks as a participant. ensureTaskNumbers
     // runs synchronously inside that handler.
@@ -187,8 +189,10 @@ test.describe("Participant", () => {
     await alice.get("/api/tasks");
     await alice.dispose();
     // Now add the FIRST hard task to the live comp.
-    const hardId = await mkTask("hard", `NoHard-hard-${t}`);
-    await sa.post(`/api/admin/tasks/${hardId}/competitions`, { headers: saH, data: { competitionIds: [comp.id] } });
+    const hardBankId = await mkTask("hard", `NoHard-hard-${t}`);
+    const hardAr = await sa.post(`/api/admin/tasks/${hardBankId}/competitions`, { headers: saH, data: { competitionIds: [comp.id] } });
+    expect(hardAr.ok(), await hardAr.text()).toBeTruthy();
+    const hardId = (await hardAr.json()).copies[0].task_id;   // the event's own copy
     await sa.dispose();
     // Re-fetch as Alice — the new hard task must be numbered 3.01.
     const { api: alice2, csrf: alice2Csrf } = await apiLogin("alice@acme.com", PARTICIPANT_PASS);
@@ -1265,7 +1269,7 @@ test.describe("Challenge events analytics", () => {
 
   test("submit writes incorrect then solved rows to challenge_events", async () => {
     await ensureState();
-    const hard = S.tasks.find(t => t.title === "Challenge hard1");
+    const hard = S.liveTask("Challenge hard1");
     // v6.10.28: hermetic setup — wipe bob's prior submissions +
     // challenge_events for Challenge hard1 before running. Pre-fix
     // a retry (RETRIES=1 default) or a `--repeat-each` stress run
@@ -1305,7 +1309,7 @@ test.describe("Challenge events analytics", () => {
   test("hint reveal writes hint_revealed row", async () => {
     const { api, csrf } = await bobInLive();
     const h = { "x-csrf-token": csrf };
-    const med = S.tasks.find(t => t.title === "Challenge med1");
+    const med = S.liveTask("Challenge med1");
     const r = await api.post(`/api/tasks/${med.id}/hint`, { headers: h });
     expect(r.ok()).toBeTruthy();
     await api.dispose();
@@ -1323,7 +1327,7 @@ test.describe("Challenge events analytics", () => {
   test("navigated-away endpoint writes one row + dedupes within 2s", async () => {
     const { api, csrf } = await bobInLive();
     const h = { "x-csrf-token": csrf, "content-type": "application/json" };
-    const easy = S.tasks.find(t => t.title === "Challenge easy1");
+    const easy = S.liveTask("Challenge easy1");
     const before = readChallengeEvents(S.bob.id, easy.id).filter(r => r.event_type === "navigated_away").length;
     let r = await api.post(`/api/tasks/${easy.id}/navigated-away`, { headers: h, data: { via: "spa_nav" } });
     expect(r.ok()).toBeTruthy();
@@ -1361,7 +1365,7 @@ test.describe("Challenge events analytics", () => {
       data: { competitionId: S.liveComp.id },
     });
     // draft1 isn't assigned to Test Live → 404, not 403. Use a task in upcoming.
-    const easy2 = S.tasks.find(t => t.title === "Challenge easy2");
+    const easy2 = S.tasks.find(t => t.title === "Challenge easy2" && !t.owner_competition_id);
     const r = await api.post(`/api/tasks/${easy2.id}/navigated-away`, {
       headers: { "x-csrf-token": csrf, "content-type": "application/json" },
       data: { via: "spa_nav" },
@@ -2298,8 +2302,12 @@ test.describe("Task recalc idempotency", () => {
       title: `Restore Task ${now}`, description: "<p>x</p>", difficulty: "easy",
       answer_type: "text", correct_answer: "original-answer", status: "published",
     }});
-    const taskId = (await r.json()).id;
-    await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] }});
+    const bankId = (await r.json()).id;
+    // The event's own copy: the question alice answers, and the one edited,
+    // restored and recalculated below (lib/event-copies.js).
+    const asg = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: h, data: { competitionIds: [compId] }});
+    expect(asg.ok(), await asg.text()).toBeTruthy();
+    const taskId = (await asg.json()).copies[0].task_id;
     await api.post("/api/admin/competitions/assign", { headers: h, data: {
       userIds: [S.alice.id, S.bob.id], competitionIds: [compId],
     }});
@@ -2353,7 +2361,7 @@ test.describe("Task recalc idempotency", () => {
     // then delete the orphan task.
     await admin.post(`/api/admin/competitions/${compId}/end-now`, { headers: { "x-csrf-token": aCsrf } });
     await admin.delete(`/api/admin/competitions/${compId}`, { headers: { "x-csrf-token": aCsrf } });
-    await admin.delete(`/api/admin/tasks/${taskId}`, { headers: { "x-csrf-token": aCsrf } });
+    await admin.delete(`/api/admin/tasks/${bankId}`, { headers: { "x-csrf-token": aCsrf } });
     await admin.dispose();
   });
 });
@@ -2867,7 +2875,9 @@ test.describe("Bulk assign challenges to competitions (v7.12.0)", () => {
   const Database = require("better-sqlite3");
   const mkTask = async (sa, saH, name, status = "published") => (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title: uniq(name), description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status } })).json()).id;
   const mkComp = async (sa, saH, name, startOffsetMs = 3600_000) => (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: uniq(name), start_time: new Date(Date.now() + startOffsetMs).toISOString(), duration_minutes: 120 } })).json()).competition.id;
-  const isAssigned = (cid, tid) => { const db = new Database(TEST_DB_PATH, { readonly: true }); try { return db.prepare("SELECT COUNT(*) c FROM competition_tasks WHERE competition_id=? AND task_id=?").get(cid, tid).c > 0; } finally { db.close(); } };
+  // The challenge is in the event: itself, or (for a bank question) the event's
+  // own copy of it, which is what every assign door puts in (lib/event-copies.js).
+  const isAssigned = (cid, tid) => { const db = new Database(TEST_DB_PATH, { readonly: true }); try { return db.prepare("SELECT COUNT(*) c FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=? AND (t.id=? OR (t.copied_from_task_id=? AND t.owner_competition_id=ct.competition_id))").get(cid, tid, tid).c > 0; } finally { db.close(); } };
   const compTaskCount = (cid) => { const db = new Database(TEST_DB_PATH, { readonly: true }); try { return db.prepare("SELECT COUNT(*) c FROM competition_tasks WHERE competition_id=?").get(cid).c; } finally { db.close(); } };
   // Register + verify + approve + promote → a logged-in REGULAR-admin context.
   async function mkAdmin(sa, saH) {

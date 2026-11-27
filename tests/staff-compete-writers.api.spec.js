@@ -226,7 +226,7 @@
 const { test, expect } = require("./isolated-test");
 const { registerPost } = require("./helpers");
 const { apiLogin, freshCtx, PARTICIPANT_PASS, TEST_DB_PATH, pngDataUri } = require("./helpers");
-const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, grantEventAdmin } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, grantEventAdmin, eventCopyOf, withLegacySharedAssign } = require("./event-admin-helpers");
 
 // better-sqlite3 is opened INSIDE the callback, never at module scope: the
 // per-file recycle recreates the database in a `beforeAll`, so a handle taken
@@ -552,8 +552,10 @@ test.describe("POST /api/admin/competitions/assign — staff rows land only on c
     expect(entry.nickname).toBe(author.nickname);
     expect(entry.competitionId).toBe(E.id);
     expect(entry.competitionName).toBe(E.name);
-    expect(entry.tasks.map(t => t.id).sort(), "every authored challenge assigned to the event is named").toEqual([t1.id, t2.id].sort());
-    for (const t of entry.tasks) expect(t.title, "each with its title").toBe([t1, t2].find(x => x.id === t.id).title);
+    // Named as the event holds them: its own copies (lib/event-copies.js).
+    const own = [t1, t2].map(x => ({ ...x, id: eventCopyOf(x.id, E.id) }));
+    expect(entry.tasks.map(t => t.id).sort(), "every authored challenge assigned to the event is named").toEqual(own.map(x => x.id).sort());
+    for (const t of entry.tasks) expect(t.title, "each with its title").toBe(own.find(x => x.id === t.id).title);
     expect(hasRow(E.id, author.id), "and no row was written").toBe(false);
 
     // CONTROL (a): a non-author admin is seated on the same event.
@@ -586,8 +588,9 @@ test.describe("POST /api/admin/competitions/assign — staff rows land only on c
     expect(pair.skippedAuthors.map(a => a.competitionId).sort(), "one entry per refused (user, event) pair").toEqual([E.id, E3.id].sort());
     const forE = pair.skippedAuthors.find(a => a.competitionId === E.id);
     const forE3 = pair.skippedAuthors.find(a => a.competitionId === E3.id);
-    expect(forE.tasks.map(t => t.id).sort(), "the E entry names both challenges E holds").toEqual([t1.id, t2.id].sort());
-    expect(forE3.tasks.map(t => t.id), "the E3 entry names only the challenge E3 holds").toEqual([t1.id]);
+    // Named as each event holds them: its own copies (lib/event-copies.js).
+    expect(forE.tasks.map(t => t.id).sort(), "the E entry names both challenges E holds").toEqual([eventCopyOf(t1.id, E.id), eventCopyOf(t2.id, E.id)].sort());
+    expect(forE3.tasks.map(t => t.id), "the E3 entry names only the challenge E3 holds").toEqual([eventCopyOf(t1.id, E3.id)]);
     expect(forE3.competitionName).toBe(E3.name);
     expect(hasRow(E3.id, author.id), "no row on the third event either").toBe(false);
     // CONTROL: the non-author through the same two-event request lands on E3
@@ -712,7 +715,7 @@ test.describe("POST /api/admin/competitions/assign — staff rows land only on c
     const bySa = await assign(sa, saCsrf, [peerAuthor.id], [E.id]);
     expect(bySa.skippedPrivileged).toBe(0);
     expect(bySa.skippedAuthors.map(a => a.competitionId), "CONTROL: the superadmin caller is refused for authorship").toEqual([E.id]);
-    expect(bySa.skippedAuthors[0].tasks.map(x => x.id)).toEqual([t.id]);
+    expect(bySa.skippedAuthors[0].tasks.map(x => x.id)).toEqual([eventCopyOf(t.id, E.id)]);   // the event's own copy
     expect(hasRow(E.id, peerAuthor.id)).toBe(false);
     await actor.api.dispose(); await peerAuthor.api.dispose();
   });
@@ -822,7 +825,7 @@ test.describe("POST /api/competitions/join — the self-enroll link", () => {
     expect(r.status(), `author join: ${await r.text()}`).toBe(409);
     const b = await r.json();
     expect(b.code).toBe("staff_compete_author_competes");
-    expect(b.tasks, "the refusal names the challenge").toEqual([{ id: t.id, title: t.title }]);
+    expect(b.tasks, "the refusal names the challenge (the event's own copy)").toEqual([{ id: eventCopyOf(t.id, E.id), title: t.title }]);
     expect(String(b.error)).toContain(t.title);
     expect(hasRow(E.id, author.id), "nothing written").toBe(false);
 
@@ -1794,7 +1797,11 @@ test.describe("POST /api/admin/import/tasks — the competitor lock's overwrite 
     const author = { ...authorP, ...(await apiLogin(authorP.email, PARTICIPANT_PASS)) };
     const held = await makeTask(author.api, author.csrf, "taskimp-held", { answer_sealed: true });
     const loose = await makeTask(author.api, author.csrf, "taskimp-loose", { answer_sealed: true });
-    await assignTask(author.api, author.csrf, held.id, [E.id]);   // switch OFF: no seal/author gate applies
+    // switch OFF: no seal/author gate applies. The LIBRARY row itself is put in
+    // the event (the previous model's mode): an import overwrites library rows
+    // only, so the lock at that door is about a library row an event holds — a
+    // database from before event-owned copies (lib/event-copies.js).
+    await withLegacySharedAssign(sa, saCsrf, () => assignTask(author.api, author.csrf, held.id, [E.id]));
     const on = await sa.put(`/api/admin/competitions/${E.id}`, { headers: H(saCsrf), data: { staff_compete: true } });
     expect(on.status(), "PRECONDITION: the switch REFUSES to turn on while an enrolled author's challenge is held — the API cannot build this state").toBe(400);
     const onBody = await on.json();

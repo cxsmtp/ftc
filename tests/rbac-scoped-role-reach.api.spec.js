@@ -17,7 +17,7 @@
 
 const { test, expect } = require("./isolated-test");
 const { BASE, apiLogin, TEST_DB_PATH } = require("./helpers");
-const { H, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin } = require("./event-admin-helpers");
+const { H, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin, withLegacySharedAssign } = require("./event-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -70,11 +70,19 @@ test.describe("RBAC — a custom role scoped to its events stays inside them on 
     u = await apiLogin(holder.email);
     // Its own challenge in A only; its own challenge ALSO used by B; and a
     // challenge in A it did not write.
-    tOwnA = await makeTask(u.api, u.csrf, "reachOwnA");
-    await assignTask(u.api, u.csrf, tOwnA.id, [A.id]);
+    // An event's question is its OWN copy (lib/event-copies.js), so `tOwnA` and
+    // `tTheirsA` are A's copies; ONE row used by two events exists only in a
+    // database from before the copies, so `tOwnAB` is built that way (the
+    // previous model's mode, through the test hook).
+    const ownIn = async (api, csrf, t, cid) => ({ ...t, id: (await assignTask(api, csrf, t.id, [cid])).copies[0].task_id });
+    tOwnA = await ownIn(u.api, u.csrf, await makeTask(u.api, u.csrf, "reachOwnA"), A.id);
     tOwnAB = await makeTask(u.api, u.csrf, "reachOwnAB");
-    await assignTask(u.api, u.csrf, tOwnAB.id, [A.id]);
-    await assignTask(sa, saCsrf, tOwnAB.id, [B.id]);
+    await withLegacySharedAssign(sa, saCsrf, async () => {
+      await assignTask(u.api, u.csrf, tOwnAB.id, [A.id]);
+      await assignTask(sa, saCsrf, tOwnAB.id, [B.id]);
+    });
+    // The LIBRARY question A holds a copy of, which it did not write (A's own copy
+    // of it is A's question, which this role may edit as an organiser of A).
     tTheirsA = await makeTask(sa, saCsrf, "reachTheirsA");
     await assignTask(sa, saCsrf, tTheirsA.id, [A.id]);
     bA = plantBadge(pA.id, A.id, 1);

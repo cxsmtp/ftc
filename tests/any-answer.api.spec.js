@@ -105,10 +105,12 @@ async function makeFixture(api, csrf, { taskSpecs = [{ answer_type: "any" }], pe
     // an EARLIER test in this file created (the attempt-caps lesson).
     const { id: tid } = await tr.json();
     expect(tid, "the create returns the new challenge's id").toBeTruthy();
-    const t = { id: tid, title };
-    tasks.push(t);
-    const asg = await api.post(`/api/admin/tasks/${t.id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+    const asg = await api.post(`/api/admin/tasks/${tid}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign task ${i}: ${await asg.text()}`).toBeTruthy();
+    // The event holds its OWN copy (lib/event-copies.js): what its participants
+    // answer and every edit below is made to. `bankId` is the library row.
+    const t = { id: (await asg.json()).copies[0].task_id, bankId: tid, title };
+    tasks.push(t);
   }
 
   const users = [];
@@ -489,9 +491,10 @@ test.describe("any-answer challenges (v8.9.0)", () => {
     const compId = (await cr.json()).competition.id;
     const tr = await mkTask(api, csrf, { answer_type: "text", correct_answer: "k", status: "published" });
     expect(tr.ok(), await tr.text()).toBeTruthy();
-    const { id } = await tr.json();
-    const asg = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
+    const { id: bankId } = await tr.json();
+    const asg = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
     expect(asg.ok(), await asg.text()).toBeTruthy();
+    const id = (await asg.json()).copies[0].task_id;   // the event's own copy: the one the end freezes
     const end = await api.post(`/api/admin/competitions/${compId}/end-now`, { headers: { "x-csrf-token": csrf } });
     expect(end.ok(), `end-now: ${end.status()} ${await end.text()}`).toBeTruthy();
 
