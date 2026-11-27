@@ -7409,6 +7409,16 @@ paths:
                 hint: { type: string, description: "Refused with 400 on an `any` challenge when it carries real content; empty markup (`<p></p>`) is accepted and stored as no hint." }
                 attachment_url: { type: string }
                 status: { type: string, enum: [draft, published], default: draft }
+                competitionId:
+                  type: string
+                  description: >-
+                    CREATE THE QUESTION INSIDE THIS EVENT: it is the event's own
+                    question from birth (`owner_competition_id`, never a bank
+                    question), and a published one is assigned to the event at once.
+                    Asked as the assign doors ask: the competitor lock, the caller's
+                    scope (403), the event exists (404), no session of it has ended,
+                    the challenge fits the event's kind and, where staff compete, the
+                    seal invariant (400). Absent: a bank question, as before.
                 answer_sealed:
                   type: boolean
                   default: false
@@ -7947,6 +7957,16 @@ paths:
                       unsealed: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "(challenge, event) pairs skipped because the event lets staff compete and the challenge's answer is not SEALED — such an event admits only sealed challenges. Each is listed in `refused`." }
                       authorCompetes: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "(challenge, event) pairs skipped because the event lets staff compete and the challenge's AUTHOR is enrolled in it — a sealed answer is readable by its author. Each is listed in `refused`." }
                       qualifyingHeld: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "(challenge, event) pairs skipped because the challenge is a qualifying question and the event already asks one on its topic (its key): an event asks each one once." }
+                      ownedElsewhere: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "(challenge, event) pairs skipped because the challenge is ANOTHER event's own question; add the bank question it was copied from. Each assigned pair puts the event's own copy of a bank question in (see the single-assign door)." }
+                  copies:
+                    type: array
+                    description: "The question each assigned (challenge, event) pair put in: the event's own copy (`task_id`) of the named question (`from`)."
+                    items:
+                      type: object
+                      properties:
+                        competition_id: { type: string }
+                        task_id: { type: string }
+                        from: { type: string }
                   unfitReasons:
                     type: array
                     description: "Present only when `skipped.unfit` is non-zero. Up to five human-readable refusals, each naming the challenge and the event."
@@ -7984,6 +8004,18 @@ paths:
       summary: Assign challenge to events
       description: >-
         Assigns a published challenge to one or more events.
+
+
+        **A question added to an event lives in that event.** Naming a BANK
+        question (`owner_competition_id` null) puts each event's OWN copy of it
+        in: made now (every question field, the option ids, tags, attachments, the
+        seal and author, origin recorded in `copied_from_task_id`), or the copy an
+        earlier add made. Later edits of the bank question never reach a copy, and
+        an edit of a copy reaches its event only. Naming an event's own question
+        assigns it to that event; another event's question is refused
+        (`task_owned_by_other_event`): copying is the only way to share one.
+        Qualifying questions keep their own rule (below) and are assigned as they are.
+        `copies` names the question each event now holds.
         `assigned` counts the number of events the challenge was
         NEWLY added to — duplicates in `competitionIds` and events
         the challenge was already assigned to do NOT inflate the count
@@ -8026,8 +8058,18 @@ paths:
                 properties:
                   ok: { type: boolean }
                   assigned: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Count of NEW competition links created. Zero if every requested competition already had this challenge." }
+                  copies:
+                    type: array
+                    description: "One entry per named event: the question it now holds (its own copy of a bank question)."
+                    items:
+                      type: object
+                      properties:
+                        competition_id: { type: string }
+                        task_id: { type: string }
         "400":
           description: >-
+            `task_owned_by_other_event`: the challenge is another event's own
+            question (add the bank question it was copied from). Or
             `competitionIds` is not an array of strings (`competitionIds must be an
             array of strings`, asked before anything else reads the list); it names
             more than 1000 events (`Cannot assign a challenge to more than 1000 events
@@ -8054,7 +8096,7 @@ paths:
                 additionalProperties: true
                 properties:
                   error: { type: string }
-                  code: { type: string, enum: [staff_compete_unsealed, staff_compete_author_competes, qualifying_key_held], description: "Present on a seal refusal, and on qualifying_key_held (which carries no refused list)." }
+                  code: { type: string, enum: [staff_compete_unsealed, staff_compete_author_competes, qualifying_key_held, task_owned_by_other_event], description: "Present on a seal refusal, on qualifying_key_held (which carries no refused list), and on task_owned_by_other_event (another event's own question)." }
                   refused:
                     type: array
                     description: "Present with a seal `code`: EVERY refused (challenge, event) pair in the request, capped at 50 (`refused_total` is the uncapped count)."
@@ -8169,7 +8211,7 @@ paths:
                 additionalProperties: true
                 properties:
                   error: { type: string }
-                  code: { type: string, enum: [staff_compete_unsealed, staff_compete_author_competes, qualifying_key_held], description: "Present on a seal refusal, and on qualifying_key_held (which carries no refused list)." }
+                  code: { type: string, enum: [staff_compete_unsealed, staff_compete_author_competes, qualifying_key_held, task_owned_by_other_event], description: "Present on a seal refusal, on qualifying_key_held (which carries no refused list), and on task_owned_by_other_event (another event's own question)." }
                   refused:
                     type: array
                     description: "Present with `code`: EVERY refused (challenge, event) pair among the additions, capped at 50 (`refused_total` is the uncapped count). Additions only."

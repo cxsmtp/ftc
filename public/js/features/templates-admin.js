@@ -24,7 +24,7 @@ import { overlayDismiss } from "../ui/modal.js";
 import { fetchJsonList } from "../core/api.js";
 import { ICO } from "../ui/icons.js";
 import { showModal } from "../ui/modal.js";
-import { taskMatchesQuery, taskTagHit, isQualifyingTask } from "../ui/task-search.js";   // the one qualifying test
+import { taskMatchesQuery, taskTagHit, isQualifyingTask, isBankTask } from "../ui/task-search.js";   // the one qualifying test
 import { showToast } from "../ui/toast.js";
 import { wallClockToUtcChecked, dstGapMessage } from "../data/country-tz.js";
 import { loadAdminCompetitions, openCompetitionForm } from "./competitions-admin.js";
@@ -683,7 +683,7 @@ function _taskMatches(ov, state) {
   const q = ov.querySelector('#tpl-ed-task-search')?.value || '';
   if (!Array.isArray(_libTasks) || !q.trim()) return [];
   const have = new Set(state.tasks.map(t => t.id));
-  return _libTasks.filter(t => t.status === 'published' && !have.has(t.id) && !isQualifyingTask(t) && taskMatchesQuery(t, q));
+  return _libTasks.filter(t => isBankTask(t) && t.status === 'published' && !have.has(t.id) && !isQualifyingTask(t) && taskMatchesQuery(t, q));
 }
 /** The matches the list is showing. */
 function _taskHits(ov, state) { return _taskMatches(ov, state).slice(0, TASK_RESULTS_SHOWN); }

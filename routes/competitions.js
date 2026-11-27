@@ -3073,6 +3073,7 @@ const { DEADLINE_MAX_SPAN_MINUTES } = require("../lib/competitions");
 const { taskViewDenied, isEventAdmin } = require("../lib/event-admin");
 const { unsealedAssignmentDenied, competitorEventsForTask } = require("../lib/staff-compete");
 const { QUALIFYING_PREFIX, DEFAULT_QUALIFYING, qualifyingKeyFromTags } = require("../lib/qualifying");
+const { copyForNewEvent } = require("../lib/event-copies");   // a clone or spawn gets fresh copies
 
 // The template settings are the create form's own fields, so the SAME rules
 // validate them (`COMPETITION_FIELD_SCHEMA`, picked rather than retyped). Two
@@ -3551,9 +3552,12 @@ function _materialiseEvent(req, spec) {
         // title (the template read withholds both from them).
         if (skip && skip.reason === "not_visible") { skipped.push({ reason: skip.reason }); continue; }
         if (skip) { const _why = skip.note || skip.message; skipped.push({ task_id: tid, title: t ? t.title : null, reason: skip.reason, ...(_why ? { message: _why } : {}) }); continue; }
-        if (ins.run(id, tid, actor, createdAt, actingId).changes > 0) {
-          assigned.push(tid);
-          recordCompetitionEvent(id, "task_added", actor, { task_id: tid, task_title: t.title, via: provenance.via, ...reqContext(req) });
+        // The new event's OWN question: a fresh copy of the source's (a bank
+        // question, or the source event's own as edited there), never shared.
+        const eid = copyForNewEvent(db, tid, id, { changedBy: actor, via: provenance.via, nowIso: createdAt });
+        if (ins.run(id, eid, actor, createdAt, actingId).changes > 0) {
+          assigned.push(eid);
+          recordCompetitionEvent(id, "task_added", actor, { task_id: eid, task_title: t.title, via: provenance.via, ...(eid !== tid ? { copied_from: tid } : {}), ...reqContext(req) });
         }
       }
     }
@@ -3769,15 +3773,19 @@ app.post("/api/admin/competitions/:id/save-as-template", requireAdmin, requireGl
   const keep = [];
   const stub = { id: "", name: _v.values.name, event_kind: kind, staff_compete: settings.staff_compete ? 1 : 0 };
   const left = [];
-  for (const tid of taskIds.slice(0, TEMPLATE_MAX_TASKS)) {
-    const t = db.prepare("SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed FROM tasks WHERE id=?").get(tid);
-    const tags = db.prepare("SELECT tag FROM task_tags WHERE task_id=?").all(tid).map(x => x.tag);
+  for (const eid of taskIds.slice(0, TEMPLATE_MAX_TASKS)) {
+    // The event's own question is judged; the template names the BANK question it
+    // was copied from where that is still in the bank (a template names library
+    // questions, lib/event-copies.js), else the event's question itself.
+    const t = db.prepare("SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed, owner_competition_id, copied_from_task_id FROM tasks WHERE id=?").get(eid);
+    const tid = (t && t.copied_from_task_id && db.prepare("SELECT 1 FROM tasks WHERE id=? AND owner_competition_id IS NULL").get(t.copied_from_task_id)) ? t.copied_from_task_id : eid;
+    const tags = db.prepare("SELECT tag FROM task_tags WHERE task_id=?").all(eid).map(x => x.tag);
     const skip = _bpTaskSkip(req, t, stub, tags);
     // A challenge of an event the saver competes in is refused, not left out:
     // the template would carry what the 23 Nov ruling keeps away from them.
     if (skip && skip.reason === "competing") return res.status(403).json({ error: skip.message, code: "template_task_competing", task_id: tid });
     if (skip && skip.reason !== "locked") { left.push({ task_id: tid, title: t ? t.title : null, reason: skip.reason }); continue; }
-    keep.push(tid);
+    if (!keep.includes(tid)) keep.push(tid);
   }
   { const clash = _tplNameClash(_v.values.name); if (clash) return res.status(409).json(clash); }
   // What the template does differently from its source, as a clone names it: a

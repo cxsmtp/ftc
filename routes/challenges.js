@@ -31,6 +31,9 @@ const { validateChoices, parseChoices, parseCorrectIds, gradeChoice, choiceIdsBy
 // and an answered one keeps its options in place (ruling 84); lib/qualifying.js.
 const { qualifyingKeysFromTags, qualifyingKeyHeldDenied, answeredOptionsChangeDenied, qualifyingOptionsFixed, qualifyingOptionsFixedSet, qualifyingNeedsPickOneDenied, tagsMakeQualifying } = require("../lib/qualifying");
 const { rescoreAfterQualifyingFlip } = require("../lib/qualifying-rescore");
+// A question added to an event lives in that event: the assign doors put the
+// event's own copy in (lib/event-copies.js), never the bank question itself.
+const { eventTaskFor, assignedEventTaskId, eventsHolding } = require("../lib/event-copies");
 const { validateUrl } = require("../lib/util");
 const { validateBody } = require("../lib/validate");
 const { now } = require("../lib/time");
@@ -460,6 +463,7 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
   const assignedAt = now().toISOString();
   // Validate + insert atomically so status can't change between check and write
   const changedCids = [];
+  const copies = [];
   const addTasks = db.transaction(() => {
     // v8.7.0 — `assigned_by_id` goes in THIS statement, never a follow-up UPDATE:
     // `OR IGNORE` writes nothing when the pair already exists, so an UPDATE keyed
@@ -530,13 +534,20 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
         const _dup = qualifyingKeyHeldDenied(db, comp, task.id, _qKeys);
         if (_dup) throw _assignRefusal(_dup.message, { code: _dup.code });
       }
-      const r = ins.run(cid, task.id, adminId, assignedAt, actingId);
+      // The event's own question: this event's copy of a bank question (made
+      // now, or found from an earlier add), or the question itself when the
+      // event owns it. Another event's question is refused: copying is the
+      // only way to share one.
+      const _et = eventTaskFor(db, task.id, cid, { changedBy: adminId, via: "assign", nowIso: assignedAt });
+      if (_et.refused) throw _assignRefusal(_et.refused.message, { code: _et.refused.code });
+      const r = ins.run(cid, _et.id, adminId, assignedAt, actingId);
+      copies.push({ competition_id: cid, task_id: _et.id });
       // Only count rows the INSERT OR IGNORE actually inserted. Without this
       // the response overstates the batch — a competitionIds list that
       // contains duplicates (or ids the task was already assigned to) still
       // reported `assigned = N`, misleading the UI's success toast.
       if (r.changes > 0) {
-        recordCompetitionEvent(cid, "task_added", adminId, { task_id: task.id, task_title: taskTitle, ...reqContext(req) });
+        recordCompetitionEvent(cid, "task_added", adminId, { task_id: _et.id, task_title: taskTitle, ...(_et.id !== task.id ? { copied_from: task.id } : {}), ...reqContext(req) });
         _invalidateTaskNumbersCache(cid);
         changedCids.push(cid);
         // v6.8.2 — eagerly re-number if the comp is already live/ended so
@@ -574,7 +585,8 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
   // each affected comp, matching the DELETE sibling's writer-lock invariant.
   for (const cid of changedCids) invalidateLeaderboardCache(cid);
   _invalidateMeCacheForComps(changedCids);
-  res.json({ ok: true, assigned });
+  // `copies`: the question each event now holds (its own copy, for a bank one).
+  res.json({ ok: true, assigned, copies });
 });
 
 // v7.12.0 — BULK assign: add many challenges to many competitions in one request
@@ -621,7 +633,9 @@ app.post("/api/admin/tasks/assign-competitions", requireAdmin, bulkAdminLimit, c
   // Operator ruling N7 (14 Nov 2026) — `qualifyingHeld`: a qualifying question
   // whose key the event already holds (an event asks each one once), per
   // (challenge, event) pair like `unfit`.
-  const skipped = { notFound: 0, draft: 0, locked: 0, endedComp: 0, missingComp: 0, unfit: 0, outOfScope: 0, notOwned: 0, unsealed: 0, authorCompetes: 0, qualifyingHeld: 0 };
+  // `ownedElsewhere`: a question another event owns (it can only be copied).
+  const skipped = { notFound: 0, draft: 0, locked: 0, endedComp: 0, missingComp: 0, unfit: 0, outOfScope: 0, notOwned: 0, unsealed: 0, authorCompetes: 0, qualifyingHeld: 0, ownedElsewhere: 0 };
+  const copies = [];
   const unfitReasons = [];
   const refused = [];
   const changedCids = new Set();
@@ -707,9 +721,14 @@ app.post("/api/admin/tasks/assign-competitions", requireAdmin, bulkAdminLimit, c
           skipped.qualifyingHeld++;
           continue;
         }
-        const r = ins.run(comp.id, task.id, adminId, assignedAt, actingId);
+        // The event's own question (lib/event-copies.js); another event's
+        // question is skipped, per pair, like `unfit`.
+        const _et = eventTaskFor(db, task.id, comp.id, { changedBy: adminId, via: "bulk", nowIso: assignedAt });
+        if (_et.refused) { skipped.ownedElsewhere++; continue; }
+        const r = ins.run(comp.id, _et.id, adminId, assignedAt, actingId);
+        copies.push({ competition_id: comp.id, task_id: _et.id, from: task.id });
         if (r.changes > 0) {
-          recordCompetitionEvent(comp.id, "task_added", adminId, { task_id: task.id, task_title: task.title, via: "bulk", ...reqContext(req) });
+          recordCompetitionEvent(comp.id, "task_added", adminId, { task_id: _et.id, task_title: task.title, via: "bulk", ...(_et.id !== task.id ? { copied_from: task.id } : {}), ...reqContext(req) });
           changedCids.add(comp.id);
           assigned++;
         }
@@ -732,7 +751,7 @@ app.post("/api/admin/tasks/assign-competitions", requireAdmin, bulkAdminLimit, c
   // v8.1.0 (PR 30) — the REASONS ride the response, capped at five. A bare count
   // ("3 skipped") tells an admin something is wrong and not which challenge or
   // why, on the one screen where they could fix it.
-  res.json({ ok: true, assigned, skipped, ...(unfitReasons.length ? { unfitReasons } : {}), ...(refused.length ? capRefused(refused) : {}) });
+  res.json({ ok: true, assigned, skipped, copies, ...(unfitReasons.length ? { unfitReasons } : {}), ...(refused.length ? capRefused(refused) : {}) });
 });
 
 // PUT = desired-state sync (used by "Assign to Competitions" modal)
@@ -773,7 +792,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
   const desiredIds = Array.isArray(competitionIds) ? [...new Set(competitionIds)] : null;
   const expectedIds = Array.isArray(expectedAssignments) ? [...new Set(expectedAssignments)] : null;
   const _curAll = desiredIds || expectedIds
-    ? new Set(db.prepare("SELECT competition_id FROM competition_tasks WHERE task_id=?").all(task.id).map(r => r.competition_id))
+    ? new Set(eventsHolding(db, task.id).map(r => r.competition_id))
     : null;
   const _changeMsg = `Cannot add or remove more than ${BULK_ADMIN_MAX} events in one save.`;
   if (desiredIds && desiredIds.filter(cid => !_curAll.has(cid)).length > BULK_ADMIN_MAX) return res.status(400).json({ error: _changeMsg });
@@ -826,7 +845,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
   // All validation and writes happen atomically inside the transaction
   const applyDiffs = db.transaction(() => {
     // Load current assignments for concurrency check and diffing
-    const currentRows = db.prepare("SELECT competition_id FROM competition_tasks WHERE task_id=?").all(task.id);
+    const currentRows = eventsHolding(db, task.id);   // a bank question is "in" every event holding a copy of it
     const currentSet = new Set(currentRows.map(r => r.competition_id));
     // v8.8.8 — THE SET THE CLIENT WAS SHOWN, which since this release is not the
     // whole set. `task.competitions` is narrowed for an event admin, so both the
@@ -931,7 +950,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
     // Ahead of the ended/fit loop below because a permission answer must not be
     // preceded by a lifecycle answer about an event the actor cannot see.
     for (const cid of toRemoveIds) {
-      const d = taskUnassignDenied(req, task.id, cid);
+      const d = taskUnassignDenied(req, assignedEventTaskId(db, task.id, cid) || task.id, cid);
       if (d) {
         // The out-of-scope arm of `taskUnassignDenied` is unreachable from here
         // now — `toRemoveIds` is drawn from `visibleSet`, which is the scope — so
@@ -1006,16 +1025,23 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
     const assignedAt = now().toISOString();
     const taskTitle = db.prepare("SELECT title FROM tasks WHERE id=?").get(task.id)?.title;
     const changedCids = [];
+    const copies = [];
     for (const cid of toRemoveIds) {
-      del.run(cid, task.id);
-      recordCompetitionEvent(cid, "task_removed", adminId, { task_id: task.id, task_title: taskTitle, ...reqContext(req) });
+      // The question the event actually holds: its copy, for a bank question.
+      const eid = assignedEventTaskId(db, task.id, cid) || task.id;
+      del.run(cid, eid);
+      recordCompetitionEvent(cid, "task_removed", adminId, { task_id: eid, task_title: taskTitle, ...reqContext(req) });
       _invalidateTaskNumbersCache(cid);
       changedCids.push(cid);
     }
     for (const cid of toAdd) {
-      const r = ins.run(cid, task.id, adminId, assignedAt, actingId);
+      // The event's own question (lib/event-copies.js), as on the POST twin.
+      const _et = eventTaskFor(db, task.id, cid, { changedBy: adminId, via: "assign", nowIso: assignedAt });
+      if (_et.refused) throw _assignRefusal(_et.refused.message, { code: _et.refused.code });
+      const r = ins.run(cid, _et.id, adminId, assignedAt, actingId);
+      copies.push({ competition_id: cid, task_id: _et.id });
       if (r.changes > 0) {
-        recordCompetitionEvent(cid, "task_added", adminId, { task_id: task.id, task_title: taskTitle, ...reqContext(req) });
+        recordCompetitionEvent(cid, "task_added", adminId, { task_id: _et.id, task_title: taskTitle, ...(_et.id !== task.id ? { copied_from: task.id } : {}), ...reqContext(req) });
         _invalidateTaskNumbersCache(cid);
         changedCids.push(cid);
         // v6.8.2 — eagerly re-number live/ended comps so the admin table
@@ -1024,7 +1050,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
         if (comp) ensureTaskNumbers(cid, comp);
       }
     }
-    return { added: toAdd.length, removed: toRemoveIds.length, changedCids };
+    return { added: toAdd.length, removed: toRemoveIds.length, changedCids, copies };
   });
   let result;
   try {
@@ -1053,7 +1079,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
   for (const cid of result.changedCids) invalidateLeaderboardCache(cid);
   _invalidateMeCacheForComps(result.changedCids);
   _queueCompleters(req.params.id, result.changedCids);
-  res.json({ ok: true, added: result.added, removed: result.removed });
+  res.json({ ok: true, added: result.added, removed: result.removed, copies: result.copies });
 });
 
 app.delete("/api/admin/tasks/:id/competitions/:cid", requireAdmin, csrfProtection, (req, res) => {
@@ -1065,7 +1091,10 @@ app.delete("/api/admin/tasks/:id/competitions/:cid", requireAdmin, csrfProtectio
   // muting it from the leaderboard while the lock was meant to freeze
   // scoring assignments. Superadmin can still unassign because they
   // can also unlock. Same gate, same error copy as POST/PUT.
-  const task = db.prepare("SELECT id, locked FROM tasks WHERE id=?").get(req.params.id);
+  // The question the event holds: naming a bank question means this event's
+  // copy of it (lib/event-copies.js); its own lock is the one that binds.
+  const eid = (typeof req.params.cid === "string" && assignedEventTaskId(db, req.params.id, req.params.cid)) || req.params.id;
+  const task = db.prepare("SELECT id, locked FROM tasks WHERE id=?").get(eid);
   // v8.12.0 — a competitor may not take a challenge out of the event they compete
   // in. FIRST, as on every other task door: the lock binds every tier, so a
   // question answered ahead of it (the locked-task gate, the assigner rule) would
@@ -1083,7 +1112,7 @@ app.delete("/api/admin/tasks/:id/competitions/:cid", requireAdmin, csrfProtectio
   // runs before the competition is even read and an out-of-scope event never
   // gets a found/not-found answer.
   {
-    const denied = taskUnassignDenied(req, req.params.id, req.params.cid);
+    const denied = taskUnassignDenied(req, eid, req.params.cid);
     if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
   }
   const comp = db.prepare("SELECT id, name, start_time, duration_minutes, ended_at FROM competitions WHERE id=?").get(req.params.cid);
@@ -1092,10 +1121,10 @@ app.delete("/api/admin/tasks/:id/competitions/:cid", requireAdmin, csrfProtectio
     return res.status(400).json({ error: `Cannot modify challenge assignments for event "${comp.name}" — a session has already ended.` });
   }
   const adminId = getAdminIdentity(req);
-  const taskTitle = db.prepare("SELECT title FROM tasks WHERE id=?").get(req.params.id)?.title;
+  const taskTitle = db.prepare("SELECT title FROM tasks WHERE id=?").get(eid)?.title;
   const removeTaskTxn = db.transaction(() => {
-    const r = db.prepare("DELETE FROM competition_tasks WHERE competition_id=? AND task_id=?").run(req.params.cid, req.params.id);
-    if (r.changes > 0) recordCompetitionEvent(req.params.cid, "task_removed", adminId, { task_id: req.params.id, task_title: taskTitle, ...reqContext(req) });
+    const r = db.prepare("DELETE FROM competition_tasks WHERE competition_id=? AND task_id=?").run(req.params.cid, eid);
+    if (r.changes > 0) recordCompetitionEvent(req.params.cid, "task_removed", adminId, { task_id: eid, task_title: taskTitle, ...reqContext(req) });
     return r.changes;
   });
   const changes = runTxnWithMirrorBuffer(() => removeTaskTxn());
@@ -1110,7 +1139,7 @@ app.delete("/api/admin/tasks/:id/competitions/:cid", requireAdmin, csrfProtectio
     invalidateLeaderboardCache(req.params.cid);
     _invalidateMeCacheForComps([req.params.cid]);
     _invalidateTaskNumbersCache(req.params.cid);
-    _queueCompleters(req.params.id, [req.params.cid]);
+    _queueCompleters(eid, [req.params.cid]);
   }
   res.json({ ok: true });
 });
@@ -1168,9 +1197,18 @@ app.get("/api/admin/tasks", requireAdmin, (req, res) => {
       // on a row with no `event_kind` key rather than guessing a kind — the same
       // strictness `eventPolicyForWire` has, and for the same reason.
       `SELECT ct.task_id, ct.task_number, c.id, c.name, c.start_time, c.duration_minutes, c.ended_at, c.ended_manually,
-              c.event_kind, c.late_entry_enabled, c.late_entry_deadline_at, c.staff_compete FROM competitions c
-       JOIN competition_tasks ct ON ct.competition_id=c.id WHERE ct.task_id IN (${ph})`
-    ).all(JSON.stringify(taskIds));
+              c.event_kind, c.late_entry_enabled, c.late_entry_deadline_at, c.staff_compete, NULL AS copy_id FROM competitions c
+       JOIN competition_tasks ct ON ct.competition_id=c.id WHERE ct.task_id IN (${ph})
+       UNION ALL
+       SELECT et.copied_from_task_id, ct.task_number, c.id, c.name, c.start_time, c.duration_minutes, c.ended_at, c.ended_manually,
+              c.event_kind, c.late_entry_enabled, c.late_entry_deadline_at, c.staff_compete, ct.task_id FROM competitions c
+       JOIN competition_tasks ct ON ct.competition_id=c.id
+       JOIN tasks et ON et.id=ct.task_id AND et.owner_competition_id=c.id
+       WHERE et.copied_from_task_id IN (${ph})`
+    ).all(JSON.stringify(taskIds), JSON.stringify(taskIds));
+    // A BANK question is listed in every event holding a copy of it (lib/event-copies.js),
+    // its entry naming that event's question as `copy_id`: the Assign dialog shows,
+    // and the desired-state PUT diffs, the events the question is used in.
     // audit v7.7.36 (P1) — batch-load every referenced competition's timeslots
     // ONCE (WHERE competition_id IN (...)) instead of competitionStatus(r) falling
     // through to a per-row getCompetitionTimeslots query. Pre-fix, a task reused
@@ -1205,6 +1243,7 @@ app.get("/api/admin/tasks", requireAdmin, (req, res) => {
         // tick where the save is certain to be refused is the v7.14.2 class).
         // Boolean, like `can_unassign` beside it on the same entry.
         staff_compete: !!r.staff_compete,
+        ...(r.copy_id ? { copy_id: r.copy_id } : {}),
       });
     }
   }
@@ -1394,7 +1433,7 @@ app.get("/api/admin/tasks", requireAdmin, (req, res) => {
       // who put it there — the row-level answer the unassign route enforces.
       competitions: visible.map(c => ({
         ...c,
-        can_unassign: !_competingSet.has(c.id) && (!_eaScoped || !taskUnassignDenied(req, t.id, c.id)),
+        can_unassign: !_competingSet.has(c.id) && (!_eaScoped || !taskUnassignDenied(req, c.copy_id || t.id, c.id)),
       })),
       // Emitted only when something IS withheld, so every unscoped payload and
       // every unshared challenge is byte-identical to before.
@@ -1556,6 +1595,29 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
   const id = uuid();
   const storedImageIds = [];
   const adminId = getAdminIdentity(req);
+  // CREATED INSIDE AN EVENT (lib/event-copies.js): `competitionId` makes the
+  // question the event's own from birth, never a bank question, and a published
+  // one is assigned to it at once. Every rule the assign doors ask about the
+  // pair is asked here, in their order, before anything is written.
+  const ownerCompId = req.body.competitionId;
+  let ownerComp = null;
+  if (ownerCompId != null) {
+    if (typeof ownerCompId !== "string" || !ownerCompId) return res.status(400).json({ error: "competitionId must be an event id." });
+    const _cmp = refuseCompetitor(res, competitorEditDenied(db, competitorIds(req), ownerCompId));
+    if (_cmp) return _cmp;
+    const denied = competitionDenied(req, ownerCompId);
+    if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
+    ownerComp = db.prepare("SELECT id, name, event_kind, start_time, duration_minutes, ended_at, staff_compete FROM competitions WHERE id=?").get(ownerCompId);
+    if (!ownerComp) return res.status(404).json({ error: "Event not found" });
+    if (competitionStatus(ownerComp) === "ended" || competitionAnySlotEnded(ownerComp)) {
+      return res.status(400).json({ error: `Cannot modify challenge assignments for event "${ownerComp.name}" — a session has already ended.` });
+    }
+    const _probe = { id, title, answer_type: _effTypeC, answer_sealed: _wantSealed, created_by_id: actorId(req) };
+    const _fit = _fitError(_probe, ownerComp);
+    if (_fit) return res.status(400).json({ error: _fit.message });
+    const _seal = unsealedAssignmentDenied(_probe, ownerComp) || authorCompetesDenied(db, _probe, ownerComp);
+    if (_seal) return res.status(400).json({ error: _seal.message, code: _seal.code });
+  }
 
   // Validate staging_attachments shape + ownership BEFORE any DB work so the
   // whole create either succeeds or rolls back cleanly. The client can send an
@@ -1638,6 +1700,16 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
     // superadmin, which owns nothing and needs to own nothing.
     db.prepare("INSERT INTO tasks (id,title,description,difficulty,answer_type,correct_answer,choices,explanation,hint,attachment_url,active,status,author_name,author_linkedin,attempt_cap,updated_at,created_by_id,answer_sealed) VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?)")
       .run(id, title, processRichText(description||"", storedImageIds), difficulty, answer_type||"text", correct_answer, _cf.choicesJson, processRichText(explanation||"", storedImageIds), _effTypeC === "any" ? null : processRichText(hint||"", storedImageIds), validateUrl(attachment_url), taskStatus, author_name||null, validateUrl(author_linkedin)||null, _attemptCap, now().toISOString(), actorId(req), _wantSealed);
+    if (ownerComp) {
+      db.prepare("UPDATE tasks SET owner_competition_id=? WHERE id=?").run(ownerComp.id, id);
+      if (taskStatus === "published") {
+        db.prepare("INSERT OR IGNORE INTO competition_tasks (competition_id, task_id, assigned_by, assigned_at, assigned_by_id) VALUES (?,?,?,?,?)")
+          .run(ownerComp.id, id, adminId, nowIso, actorId(req));
+        recordCompetitionEvent(ownerComp.id, "task_added", adminId, { task_id: id, task_title: title, via: "created_in_event", ...reqContext(req) });
+        _invalidateTaskNumbersCache(ownerComp.id);
+        ensureTaskNumbers(ownerComp.id, ownerComp);
+      }
+    }
     for (const spec of stagingSpecs) {
       db.prepare(
         "INSERT INTO task_attachments (id, task_id, display_name, original_name, size_bytes, sha256, storage_path, created_at, created_by, order_idx) VALUES (?,?,?,?,?,?,?,?,?,?)"
@@ -1646,7 +1718,7 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
     }
   });
 
-  try { createTxn(); } catch (e) {
+  try { runTxnWithMirrorBuffer(() => createTxn()); } catch (e) {
     for (const mv of movesApplied) {
       try { fs.renameSync(mv.dst, mv.src); } catch (undoErr) { swallowed("challenges:create-txn-undo-move", undoErr); }
     }
@@ -1654,8 +1726,12 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
     return res.status(500).json({ error: "Failed to create challenge." });
   }
 
-  createTaskVersion(id, adminId, "create", storedImageIds, { ...reqContext(req) });
-  res.json({ ok: true, id, status: taskStatus });
+  if (ownerComp && taskStatus === "published") {
+    invalidateLeaderboardCache(ownerComp.id);
+    _invalidateMeCacheForComps([ownerComp.id]);
+  }
+  createTaskVersion(id, adminId, "create", storedImageIds, { ...reqContext(req), ...(ownerComp ? { competition_id: ownerComp.id } : {}) });
+  res.json({ ok: true, id, status: taskStatus, ...(ownerComp ? { owner_competition_id: ownerComp.id } : {}) });
 });
 
 app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
@@ -2396,6 +2472,9 @@ app.delete("/api/admin/tasks/:id", requireAdmin, requireSuperAdmin, destructiveA
   // Post-commit: unlink attachment binaries. Fire-and-forget, unreferenced
   // files are also reaped by the boot sweep.
   for (const rel of (deleteTxn._attachmentPaths || [])) {
+    // An event's copy of a question shares the bank question's FILES (same
+    // storage_path, lib/event-copies.js): a file another row still names stays.
+    if (db.prepare("SELECT 1 FROM task_attachments WHERE storage_path=? LIMIT 1").get(rel)) continue;
     // Inline path-containment guard (Checkmarx-recognized sanitizer): resolve the
     // server-generated storage_path under DATA_DIR and only unlink if it stays
     // strictly inside the data dir. Inlined at every attachment sink — see the
@@ -2984,7 +3063,9 @@ app.post("/api/admin/tasks/:id/attempt-grant", requireAdmin, destructiveAdminLim
     return res.status(400).json({ error: `extra must be a whole number between 1 and ${ATTEMPT_CAP_MAX}.` });
   }
 
-  const task = db.prepare("SELECT id, title, attempt_cap FROM tasks WHERE id=?").get(req.params.id);
+  // The grant is on the event's own question: naming a bank question means this
+  // event's copy of it (lib/event-copies.js).
+  const task = db.prepare("SELECT id, title, attempt_cap FROM tasks WHERE id=?").get(assignedEventTaskId(db, req.params.id, competitionId) || req.params.id);
   if (!task) return res.status(404).json({ error: "Challenge not found" });
   const comp = getCompetition(competitionId);
   if (!comp) return res.status(404).json({ error: "Event not found" });
@@ -3023,7 +3104,7 @@ app.post("/api/admin/tasks/:id/attempt-grant", requireAdmin, destructiveAdminLim
   if (!_enrolled) {
     return res.status(409).json({ error: "That participant is not enrolled in this event." });
   }
-  if (!db.prepare("SELECT 1 FROM competition_tasks WHERE competition_id=? AND task_id=?").get(competitionId, req.params.id)) {
+  if (!db.prepare("SELECT 1 FROM competition_tasks WHERE competition_id=? AND task_id=?").get(competitionId, task.id)) {
     return res.status(409).json({ error: "That challenge is not assigned to this event." });
   }
   // A grant on an UNCAPPED challenge would be stored and mean nothing — the admin
@@ -3033,11 +3114,11 @@ app.post("/api/admin/tasks/:id/attempt-grant", requireAdmin, destructiveAdminLim
     return res.status(409).json({ error: "That challenge has no attempt cap in this event, so there is nothing to grant.", code: "not_capped" });
   }
 
-  const granted = grantAttempts(userId, req.params.id, competitionId, extra);
+  const granted = grantAttempts(userId, task.id, competitionId, extra);
   const state = attemptState(userId, task, comp);
   try {
     recordUserEvent(userId, "attempt_grant", getAdminIdentity(req), {
-      task_id: req.params.id, task_title: task.title,
+      task_id: task.id, task_title: task.title,
       competition_id: competitionId, competition_name: comp.name,
       extra, granted_total: granted,
       attempts_used: state.used, attempts_left: state.left,

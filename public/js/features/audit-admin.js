@@ -84,6 +84,8 @@ export const AUDIT_ACTIVITY_LABELS = Object.freeze({
   certificate_emailed: "Certificate emailed",
   cleared: "Cleared",
   competition_session_cleared: "Session choice cleared",
+  // lib/event-copies.js — the first version of an event's own copy of a question.
+  copy: "Question copied into an event",
   create: "Challenge created",
   created: "Created",
   credential_lookup_failed: "Certificate check failed",

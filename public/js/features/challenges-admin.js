@@ -16,7 +16,7 @@ import { showSkeletonRows, showLoading, hideLoading } from "../ui/loading.js";
 import { overlayDismiss, showModal } from "../ui/modal.js";
 import { createRichEditor, highlightCodeElement, renderRich } from "../ui/richtext.js";
 import { showToast } from "../ui/toast.js";
-import { taskMatchesQuery, isQualifyingTask } from "../ui/task-search.js"; // the one challenge search: title, difficulty, tags; the one qualifying test
+import { taskMatchesQuery, isQualifyingTask, bankTasks, workspaceTasks, pickerTasks } from "../ui/task-search.js"; // the one challenge search: title, difficulty, tags; the one qualifying test
 import { addTasksToCompetition, runBoundedCollect } from "./task-assign.js"; // the one add-to-event path
 import { tipsAllOn } from "../ui/help-tips.js";
 import { _stopAllPolls, _announceSignout } from "./session-monitor.js";
@@ -108,7 +108,9 @@ export async function openTaskPickerForCompetition(compId){
   const tasks=await _loadAdminTaskList();
   if(seq!==_taskPickerOpenSeq)return;   // v8.12.6 — superseded by a later open (the list is parsed inside the loader)
   if(!tasks){ showToast('Could not load the challenge list. Please try again.','error'); return; }
-  const published=tasks.filter(t=>t.status==='published');
+  // Bank questions (ticked where the event holds its copy) and the event's own
+  // questions no bank question stands for (lib/event-copies.js).
+  const published=pickerTasks(tasks,compId).filter(t=>t.status==='published');
   const isOn=t=>(t.competitions||[]).some(c=>c.id===compId);
   // Operator ruling N7 (14 Nov 2026) — AN EVENT ASKS EACH QUALIFYING QUESTION
   // ONCE. Another event's qualifying question may be added (the two events then
@@ -669,8 +671,14 @@ export async function fixPublicDomainTag(taskId,badTag){
   renderAdminTasks();
 }
 
+// The rows this list shows (ui/task-search.js): the library outside an event;
+// inside one, the event's own questions and the bank questions it holds no copy of.
+function _listedTasks(){
+  const all=Array.isArray(S.adminTasksData)?S.adminTasksData:[];
+  return S.adminSelectedCompetitionId?workspaceTasks(all,S.adminSelectedCompetitionId):bankTasks(all);
+}
 export function renderAdminTasks(){
-  let tasks=[...S.adminTasksData];
+  let tasks=_listedTasks();
   // RBAC — a row is selected only to assign it (`challenges.assign`): a role
   // that may not gets no checkboxes and no Select all.
   const _canSelect=adminCan('challenges.assign');
@@ -1028,7 +1036,7 @@ export function renderAdminTasks(){
   // v7.20.11 — the three chip groups narrow the list too, so they count as
   // "filtered"; otherwise the count reports the whole table over a chip-narrowed
   // handful of rows.
-  setListCount('task-search',{matched:totalFiltered,total:(S.adminTasksData||[]).length,filtered:!!q||!!(S.tDiffFilters&&S.tDiffFilters.size)||!!(S.tStatusFilters&&S.tStatusFilters.size)||!!(S.tStateFilters&&S.tStateFilters.size)||hasColumnFilters('challenges'),queried:!!q||hasColumnFilters('challenges')});
+  setListCount('task-search',{matched:totalFiltered,total:_listedTasks().length,filtered:!!q||!!(S.tDiffFilters&&S.tDiffFilters.size)||!!(S.tStatusFilters&&S.tStatusFilters.size)||!!(S.tStateFilters&&S.tStateFilters.size)||hasColumnFilters('challenges'),queried:!!q||hasColumnFilters('challenges')});
   if(pagDiv)setSafeHtml(pagDiv, paginationHtml('tasks', {page:S.tPage,totalPages,totalLabel:`${totalFiltered} total`,pageSize:S.tPageSize}));
 
   // v7.12.0 — keep the bulk-assign selection bar + the select-all checkbox in sync
@@ -1146,6 +1154,8 @@ async function _postBulkAssignChallenges(competitionIds){
     if(sk.authorCompetes)skipBits.push(`${sk.authorCompetes} whose author competes in the event`);
     // Operator ruling N7 — an event asks each qualifying question once.
     if(sk.qualifyingHeld)skipBits.push(`${sk.qualifyingHeld} qualifying question(s) on a topic the event already asks`);
+    // A question another event owns is never shared (lib/event-copies.js).
+    if(sk.ownedElsewhere)skipBits.push(`${sk.ownedElsewhere} question(s) belonging to another event (add the bank question instead)`);
     if(skipBits.length)msg+=` Skipped: ${skipBits.join(', ')}.`;
     // The REASONS ride the response precisely so a refusal can be read rather
     // than counted (the server caps them at five). The single-assign path already
@@ -3355,7 +3365,7 @@ export const CHALLENGE_TABLE_COLUMNS={
   cols:{title:{grow:true},difficulty:{filter:'enum',options:['easy','medium','hard']},type:{filter:'enum'},status:{filter:'enum',options:['Draft','Hidden','Published']},
     tags:{filter:'tags'},events:{filter:'tags'},last_changed:{filter:'date'},changed_by:{filter:'enum'},author:{filter:'enum'}},
   model:{
-    rows:()=>S.adminTasksData||[],
+    rows:()=>_listedTasks(),
     get:(t,k)=>{switch(k){
       case 'title':return t.title||'';
       case 'difficulty':return t.difficulty||'';

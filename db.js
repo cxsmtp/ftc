@@ -3400,6 +3400,44 @@ try {
   }
 }
 
+// A QUESTION ADDED TO AN EVENT LIVES IN THAT EVENT (lib/event-copies.js).
+// `owner_competition_id`: the event owning this question (NULL = a bank
+// question). `copied_from_task_id`: the bank question it was copied from (NULL
+// for one created in its event). No foreign keys on purpose: a cascade would
+// erase the origin exactly when "copied from" must still be shown, and an event
+// deleted leaves its questions as rows nothing assigns. OUTSIDE try/catch: every
+// assign door writes both columns, so a swallowed ADD would fail each write.
+// Below every `tasks` rebuild, so neither the ALTERs nor the indexes are taken
+// by a DROP TABLE.
+{
+  const _cols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+  if (!_cols.includes("owner_competition_id")) db.exec("ALTER TABLE tasks ADD COLUMN owner_competition_id TEXT");
+  if (!_cols.includes("copied_from_task_id")) db.exec("ALTER TABLE tasks ADD COLUMN copied_from_task_id TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_owner_origin ON tasks(owner_competition_id, copied_from_task_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_copied_from ON tasks(copied_from_task_id)");
+}
+// One shot (owner decision, ended events included): every event gets its own
+// copy of every bank question it holds, and the event's answers, hints, grants,
+// analytics and assignment move to the copy (lib/event-copies.js says which
+// table goes where). One transaction per event, so an interrupted boot resumes
+// where it stopped; the marker is written once every event is done, even when
+// there was nothing to do. Preview it read-only first with
+// scripts/event-copies-dry-run.js.
+{
+  const done = db.prepare("SELECT value FROM settings WHERE key='event_owned_questions_migrated_at'").get();
+  if (!done) {
+    const at = new Date().toISOString();
+    const rep = require("./lib/event-copies").migrateSharedTasksToEventCopies(db, { nowIso: at });
+    db.prepare("INSERT INTO settings (key, value) VALUES ('event_owned_questions_migrated_at', ?) ON CONFLICT(key) DO NOTHING").run(at);
+    if (rep.questions) {
+      db.prepare("INSERT INTO settings_events (id, setting_key, event_type, changed_by, changed_at, details) VALUES (?,?,?,?,?,?)")
+        .run(crypto.randomUUID(), "event_owned_questions", "updated", "system", at,
+          JSON.stringify({ via: "migration", events: rep.events.length, questions: rep.questions, rows_moved: rep.rows }));
+      console.log(`[migration] event-owned questions: ${rep.questions} question(s) copied into ${rep.events.length} event(s)`);
+    }
+  }
+}
+
 // ── Prepared-statement memo (installed AFTER every migration above) ──────────
 //
 // Request code calls `db.prepare(sql)` inline, so the same SQL text was compiled

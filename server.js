@@ -3882,6 +3882,25 @@ if (process.env.NODE_ENV === "test") {
     try { runStatusSchedulerTick(); res.json({ ok: true }); }
     catch (e) { res.status(500).json({ error: e.message }); }
   });
+  // Event-owned questions (lib/event-copies.js). `legacy-shared-assign {on}`: the
+  // assign doors put the bank question itself into the event, as the previous
+  // release did, so a spec can build that database through the real doors.
+  // `event-copies-migrate {dryRun}`: run the boot's batch migration now (its
+  // marker is not consulted) and bust what it changes, after the commit.
+  app.post("/api/test/legacy-shared-assign", (req, res) => {
+    require("./lib/event-copies")._setLegacySharedAssignForTest(req.body?.on === true);
+    res.json({ ok: true, on: req.body?.on === true });
+  });
+  app.post("/api/test/event-copies-migrate", (req, res) => {
+    const rep = require("./lib/event-copies").migrateSharedTasksToEventCopies(db, { dryRun: req.body?.dryRun === true });
+    if (req.body?.dryRun !== true) {
+      const ids = rep.events.map(e => e.competition_id);
+      for (const cid of ids) { invalidateLeaderboardCache(cid); _invalidateTaskNumbersCache(cid); }
+      _invalidateMeCacheForComps(ids);
+      invalidateAdminParticipantsCache();
+    }
+    res.json({ ok: true, ...rep });
+  });
   // v7.21.5 — drive ONE reminder-dispatcher tick on demand. The 30 s interval is
   // disabled under NODE_ENV=test, so without this the dispatcher is unreachable
   // from the suite and its only "tests" re-implemented its SQL. Per-invocation
@@ -5040,7 +5059,9 @@ const submitLimit = rateLimit(60_000, 120, "submit");
 // reads a byte of it, with the sentence an over-limit file gets (an honest client
 // only gets here by choosing too large a file).
 const _submitDeclaredLengthGate = declaredLengthGate(_SUBMIT_UPLOAD_LIMITS, _MULTER_TOO_LARGE.LIMIT_FILE_SIZE);
-app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompetitionContext, requireParticipantInCompetition, csrfProtection, _submitDeclaredLengthGate, upload.single("file"), async (req, res) => {
+// A bank question id named in the session's event means that event's own copy (lib/event-copies.js).
+const _resolveEventTask = require("./lib/event-copies").resolveEventTaskParam(db, "id");
+app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, csrfProtection, _submitDeclaredLengthGate, upload.single("file"), async (req, res) => {
   // v6.13.14 — perf-span instrumentation. POST /api/tasks/:id/submit
   // is the hot write-path on the platform; v6.13.13's 4 h run logged
   // its p95 creeping 4.6 → 16.1 ms (3.5×). Stages worth splitting:
@@ -6173,7 +6194,9 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
   // unindexed column, i.e. one statement compilation plus one full table scan per
   // imported row — O(rows x tasks), synchronously, on a single-process server.
   // Measured by the audit at 263 ms for 10 000 rows before a single write.
-  const _conflictStmt = db.prepare("SELECT id, title, locked FROM tasks WHERE title=?");
+  // The library is what a file overwrites: bank questions only, never an event's own
+  // (same-titled) copy of one (lib/event-copies.js).
+  const _conflictStmt = db.prepare("SELECT id, title, locked FROM tasks WHERE title=? AND owner_competition_id IS NULL");
   const conflicts = [];
   for (const [i, t] of tasks.entries()) {
     // v8.3.20 — TRIM, matching the create path's own `title.trim()` guard. A
@@ -6340,7 +6363,7 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
   // Sweep #413 — how many of the file's rows would overwrite each title (an
   // overwrite that could mean more than one challenge is refused in the txn).
   const _overwritesByTitle = new Map();
-  const _sameTitleStmt = db.prepare(`SELECT COUNT(*) AS n, COALESCE(MAX(${qualifyingSql("t")}), 0) AS q FROM tasks t WHERE t.title=?`);
+  const _sameTitleStmt = db.prepare(`SELECT COUNT(*) AS n, COALESCE(MAX(${qualifyingSql("t")}), 0) AS q FROM tasks t WHERE t.title=? AND t.owner_competition_id IS NULL`);
   const specsToPromote = []; // specs whose tmp file we'll move to ./data/attachments/
   for (const [i, t] of tasks.entries()) {
     if (typeof t.title !== "string" || !t.title.trim() || !t.difficulty || (answerTypeHasKey(t.answer_type) && !t.correct_answer)) continue;   // v8.3.20 — trim, as above; v8.9.0 — `any` has no key
@@ -8384,7 +8407,10 @@ app.post("/api/admin/perf/bulk-seed-history", requireAdmin, requireSuperAdmin, c
     insComp.run(compId, compName, startIso, durationMinutes, endedIso, startIso);
     compCount++;
 
-    const compTasks = sampleFrom(taskIdx, taskRows, effectiveTasksPer);
+    // Each event holds its OWN copy of the sampled questions (lib/event-copies.js),
+    // as every assign door now makes it; the history rows below name the copy.
+    const compTasks = sampleFrom(taskIdx, taskRows, effectiveTasksPer)
+      .map(t => ({ ...t, id: require("./lib/event-copies").copyTaskIntoEvent(db, t.id, compId, { changedBy: "perf-seed", via: "perf_seed", nowIso: startIso }) }));
     let tn = 1;
     for (const t of compTasks) insCompTask.run(compId, t.id, String(tn++), adminId, startIso);
 

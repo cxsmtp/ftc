@@ -13,7 +13,7 @@ import { _sessionGetDurMinutes, _sessionGetStartUtc, sessionFormUpdateEnd } from
 import { loadAdminSubmissions } from "./submissions-admin.js";
 import { paginationHtml, setListCount, renderLoadFailure, colspanFor, countText, patchTableRows, setHtmlIfChanged } from "../ui/list-controls.js";
 import { esc, fmtDt, formatCountdown, formatDuration, _syncSortAria, DRY_RUN_TAG, PUBLIC_DOMAIN_TAG, eventKindChipHtml, eventKindLabel, eventCollectiveSingular, policyOrDefault, NO_FIXED_DEADLINE, eventEndText } from "../ui/format.js";
-import { taskMatchesQuery, isQualifyingTag, isQualifyingTask } from "../ui/task-search.js";   // the one challenge search; the one qualifying test
+import { taskMatchesQuery, isQualifyingTag, isQualifyingTask, isBankTask } from "../ui/task-search.js";   // the one challenge search; the one qualifying test
 import { addTasksToCompetition } from "./task-assign.js";   // the one add-to-event path
 import { ICO } from "../ui/icons.js";
 import { applyColumnFilters, hasColumnFilters } from "../ui/table-columns.js"; // v8.17.0 — heading filters
@@ -3084,7 +3084,7 @@ async function _initCompChallengePicker(overlay,tpl,picked){
   q('#comp-ch-none').addEventListener('click',()=>{overlay._chPicked.clear();_renderCompChallenges(overlay);});
   const lib=await fetchJsonList('/api/admin/tasks');
   if(!document.body.contains(overlay))return;   // the form closed meanwhile
-  overlay._chLib=Array.isArray(lib)?lib.filter(t=>t&&t.status==='published'&&!_chIsQualifying(t)):null;
+  overlay._chLib=Array.isArray(lib)?lib.filter(t=>t&&isBankTask(t)&&t.status==='published'&&!_chIsQualifying(t)):null;
   // The chips: every tag the listed challenges carry, categories first, minus
   // the platform's own markers. Rendered once; pressing one only flips it.
   const tags=new Map();

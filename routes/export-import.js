@@ -82,6 +82,12 @@ function _taskVisibilityScope(req) {
   if (ids.length) {
     parts.push(`EXISTS (SELECT 1 FROM competition_tasks ct2 WHERE ct2.task_id = t.id AND ct2.competition_id IN (SELECT value FROM json_each(?)))`);
     params.push(JSON.stringify(ids));
+    // An event's own question, and a bank question one of the events holds a
+    // copy of (lib/event-copies.js), as lib/event-admin.js taskVisibilitySql.
+    parts.push(`t.owner_competition_id IN (SELECT value FROM json_each(?))`);
+    params.push(JSON.stringify(ids));
+    parts.push(`EXISTS (SELECT 1 FROM tasks tcp WHERE tcp.copied_from_task_id = t.id AND tcp.owner_competition_id IN (SELECT value FROM json_each(?)))`);
+    params.push(JSON.stringify(ids));
   }
   return { clause: ` AND (${parts.join(" OR ")})`, params };
 }
@@ -126,7 +132,9 @@ app.get("/api/admin/export/tasks", requireAdmin, exportLimiter, async (req, res)
       "SELECT t.* FROM tasks t JOIN competition_tasks ct ON ct.task_id=t.id WHERE ct.competition_id=?" + _vis.clause + " ORDER BY t.difficulty, t.title"
     ).all(compId, ..._vis.params);
   } else {
-    tasks = db.prepare("SELECT t.* FROM tasks t WHERE 1=1" + _vis.clause + " ORDER BY t.difficulty, t.title").all(..._vis.params);
+    // The LIBRARY: bank questions only. An event's own questions (lib/event-copies.js)
+    // leave with that event (`?competitionId=`, or the full event export).
+    tasks = db.prepare("SELECT t.* FROM tasks t WHERE t.owner_competition_id IS NULL" + _vis.clause + " ORDER BY t.difficulty, t.title").all(..._vis.params);
   }
   const allTaskTags = db.prepare("SELECT task_id, tag FROM task_tags").all();
   const tagMap = {};

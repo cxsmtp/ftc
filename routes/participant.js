@@ -57,6 +57,8 @@ const { now } = require("../lib/time");
 const { attemptState, outOfAttemptsTaskIds } = require("../lib/attempts"); // v8.1.0 — the attempt ceiling on the participant wire; #283 the list's `out_of_attempts`
 const { isStaff } = require("../lib/user-tags");
 const { staffCompeteOn, refuseCompetitor, competitorEventsForTask } = require("../lib/staff-compete"); // v8.12.0; refuseCompetitor v8.12.1 (the toggle's compete refusal); competitorEventsForTask v8.12.2 (the seal never opens to a competitor)
+// A bank question id named in the session's event means that event's own copy (lib/event-copies.js).
+const _resolveEventTask = require("../lib/event-copies").resolveEventTaskParam(db, "id");
 const { verificationGraceState } = require("../lib/self-enroll");
 const { impersonationActor, impersonationEndedDetails, isImpersonating, actingAdminCompetesInTargetEvents, destroyImpersonationSession, restoreImpersonationTargetInactive, organiserPanelOpensTo } = require("../lib/impersonation");
 const { _capsOk, _firstNonStringField, _profileMissingFields, isValidTimezone, isFreeEmail, isValidEmailFormat, normaliseEmail, sameSlotEmails, validateUrl, _nicknameCharsOk, NICKNAME_CHARSET_ERROR, PROFILE_GATE_JOIN, PROFILE_GATE_COLUMNS, profileVersionSql, awaitDeliveryWithDeadline, MAIL_REPORT_DEADLINE_MS, profileTextControlField, profileTextControlBody } = require("../lib/util");
@@ -1925,7 +1927,7 @@ app.get("/api/tasks", requireParticipant, requireCompetitionContext, requirePart
   res.json(tasks.map(t => ({ ...t, categories: categoriesFromTags(_catMap.get(t.id) || []), qualifying: tagsMakeQualifying(_catMap.get(t.id) || []), solved: solved.includes(t.id), out_of_attempts: outOfAttempts.has(t.id), hackathon_ended: mySlotEnded, competition_fully_ended: fullyEnded })));
 });
 
-app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, rateLimit(60_000, 120, "tasks-get"), (req, res) => {
+app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, rateLimit(60_000, 120, "tasks-get"), (req, res) => {
   const compId = req.session.competitionId;
   // v6.20.x — withhold full challenge content (description, attachment list)
   // until the participant's window is live. See participantContentNotStarted.
@@ -2281,7 +2283,7 @@ app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, require
 // taskGradingHash now lives in lib/scoring.js (imported at the top) — shared by
 // GET /api/tasks/:id (routes/participant.js) and the inline submit route.
 
-app.post("/api/tasks/:id/hint", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, rateLimit(60_000, 30, "hint"), csrfProtection, (req, res) => {
+app.post("/api/tasks/:id/hint", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, rateLimit(60_000, 30, "hint"), csrfProtection, (req, res) => {
   const compId = req.session.competitionId;
   // v6.16.2 — same lifecycle gates as /api/tasks/:id/submit. Pre-fix
   // a participant who selected an UPCOMING competition could call
@@ -2492,7 +2494,7 @@ app.post("/api/tasks/:id/hint", requireParticipant, requireCompetitionContext, r
 
 app.post("/api/tasks/:id/navigated-away",
   requireParticipant, rateLimit(60_000, 60, "navaway"),
-  requireCompetitionContext, requireParticipantInCompetition,
+  requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask,
   csrfProtection,
   (req, res) => {
     const taskId = req.params.id;
@@ -2563,7 +2565,7 @@ app.post("/api/tasks/:id/navigated-away",
   }
 );
 
-app.put("/api/tasks/:id/feedback", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, rateLimit(60_000, 30, "task-feedback"), csrfProtection, (req, res) => {
+app.put("/api/tasks/:id/feedback", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, rateLimit(60_000, 30, "task-feedback"), csrfProtection, (req, res) => {
   // Number() throws on an object whose toString/valueOf is not callable (JSON can
   // send one), so only a number or a numeric string is converted.
   const rating = typeof req.body.rating === "number" || typeof req.body.rating === "string" ? Number(req.body.rating) : NaN;

@@ -33,6 +33,35 @@ export function isQualifyingTask(t) {
   return ((t && t.tags) || []).some(isQualifyingTag);
 }
 
+// ── The bank and an event's own questions (lib/event-copies.js) ─────────────
+// A row of GET /api/admin/tasks is a BANK question (`owner_competition_id`
+// null) or an event's OWN question (that event's id). A bank row lists every
+// event holding a copy of it in `competitions[]`, its entry naming the copy as
+// `copy_id`. Every organiser list picks its rows through these, so no screen
+// shows one event's question as part of the library or of another event.
+
+/** A bank (library) question. */
+export function isBankTask(t) { return !!t && !t.owner_competition_id; }
+
+/** The library: bank questions only. */
+export function bankTasks(tasks) { return (tasks || []).filter(isBankTask); }
+
+/** Event `compId`'s workspace list: its own questions, then the bank questions
+ *  it holds no copy of (the rest of the library, to add from). */
+export function workspaceTasks(tasks, compId) {
+  return (tasks || []).filter(t => t && (t.owner_competition_id
+    ? t.owner_competition_id === compId
+    : !(t.competitions || []).some(c => c.id === compId && c.copy_id)));
+}
+
+/** An assign picker for event `compId`: bank questions (ticked when the event
+ *  holds a copy), plus the event's own questions no listed bank question stands for. */
+export function pickerTasks(tasks, compId) {
+  const all = tasks || [];
+  const bankIds = new Set(all.filter(isBankTask).map(t => t.id));
+  return all.filter(t => t && (isBankTask(t) || (t.owner_competition_id === compId && !bankIds.has(t.copied_from_task_id))));
+}
+
 /** The words of a query, lower-cased. Empty for a blank query. */
 export function taskQueryTerms(q) {
   return String(q == null ? "" : q).toLowerCase().trim().split(/\s+/).filter(Boolean);

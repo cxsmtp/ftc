@@ -44,7 +44,7 @@
 //     the recipe of the seeded-once lock in tests/event-clone-templates.api.spec.js.
 const { test, expect } = require("./isolated-test");
 const { apiLogin, PARTICIPANT_PASS, TEST_DB_PATH } = require("./helpers");
-const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, eventCopyOf, originsHeldBy } = require("./event-admin-helpers");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -63,7 +63,9 @@ const write = (fn, file = TEST_DB_PATH) => sql(fn, file, {});
 const compRow = (id) => sql(db => db.prepare("SELECT * FROM competitions WHERE id=?").get(id));
 const eventsNamed = (name) => sql(db => db.prepare("SELECT COUNT(*) AS n FROM competitions WHERE name=?").get(name).n);
 const templatesNamed = (name) => sql(db => db.prepare("SELECT COUNT(*) AS n FROM event_templates WHERE name=?").get(name).n);
-const heldBy = (compId) => sql(db => db.prepare("SELECT task_id FROM competition_tasks WHERE competition_id=? ORDER BY task_id").all(compId).map(r => r.task_id));
+// The questions an event holds, each named by the bank question it was copied
+// from (an event holds its own copies: lib/event-copies.js).
+const heldBy = (compId) => originsHeldBy(compId);
 const sorted = (...ids) => [...ids].sort();
 
 let sa, saCsrf, adm;
@@ -169,17 +171,23 @@ test.describe("Challenges a copy leaves out", () => {
     const L = await makeTask(sa, saCsrf, "lk-locked"), O = await makeTask(sa, saCsrf, "lk-open");
     await assignTask(sa, saCsrf, L.id, [src.id]);
     await assignTask(sa, saCsrf, O.id, [src.id]);
-    const lk = await sa.post(`/api/admin/tasks/${L.id}/lock`, { headers: H(saCsrf) });
-    expect((await lk.json()).locked, "PRECONDITION: the toggle locked it").toBe(1);
-    const leftOut = (b, how) => {
-      expect(b.skipped_challenges, `${how}: the locked challenge is named`).toEqual([{ task_id: L.id, title: L.title, reason: "locked" }]);
+    // The source event holds its own copy of L (lib/event-copies.js): the clone
+    // judges that copy, the templates the bank question. Both are locked.
+    const Lc = eventCopyOf(L.id, src.id);
+    expect(Lc, "PRECONDITION: the event holds its own copy").toBeTruthy();
+    for (const id of [L.id, Lc]) {
+      const lk = await sa.post(`/api/admin/tasks/${id}/lock`, { headers: H(saCsrf) });
+      expect((await lk.json()).locked, "PRECONDITION: the toggle locked it").toBe(1);
+    }
+    const leftOut = (b, how, lockedId) => {
+      expect(b.skipped_challenges, `${how}: the locked challenge is named`).toEqual([{ task_id: lockedId, title: L.title, reason: "locked" }]);
       expect(b.assigned_challenges, how).toBe(1);
       expect(heldBy(b.competition.id), `${how}: the copy holds the other one only`).toEqual([O.id]);
     };
     // To the regular admin it IS a locked challenge (`_bpTaskSkip` answers
     // `locked`, as their clone shows), so each template save below that keeps
     // it is the `locked` exemption at work, never a skip that did not fire.
-    leftOut(await clone(adm.api, adm.csrf, src.id, { name: `LK c ${uniq("a")}` }), "an admin's clone");
+    leftOut(await clone(adm.api, adm.csrf, src.id, { name: `LK c ${uniq("a")}` }), "an admin's clone", Lc);
 
     // TEMPLATE SAVES keep it: a template is a plan, and each copy made from it
     // judges its own actor. The admin's create, a PUT sending it, and a PUT that
@@ -203,7 +211,7 @@ test.describe("Challenges a copy leaves out", () => {
     }
 
     // A COPY of that template judges the admin who makes it.
-    leftOut(await spawn(adm.api, adm.csrf, tpl.id, { name: `LK s ${uniq("a")}` }), "an admin's spawn");
+    leftOut(await spawn(adm.api, adm.csrf, tpl.id, { name: `LK s ${uniq("a")}` }), "an admin's spawn", L.id);
     for (const [how, b] of [
       ["the superadmin's clone", await clone(sa, saCsrf, src.id, { name: `LK c ${uniq("s")}` })],
       ["the superadmin's spawn", await spawn(sa, saCsrf, tpl.id, { name: `LK s ${uniq("s")}` })],
@@ -237,13 +245,16 @@ test.describe("Challenges a copy leaves out", () => {
     const Sc = await sealed("us-c"), Sd = await sealed("us-d");
     await assignTask(sa, saCsrf, Sc.id, [E.id]);
     await assignTask(sa, saCsrf, Sd.id, [E.id]);
-    const refused = await adm.api.put(`/api/admin/tasks/${Sc.id}`, { headers: H(adm.csrf), data: { answer_sealed: false } });
+    // E holds its own copy of Sc (lib/event-copies.js): that is the question
+    // no door unseals, and the one the planted row unseals.
+    const Scc = eventCopyOf(Sc.id, E.id);
+    const refused = await adm.api.put(`/api/admin/tasks/${Scc}`, { headers: H(adm.csrf), data: { answer_sealed: false } });
     expect(refused.status(), "PRECONDITION: no door unseals a challenge a compete event holds").toBe(409);
     expect((await refused.json()).code).toBe("answer_seal_in_compete_event");
-    write(db => db.prepare("UPDATE tasks SET answer_sealed=0 WHERE id=?").run(Sc.id));
+    write(db => db.prepare("UPDATE tasks SET answer_sealed=0 WHERE id=?").run(Scc));
     const cl = await clone(sa, saCsrf, E.id, { name: `US c ${uniq("c")}` });
     expect(compRow(cl.competition.id).staff_compete, "PRECONDITION: the copy lets staff compete").toBe(1);
-    expect(cl.skipped_challenges).toEqual([unsealedEntry(Sc)]);
+    expect(cl.skipped_challenges).toEqual([{ ...unsealedEntry(Sc), task_id: Scc }]);
     expect(heldBy(cl.competition.id), "CONTROL: the sealed one is carried").toEqual([Sd.id]);
 
     // SAVE-AS-TEMPLATE of the same source: a template that lets staff compete
