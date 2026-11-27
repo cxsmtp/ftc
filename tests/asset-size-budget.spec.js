@@ -63,11 +63,19 @@ const ROOT = path.join(__dirname, "..");
 // 359960 and brotli 312940 -> 315200, page gzip 33262 -> 33907 and brotli
 // 31062 -> 31536 (stage B, measured as the delta over its base: the Question
 // bank's topics module and dialog, the editor's Topic and sharing row, Save to
-// bank, the page's Topic filter and sharing markup).
+// bank, the page's Topic filter and sharing markup); then, on the integration of
+// the settings-smtp, program-grades, first-touch-timer, stage-b and declutter
+// branches (27 Nov 2026), every figure RE-MEASURED with this spec's own procedure
+// on the merged tree rather than summed from the branches' deltas (which double
+// counted shared markup and missed the merge's own changes): stylesheet gzip
+// 56241 -> 57673 and brotli 52368 -> 53783, page gzip 33907 -> 35569 and brotli
+// 31536 -> 33165, script gzip 359960 -> 375387 and brotli 315200 -> 328925
+// (the declutter screens, the template editor's Topic filter, the account doors
+// on Roles & permissions and the dialog toast placement included).
 const AT_RULING = {
-  stylesheet: { gzip: 56241, br: 52368 },
-  page: { gzip: 33907, br: 31536 },
-  script: { gzip: 359960, br: 315200 },
+  stylesheet: { gzip: 57673, br: 53783 },
+  page: { gzip: 35569, br: 33165 },
+  script: { gzip: 375387, br: 328925 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));
