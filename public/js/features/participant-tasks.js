@@ -529,7 +529,21 @@ function _showTasksLoadError(){
   if(sub)sub.textContent='Connection problem';
 }
 
+// When the solve clock starts: said on an event that starts it at the first
+// challenge (the server's answer, `clock_starts_at_first_open`), from the same row
+// the presence note reads. Painted as the page opens, BEFORE /api/tasks answers,
+// from what the tab already holds: drawn after the data it would move the
+// filters and the grid below it as the challenges land.
+function _paintClockNote(){
+  const cn=document.getElementById('clock-note');
+  if(!cn)return;
+  const list=(S.currentUser&&S.currentUser.competitions)||S.myCompetitions||[];
+  const c=list.find(x=>x.id===S.currentCompetitionId);
+  cn.hidden=!(c&&c.clock_starts_at_first_open===true);
+}
+
 export async function loadTasks(){
+  _paintClockNote();
   // v6.10.78 — 12 skeletons covers typical tournament grid layouts
   // (3-col × 4 rows on desktop, 2-col × 6 rows on tablet) before
   // /api/tasks returns and the real cards swap in. Paired with the
@@ -619,15 +633,7 @@ export async function loadTasks(){
     const _c=_list.find(c=>c.id===S.currentCompetitionId);
     _pn.hidden=!(_c&&_c.measure_presence);
   }
-  // When the solve clock starts: said on an event that starts it at the first
-  // challenge (the server's answer, `clock_starts_at_first_open`), from the same
-  // row the presence note reads.
-  const _cn=document.getElementById('clock-note');
-  if(_cn){
-    const _list=(S.currentUser&&S.currentUser.competitions)||S.myCompetitions||[];
-    const _c=_list.find(c=>c.id===S.currentCompetitionId);
-    _cn.hidden=!(_c&&_c.clock_starts_at_first_open===true);
-  }
+  _paintClockNote();
   // Show competition + session context
   const compLabel=document.getElementById('tasks-comp-label');
   if(compLabel){

@@ -176,7 +176,10 @@ test.describe("first-open solve clock", () => {
         const ans = await s.api.post(`/api/tasks/${quick.id}/submit`, { headers: H(s.csrf), data: {
           answer: JSON.stringify([optId || (qd.choices || [])[0].id]), gradingHash: await gradingHashFor(s.api, quick.id) } });
         expect(ans.ok(), await ans.text()).toBeTruthy();
+        expect(rawGet("SELECT COUNT(*) n FROM submissions WHERE competition_id=? AND user_id=? AND task_id=?", [comp.id, p.id, quick.id]).n,
+          "PRECONDITION: the Quick answer is on record, so an anchor reading it would move").toBe(1);
         expect(cu(comp.id, p.id).login_time, "a Quick answer starts no clock").toBeNull();
+        await sleep(300);
         const off = await (await api.get(`/api/admin/leaderboard?competitionId=${comp.id}`)).json();
         expect(off.map(e => e.userId), "a Quick answer alone does not put anyone on the board").toEqual([]);
         // CONTROL: the scoring challenge's open does start it, after the Quick answer.
@@ -195,14 +198,22 @@ test.describe("first-open solve clock", () => {
       const { comp, taskIds } = await liveEvent(api, csrf, "tournament", { n: 2 });
       const other = await liveEvent(api, csrf, "tournament", { n: 1 });
       const p = await makeParticipant(api, csrf, `fos${uniq()}`);
+      const peer = await makeParticipant(api, csrf, `fosp${uniq()}`);
       await enrol(api, csrf, comp.id, p.id);
+      await enrol(api, csrf, comp.id, peer.id);
+      // The grading hash is the challenge's, not the reader's: a PEER opens it, so
+      // the participant under test answers without ever opening it themselves.
+      const sp = await participantCtx(peer.email, comp.id);
+      const hash = await gradingHashFor(sp.api, taskIds[0]);
+      await sp.api.dispose();
+      expect(hash, "PRECONDITION: a grading hash to answer with").toBeTruthy();
       const s = await participantCtx(p.email, comp.id);
       try {
         // Another event's challenge is a 404 here and must not start this clock.
         expect((await s.api.get(`/api/tasks/${other.taskIds[0]}`)).status()).toBe(404);
         expect(cu(comp.id, p.id).login_time).toBeNull();
         // A wrong answer stored without any open.
-        const r = await submit(s.api, s.csrf, taskIds[0], "nope");
+        const r = await s.api.post(`/api/tasks/${taskIds[0]}/submit`, { headers: H(s.csrf), data: { answer: "nope", gradingHash: hash } });
         expect(r.ok(), await r.text()).toBeTruthy();
         const row = cu(comp.id, p.id);
         const sub = rawGet("SELECT submitted_at FROM submissions WHERE competition_id=? AND user_id=?", [comp.id, p.id]);

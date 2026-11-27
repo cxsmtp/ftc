@@ -44,11 +44,15 @@ const ROOT = path.join(__dirname, "..");
 // items, and the Updates, Backups & health and About cards with their loaders);
 // then gzip 350700 -> 350960 and brotli 306560 -> 306820 (event-owned questions: the
 // library/workspace/picker row filters in ui/task-search.js and the bulk toast's
-// "belonging to another event" skip line).
+// "belonging to another event" skip line); then gzip 350960 -> 352000 and brotli
+// 306820 -> 307760 (the first-open solve clock: measured +1031 B gzip, +935 B
+// brotli over the base tree — the event form's "Start each participant's clock"
+// choice with its lock note, the template editor's matching select and summary
+// line, its help tip and the challenge list's clock note).
 const AT_RULING = {
   stylesheet: { gzip: 56241, br: 52368 },
   page: { gzip: 33262, br: 31062 },
-  script: { gzip: 350960, br: 306820 },
+  script: { gzip: 352000, br: 307760 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));
