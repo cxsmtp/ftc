@@ -1,0 +1,118 @@
+name: release-image
+
+# Builds the app image on GitHub's runners, boots it with the same hardening the
+# servers use (read-only root, no capabilities), and only if it becomes ready
+# pushes it to GHCR SIGNED with the project's sigstore key. Servers installed with
+# deploy/podman/install.sh pull only images that carry this signature and follow
+# the `stable` tag through podman auto-update.
+#
+# Required repository secrets:
+#   IMAGE_SIGNING_KEY         contents of the private key (skopeo generate-sigstore-key)
+#   IMAGE_SIGNING_PASSPHRASE  its passphrase
+# The matching public key is deploy/podman/signing.pub.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-image
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    name: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read   # checkout
+      packages: write  # push to ghcr.io
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Name the image
+        id: meta
+        run: |
+          set -euo pipefail
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          version="$(jq -r .version version.json)"
+          echo "repo=$repo" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "short=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          podman --version
+          podman build --format docker --pull=always --no-cache -t localhost/release:ci .
+
+      - name: Boot it hardened and wait for /readyz
+        run: |
+          set -euo pipefail
+          podman run -d --name smoke \
+            --read-only --read-only-tmpfs \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 1024 \
+            -v smoke-data:/app/data -v smoke-uploads:/app/uploads \
+            -e BASE_URL=http://localhost:3000 -e SMTP_HOST=127.0.0.1 \
+            -p 127.0.0.1:3000:3000 localhost/release:ci
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/readyz; then echo; break; fi
+            if [ "$i" = 60 ]; then podman logs smoke | tail -60; echo "image never became ready" >&2; exit 1; fi
+            sleep 2
+          done
+          podman exec smoke test -s /app/data/.superadmin-password
+          curl -fsS -o /dev/null http://127.0.0.1:3000/
+          podman rm -f smoke
+
+      - name: Push signed
+        env:
+          SIGNING_KEY: ${{ secrets.IMAGE_SIGNING_KEY }}
+          SIGNING_PASSPHRASE: ${{ secrets.IMAGE_SIGNING_PASSPHRASE }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ steps.meta.outputs.repo }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHORT: ${{ steps.meta.outputs.short }}
+        run: |
+          set -euo pipefail
+          [ -n "$SIGNING_KEY" ] || { echo "IMAGE_SIGNING_KEY secret is not set" >&2; exit 1; }
+          umask 077
+          key="$RUNNER_TEMP/signing.key"; pass="$RUNNER_TEMP/signing.pass"
+          printf '%s\n' "$SIGNING_KEY" > "$key"
+          printf '%s' "$SIGNING_PASSPHRASE" > "$pass"
+          mkdir -p "$HOME/.config/containers/registries.d"
+          printf 'docker:\n  %s:\n    use-sigstore-attachments: true\n' "$REPO" \
+            > "$HOME/.config/containers/registries.d/release.yaml"
+          printf '%s' "$GHCR_TOKEN" | podman login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          tags="$VERSION sha-$SHORT"
+          if [ "$GITHUB_REF" = "refs/heads/main" ] || [[ "$GITHUB_REF" == refs/tags/v* ]]; then tags="$tags stable"; fi
+          for t in $tags; do
+            podman push --sign-by-sigstore-private-key "$key" --sign-passphrase-file "$pass" \
+              localhost/release:ci "docker://$REPO:$t"
+            echo "pushed $REPO:$t"
+          done
+          rm -f "$key" "$pass"
+
+      - name: Verify the signature the servers will check
+        env:
+          REPO: ${{ steps.meta.outputs.repo }}
+          SHORT: ${{ steps.meta.outputs.short }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/policy.json" <<EOF
+          {"default":[{"type":"reject"}],
+           "transports":{"docker":{"$REPO":[{"type":"sigstoreSigned",
+             "keyPath":"$GITHUB_WORKSPACE/deploy/podman/signing.pub",
+             "signedIdentity":{"type":"matchRepository"}}]}}}
+          EOF
+          skopeo copy --policy "$RUNNER_TEMP/policy.json" \
+            "docker://$REPO:sha-$SHORT" "dir:$RUNNER_TEMP/verify"
+          echo "signature verified against deploy/podman/signing.pub"

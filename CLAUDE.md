@@ -1680,7 +1680,7 @@ Targets are 44×44 except for these rulings:
 
 ## Deployment and CI image
 
-No CI job builds the app image. **Whenever `package-lock.json`, `Dockerfile` or `scripts/prune-runtime-deps.cjs` changes, build the image and boot it before the old container comes down:** scratch `DATA_DIR`/`UPLOADS_DIR` volumes, `BASE_URL`/`SMTP_HOST` set, wait for `/readyz` (recipe: CONTRIBUTING.md). The build fails closed; the documented redeploy builds before it replaces the old container, so a failed build leaves the old version serving.
+**Podman servers pull, never build:** `.github/workflows/release-image.yml` builds the image on a GitHub-hosted runner, boots it read-only with no capabilities until `/readyz` answers, and pushes it to GHCR signed with the sigstore key whose public half is `deploy/podman/signing.pub` (`stable` on main and `v*` tags). `deploy/podman/install.sh` (Ubuntu, once) installs a Quadlet unit that refuses unsigned images for that repository only, backs up the database before every start, and follows `stable` through `podman auto-update` with rollback. Its runner breaks the functional-core-b rule that every workflow uses `cx-private-ubuntu-x64` (an operator decision pending). The checkmarx.yml test jobs below still build nothing. **Whenever `package-lock.json`, `Dockerfile` or `scripts/prune-runtime-deps.cjs` changes, build the image and boot it before the old container comes down:** scratch `DATA_DIR`/`UPLOADS_DIR` volumes, `BASE_URL`/`SMTP_HOST` set, wait for `/readyz` (recipe: CONTRIBUTING.md). The build fails closed; the documented redeploy builds before it replaces the old container, so a failed build leaves the old version serving.
 
 ### App image (`Dockerfile`)
 
