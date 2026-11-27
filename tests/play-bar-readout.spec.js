@@ -100,6 +100,23 @@ test.describe("the play bar says the time left in words for a Program", () => {
     });
   }
 
+  // The score is said once on the challenge view (owner's decision, 27 Nov
+  // 2026): the play bar shows it, so the header's score pill steps aside, and
+  // comes back on the list (CONTROL).
+  test("the header's score pill is hidden where the play bar shows the score, and shown on the list", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await loginViaApi(page, fx.q.email, PARTICIPANT_PASS);
+    await page.goto("/");
+    await page.locator("#task-grid .task-card").first().waitFor({ state: "visible", timeout: 30000 });
+    await expect(page.locator("#header-score"), "CONTROL: the list shows the header's score").toBeVisible({ timeout: 15000 });
+    await page.evaluate((id) => window.openTask(id), fx.ttask.id);
+    await page.locator("#task-detail-page.active #qa-playbar").waitFor({ state: "visible", timeout: 15000 });
+    await expect(page.locator("#qa-playbar .qa-score"), "PRECONDITION: the bar shows the score").toBeVisible({ timeout: 10000 });
+    await expect(page.locator("#header-score"), "the header does not repeat it").toBeHidden();
+    await page.locator("#qa-playbar .qa-close").click();
+    await expect(page.locator("#header-score"), "back on the list it shows again").toBeVisible({ timeout: 10000 });
+  });
+
   test("CONTROL: a tournament's bar draws its ring and no text readout", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
     await openFirstChallenge(page, fx.q.email, fx.ttask.id);

@@ -486,8 +486,9 @@ more, a **Day 2 of 5** chip sits beside it. A Program whose closing date is five
 years or more away says **No fixed deadline** there instead, with no day chip.
 On a ranked event your running score is shown beside your account button and
 keeps itself up to date: about every 15 seconds while you are using the page,
-less often while it sits idle. When the clock runs out the countdown is replaced
-by the event's name and *Ended*.
+less often while it sits idle (on an open challenge the play bar shows it
+instead, so the page says it once). When the clock runs out the countdown is
+replaced by the event's name and *Ended*.
 
 ![Challenges grid](../screenshots/participant/04-tasks-list.png)
 

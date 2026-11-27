@@ -5803,8 +5803,10 @@ body.mcf #qa-playbar{display:none!important}
    On every width: Log out and the footer go while a challenge is open, and so
    do the header's countdown and day chip wherever the play bar draws its ring —
    the ring is then the one clock. A Program's bar draws none (its deadline is
-   weeks out), so its header countdown stays. On a phone the whole header steps
-   aside (the block above). */
+   weeks out), so its header countdown stays. The header's score pill goes too
+   wherever the play bar shows the score, so the page says it once (owner's
+   decision, 27 Nov 2026). On a phone the whole header steps aside (the block
+   above). */
 @supports selector(:has(*)){
   body:has(#task-detail-page.active):not(.mcf) #app-footer,
   body:has(#task-detail-page.active #qa-stats .qa-gauge):not(.mcf) #header-timer,
@@ -5817,6 +5819,7 @@ body.mcf #qa-playbar{display:none!important}
 #task-detail-page .qa-playbar .back-btn.qa-close{width:44px;height:44px;min-height:44px;padding:0;justify-content:center;border-radius:var(--r-s)}
 #task-detail-page .qa-playbar .back-btn.qa-close svg{width:20px;height:20px}
 .qa-playbar .qa-close .back-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  body:has(#task-detail-page.active #qa-stats .qa-score:not([hidden])):not(.mcf) #header-score,
 
 /* THE TIME RING'S WORDS. --qa-inner is the inner disc as a share of the ring;
    the client fits the words inside it (participant-tasks.js _fitGauge). */
