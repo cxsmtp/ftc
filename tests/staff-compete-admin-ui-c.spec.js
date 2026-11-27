@@ -176,10 +176,11 @@ test.describe("v8.12.0 — the challenge-side bulk picker, Remove from Event, an
   test("the challenge-side bulk picker disables the event the actor competes in as 'You compete here', flags a compete event as 'Sealed challenges only', and offers a plain one (CONTROL)", async ({ page }) => {
     await adminPanel(page, competitor.email);
     // Stage B — the bank's one door: two ticked questions open the bulk picker.
-    for (const t of [plainHinted, cTask]) {
-      const row = await challengeRow(page, t.title);
-      await row.locator('td.cb-cell input[type="checkbox"]').check();
-    }
+    // (The second is found by narrowing, not by re-entering the tab: a reload of
+    // the list clears the selection.)
+    await (await challengeRow(page, plainHinted.title)).locator('td.cb-cell input[type="checkbox"]').check();
+    await (await findSeededTaskRow(page, cTask.title)).first().locator('td.cb-cell input[type="checkbox"]').check();
+    await expect(page.locator("#challenge-selection-count")).toHaveText("2 selected");
     const btn = page.locator("#challenge-selection-bar-assign-btn");
     await expect(btn, "the bar's door renders once questions are ticked").toBeVisible({ timeout: 15000 });
     await btn.click();
