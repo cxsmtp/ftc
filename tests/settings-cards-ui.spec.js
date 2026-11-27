@@ -145,7 +145,7 @@ test.describe("Settings cards in the browser", () => {
     expect(before.tables.length).toBeGreaterThan(0);
 
     await adminLogin(page);
-    await clickTab(page, "settings"); await openSettingsSection(page, "data");
+    await clickTab(page, "settings"); await openSettingsSection(page, "general");
     const facts = () => page.locator("#retention-body .settings-facts").evaluate((dl) => {
       const out = {};
       const dts = [...dl.querySelectorAll("dt")];
@@ -174,7 +174,7 @@ test.describe("Settings cards in the browser", () => {
   // sweep in service says how many unused pictures it removed.
   test("Data & retention: the last sweep's unused pictures, removed in service and held in maintenance", async ({ page }) => {
     await adminLogin(page);
-    await clickTab(page, "settings"); await openSettingsSection(page, "data");
+    await clickTab(page, "settings"); await openSettingsSection(page, "general");
     await expect(page.locator("#retention-body .settings-facts")).toBeVisible({ timeout: 15000 });
     const pictures = () => page.locator("#retention-body .settings-facts").evaluate((dl) => {
       const dt = [...dl.querySelectorAll("dt")].find((x) => x.textContent === "Unused pictures");
@@ -211,7 +211,7 @@ test.describe("Settings cards in the browser", () => {
     await adminLogin(page);   // the boot tick sees no alert yet
     const raised = await (await page.request.post("/api/test/raise-ip-ban-alert", { data: { ip: "198.51.100.77" } })).json();
     expect(raised.alert && raised.alert.id, "PRECONDITION: an alert is open").toBeTruthy();
-    await clickTab(page, "settings"); await openSettingsSection(page, "alerts");
+    await clickTab(page, "settings"); await openSettingsSection(page, "general");
     const body = page.locator("#alerts-body");
     await expect(body.locator(".list-count")).toHaveText("1 open alert", { timeout: 15000 });
     await expect(body.locator(".settings-alert-row")).toContainText("198.51.100.77");
@@ -232,7 +232,7 @@ test.describe("Settings cards in the browser", () => {
   test("Alerts: at 390 px the card's sentence wraps inside the card", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await adminLogin(page);
-    await clickTab(page, "settings"); await openSettingsSection(page, "alerts");
+    await clickTab(page, "settings"); await openSettingsSection(page, "general");
     const line = page.locator("#alerts-body .list-count");
     await expect(line).toHaveText(/^No open alerts\./, { timeout: 15000 });
     const g = await line.evaluate((p) => {
@@ -268,7 +268,7 @@ test.describe("Approval required: the switch and what a held account meets", () 
         await act();
         return saved;
       };
-      const openAccounts = async () => { await clickTab(page, "settings"); await openSettingsSection(page, "accounts"); };
+      const openAccounts = async () => { await clickTab(page, "settings"); await openSettingsSection(page, "signin"); };
       const peopleLoaded = async () => {
         await clickTab(page, "Participants");
         await expect.poll(() => page.evaluate(() => (window.S.adminParticipantsData || []).length), { timeout: 20000 }).toBeGreaterThan(0);

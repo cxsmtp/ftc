@@ -609,6 +609,7 @@ route's own tier guard.
 | `PUT /api/admin/platform-look` | superadmin |  |
 | `GET /api/admin/settings/events` | **forbidden** | Platform settings apply to every event, so they are not available to event admins. |
 | `GET /api/admin/submissions` | **scoped** |  |
+| `GET /api/admin/system-health` | **forbidden** | The platform's health covers every event, so it is not available to event admins. |
 | `GET /api/admin/tags` | **scoped** |  |
 | `GET /api/admin/task-tags` | **scoped** |  |
 | `GET /api/admin/tasks` | **scoped** |  |

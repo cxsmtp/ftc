@@ -239,7 +239,14 @@ app.get("/api/admin/system-health", requireAdmin, (req, res) => {
   };
   if (req.session.isSuperAdmin) {
     let size = null;
-    try { size = Math.round(fs.statSync(db.name).size / (1024 * 1024) * 10) / 10; } catch (e) { swallowed("admin-misc:db-size", e); }
+    // The main file plus its write-ahead log, which holds every commit since the
+    // last checkpoint (the -shm index is a few KiB and left out).
+    try {
+      let bytes = fs.statSync(db.name).size;
+      try { bytes += fs.statSync(`${db.name}-wal`).size; }
+      catch (e) { if (e.code !== "ENOENT") throw e; }
+      size = Math.round(bytes / (1024 * 1024) * 10) / 10;
+    } catch (e) { swallowed("admin-misc:db-size", e); }
     body.database_size_mib = size;
     body.node_version = process.version;
     body.started_at = SERVER_STARTED_AT;

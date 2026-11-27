@@ -1212,12 +1212,15 @@ Settings is two panes: the list on the left, grouped under **People**,
   look and the certificate design), **Email (SMTP)** (the mail relay's last
   check, **Send test email**, the unsubscribe list and the [event team report
   domains](#event-team-report-domains)), **Updates** (the running version and
-  **What's new**; the server installs new versions itself from the signed
-  release image), **Backups & health** (the database's start-up checks,
+  **What's new**; a server set up with the Podman installer checks daily for
+  a new signed release image and restarts on it, any other deployment updates
+  however its operator set it up), **Backups & health** (the database's start-up checks,
   maintenance mode, the mail relay, free disk space and how long the server has
   run; a superadmin also sees the database's size, the Node.js version and when
-  the server started; backups are taken by the server before every start and
-  update, and this page cannot list them), **Get help** (opens the guides) and
+  the server started; a server set up with the Podman installer tries to back
+  up its database before each start (a failed backup does not stop it), any
+  other deployment has whatever backups its operator set up, and this page
+  cannot list them), **Get help** (opens the guides) and
   **About** (the version and the typefaces certificates use).
 
 The history sweep also reports how many unused pictures it removed, or that it

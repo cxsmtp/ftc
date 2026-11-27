@@ -131,13 +131,13 @@ const ADMIN = [
   // Settings is two panes (one section on screen), so each card's own row picks
   // its section after entering the tab.
   ["cxone removals", "**/api/admin/cxone/withdrawals*", "Settings", "admin-settings-tab",  "#cxone-withdrawals-card",
-    async (page) => require("./ui-admin-helpers").openSettingsSection(page, "cxone")],
+    async (page) => require("./ui-admin-helpers").openSettingsSection(page, "cxone-audit")],
   // The Data & retention and Alerts sections' own loaders: a failed read is said
   // in the card, never an empty "kept for —" or "No open alerts".
   ["retention",    "**/api/admin/retention*",    "Settings",     "admin-settings-tab",     "#retention-card",
-    async (page) => require("./ui-admin-helpers").openSettingsSection(page, "data")],
+    async (page) => require("./ui-admin-helpers").openSettingsSection(page, "general")],
   ["alerts",       "**/api/admin/alerts*",       "Settings",     "admin-settings-tab",     "#alerts-card",
-    async (page) => require("./ui-admin-helpers").openSettingsSection(page, "alerts")],
+    async (page) => require("./ui-admin-helpers").openSettingsSection(page, "general")],
   // The panes and workspace parts that came later, each with its own failure
   // branch: a 500 must never read as "no users", "no templates", an empty team
   // or an event nobody has joined.

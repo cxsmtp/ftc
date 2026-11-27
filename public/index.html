@@ -1434,7 +1434,7 @@
               <div class="card settings-card" id="updates-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">Updates</h3><span data-help="settings.updates" data-help-label="Updates"></span></div>
                 <p class="settings-help">Running version <strong id="settings-updates-version">—</strong>.</p>
-                <p class="settings-help">Updates are installed by the server, not from this page: it follows the signed “stable” image and restarts on a new one (podman auto-update). This page cannot check what the server will install next.</p>
+                <p class="settings-help">Updates are not installed from this page. A server set up with the Podman installer checks daily for a new signed release image and restarts on it; any other deployment updates however its operator set it up (see the operator guide). This page cannot check what will be installed next.</p>
                 <div class="settings-actions" id="settings-updates-actions" hidden><button class="btn secondary" data-action="release-notes-open">What's new</button></div>
               </div>
             </div>
@@ -1444,7 +1444,7 @@
               <div class="card settings-card" id="system-health-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">Platform health</h3><span data-help="settings.health" data-help-label="Platform health"></span></div>
                 <div id="system-health-body" role="status"></div>
-                <p class="settings-help">Backups are taken by the server before every start and update, into its backup folder. This page cannot list them; the server's operator restores from there.</p>
+                <p class="settings-help">A server set up with the Podman installer tries to back up its database before each start, into its backup folder (a failed backup does not stop the start). Any other deployment has whatever backups its operator set up (see the operator guide). This page cannot list backups; the server's operator restores them.</p>
               </div>
             </div>
 

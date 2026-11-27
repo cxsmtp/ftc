@@ -338,6 +338,7 @@ There's a `CLAUDE.md` at the repo root that is the LLM-facing brief: architectur
 
 ## Submitting a PR
 
+Open a draft pull request against `main`; the CI jobs and the release image workflow are described in CLAUDE.md, *Deployment and CI image*.
 
 <!-- DOC-REGISTRY
 # v8.3.24 — see AUTH_PATHS.md's registry for the design. The repository map

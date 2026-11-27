@@ -11181,7 +11181,7 @@ paths:
   /api/admin/users/{id}/role:
     patch:
       tags: [Admin - Users and roles]
-      summary: Change an account's role (Users & roles)
+      summary: Change an account's role (Roles & permissions)
       description: >-
         The same handler as `POST /api/admin/participants/{id}/role`, behind the
         `users.manage` permission instead of the superadmin tier. The escalation
@@ -11367,7 +11367,7 @@ paths:
                         label: { type: string }
                         grantable: { type: boolean }
                         superadmin_only: { type: boolean }
-                        every_event_only: { type: boolean, description: "A permission whose routes reach beyond any one event (the raw logs, the alerts, platform settings, metrics, retention, test email and the unsubscribe list, every-event and settings exports, imports, event templates, certificate designs, Users & roles, deleting accounts, creating events, adding organisers): only a role whose scope is `all` may hold it." }
+                        every_event_only: { type: boolean, description: "A permission whose routes reach beyond any one event (the raw logs, the alerts, platform settings, metrics, retention, test email and the unsubscribe list, every-event and settings exports, imports, event templates, certificate designs, Roles & permissions, deleting accounts, creating events, adding organisers): only a role whose scope is `all` may hold it." }
         "400": { $ref: '#/components/responses/QueryParamRepeated' }
         "401": { description: Not authenticated }
         "403": { description: "`permission_denied` — the role lacks `users.view`." }
@@ -11599,7 +11599,7 @@ paths:
         created plus the groups bound to one of their events (an organiser with no
         events sees only their own). Each row also carries THE ANSWER to what this
         caller may do with it — `can_write`, `can_bind`, `can_delete` and, when it
-        applies, `competing` — so the Groups pane and the pickers can withhold a
+        applies, `competing` — so the Teams page and the pickers can withhold a
         control with its reason instead of offering one the server refuses.
       responses:
         default: { $ref: '#/components/responses/UnexpectedError' }
@@ -11631,7 +11631,7 @@ paths:
                         (PUT /api/admin/groups/{id}) takes the scope half alone and
                         is never asked the competitor question — a rename changes no
                         membership — so a competing caller may still rename a group
-                        this flag is false for; the Groups pane disables Rename only
+                        this flag is false for; the Teams page disables Rename only
                         on the scope refusal (`competing` says which it was). The
                         invite dialog's group picker offers only groups with this set.
                     can_bind:
@@ -11658,7 +11658,7 @@ paths:
                         Present ONLY when the caller competes in an event this group
                         is bound to (a membership row on it while its "Staff can
                         compete" switch is on) — the first such event. `can_write`
-                        and `can_delete` are then false, and the Groups pane renders
+                        and `can_delete` are then false, and the Teams page renders
                         its Members dialog read-only and its Delete control
                         disabled, naming this event. Absent otherwise.
                       properties:
@@ -16204,7 +16204,7 @@ paths:
                       privileged_skipped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows skipped whole because the importer is not a superadmin and the row would overwrite an account that is a privileged target for them (an unscoped role, or one holding a permission the importer lacks — lib/rbac.js privilegedTargetFor), or would give a role that can do more than the importer's own (the escalation rule, roleAssignDenied). Always 0 for a superadmin. Counted apart from `skipped`; a superadmin can import those rows." }
                       control_chars_skipped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows skipped whole, new or overwrite, because a single-line profile text field (first_name, last_name, company, title, city, country, job_function, personal_title, phone, certificate_given_name, certificate_family_name) holds a control character (C0, DEL or C1). Nothing in the row is applied; the client's import summary names the count." }
                       avatar_links_dropped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows whose `avatar` is a `/api/images/` link to no picture this installation holds (or a malformed one), or to a picture that is not the overwritten account's own current one (a new row may name none). The link is not stored: an OVERWRITE keeps the account's current avatar, a NEW row gets `default1`. The client's import summary names the count; a stopped import's `partial` carries it too." }
-                      invalid_roles_dropped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows whose `role` names no role in this installation (a built-in role, or a custom role from Users & roles, whose id the export carries) and was therefore IGNORED. `users.role` has no CHECK constraint, so an unrecognised value used to be stored verbatim and rendered as itself on the admin screen. The key is dropped rather than rewritten, which means a NEW row falls through to the `participant` default and an OVERWRITE leaves the account's current role untouched — a malformed file cannot demote an existing admin." }
+                      invalid_roles_dropped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows whose `role` names no role in this installation (a built-in role, or a custom role from Roles & permissions, whose id the export carries) and was therefore IGNORED. `users.role` has no CHECK constraint, so an unrecognised value used to be stored verbatim and rendered as itself on the admin screen. The key is dropped rather than rewritten, which means a NEW row falls through to the `participant` default and an OVERWRITE leaves the account's current role untouched — a malformed file cannot demote an existing admin." }
         "400": { description: "Invalid format, too many participants, unsupported envelope version, a malformed email in any row, or a wrong-TYPED field in any row (the message names the row). Every field the importer binds is shape-checked, including the lifecycle and audit fields (`role`, `created_at`, `login_time`, `last_login_time`, `locked_until`, `first_verified_at`, the approval / denial / invitation ladders): a value that SQLite cannot bind — an object, an array, a boolean — means the FILE is malformed and is refused with the row named, rather than reaching the write transaction and 500ing a partially-committed import." }
         "401":
           description: >-
@@ -17146,7 +17146,7 @@ paths:
                   data_free_gib: { type: number, nullable: true, description: "Free space on the data volume in GiB, one decimal; null when it cannot be read" }
                   uploads_free_gib: { type: number, nullable: true, description: "Free space on the uploads volume in GiB, one decimal; null when it cannot be read" }
                   event_retention_days: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
-                  database_size_mib: { type: number, nullable: true, description: "Superadmin only: the database file's size in MiB, one decimal" }
+                  database_size_mib: { type: number, nullable: true, description: "Superadmin only: the database's size in MiB, one decimal: the main file plus its write-ahead log" }
                   node_version: { type: string, description: "Superadmin only" }
                   started_at: { type: string, format: date-time, description: "Superadmin only: when this server process started" }
         "400": { $ref: '#/components/responses/QueryParamRepeated' }

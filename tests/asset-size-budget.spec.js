@@ -38,11 +38,14 @@ const ROOT = path.join(__dirname, "..");
 // the retention card's picture count); then gzip 348400 -> 348460 and brotli
 // 304600 -> 304700 (9.2.18: the import summary's dropped-photo-link line); then
 // gzip 348460 -> 348880 and brotli 304700 -> 305040 (the New event page's one
-// card per type: its recommended setup, Start blank and the built-in's menu).
+// card per type: its recommended setup, Start blank and the built-in's menu);
+// then gzip 348880 -> 350700 and brotli 305040 -> 306560 (the regrouped Settings
+// menu, merged beside the New event page: the grouped section list with its link
+// items, and the Updates, Backups & health and About cards with their loaders).
 const AT_RULING = {
   stylesheet: { gzip: 56241, br: 52368 },
   page: { gzip: 33262, br: 31062 },
-  script: { gzip: 348880, br: 305040 },
+  script: { gzip: 350700, br: 306560 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));

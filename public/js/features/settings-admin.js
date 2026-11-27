@@ -840,6 +840,8 @@ export function loadAboutCard(){
   card.style.display='';
 }
 let _healthSeq=0;
+// The mail relay is null until its first probe (never under test); the boot's
+// database checks run before the server listens, so they are always booleans.
 const _yesNo=(ok,yes,no)=>ok===true?yes:ok===false?no:'Not checked yet';
 /** Backups & health: GET /api/admin/system-health (settings.view). */
 export async function loadSystemHealthCard(){
@@ -853,8 +855,8 @@ export async function loadSystemHealthCard(){
   const up=Number(d.uptime_seconds)||0;
   const upText=up>=86400?`${Math.floor(up/86400)} d ${Math.floor(up%86400/3600)} h`:up>=3600?`${Math.floor(up/3600)} h ${Math.floor(up%3600/60)} min`:`${Math.floor(up/60)} min`;
   const rows=[
-    ['Database check',_yesNo(d.database_integrity_ok,'Passed at start-up','Failed at start-up — restore from a backup')],
-    ['Database tables',_yesNo(d.database_schema_ok,'Complete','Incomplete — see the server log')],
+    ['Database check',d.database_integrity_ok===true?'Passed at start-up':'Failed at start-up — restore from a backup'],
+    ['Database tables',d.database_schema_ok===true?'Complete':'Incomplete — see the server log'],
     ['Maintenance mode',d.maintenance===true?'On':'Off'],
     ['Mail relay',_yesNo(d.smtp_healthy,'Answering','Not answering')],
     ['Running for',upText],
@@ -1093,7 +1095,7 @@ export const SETTINGS_HELP_TIPS={
   'settings.retention':'Audit and activity history older than this is deleted by a daily sweep. Submissions, scores and certificates are not affected.',
   'settings.alerts':'When a blocked address could be a busy shared network such as a venue, every superadmin is emailed and an alert opens here until the block lapses or someone dismisses it. An unmistakable scanner is blocked without an alert; every block is recorded in Audit.',
   'settings.cxone-audit':'Opens the Audit log searching for Checkmarx One activity: accounts set up, linked and removed, and changes to the integration.',
-  'settings.updates':'The server installs new versions itself from the signed release image and restarts. What’s new lists what each version changed.',
+  'settings.updates':'On a server set up with the Podman installer, new signed releases are checked for daily and installed with a restart; otherwise updates are whatever the deployment’s operator set up. What’s new lists what each version changed.',
   'settings.health':'What the server found at its last start and sees now. Superadmins also see the database size and the server’s Node.js version.',
   'settings.about':'The running version and the typefaces the certificates use.',
   'settings.breakglass':'The boot-generated password is in the data folder. Changing the username keeps you signed in; the new one is needed from the next sign-in, and the old one then signs nobody in.',
