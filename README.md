@@ -1710,6 +1710,5 @@ npm run check-version       # Fails if the four files disagree — suitable for 
 ## License
 
 See [LICENSE](LICENSE) for details.
-#   f t c 
- 
+#   f t c  
  
