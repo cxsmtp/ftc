@@ -1,0 +1,75 @@
+/* FONTS — one family for every look: Inter (operator ruling, 13 Nov 2026).
+ *
+ * The text and display stacks in styles.css open with "Inter Text" / "Inter
+ * Text Display": the vendored Inter (variable 100-900, latin + latin-ext) at
+ * size-adjust 87.1%, the size every machine without Aptos already drew (the
+ * platform used Aptos where installed until 9.1.0), so no line length or wrap
+ * moved when Aptos went. Every machine now renders the same face. Code is the
+ * vendored JetBrains Mono.
+ *
+ * Files live in /vendor/fonts/ and are content-hashed by the asset pipeline.
+ * unicode-range values are Google's css2 output, so a page fetches only the
+ * subset it draws. Plain 'Inter' (full size) stays declared for rich text
+ * authored with the editor's Inter font. /vendor/fonts/badge/ is the
+ * server-side certificate set.
+ */
+@font-face {
+  font-family: 'Inter Text';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/vendor/fonts/inter-latin.woff2) format('woff2');
+  size-adjust: 87.1%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter Text';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/vendor/fonts/inter-latin-ext.woff2) format('woff2');
+  size-adjust: 87.1%;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter Text Display';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/vendor/fonts/inter-latin.woff2) format('woff2');
+  size-adjust: 87.1%;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter Text Display';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/vendor/fonts/inter-latin-ext.woff2) format('woff2');
+  size-adjust: 87.1%;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/vendor/fonts/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/vendor/fonts/inter-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url(/vendor/fonts/jetbrains-mono-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

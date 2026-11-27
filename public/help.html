@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!-- data-platform-look: the superadmin's platform look, filled per request by
+     server.js like the app's own page, so theme-boot.js paints its look, mode,
+     light colour and lock here too. -->
+<html lang="en" data-platform-look="{{platformLook}}">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <!-- color-scheme tells the browser the page supports both themes so form
+       controls (inputs, scrollbars, default link colours) render with the
+       theme-matched defaults instead of always-light. Without this, mobile
+       Safari renders white-bg inputs even when prefers-color-scheme is dark. -->
+  <meta name="color-scheme" content="light dark"/>
+  <title>Help</title>
+  <link rel="icon" type="image/webp" href="/favicon.webp"/>
+  <link rel="stylesheet" href="/fonts.css"/>
+  <link rel="stylesheet" href="/styles.css"/>
+  <script src="/theme-boot.js"></script>
+  <script src="/asset-versions.js"></script>
+  <!-- v6.10.34 — defer marked + help-renderer so the HTML parser reaches
+       body + stylesheets without waiting for their downloads. help.js
+       was already deferred; extending to the two libraries it depends on
+       keeps ordering (defer scripts run in document order before
+       DOMContentLoaded, so help.js sees window.marked + window.HelpRenderer
+       populated by the time it runs). -->
+  <script defer src="/vendor/marked.min.js"></script>
+  <script defer src="/help-renderer.js"></script>
+  <script defer src="/help.js"></script>
+</head>
+<body>
+  <main class="help-page">
+    <header class="help-page-head">
+      <a class="help-page-home" href="/" title="Back to app">◂ Back to app</a>
+      <div id="help-page-title" class="help-page-title">Help</div>
+      <nav class="help-page-nav">
+        <a href="/help.html?doc=/docs/user-guide/participant.md">Participant</a>
+        <a href="/help.html?doc=/docs/user-guide/admin.md">Admin</a>
+        <a href="/help.html?doc=/docs/user-guide/superadmin.md">Superadmin</a>
+      </nav>
+    </header>
+    <article id="help-page-body" class="help-drawer-body help-page-body"></article>
+  </main>
+</body>
+</html>

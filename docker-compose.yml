@@ -1,0 +1,47 @@
+services:
+  hackarena:
+    build:
+      context: .
+      # v8.13.2 (external audit) — every build PULLS the base image's current
+      # digest instead of reusing whatever node:<major>-alpine was cached the
+      # last time. Without it `docker compose up --build` on a host with a cached
+      # base ships the old Node and the old Alpine packages (measured: 26.7.0 on
+      # Alpine 3.24.1 against a current 26.10.0 on 3.24.2). The documented
+      # redeploy builds with `--pull --no-cache` before it replaces the running
+      # container; this makes the fresh pull hold for every other way of building.
+      # It does NOT refresh Alpine fixes published since the base was built:
+      # on an unchanged base digest the Dockerfile's `apk upgrade` layer is
+      # reused from the build cache, which is why the documented redeploy builds
+      # with `--no-cache` (README, Deployment -> Docker).
+      pull: true
+    # Image tag is kept in lock-step with version.json by `npm run bump`
+    # (scripts/bump-version.js), which rewrites this line, version.json,
+    # package.json and swagger.yaml's info.version together; `npm run
+    # check-version` (scripts/check-version.js) catches drift.
+    image: hackarena:9.2.18
+    pull_policy: build
+    container_name: hackarena
+    ports:
+      - "0.0.0.0:3000:3000"
+    volumes:
+      - /opt/hackarena/data:/app/data
+      - /opt/hackarena/uploads:/app/uploads
+    env_file:
+      - .env
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # ext-audit v7.15.11: READINESS, not liveness. /healthz stays 200 even on a
+      # corrupt DB so an operator can still reach the box and triage — which meant
+      # a known-corrupt database stayed traffic-ready behind this check. /readyz
+      # fails on a failed boot integrity check (and during maintenance mode), so
+      # the orchestrator marks the container unhealthy and drains it while the
+      # process itself keeps running for triage.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/readyz').then(r=>{if(!r.ok)throw r.status;process.exit(0)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped

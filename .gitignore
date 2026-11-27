@@ -1,0 +1,46 @@
+node_modules/
+/data
+/uploads
+*.db
+.env
+.vscode/.checkmarxIgnored
+.vscode/.checkmarxIgnoredTempList.json
+/data-test/
+/data-test-*/
+# v8.8.27 — the Playwright worker's own uploads volume, pinned in playwright.config.js
+/uploads-test-worker-*/
+# v8.4.0 — tests/harness-isolation.spec.js spawns a decoy server on PORT_BASE+170
+# and gives it its own data directory. It is a test artefact like the two above,
+# and it was untracked-but-unignored, so any suite run left it showing up in
+# `git status` waiting to be committed by accident.
+/data-harness-*/
+test-results/
+playwright-report/
+perf/results/
+perf/.env.perf
+# UI polish pipeline outputs (per-screen before/after PNGs written by
+# tests/_ui-polish.spec.js). Large binary diffs — kept local, never committed.
+.claude/visual-diffs/
+
+.claude/scheduled_tasks.lock
+
+# v7.15.33 — local perf runs (own DATA_DIR, DB, logs, resource samples)
+perf/.local/
+
+# v8.3.14 — `npm run smoke` boots a real server per serving mode under
+# `smoke-data-dev/` and `smoke-data-prod/`. Each holds a SQLite database and a
+# `.superadmin-password` (mode 0600), so an untracked one is a credential file
+# one `git add -A` away from the repository.
+smoke-data-*/
+
+# v8.12.4 — coverage-mode output (npm run test:coverage)
+/.coverage/
+
+# v8.13.3 — scripts/backup.sh writes to <repo>/backups/ by default, and README's
+# Option A writes a tarball. Each holds the database AND both HMAC secrets, so an
+# untracked one is a credential file one `git add -A` away from the repository.
+/backups/
+/hackarena-backup-*.tgz
+
+# Agent worktrees (Claude Code isolation); never part of the repository
+/.claude/worktrees/

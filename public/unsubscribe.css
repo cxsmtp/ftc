@@ -1,0 +1,64 @@
+/* Standalone shell for the unsubscribe pages (ext-audit v7.15.12).
+
+   audit v7.23.6 — THIS WAS AN INLINE <style> BLOCK AND HAD NEVER RENDERED.
+   The global CSP sets `style-src-elem 'self'`, so the browser dropped it on
+   every request: measured styleSheets 0, font "Times New Roman", body
+   background transparent, with the console reporting
+   "Applying inline style violates ... 'style-src-elem 'self''".
+   So the shell v7.15.12 added to stop these pages looking like bare markup
+   produced exactly the bare markup it was written to replace, for eight
+   releases, with nothing failing.
+
+   The original comment justified inlining as "dependency-free so the page
+   renders even if the static asset pipeline is unavailable" — a trade that
+   only makes sense if the inline version renders at all, and it never did.
+   Its server-rendered sibling (_emailResultPage) has always linked its
+   stylesheets and has always been styled correctly; this now matches it.
+   The rules below are the v7.15.12 block, with TWO corrections that the move
+   itself exposed: the Docs-hygiene scanners read public/*.css, so while these
+   rules lived inside a .js template literal they were outside every one of
+   them. Extracting them immediately failed two:
+     • `min-height:100vh` had no `dvh` sibling — on iOS Safari / Android Chrome
+       100vh resolves against the LARGE viewport, so the card's lower edge sits
+       under the browser chrome (v7.23.0);
+     • the sans stack named no emoji font, so a glyph in the address or the
+       platform name resolves per-glyph through the OS fallback and two emoji in
+       one string can land in different fonts (v7.19.0).
+   Both are fixed here to match verify-pages.css. That is the argument for the
+   extraction beyond the CSP fix: inline CSS is unreachable by the checks.
+
+   Radii and the card's shadow are tokens, named as the shell names them
+   (DESIGN_SYSTEM.md §4 and §5): the radii at Signature's values by role (the
+   card --r-l, the button --r-m), the resting
+   shadow at tier 1 for each mode, as verify-pages.css declares it. */
+  :root{color-scheme:light dark;--bg:#f4f5f9;--surface:#fff;--text:#16151f;--muted:#5c5a6e;--border:#e3e2ea;--accent:#7C3AED;
+  --r-m:12px;--r-l:18px;--shadow-1:0 1px 2px rgba(15,13,26,0.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#0C0A17;--surface:#171430;--text:#E8E4F2;--muted:#8B87A8;--border:rgba(255,255,255,.1);
+  --shadow-1:0 1px 3px rgba(0,0,0,0.12)}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;
+     background:var(--bg);color:var(--text);
+     font-family:"Inter Text",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji','Segoe UI Symbol',sans-serif;line-height:1.55}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-l);padding:32px;
+      max-width:520px;width:100%;text-align:center;box-shadow:var(--shadow-1)}
+h1{font-size:1.35rem;margin:0 0 12px;font-weight:700}
+p{margin:0 0 12px;color:var(--muted);font-size:.95rem}
+.addr{color:var(--text);font-weight:600;word-break:break-all}
+button{min-height:44px;padding:11px 22px;font:inherit;font-weight:600;cursor:pointer;
+       background:var(--accent);color:#fff;border:0;border-radius:var(--r-m)}
+button:hover{filter:brightness(1.08)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fine{font-size:.82rem;margin-top:18px}
+
+/* audit v7.23.7 — Windows High Contrast / forced-colors. The two sibling
+   standalone sheets (verify-pages.css, reset-password.css) have carried this for
+   releases; these pages were added later and never got it. Under forced-colors
+   the browser replaces every colour, so a card distinguished only by its
+   background becomes indistinguishable from the page and a filled button loses
+   its shape — on a page reached from an email, where the button is the only
+   thing to do. */
+@media(forced-colors:active){
+  .card{border:1px solid CanvasText}
+  button{border:1px solid ButtonText}
+  button:focus-visible{outline:2px solid Highlight}
+}

@@ -1,0 +1,49 @@
+# v8.13.3 — AN ALLOW-LIST: exclude EVERYTHING, then re-admit exactly what the
+# image runs.
+#
+# This file used to be a deny-list, and a deny-list fails OPEN on whatever nobody
+# thought to list. Measured with a `FROM scratch; COPY . /ctx` export of the
+# build context, it shipped:
+#   - ./backups/<timestamp>/ — scripts/backup.sh's DEFAULT output, inside the
+#     checkout the documented deploy builds from: the live database, both HMAC
+#     secrets (.grading-secret, .unsubscribe-secret), logs and attachments;
+#   - smoke-data-*/, data-harness-*/, uploads-test-worker-*/, .coverage/ — local
+#     test artefacts, two of them holding a database and a .superadmin-password;
+#   - a backup tarball written into the checkout, and AUTH_PATHS.md, EMAIL_RULES.md,
+#     ROLES_AND_PERMISSIONS.md and ci/, all added after the list was written.
+# A line per artefact is a list that is always one release behind. An allow-list
+# fails CLOSED: anything new at the repo root stays out until somebody decides it
+# belongs in the image.
+#
+# What the runtime reads, from code: server.js and db.js; lib/ and routes/ (every
+# relative require resolves under them); version.json (lib/config requires it);
+# public/ and docs/ (served, read through path.join(__dirname, …)). package.json
+# and package-lock.json are what the build stage installs from, and the CI image
+# (ci/Dockerfile.cross-browser, built from this same context) copies those two
+# and nothing else. The Dockerfile and this file are read by the builder through
+# its own channel, so excluding them changes nothing.
+#
+# A Docs-hygiene lock DERIVES that set from the code and both Dockerfiles and
+# requires this list to equal it in both directions: a missing root is an image
+# that cannot boot, an extra one is a decision nobody took. Stated limit: a file
+# dropped INSIDE public/ or docs/ still ships — both are tracked trees.
+#
+# v8.13.4 — ONE BUILD-STAGE TOOL, ADMITTED AS A FILE, NOT AS A ROOT.
+# scripts/prune-runtime-deps.cjs strips the native addons' build residue in the
+# Dockerfile's build stage (tests/prune-runtime-deps.spec.js). It is re-admitted
+# by its own path because scripts/ also holds backup.sh, purge.sh, smoke.cjs and
+# the rest, none of which belongs in an image; and since `COPY . /src` mirrors
+# the context, the build stage deletes /src/scripts before the runtime stage
+# copies /src, so the image never carries it. The lock accepts a sub-path here
+# only when it is exactly a file the app Dockerfile COPYs.
+*
+!server.js
+!db.js
+!version.json
+!package.json
+!package-lock.json
+!lib/
+!routes/
+!public/
+!docs/
+!scripts/prune-runtime-deps.cjs

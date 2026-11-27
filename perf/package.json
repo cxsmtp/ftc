@@ -1,0 +1,12 @@
+{
+  "name": "hackarena-perf",
+  "private": true,
+  "description": "Performance test suite for HackArena",
+  "scripts": {
+    "seed": "node seed.js",
+    "seed:quick": "node seed.js --skip-history --participant-count 20 --task-count 10 --competition-duration 10 --competition-start-offset 120 --browser-probes 2",
+    "seed:quick:skip-bg": "node seed.js --skip-bg --skip-history --participant-count 20 --task-count 10 --competition-duration 10 --competition-start-offset 120 --browser-probes 2",
+    "seed:full": "node seed.js --participant-count 200 --task-count 30 --competition-duration 210 --competition-start-offset 900 --browser-probes 2 --history-comps 100 --history-participants 200"
+  },
+  "dependencies": {}
+}

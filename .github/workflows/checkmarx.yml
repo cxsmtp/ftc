@@ -1,0 +1,343 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Cancel a superseded run for the same ref: a new push to a PR cancels that PR's
+# in-flight run, while main-branch runs always complete (every commit to main still
+# gets a full scan). (zizmor: concurrency-limits)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Minimal default token scope for the whole workflow; each job adds only the scopes
+# it actually needs (zizmor: excessive-permissions / undocumented-permissions).
+permissions:
+  contents: read  # clone the repo (actions/checkout)
+
+jobs:
+  # Existing job — Checkmarx One scan. Renamed file header from
+  # "Checkmarx Scan" to "CI" to reflect the v6.16.32 addition of a
+  # parallel cross-browser job; the job ID `checkmarx-scan` is kept
+  # so any branch-protection rule keyed on it continues to match.
+  checkmarx-scan:
+    # name == job id so the required-status-check context ("checkmarx-scan") stays
+    # the same for branch protection (zizmor: anonymous-definition).
+    name: checkmarx-scan
+    runs-on: cx-private-ubuntu-x64
+    permissions:
+      contents: read       # checkout
+      pull-requests: read  # PR branch / context for the scan (Checkmarx doesn't upload SARIF, so no security-events)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false  # don't leave the token in .git/config (zizmor: artipacked)
+
+      # v8.13.4 (operator decision) — SCS runs WITHOUT a repository URL or token:
+      # the --scs-repo-url and --scs-repo-token flags, and with them the
+      # REPO_TOKEN secret, are gone. Scorecard (SCS repository health) reads the
+      # repository from Checkmarx One's side, and this org is IP-allowlisted, so
+      # it never could: every scan that asked for it produced no Scorecard
+      # result. The URL it was given was a LITERAL naming the pre-transfer
+      # repository, which resolved only through GitHub's transfer redirect, so
+      # Checkmarx One would have used our token against a repository re-created
+      # at that old path (the token went to Checkmarx One, never to the repo).
+      # Secret detection (2ms) still runs, on the source the action uploads.
+      # Expect one "Unable to start Scorecard scan" warning per run; it is the
+      # price of not naming a URL.
+      # To re-enable Scorecard: only once Checkmarx One can reach the org, and
+      # with the URL derived from github.server_url and github.repository, never
+      # written out (tests/ci-config-lockstep.spec.js refuses a literal).
+      - name: Checkmarx AST Scan
+        uses: checkmarx/ast-github-action@58c998c5d78b3ecfa51e7cbde852d5565d5dea0b # 2.3.47
+        with:
+          base_uri: ${{ secrets.CX_BASE_URI }}
+          cx_tenant: ${{ secrets.CX_TENANT }}
+          cx_client_id: ${{ secrets.CX_CLIENT_ID }}
+          cx_client_secret: ${{ secrets.CX_CLIENT_SECRET }}
+          project_name: ${{ github.event.repository.name }}
+          branch: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          additional_params: --scan-types sast,iac-security,sca,api-security,container-security,scs
+
+  # v6.16.32 — Cross-browser CI on every PR. Promotes `npm run test:cross`
+  # from opt-in / nightly canary to a check on every PR, so the same
+  # categories of bugs the cross-browser smoke catches (Trusted
+  # Types policy use, `:has()` / `inset` shorthand, mobile viewport
+  # chrome quirks) are caught at PR time on every non-Chromium engine
+  # and device profile in the CROSS_BROWSER matrix (the projects array
+  # in playwright.config.js) instead of after merge.
+  #
+  # Runs in parallel with the other jobs in this workflow. Which of them
+  # can block a merge is decided by main's branch protection, not by this
+  # file, and it requires checkmarx-scan alone (read back on 10 October
+  # 2026): a red test job here is a defect to fix before merging, but it
+  # is not what stops the merge button.
+  cross-browser-tests:
+    # name == job id so the required-status-check context is unchanged (zizmor:
+    # anonymous-definition).
+    name: cross-browser-tests
+    runs-on: cx-private-ubuntu-x64
+    permissions:
+      contents: read  # checkout only — this job runs tests, uploads nothing
+    # Runs inside a PRE-BAKED image: mpogr/hackarena-ci built FROM
+    # mcr.microsoft.com/playwright:v1.65.1-noble with the project's node_modules
+    # already installed (see ci/Dockerfile.cross-browser + ci/README.md).
+    #
+    # WHY pre-baked: this hardened runner's egress allowlist is ~github.com only.
+    # registry.npmjs.org is unreachable (DNS dropped — verified host AND
+    # container), so `npm ci` cannot run at job time, and there is no warm npm
+    # cache to fall back on. The browsers + OS deps come from the Playwright base
+    # image; the only missing piece is node_modules, which we install at IMAGE
+    # BUILD time (where the registry + a C/C++ toolchain for better-sqlite3 are
+    # available) and bake in. Pull comes from Docker Hub, which IS allowlisted.
+    #
+    # node_modules is baked at /ci-deps (NOT the workspace path) because a
+    # `container:` job mounts the workspace over it; the step below symlinks it in.
+    # Rebuild + push the image whenever package-lock.json, the Playwright
+    # version or production's Node major changes (ci/README.md "When + how to
+    # rebuild"); the drift guard below fails loudly on the first of those, and the
+    # v7.15.28 Docs-hygiene test on the third.
+    container:
+      # Pinned by DIGEST for a reproducible, tamper-evident pull — same policy as the
+      # SHA-pinned actions above. The trailing comment keeps the human-readable tag.
+      # On EVERY image rebuild+push, re-resolve the digest and update this line so the
+      # pin stays a digest (see ci/README.md "When + how to rebuild").
+      image: mpogr/hackarena-ci@sha256:d7cad53ffbf942182bdd5f02b8fa9155f57c359ff25e98d000c7be3950a4d1e5 # playwright-v1.65.1-noble-deps
+      # Browser shared memory, as in the two jobs below: Docker's default 64 MB
+      # /dev/shm is shared by every engine and device this job runs.
+      options: --shm-size=1g
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false  # don't leave the token in .git/config (zizmor: artipacked)
+
+      - name: Link pre-baked dependencies
+        # Guard against a stale image (deps changed but image not rebuilt), then
+        # symlink the baked node_modules into the freshly-checked-out workspace.
+        # The last line OPENS a database (v8.13.4): better-sqlite3 13 loads its
+        # native addon lazily, so the bare require() it used to do proved nothing.
+        run: |
+          set -e
+          NOW="$(sha256sum package-lock.json | awk '{print $1}')"
+          BAKED="$(cat /ci-deps/.lock-hash 2>/dev/null || echo MISSING)"
+          if [ "$NOW" != "$BAKED" ]; then
+            echo "::error::package-lock.json ($NOW) does not match the pre-baked image ($BAKED). Rebuild + push mpogr/hackarena-ci per ci/README.md."
+            exit 1
+          fi
+          ln -s /ci-deps/node_modules node_modules
+          node -e "const D = require('better-sqlite3'); new D(':memory:').prepare('SELECT 1').get(); console.log('better-sqlite3 opens a database (ABI ' + process.versions.modules + ')')"
+
+      # No "Install Playwright browsers" step: the base image ships Chromium +
+      # Firefox + WebKit + OS deps at $PLAYWRIGHT_BROWSERS_PATH=/ms-playwright.
+
+      - name: Run cross-browser smoke
+        # WORKERS=4 parallelises the matrix. The config scales BOTH the worker
+        # pool and the per-worker servers off WORKERS (each worker gets its own
+        # server on TEST_PORT_BASE + index), and every non-default browser and
+        # device project × cross-browser.spec.js + cross-device.spec.js (the
+        # test:cross script) distribute across the 4 workers even with
+        # fullyParallel:false (the parallel unit is project×file). The smoke is
+        # stateless (each test self-fetches CSRF + logs in fresh — no shared
+        # fixtures / serial ordering), so it parallelises safely. This cut the
+        # serial ~38min run to roughly a quarter. RETRIES=1 absorbs CI jitter.
+        # The npm scripts invoke `node node_modules/@playwright/test/cli.js test`
+        # (resolves the local CLI with no registry/PATH lookup).
+        run: npm run test:cross
+        env:
+          WORKERS: 4
+          RETRIES: 1
+          # GitHub Actions overrides HOME=/github/home for container jobs, and
+          # that dir is created owned by the image's `pwuser`. Firefox refuses to
+          # launch as root when $HOME isn't owned by the current user
+          # ("CanCreateUserNamespace clone() EPERM / running as root not
+          # supported"), which failed all 8 [firefox] smoke tests (Chromium /
+          # WebKit / mobile were fine). Playwright's documented fix: pin HOME=/root
+          # (root-owned in the image) for the job.
+          HOME: /root
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # v7.15.16 — the FULL suite, on every PR (informational: see the note above
+  # cross-browser-tests — branch protection requires checkmarx-scan alone).
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Until now CI ran only cross-browser.spec.js: 14 of ~1,450 tests. Every
+  # regression lock the architecture depends on — session sliding, purge
+  # tombstones, the impersonation read-only gate, the leaderboard ranking
+  # invariant, the attachment quota, the path-variant gates — could be broken
+  # and merged with CI fully green. A test-suite audit demonstrated this by
+  # mutation: two deliberate breakages (leaderboard XSS escaping, the all-solved
+  # revive gate) passed 517 and 573 tests respectively.
+  #
+  # Same container + pre-baked-deps mechanics as cross-browser-tests above.
+  # Chromium only: the other projects are restricted to cross-browser.spec.js and
+  # cross-device.spec.js by playwright.config.js, so this job is the chromium half
+  # of the matrix.
+  full-suite-tests:
+    # name == job id so the required-status-check context is unchanged, matching
+    # the two jobs above. v7.15.18 — this said "Full test suite (chromium)",
+    # which breaks that convention: a branch-protection rule keyed on the job id
+    # would never have matched, so the job could never have been made a required
+    # check (zizmor: anonymous-definition). It is not one today; see above.
+    name: full-suite-tests
+    runs-on: cx-private-ubuntu-x64
+    permissions:
+      contents: read  # checkout only
+    container:
+      # Keep this digest in step with cross-browser-tests above and capture-suite
+      # below — all THREE container jobs pin the same image, and ci/README.md's
+      # rebuild note covers all three.
+      image: mpogr/hackarena-ci@sha256:d7cad53ffbf942182bdd5f02b8fa9155f57c359ff25e98d000c7be3950a4d1e5 # playwright-v1.65.1-noble-deps
+      # v7.15.21 — Docker defaults /dev/shm to 64 MB, and Chromium puts its
+      # renderer shared memory there. That is the textbook cause of
+      # "worker process exited unexpectedly (code=1)" in a container, and it
+      # matches every observation: the crashes appear ONLY in CI, never locally
+      # at any worker count, and their number was identical (8) at WORKERS=4 and
+      # WORKERS=2 — a memory ceiling per browser, not contention. The sibling
+      # cross-browser job escapes it by running only the two cross specs per
+      # project rather than the whole suite through one Chromium.
+      #
+      # Fixed in CI config alone, deliberately: playwright.config.js is
+      # untouched, so a local `npm test` is provably identical to before.
+      options: --shm-size=1g
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Link pre-baked dependencies
+        run: |
+          set -e
+          NOW="$(sha256sum package-lock.json | awk '{print $1}')"
+          BAKED="$(cat /ci-deps/.lock-hash 2>/dev/null || echo MISSING)"
+          if [ "$NOW" != "$BAKED" ]; then
+            echo "::error::package-lock.json ($NOW) does not match the pre-baked image ($BAKED). Rebuild + push mpogr/hackarena-ci per ci/README.md."
+            exit 1
+          fi
+          ln -s /ci-deps/node_modules node_modules
+          node -e "const D = require('better-sqlite3'); new D(':memory:').prepare('SELECT 1').get(); console.log('better-sqlite3 opens a database (ABI ' + process.versions.modules + ')')"
+
+      - name: Run the full suite
+        # WORKERS=4, matching the cross-browser job.
+        #
+        # v7.15.20 tried WORKERS=2 to cure the "worker process exited
+        # unexpectedly (code=1)" crashes and made it STRICTLY WORSE: 82 failures
+        # against 9, with the SAME eight crashes. That is what disproved the
+        # resource-contention theory — a memory-pressure problem scales with the
+        # worker count, and this did not; fewer workers merely meant each crash
+        # took a larger slice of the suite with it. The real cause is the
+        # container's 64 MB /dev/shm (see `options:` above).
+        #
+        # RETRIES=1 absorbs jitter — a test that only passes on retry is a flake
+        # to fix, not a result to accept.
+        run: npm test
+        env:
+          # v7.15.30 — the crash probe (tests/_worker-crash-probe.cjs) is NOT
+          # loaded here any more. It did its job (the worker deaths it caught
+          # were the missing BASE_URL, now fixed and locked), and NODE_OPTIONS
+          # is inherited by every child process — including the servers the
+          # shutdown tests spawn and assert exit codes on, which it broke. Add
+          # it back deliberately when diagnosing a worker death, not by default.
+          WORKERS: 4
+          RETRIES: 1
+          HOME: /root
+
+      - name: Upload failure artifacts
+        # v7.15.25 — `always()`, not `failure()`. It was added so the crash
+        # probe's marker could be seen on a GREEN run; the probe has not been
+        # loaded since v7.15.30 (see `env:` above), and `always()` stays because
+        # test-results/ also holds the traces of a test that failed and then
+        # passed on its retry (RETRIES=1) — a flake to fix, whose evidence a
+        # `failure()` condition would throw away on a green run.
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-failures
+          path: test-results/
+          retention-days: 7
+          # Say so loudly rather than succeeding silently on an empty directory —
+          # v7.15.24's run produced no artifact at all and that was mistaken for
+          # a probe that had run and found nothing.
+          if-no-files-found: warn
+
+  capture-suite:
+    # v8.8.19 — THE FILES `npm test` STRUCTURALLY CANNOT SEE.
+    #
+    # `playwright.config.js` sets testIgnore: ["**/_*.spec.js"] unless
+    # CAPTURE_SCREENSHOTS=1, so tests/_screenshots.spec.js (the guide captures) never
+    # runs on the merge gate and can never go red. That is not theoretical: v8.6.6
+    # had to repair THREE broken captures at once, and the sweeps that broke them
+    # were each correct about the files they could see —
+    #   * v8.3.15 made auto-resume enter an ended event, touching no public/ file;
+    #   * v8.3.8/.9 made a deselect durable, one of them touching no public/ file;
+    #   * v8.3.22 added a capture whose +90-day fixture re-sorted the table for
+    #     the capture after it — inside THIS FILE.
+    # Measured against those three: running the file catches 3 of 3. A lint-only
+    # pass catches 0 (every selector still existed), and a "you touched a UI
+    # surface, touch this too" scanner catches ~1 and is defeated outright by the
+    # third, whose breaking commit edited this very file.
+    #
+    # LIGHT ONLY, and that is a measurement rather than a saving. THEME is read at
+    # six sites and decides colorScheme, the filename suffix and manifest
+    # bookkeeping; no assertion, route or fixture branches on it, and Playwright
+    # visibility is box-based, so a dark run detects no breakage a light one does
+    # not. 122s against 244s for both.
+    #
+    # NOTHING IS COMMITTED. This is a verification run, not a regeneration, so the
+    # near-total PNG churn and the MANIFEST.json restamp that make `npm run
+    # docs:shots` unsuitable for a gate simply do not arise — the artefacts are
+    # discarded with the container.
+    name: capture-suite
+    runs-on: cx-private-ubuntu-x64
+    permissions:
+      contents: read  # checkout only
+    container:
+      # Keep this digest in step with the two jobs above.
+      image: mpogr/hackarena-ci@sha256:d7cad53ffbf942182bdd5f02b8fa9155f57c359ff25e98d000c7be3950a4d1e5 # playwright-v1.65.1-noble-deps
+      # Chromium's renderer shared memory, same reason as full-suite-tests.
+      options: --shm-size=1g
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Link pre-baked dependencies
+        run: |
+          set -e
+          NOW="$(sha256sum package-lock.json | awk '{print $1}')"
+          BAKED="$(cat /ci-deps/.lock-hash 2>/dev/null || echo MISSING)"
+          if [ "$NOW" != "$BAKED" ]; then
+            echo "::error::package-lock.json ($NOW) does not match the pre-baked image ($BAKED). Rebuild + push mpogr/hackarena-ci per ci/README.md."
+            exit 1
+          fi
+          ln -s /ci-deps/node_modules node_modules
+          node -e "const D = require('better-sqlite3'); new D(':memory:').prepare('SELECT 1').get(); console.log('better-sqlite3 opens a database (ABI ' + process.versions.modules + ')')"
+
+      - name: Run the capture suite (light theme, artefacts discarded)
+        # WORKERS=1 because fullyParallel:false makes the spec FILE the unit of
+        # distribution — one file never spans workers, so a higher count buys
+        # nothing here and only adds contention to the heavy UI captures, which
+        # were written and measured in the serial regime.
+        run: npx playwright test tests/_screenshots.spec.js
+        env:
+          CAPTURE_SCREENSHOTS: "1"
+          THEME: light
+          WORKERS: 1
+          RETRIES: 1
+          HOME: /root
+
+      - name: Upload failure artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: capture-failures
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore

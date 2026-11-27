@@ -1,0 +1,69 @@
+{
+  "name": "hackathon-platform",
+  "version": "9.2.18",
+  "description": "Self-contained hackathon platform",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "DATA_DIR=${DATA_DIR:-./data} UPLOADS_DIR=${UPLOADS_DIR:-./uploads} node server.js",
+    "dev": "DATA_DIR=${DATA_DIR:-./data} UPLOADS_DIR=${UPLOADS_DIR:-./uploads} nodemon server.js",
+    "test": "node node_modules/@playwright/test/cli.js test",
+    "test:ui": "node node_modules/@playwright/test/cli.js test --ui",
+    "test:cross": "CROSS_BROWSER=1 PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 LD_LIBRARY_PATH=/tmp/pw-libs/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH node node_modules/@playwright/test/cli.js test tests/cross-browser.spec.js tests/cross-device.spec.js",
+    "test:cross:setup": "bash scripts/setup-cross-browser.sh",
+    "test:changed": "node scripts/test-changed.cjs",
+    "smoke": "node scripts/smoke.cjs",
+    "perf:local": "bash perf/run-local.sh",
+    "perf:local:medium": "bash perf/run-local.sh --profile medium",
+    "bump": "node scripts/bump-version.js",
+    "check-version": "node scripts/check-version.js",
+    "theme:tokens": "node scripts/build-theme-tokens.js",
+    "docs:shots": "npm run docs:shots:light && npm run docs:shots:dark",
+    "docs:shots:light": "CAPTURE_SCREENSHOTS=1 THEME=light WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js",
+    "docs:shots:dark": "CAPTURE_SCREENSHOTS=1 THEME=dark  WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js",
+    "docs:shots:participant": "CAPTURE_SCREENSHOTS=1 THEME=light WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js -g participant && CAPTURE_SCREENSHOTS=1 THEME=dark WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js -g participant",
+    "docs:shots:admin": "CAPTURE_SCREENSHOTS=1 THEME=light WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js -g admin       && CAPTURE_SCREENSHOTS=1 THEME=dark WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js -g admin",
+    "docs:shots:event-admin": "CAPTURE_SCREENSHOTS=1 THEME=light WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js -g event-admin && CAPTURE_SCREENSHOTS=1 THEME=dark WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js -g event-admin",
+    "docs:shots:superadmin": "CAPTURE_SCREENSHOTS=1 THEME=light WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js -g superadmin  && CAPTURE_SCREENSHOTS=1 THEME=dark WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_screenshots.spec.js -g superadmin",
+    "polish:shots": "CAPTURE_SCREENSHOTS=1 WORKERS=1 RETRIES=0 node node_modules/@playwright/test/cli.js test tests/_ui-polish.spec.js",
+    "test:balance": "node scripts/test-balance.cjs",
+    "test:independence": "node scripts/test-independence.cjs",
+    "test:coverage": "rm -rf .coverage && HACKARENA_COVERAGE=.coverage NODE_V8_COVERAGE=.coverage/worker playwright test; node scripts/coverage-report.cjs"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^13.2.0",
+    "compression": "^1.8.2",
+    "csrf-sync": "^4.2.1",
+    "esbuild": "^0.28.2",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
+    "express-session-better-sqlite3": "^1.2.1",
+    "multer": "^2.5.0",
+    "nodemailer": "^10.6.0",
+    "sanitize-html": "^2.18.2",
+    "uuid": "^14.0.3",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.1",
+    "nodemon": "^3.1.14"
+  },
+  "overrides": {
+    "debug": "^4.4.3",
+    "qs": "^6.17.1",
+    "nodemon": {
+      "chokidar": "^4.0.3",
+      "minimatch": "^11.0.3"
+    }
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true,
+    "better-sqlite3@13.2.0": true,
+    "esbuild@0.28.2": true
+  }
+}

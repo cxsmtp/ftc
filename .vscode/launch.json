@@ -1,0 +1,44 @@
+{
+  // Cursor / VS Code debug launch configs. F5 runs the server from the WORKING
+  // TREE — no build step, no MINIFY_JS, so public/*.js is served raw and every
+  // edit is live on browser refresh. Set breakpoints in server.js / db.js here;
+  // debug the frontend (public/app.js) in the browser DevTools (it's served raw,
+  // so those breakpoints map 1:1 to your source).
+  //
+  // The server requires BASE_URL + SMTP_HOST to boot; SMTP being unreachable is
+  // non-fatal (email sends just fail/log). The auto-generated superadmin
+  // password prints to the integrated terminal on startup.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug server (working tree)",
+      "program": "${workspaceFolder}/server.js",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "BASE_URL": "http://localhost:3000",
+        "SMTP_HOST": "localhost",
+        "RATE_LIMIT_DISABLED": "1"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug server (nodemon, auto-restart)",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/nodemon",
+      "program": "${workspaceFolder}/server.js",
+      "cwd": "${workspaceFolder}",
+      "restart": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "BASE_URL": "http://localhost:3000",
+        "SMTP_HOST": "localhost",
+        "RATE_LIMIT_DISABLED": "1"
+      }
+    }
+  ]
+}

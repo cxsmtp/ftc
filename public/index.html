@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<!-- data-platform-look: the superadmin's platform look (lib/platform-look.js),
+     filled per request by server.js so theme-boot.js paints it before first
+     paint; an attribute, not an inline script (CSP, Trusted Types). -->
+<html lang="en" data-platform-look="{{platformLook}}">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="color-scheme" content="light dark"/>
+<title>{{platformName}} | Checkmarx</title>
+<link rel="icon" href="/favicon.webp"/>
+<!-- Theme resolution — runs synchronously BEFORE styles.css loads so the
+     html[data-theme=...] attribute selectors already apply on first paint.
+     Kept in a standalone file (rather than an inline <script>) so the
+     strict CSP (script-src 'self') covers it. -->
+<script src="/theme-boot.js"></script>
+<!-- Asset-hash map (v6.8.2) — exposes `window.__assetUrlWithVersion(url)`
+     so the help-drawer renderer can derive content-hashed `?v=<hash>`
+     query strings for both the light and dark variants of each
+     screenshot. The server regenerates the map on restart; nodemon
+     watches version.json + *.json so a bump refreshes it automatically. -->
+<script src="/asset-versions.js"></script>
+<!-- v6.20.x — fonts self-hosted (was Google Fonts CDN). Inter (size-adjusted,
+     "Inter Text") and JetBrains Mono ship from /vendor/fonts/ via /fonts.css. Removes the cross-origin font
+     dependency + two preconnects, lets the CSP drop the Google Fonts origins,
+     and makes rendering deterministic (prerequisite for visual-regression).
+     NO FONT PRELOAD. The shell rewriter versions this href (?v=<hash>) but
+     fonts.css asks for the bare /vendor/fonts/*.woff2, so a preload here is a
+     different URL: it never served the @font-face, the face was fetched a
+     second time after styles.css, and the stray 48 KB raced the render-blocking
+     styles.css on a slow link. Worse, its arrival before styles.css ran a full
+     layout + pre-paint on the UNSTYLED page (Chrome's hover hit test), which
+     the layout-shift tracker took as the baseline: the first styled frame then
+     counted as a 0.037 shift of <body> (UA 8px margin → 0) — the intermittent
+     tests/cls-picker-skeleton.spec.js failure. The face loads when the styled
+     page first draws text, as it always did in practice. -->
+<link rel="stylesheet" href="/fonts.css"/>
+<link rel="stylesheet" href="/vendor/highlight/atom-one-dark.min.css"/>
+<!-- v6.10.34 — defer the heavy head scripts so the HTML parser reaches the
+     body + styles.css without waiting ~1.4 MB of JS to download. Three of
+     these are render-irrelevant for the login form that participants hit
+     first: the self-hosted highlight.js bundle and marked.min.js render markdown
+     inside task descriptions after login, and help-renderer.js only runs
+     when the help drawer opens. With defer, they download in parallel with
+     the rest of the page and execute in document order before
+     DOMContentLoaded, so the SPA's DOMContentLoaded boot (core/main.js; and all
+     downstream references to hljs / marked / HelpRenderer) still see them
+     populated.
+     v6.10.36 — echarts (1 MB) was removed entirely from the page-boot
+     path. It's loaded on-demand the first time an admin opens the
+     Analytics tab (see `loadEchartsOnDemand` in features/analytics-admin.js), via a
+     dedicated named Trusted Types policy (`vendor-script-src`) with a
+     strict allowlist for `/vendor/echarts.min.js`. Participants never pay
+     for it. -->
+<script defer src="/vendor/highlight/highlight.min.js"></script>
+<!-- v7.20.4 — dockerfile + powershell are absent from the common highlight.js
+     build, so both menu entries silently did nothing. `defer` preserves the
+     load order, so hljs exists by the time this runs. -->
+<script defer src="/vendor/highlight/extra-languages.js"></script>
+<script defer src="/vendor/marked.min.js"></script>
+<script defer src="/help-renderer.js"></script>
+<link rel="stylesheet" href="/styles.css"/>
+</head>
+<!-- v8.1.0 (PR 13) — the event-kind label table, substituted by the SPA-shell
+     handler at send time. It rides the shell rather than /api/config because that
+     endpoint is rate-limited 120/min against a 60-second window: at a venue NAT
+     every retry lands in the same throttled minute, and the create chooser's only
+     remedy would be a reload into the same 429. These are source constants, so
+     there is nothing to go stale between deploys.
+
+     A data- attribute, not an inline <script>: it sidesteps CSP and Trusted Types
+     entirely. `dataset` returns the decoded string, so JSON.parse is safe on the
+     server-escaped value. The client keeps NO fallback copy of these labels —
+     a chip reading "Competition" on a Booth Event is a WRONG answer, not a
+     degraded one, so a surface that cannot read them renders nothing instead. -->
+<body data-event-kinds="{{eventKinds}}" data-event-collective="{{eventCollective}}" data-login-code-ttl="{{loginCodeTtl}}">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<div id="app">
+  <header id="app-header">
+    <!-- v6.10.53 — reverts the v6.10.42 width/height addition. Original
+         intent (reserve box from first paint to prevent a late-SVG
+         load shift) read right on paper, but the v6.10.50 perf run
+         kept CLS median at 0.67 even after the v6.10.50 font-display
+         revert — by elimination across all UI changes between
+         v6.10.41 (median 0.0037, good) and v6.10.49 (median 0.67,
+         bad), the width/height attrs were the remaining suspect.
+         Likely cause: HTML width/height attrs interact unexpectedly
+         with the CSS `height:36px;width:auto` rule — browsers may
+         double-compute width between the HTML presentation hint
+         (142) and the CSS auto (intrinsic-derived), producing a
+         small jump when the SVG actually loads. Returning to the
+         pre-v6.10.42 shape; next perf run confirms whether CLS drops
+         back to ~0.0037. -->
+    <h1><img class="logo-dark" src="/checkmarx-logo-white.svg" alt="Checkmarx"/><img class="logo-light" src="/checkmarx-logo-blue.svg" alt="Checkmarx"/><span class="platform-name">{{platformName}}</span></h1>
+    <!-- v8.11.12 — NAMED, because there are two <nav> landmarks on the admin page
+         and only the sidebar carried a label, so a screen-reader user listing
+         landmarks met one "navigation" and one "Admin navigation". The label sits
+         in the STATIC markup deliberately: buildParticipantNav / buildAdminSwitch
+         replace this element's CHILDREN (setSafeHtml on the element itself), never
+         the element, so one declaration survives every role transition. -->
+    <nav id="main-nav" aria-label="Main"></nav>
+    <!-- audit v7.7.30 (M18): aria-live is OFF here. The textContent is rewritten
+         every second, and a polite live region announced the whole countdown
+         continuously for the entire competition (the promised "final minutes
+         only" gate never existed in the tick code). role=timer's implicit
+         aria-live is "off"; we make it explicit. The numerals stay visible; a
+         screen reader can read the timer on demand rather than being flooded. -->
+    <div id="header-timer" class="countdown header-timer" style="display:none" role="timer" aria-live="off"></div>
+    <!-- v8.1.0 (PR 17) — "Day 2 of 5" for a multi-day event. Mounted statically
+         beside the timer so no pane loader can destroy it, and hidden until a
+         span of two days or more makes it mean something. aria-live is off:
+         it changes once a day and sits next to a role="timer" that is already
+         deliberately silent. -->
+    <div id="header-day" class="header-day" hidden></div>
+    <!-- v8.6.0 — LATE ENTRY. Mounted statically beside the day chip, so no
+         poll-driven re-render can destroy it; only its text and hidden state
+         move. It says what the countdown beside it is counting down to, on an
+         event every other surface lists as finished. -->
+    <div id="header-late-entry" class="header-late-entry" hidden></div>
+    <div id="user-info" style="display:flex;align-items:center;gap:12px"></div>
+    <div id="theme-slot"></div>
+    <div id="help-slot"></div>
+    <!-- v8.5.0 — the release-notes button. Mounted STATICALLY beside the help
+         trigger and the version badge it explains, so no pane loader can destroy
+         it (the #smtp-banner precedent), and left EMPTY here: the button itself is
+         rendered by renderReleaseNotesButton() only for an admin or superadmin, and
+         cleared again on the way down to participant view. An empty slot is the
+         resting state for everybody else, including an anonymous first paint. -->
+    <div id="release-notes-slot"></div>
+    <span id="platform-version" class="platform-version"></span>
+  </header>
+
+  <!-- v8.11.7 — tabindex="-1" is what makes the skip link MOVE FOCUS. Without
+       it the fragment navigation scrolls and activeElement stays on <body>, so
+       a screen-reader user who took the bypass is still reading the header. -->
+  <main id="main-content" tabindex="-1">
+
+  <!-- Pending page -->
+  <div id="pending-page" class="page" style="display:none">
+    <div class="pending-screen">
+      <div class="card pending-card">
+        <div class="pending-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <h2 id="pending-title">Not Live Yet</h2>
+        <p class="pending-start" id="pending-start-label"></p>
+        <p class="pending-kicker">Starts in:</p>
+        <div class="countdown" id="pending-countdown">--d --h --m --s</div>
+        <div id="pending-reminder" class="pending-reminder"></div>
+        <div id="pending-change-session" class="pending-change-session" style="display:none"></div>
+        <div class="pending-actions">
+          <button class="btn secondary" id="pending-back-btn" data-action="nav-show-competitions-page">Back to Events</button>
+          <button class="btn secondary" data-action="show-page" data-page="login-page">Back to Login</button>
+        </div>
+        <!-- v8.1.0 — LEAVE THIS EVENT. Shown only when the server says
+             `can_leave`, i.e. the participant enrolled themselves and the event
+             has not finished; an organiser's assignment is not undoable from
+             here. Placed on the PENDING page rather than on a picker card
+             because `.comp-card` is itself `role="button"`, and a control nested
+             inside one is an axe `nested-interactive` violation. This is also
+             where the walk-up mistake surfaces: they scanned the wrong QR and
+             are looking at a countdown for an event they did not mean to join. -->
+        <div id="pending-leave" class="pending-leave" hidden>
+          <button class="btn danger-link" data-action="leave-competition">Leave this event</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Competitions picker page -->
+  <div id="competitions-page" class="page" style="display:none">
+    <!-- The welcome. The eyebrow greets by nickname (competition-picker.js
+         renderCompetitionPicker writes it); the heading and the line under it are
+         static so the page reads right before /api/me resolves. -->
+    <div class="ev-hero">
+      <p class="eyebrow ink" id="ev-hero-greet">Welcome to the arena</p>
+      <h2 class="display ev-hero-title">Your Events</h2>
+      <p class="ev-hero-sub">Select an event to enter. Live ones are open now — step in and start solving.</p>
+    </div>
+    <!-- THE PROGRESS STRIP: a row per live run under way — the challenge play
+         bar's own readouts (one renderer) and Continue. Drawn by
+         competition-picker.js _renderProgressStrip; [hidden] when nothing is
+         under way. Holds no input, so its re-render on the list's poll can
+         destroy nothing typed. -->
+    <section id="ev-progress" class="ev-progress" aria-label="In progress" hidden></section>
+    <div class="filters" id="comp-filters">
+      <button class="filter-btn active" data-action="set-comp-filter" data-value="active" data-filter="active">Active &amp; Upcoming</button>
+      <button class="filter-btn" data-action="set-comp-filter" data-value="all" data-filter="all">All</button>
+      <span data-help="events.filters" data-help-label="Event filters"></span>
+    </div>
+    <!-- v8.2.3 — the short event code, for someone who ALREADY has an account.
+         It shipped on the sign-up form only, so an attendee returning from a
+         previous event signed in, landed here, and had nowhere to type the code
+         printed on the sign three feet away. A SIBLING of #comp-grid, never a
+         child: renderCompetitionPicker() replaces that container's contents on
+         a 15-second poll, which would destroy a half-typed code (v7.20.10).
+
+         v8.3.16 — AND IT SITS ABOVE THE GRID, WHICH IS A CLS FIX, NOT A TIDY-UP.
+         `#comp-grid` renders EMPTY and is then filled once /api/me resolves, so
+         everything below it is pushed down by the full height of the card list —
+         and this box is a tall bordered block, so it carried most of the impact
+         fraction. MEASURED on a 400 kbps / 500 ms link: with the box below the
+         grid, 10 events → CLS 0.094 and 22 events → 0.160, i.e. PAST the Core
+         Web Vitals "Good" threshold of 0.1 for any participant with a normal
+         number of events; above the grid, the same fixtures measure 0.045 and
+         0.093. It scales with the event count, which is why it presented as an
+         intermittent test failure rather than as the real defect it is.
+         (The residual is `#app-footer` alone, which is the v6.10.75 "grid
+         populates from 0 to N cards" backlog recorded in styles.css. Do NOT
+         "finish" this by reserving #comp-grid's height — that was tried in
+         v6.10.55 and MEASURED WORSE, 0.057 → 0.120.)
+         It also reads better here: a returning attendee holding a printed code
+         should not have to scroll past every event they are already in. -->
+    <div id="comp-join-code-box" class="join-code-box">
+      <label for="comp-join-code">Have an event code?</label>
+      <div class="join-code-row">
+        <input id="comp-join-code" type="text" inputmode="latin" autocapitalize="characters"
+               autocomplete="off" spellcheck="false" maxlength="12" placeholder="ABC-123"
+               aria-describedby="comp-join-code-hint" data-enter-action="join-with-code"/>
+        <button type="button" class="btn secondary" data-action="join-with-code">Join event</button>
+      </div>
+      <p class="join-code-hint" id="comp-join-code-hint">Six characters from the event signage. Letters and digits only.</p>
+      <p class="join-code-hint join-code-imp" id="comp-join-code-imp">Joining an event is not available while you view as someone: it would enrol them. To add them to an event, use Add to event in that event's Participants section.</p>
+    </div>
+    <!-- v7.21.16 (phase 6) — sibling of #comp-grid, for the same reason. -->
+    <div class="search-wrap participant-search-wrap"><input id="participant-comp-search" placeholder="Search events..." aria-label="Search events by name" data-input-action="participant-comp-search" autocomplete="off"/><button class="search-clear hidden" id="participant-comp-search-clear" data-action="participant-comp-search-clear" aria-label="Clear event search"><span aria-hidden="true">×</span> Clear</button></div>
+    <p id="comp-grid-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="event" data-noun-plural="events" style="margin:0 0 8px"></p>
+    <!-- v6.16.46 — opted into the design system's `.bento` grid utility.
+         Live competitions render at bento-span-8 (featured), all others
+         at bento-span-4. Asymmetric "8+4" layouts are the design's
+         intent over uniform 4+4+4 (per design handoff README). -->
+    <div class="bento" id="comp-grid"></div>
+    <!-- v8.12.0 — A STAFF MEMBER'S SECOND SECTION. "Your Events" above holds the
+         events they were PUT IN (a row in competition_users); this holds every
+         other event on the platform, which staff may enter as spectators without
+         a row. Hidden for everybody else — an ordinary participant holds a row on
+         everything they can see, so their picker is one section as it always was.
+         Rendered by competition-picker.js from the same payload, with its OWN
+         chips (per-section state — filtering your own events to "All" says
+         nothing about the platform-wide list) and the search box above shared. -->
+    <div id="comp-other-section" hidden>
+      <div class="ev-other-head">
+        <div>
+          <h2 class="ev-other-title">All other events</h2>
+          <p class="ev-other-sub">Events you can enter as staff without being enrolled in them</p>
+        </div>
+        <span data-help="events.other" data-help-label="All other events"></span>
+      </div>
+      <div class="filters" id="comp-other-filters">
+        <button class="filter-btn active" data-action="set-comp-other-filter" data-value="active" data-filter="active">Active &amp; Upcoming</button>
+        <button class="filter-btn" data-action="set-comp-other-filter" data-value="all" data-filter="all">All</button>
+      </div>
+      <p id="comp-other-grid-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="event" data-noun-plural="events" style="margin:0 0 8px"></p>
+      <div class="bento" id="comp-other-grid"></div>
+    </div>
+  </div>
+
+  <!-- Login page -->
+  <!-- The sign-in screen: ONE centred card over the look's own motif (body::before),
+       fitting one viewport at every size. The card carries the look's character
+       (auth.css block "THE SIGN-IN CARD"). Email first: one box, one button. An
+       account that signs in with a password gets the password box here, with
+       "Email me a code instead" beside it; anything that is not an address (the
+       break-glass username) gets the password box alone. Every other address goes
+       to the code step in its dialog, and a new address continues to sign-up. -->
+  <div id="login-page" class="page active">
+    <div class="login-viewport auth-solo">
+      <section class="auth-side">
+        <div class="card login-card auth-card">
+          <span class="auth-ornament" aria-hidden="true"></span>
+          <!-- A join link, QR or event code: the event is the only context shown. -->
+          <div id="join-banner" class="auth-event" style="display:none">
+            <p class="eyebrow">You are joining</p>
+            <p class="auth-event-name"><span id="join-banner-info"></span> <span id="join-banner-chip" class="badge"></span></p>
+            <p id="join-banner-leads" class="auth-event-note" hidden></p>
+            <p class="auth-event-out"><a href="#" id="join-banner-out" data-action="event-code-discard">Not your event? Continue without it</a></p>
+          </div>
+          <div class="login-header">
+            <p class="eyebrow ink auth-tagline" id="auth-tagline">Security challenges for the AI era</p>
+            <h2 class="display auth-title">Sign in</h2>
+            <p class="auth-sub" id="login-sub">We'll email you a one-time code. No password.</p>
+          </div>
+          <div class="form-group">
+            <div class="help-label-row"><label for="login-email">Work email</label><span data-help="signin.email" data-help-label="Work email"></span></div>
+            <input id="login-email" name="email" type="text" inputmode="email" autocomplete="username" placeholder="you@company.com" data-enter-action="do-login" data-input-action="login-email-input" aria-describedby="login-email-hint login-error"/>
+            <!-- Depends on the TYPED TEXT, never on the server: a personal
+                 domain gets the reminder whether or not an account holds it,
+                 except the address an open invitation names, which that
+                 invitation lets start an account (auth.js syncLoginEmailHint). -->
+            <p class="login-email-hint" id="login-email-hint" hidden>Use your work email address. Personal addresses (Gmail, Outlook and similar) cannot start a new account; if you were invited, open the link in your invitation email.</p>
+          </div>
+          <!-- The password step (features/auth.js doLogin): shown only for a name
+               whose account signs in with a password, or for one that is not an
+               address. Editing the email box hides it again. -->
+          <div class="form-group" id="login-password-group" hidden>
+            <label for="login-password">Password</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" data-enter-action="do-login" aria-describedby="login-password-note login-error"/>
+            <p class="login-email-hint" id="login-password-note" hidden></p>
+          </div>
+          <div id="login-error" class="login-error" style="display:none" role="alert" aria-live="assertive"></div>
+          <button class="btn lg block" id="login-submit" data-action="do-login">Continue</button>
+          <button class="btn secondary block login-code-instead" id="login-code-instead" data-action="login-code-instead" hidden>Email me a code instead</button>
+          <!-- The event code opens its own dialog, which names the event it found. -->
+          <div class="login-alt login-event-alt" id="login-event-code-row">
+            <a href="#" id="login-event-code-link" data-action="open-event-code">Have an event code?</a>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <!-- Register page: THE SAME CARD as the sign-in screen, its second state. It is
+       reached only after the entry screen's code proved an address with no
+       account (the server holds that grant in the session; this form spends it).
+       The short form (operator order, 29 Oct 2026; confirmed by operator ruling,
+       14 Nov 2026): first and last name, company, job title, the detected
+       location, then whatever the event requires. The
+       nickname is suggested from the name (editable later in the profile). -->
+  <div id="register-page" class="page">
+    <div class="login-viewport auth-solo">
+      <section class="auth-side">
+        <div class="card register-card auth-card">
+          <span class="auth-ornament" aria-hidden="true"></span>
+          <div id="reg-join-banner" class="auth-event" style="display:none">
+            <p class="eyebrow">You are joining</p>
+            <p class="auth-event-name" id="reg-join-info"></p>
+            <p id="reg-join-leads" class="auth-event-note" hidden></p>
+            <p class="auth-event-out"><a href="#" id="reg-join-banner-out" data-action="event-code-discard">Not your event? Continue without it</a></p>
+          </div>
+          <div id="reg-invitation-banner" class="auth-event" style="display:none">
+            <p class="eyebrow">You are invited to</p>
+            <p class="auth-event-name" id="reg-invitation-info"></p>
+          </div>
+          <div class="register-header">
+            <p class="eyebrow ink">Email confirmed</p>
+            <h2 class="display auth-title">Create your account</h2>
+            <p class="auth-sub" id="reg-verified-note">A few details and you are in.</p>
+          </div>
+          <!-- The proven address: shown, never edited (the server uses the grant's). -->
+          <input id="reg-email" name="email" type="hidden"/>
+          <div class="form-row reg-name-row">
+            <div class="form-group"><label for="reg-first">First name <span class="req">*</span></label><input aria-required="true" id="reg-first" name="firstName" autocomplete="given-name" maxlength="80" data-input-action="reg-name-input"/></div>
+            <div class="form-group"><label for="reg-last">Last name <span class="req">*</span></label><input aria-required="true" id="reg-last" name="lastName" autocomplete="family-name" maxlength="80" data-input-action="reg-name-input"/></div>
+          </div>
+          <div class="form-group"><label for="reg-company">Company <span class="req">*</span></label><input aria-required="true" id="reg-company" name="company" autocomplete="organization" maxlength="120"/></div>
+          <div class="form-group"><label for="reg-title">Job title <span class="req">*</span></label><input aria-required="true" id="reg-title" name="title" autocomplete="organization-title" maxlength="120"/></div>
+          <!-- Country and timezone, detected from the browser and shown as ONE line;
+               "change" reveals the two pickers (auth.js _paintRegLocation). -->
+          <div class="reg-location" id="reg-location">
+            <span class="reg-location-text" id="reg-location-text">Detecting your location…</span>
+            <button type="button" class="link-btn-inline" id="reg-location-change" data-action="reg-location-change" aria-expanded="false" aria-controls="reg-location-pick">change</button>
+            <span data-help="register.location" data-help-label="Location"></span>
+          </div>
+          <div class="form-row" id="reg-location-pick" hidden>
+            <div class="form-group"><label for="reg-country">Country</label><select id="reg-country" name="country" autocomplete="country" data-change-action="update-timezones"><option value="">Select country...</option></select></div>
+            <div class="form-group"><label for="reg-tz">Timezone</label><select id="reg-tz" name="timezone" data-change-action="update-reg-city"><option value="">Select timezone...</option></select></div>
+          </div>
+          <!-- Asked only when the event's policy shows them (data-relax-default is
+               the short form; it must equal lib/registration-fields.js LEGACY_STATES). -->
+          <div class="form-group" data-relax-field="job_function" data-relax-default="optional">
+            <label for="reg-job-function">Job function <span class="label-hint label-static-hint">(optional)</span></label>
+            <select id="reg-job-function" name="jobFunction" data-change-action="toggle-job-function-other">
+              <option value="">Select your role...</option>
+              <option value="Software Developer / Engineer">Software Developer / Engineer</option>
+              <option value="Solutions / Cloud Architect">Solutions / Cloud Architect</option>
+              <option value="DevOps / DevSecOps Engineer">DevOps / DevSecOps Engineer</option>
+              <option value="Application Security Engineer">Application Security Engineer</option>
+              <option value="Security Leader (Manager, Director, CISO)">Security Leader (Manager, Director, CISO)</option>
+              <option value="other">Other...</option>
+            </select>
+            <input id="reg-job-function-other" type="text" placeholder="Describe your role" maxlength="120" style="display:none;margin-top:6px" aria-label="Describe your role"/>
+          </div>
+          <div class="form-group" data-relax-field="city" data-relax-default="optional"><label for="reg-city">City <span class="label-hint label-static-hint">(optional)</span></label><input id="reg-city" name="city" type="text" maxlength="120" autocomplete="address-level2"/></div>
+          <div class="form-group" data-relax-field="personal_title" data-relax-default="hidden" hidden><label for="reg-personal-title">Salutation <span class="label-hint label-static-hint">(optional)</span></label><select id="reg-personal-title" name="personalTitle" autocomplete="honorific-prefix"><option value="" data-required-label="Select a salutation...">Prefer not to say</option><option value="Mr.">Mr.</option><option value="Mrs.">Mrs.</option><option value="Ms.">Ms.</option><option value="Miss">Miss</option><option value="Dr.">Dr.</option><option value="Prof.">Prof.</option><option value="Mx.">Mx.</option></select></div>
+          <div class="form-group" data-relax-field="phone" data-relax-default="hidden" hidden><label for="reg-phone">Phone <span class="label-hint label-static-hint">(optional)</span></label><input id="reg-phone" name="phone" type="tel" autocomplete="tel" maxlength="32"/></div>
+          <div class="form-group" data-relax-field="linkedin_url" data-relax-default="hidden" hidden><label for="reg-linkedin">LinkedIn profile URL <span class="label-hint label-static-hint">(optional)</span></label><input id="reg-linkedin" name="linkedinUrl" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/yourprofile"/></div>
+          <div id="reg-error" class="login-error" style="display:none" role="alert" aria-live="assertive"></div>
+          <div id="reg-form-actions">
+            <button class="btn lg block register-submit-btn" data-action="do-register">Create account and continue</button>
+            <p class="auth-legal">Not you? <a href="#" data-action="register-cancel">Use a different email</a></p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Tasks page -->
+    <div id="tasks-page" class="page">
+      <div class="tasks-head">
+        <div class="tasks-head-text">
+          <p class="eyebrow ink tasks-comp-label" id="tasks-comp-label"></p>
+          <h2 class="display tasks-title">Challenges</h2>
+          <p class="tasks-subtitle" id="tasks-subtitle"></p>
+          <!-- The solved share, drawn. Always in the layout at its full height
+               (only its fill moves), so filling it after /api/tasks shifts nothing. -->
+          <div class="tasks-meter" id="tasks-meter" aria-hidden="true"><i></i></div>
+          <!-- v8.1.0 (PR 34) — the presence disclosure, rendered PER EVENT
+               because the recording is gated per event: a blanket notice would
+               be false on every event that does not record. -->
+          <p class="presence-note" id="presence-note" hidden>This event records how much time you spend on the platform.</p>
+        </div>
+      </div>
+      <!-- v8.1.0 (PR 29) — THE CERTIFICATE'S HOME. Mounted STATICALLY here, and on
+           the Challenges page rather than the Leaderboard, because PR 18 hides the
+           Leaderboard tab for a kind with no ranking — so the only route a Program
+           participant has to their own certificate is this one. Static so no pane
+           loader can destroy it (the #smtp-banner precedent); [hidden] until the
+           participant actually has or can claim something. -->
+      <div id="cert-cta" class="cert-cta" hidden></div>
+      <div class="filters" id="solve-filters">
+        <button class="filter-btn" data-filter="all" data-action="set-solve-filter" data-value="all">All</button>
+        <button class="filter-btn" data-filter="solved" data-action="set-solve-filter" data-value="solved"><span style="color:var(--green);display:inline-flex;vertical-align:middle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></span> Solved</button>
+        <button class="filter-btn" data-filter="unsolved" data-action="set-solve-filter" data-value="unsolved"><span style="color:var(--red);display:inline-flex;vertical-align:middle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Unsolved</button>
+      </div>
+      <div class="filters" id="diff-filters">
+        <button class="filter-btn active" data-action="filter-tasks" data-filter="all">All</button>
+        <button class="filter-btn" data-action="filter-tasks" data-filter="easy"><span class="chip-dot dot-easy"></span>Easy (50pts)</button>
+        <button class="filter-btn" data-action="filter-tasks" data-filter="medium"><span class="chip-dot dot-medium"></span>Medium (100pts)</button>
+        <button class="filter-btn" data-action="filter-tasks" data-filter="hard"><span class="chip-dot dot-hard"></span>Hard (150pts)</button>
+        <span data-help="tasks.filters" data-help-label="Challenge filters"></span>
+      </div>
+      <!-- v7.21.16 (long-list phase 6) — a participant-facing search. The input
+           is a SIBLING of #task-grid, never inside it: the handler re-renders
+           the grid, and an input inside the re-rendered region loses keystrokes
+           typed during the debounce and jumps the caret (v7.20.10). -->
+      <div class="search-wrap participant-search-wrap"><input id="participant-task-search" placeholder="Search challenges..." aria-label="Search challenges by title or category" data-input-action="participant-task-search" autocomplete="off"/><button class="search-clear hidden" id="participant-task-search-clear" data-action="participant-task-search-clear" aria-label="Clear challenge search"><span aria-hidden="true">×</span> Clear</button></div>
+      <p id="task-grid-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="challenge" data-noun-plural="challenges" style="margin:0 0 8px"></p>
+      <div class="task-grid" id="task-grid"></div>
+    </div>
+
+    <div id="task-detail-page" class="page">
+      <!-- The Back control draws a close mark as an inline Feather-style SVG
+           (CLAUDE.md icon convention: every UI icon is an inline SVG, no
+           dingbats); its two lines are identical to ICO.x in ui/icons.js. Its
+           name is the visually hidden "Back to Challenges" label. -->
+      <!-- THE PLAY BAR: the focus view's one strip of chrome — Back, where this
+           challenge sits among the event's, the time left and the score. Static, so
+           no render can destroy the Back control; openTask fills the three readouts
+           (participant-tasks.js _paintPlaybar) and leaves them [hidden] when it has
+           nothing to say (a Program is not ranked, so no score readout). On a phone the app header
+           steps aside and this is the only bar. The booth tap card brings its own
+           bar, so body.mcf hides this one. It sticks under the header, so the
+           route focus lands the challenge's title below it (data-sticky-strip:
+           ui/nav.js publishStripBottoms). -->
+      <div class="qa-playbar" id="qa-playbar" data-sticky-strip>
+        <button class="back-btn qa-close" data-action="show-main" data-page="tasks-page" title="Back to Challenges"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> <span class="back-label">Back to Challenges</span></button>
+        <!-- The three readouts — position, the time ring, the score — drawn by
+             participant-tasks.js playStatsHtml, the renderer the events page's
+             progress strip shares. display:contents, so they sit in the bar's grid. -->
+        <div class="qa-stats" id="qa-stats"></div>
+      </div>
+      <div class="card" id="task-detail-card"></div>
+    </div>
+
+    <div id="leaderboard-page" class="page">
+      <!-- v6.16.46 — design system §Screens / preview/leaderboard.html:
+           page header has a "Live Rankings" title, a sub line with
+           competition context + update cadence, and a pulsing LIVE
+           badge top-right. Subtitle + badge are JS-populated by
+           loadLeaderboard() since the comp name is per-session. -->
+      <div class="lb-layout">
+      <div class="lb-main">
+      <div class="lb-page-head">
+        <div>
+          <p class="eyebrow ink lb-eyebrow" id="lb-eyebrow">Standings</p>
+          <h2 class="lb-page-title display" id="lb-page-title">Live Rankings</h2>
+          <div id="lb-subtitle" class="lb-subtitle"></div>
+        </div>
+        <span id="lb-live-badge" class="lb-live-pill" style="display:none"><span class="live-dot"></span>Live</span>
+      </div>
+      <p class="lb-help-row"><span data-help="lb.board" data-help-label="How the ranking works"></span></p>
+      <div id="podium-row" class="podium"></div>
+      <div class="card">
+        <table class="lb-table">
+          <!-- v7.15.0 — every column sortable. The sort re-orders ONLY the rows
+               already on screen (the top-20 the server sent, plus your own row);
+               it never asks for more, so the board can't be used to discover who
+               else is competing or how many. Icon-span ids are `lbsort-*` rather
+               than the admin tables' `sort-*` because renderParticipants() clears
+               sort icons with a GLOBAL [id^="sort-"][id$="-icon"] query, which
+               would otherwise wipe this table's indicator. -->
+          <thead><tr>
+            <th scope="col" class="sortable" data-action="sort-leaderboard" data-col="place">#<span id="lbsort-place-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-leaderboard" data-col="player">Player<span id="lbsort-player-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-leaderboard" data-col="score">Score<span id="lbsort-score-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-leaderboard" data-col="time">Time to Solve<span id="lbsort-time-icon"></span></th>
+            <th scope="col" class="sortable lb-solved-col" data-action="sort-leaderboard" data-col="solved">All Solved<span id="lbsort-solved-icon"></span></th>
+          </tr></thead>
+          <tbody id="lb-body"></tbody>
+        </table>
+      </div>
+      <div id="lb-me-banner" style="margin-top:16px"></div>
+      <!-- v7.11.0 — group / team rankings, shown only when the competition has groups. -->
+      <div id="lb-group-section" style="display:none;margin-top:20px"></div>
+      <!-- v8.6.0 — the LATE-ENTRANT section. Mounted statically and empty, exactly
+           as the team board above is: its renderer replaces the container's
+           contents on every poll, so anything it must not destroy has to live
+           outside it. -->
+      <div id="lb-late-section" style="display:none;margin-top:20px"></div>
+      </div>
+      <!-- v7.1.0 — the certificate card. Populated by loadLeaderboard() only when
+           the participant can mint or already holds this event's certificate
+           (canShareBadge); [style=display:none] otherwise. Beside the board on a
+           wide screen, below it on a narrow one. -->
+      <div class="lb-aside">
+        <div id="lb-badge-cta" class="lb-badge-cta" style="display:none"></div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Admin page -->
+    <div id="admin-page" class="page">
+      <!-- The phone SECTION BAR (<=768px): a full-width bar in flow under the
+           header, naming the section on screen; a press opens the sections
+           drawer. Hidden on wider screens, where the sidebar is always shown.
+           Its name opens with the words it shows (WCAG 2.5.3). -->
+      <button id="admin-mobile-menu-btn" class="admin-section-bar" type="button" aria-haspopup="dialog">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg><span id="admin-section-label" class="admin-section-label">Events</span><span class="sr-only"> — open sections</span>
+      </button>
+      <nav id="admin-sidebar" class="admin-sidebar" aria-label="Admin navigation">
+        <div class="admin-sidebar-header">
+          <span id="admin-panel-title" class="admin-sidebar-brand">Admin Panel</span>
+          <button id="admin-sidebar-toggle" class="btn" aria-label="Collapse sidebar"></button>
+        </div>
+        <!-- Organiser shell. EVENTS is the home: every event runs as a campaign
+             in its own WORKSPACE (header, KPIs, its own Participants, Challenges,
+             Rankings, Certificates and Settings), opened from the Events list.
+             The other items are the cross-event pages a global admin keeps
+             (People, the Challenge library, Groups, Logs, Analytics, Settings).
+             Every item is still found by `data-tab-id`, never by label.
+             RBAC — three groups (Manage, Participants, Admin). ui/nav.js hides
+             each item the role's permissions do not open (ADMIN_NAV_PERMISSIONS)
+             and a caption whose group is left empty. Submissions and Logs have
+             no sidebar item: Audit covers both (its Raw logs switch opens the
+             Logs pane; the event workspace's Activity tab is Submissions). -->
+        <p class="admin-nav-section" aria-hidden="true" data-nav-group="manage">Manage</p>
+        <ul class="admin-nav-list" role="list" data-nav-group="manage">
+          <li><button class="admin-nav-item active" data-action="admin-tab" data-tab-id="admin-competitions-tab" aria-current="page"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Events</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-templates-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">New event</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-tasks-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Challenge library</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-rankings-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Live rankings</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-analytics-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Analytics</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-audit-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Audit</span></button></li>
+        </ul>
+        <p class="admin-nav-section" aria-hidden="true" data-nav-group="participants">Participants</p>
+        <ul class="admin-nav-list" role="list" data-nav-group="participants">
+          <li><button id="participants-tab-btn" class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-participants-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">People</span><span id="pending-badge"></span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-groups-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Groups</span></button></li>
+        </ul>
+        <p class="admin-nav-section" aria-hidden="true" data-nav-group="admin">Admin</p>
+        <ul class="admin-nav-list" role="list" data-nav-group="admin">
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-users-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Users &amp; roles</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-settings-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Settings</span></button></li>
+        </ul>
+      </nav>
+      <div id="admin-sidebar-overlay" class="admin-sidebar-overlay" aria-hidden="true"></div>
+      <div class="admin-content">
+      <!-- v7.29.0 — SMTP-degraded banner. Mounted statically (never rendered by
+           a loader) so no pane refresh can destroy it, and hidden until the
+           alerts poll reports smtp_healthy === false. role=status, not alert:
+           it is a standing condition, not an interruption. -->
+      <div id="smtp-banner" class="smtp-banner" role="status" hidden></div>
+      <!-- v8.12.7 — Checkmarx One account removals that need a superadmin's
+           decision. Static for the #smtp-banner reason; filled from the alerts
+           poll's cxone_withdrawals_attention, which only a superadmin is sent,
+           and [hidden] otherwise. Its button leads to the Settings card. -->
+      <div id="cxone-withdrawal-banner" class="smtp-banner cxone-withdrawal-banner" role="status" hidden></div>
+      <!-- THE EVENT WORKSPACE. Opened from the Events list (or a template, a
+           clone, a create); hidden on every cross-event page. Its pieces:
+             #ws-record          the record header (static per render: kind,
+                                 title, facts, quick actions, join card)
+             #admin-scope-banner the LIVE status strip inside it (1 s tick:
+                                 countdown, session chips, End now, back link)
+             #ws-kpis            the KPI band
+             #ws-tabs            the event's own sections; each is a pane below,
+                                 shown with the event kept (adminTab keepEvent).
+           The section picker replaces the tab strip on phones. -->
+      <section id="admin-workspace" class="ws" hidden aria-labelledby="ws-title">
+        <!-- The COMPACT HEADER: two lines. Line 1 — ← Events (the status strip's
+             leave button), name, kind chip, the live status chip, then the join
+             pill (QR popover), Invite and the ⋯ menu. Line 2 (muted) — dates,
+             sessions, organisers. The status strip (#admin-scope-banner) is a
+             `display:contents` box inside line 1 so its leave button and its
+             ticking status chip sit in the row (CSS `order`). On every section
+             but Overview the header collapses to a 64 px sticky strip, and the
+             route focus lands a section's heading below it (data-sticky-strip:
+             ui/nav.js publishStripBottoms). -->
+        <div id="ws-record" class="ws-record card" data-sticky-strip>
+          <div class="ws-line1">
+            <div id="admin-scope-banner" style="display:none"></div>
+            <h2 id="ws-title" class="ws-title" tabindex="-1"></h2>
+            <div id="ws-rec-chips" class="ws-chips"></div>
+            <span class="ws-line1-gap" aria-hidden="true"></span>
+            <div id="ws-join" class="ws-join"></div>
+            <div id="ws-quick" class="ws-quick"></div>
+          </div>
+          <p id="ws-facts" class="ws-facts"></p>
+        </div>
+        <section id="ws-kpis" class="ws-kpis" aria-label="At a glance"></section>
+        <nav id="ws-tabs" class="ws-tabs" aria-label="Event sections">
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-event-overview-tab">Overview</button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-participants-tab">Participants <span class="ws-count" id="ws-count-participants"></span></button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-tasks-tab">Challenges <span class="ws-count" id="ws-count-tasks"></span></button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-rankings-tab">Rankings</button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-submissions-tab">Activity</button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-analytics-tab">Analytics</button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-event-certs-tab">Certificates</button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-event-team-tab">Team &amp; reports</button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-event-settings-tab">Settings</button>
+        </nav>
+        <button type="button" id="ws-section-pick" class="ws-section-pick btn secondary" data-action="ws-section-pick" aria-haspopup="dialog"><span class="eyebrow">Section</span><b id="ws-section-name">Overview</b><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+      </section>
+
+      <!-- Competitions tab -->
+      <div id="admin-competitions-tab">
+        <!-- v8.11.7 — THE PANE'S OWN HEADING. Two findings, one cause: the
+             admin route-focus mechanism (`_focusTarget`, ui/nav.js) queries
+             `h1,h2`, so a pane with neither dumped keyboard focus onto an
+             unnamed <div> on every tab switch; and the cards inside these
+             panes are <h3>, so with no h2 above them the document skipped a
+             level (axe `heading-order`). The GROUPS pane already carried one
+             — it is the house pattern, and these were the outliers. -->
+        <div class="ev-home-head">
+          <div class="ev-home-titles">
+            <p class="eyebrow ink">Organise</p>
+            <h2 class="admin-pane-title ev-home-title">Events</h2>
+            <p class="ev-home-lede">Every event runs as its own campaign. Open one to manage its people, challenges, rankings and certificates in one place.</p>
+          </div>
+          <div class="ev-home-actions">
+            <button id="new-competition-btn" class="btn" data-action="open-competition-form">+ New Event</button>
+          </div>
+        </div>
+        <div class="ev-home-toolbar">
+          <div class="search-wrap"><input id="comp-search" placeholder="Search events or sessions..." aria-label="Search events or sessions" data-input-action="comp-search"/><button class="search-clear hidden" id="comp-search-clear" data-action="comp-search-clear" aria-label="Clear events search"><span aria-hidden="true">×</span> Clear</button></div><span id="comp-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="event" data-noun-plural="events"></span>
+          <!-- THE FILTERS PATTERN (features/filters-panel.js): one Filters button
+               opens the panel holding the chip groups (same ids, same actions);
+               the active ones show beside it as removable chips. -->
+          <button type="button" class="btn sm secondary filters-btn" id="comp-filters-btn" data-action="filters-toggle" data-panel="comp-filters-panel" aria-expanded="false" aria-controls="comp-filters-panel">Filters</button>
+          <span data-help="lists.filters" data-help-label="Filters"></span>
+          <span class="filters-active" id="comp-filters-panel-active"></span>
+          <div class="filters-panel card" id="comp-filters-panel" role="group" aria-label="Event filters" hidden>
+          <p class="t-eyebrow">Status</p>
+          <div class="filters" style="margin:0" id="comp-status-filters">
+            <button class="filter-btn" data-status="all" data-action="toggle-comp-filter">All</button>
+            <button class="filter-btn active" data-status="live" data-action="toggle-comp-filter"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="color:var(--green);vertical-align:middle"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg> Live</button>
+            <button class="filter-btn active" data-status="upcoming" data-action="toggle-comp-filter"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="color:var(--yellow);vertical-align:middle"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg> Upcoming</button>
+            <button class="filter-btn active" data-status="late-entry" data-action="toggle-comp-filter"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="color:var(--accent2);vertical-align:middle"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg> Late entry</button>
+            <button class="filter-btn" data-status="ended" data-action="toggle-comp-filter"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="color:var(--muted);vertical-align:middle"><circle cx="5" cy="5" r="4" fill="currentColor"/></svg> Ended</button>
+          </div>
+          <!-- v8.1.0 (PR 13) — the KIND filter row is rendered by JS from the
+               shell-injected label table, never authored here. This is one of the
+               two surfaces whose whole job is to teach the three words, so it
+               REFUSES to render when the vocabulary is absent rather than offering
+               three chips captioned booth / tournament / program. -->
+          <p class="t-eyebrow">Type</p>
+          <div class="filters" style="margin:0" id="comp-kind-filters" role="group" aria-label="Filter by event type"></div>
+          <div class="modal-foot"><button type="button" class="btn sm secondary" data-action="filters-clear" data-panel="comp-filters-panel">Clear all</button><button type="button" class="btn sm" data-action="filters-toggle" data-panel="comp-filters-panel">Done</button></div>
+          </div>
+        </div>
+        <div class="card table-card">
+          <table id="admin-comp-table" class="dense" data-tcols="events" style="width:100%">
+            <thead><tr>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="name">Name<span id="sort-comp-name-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="start">Start<span id="sort-comp-start-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="end">End<span id="sort-comp-end-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="duration">Duration<span id="sort-comp-duration-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="status">Status<span id="sort-comp-status-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="tags">Tags<span id="sort-comp-tags-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="participants">Participants<span id="sort-comp-participants-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="challenges">Challenges<span id="sort-comp-challenges-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="sessions">Sessions<span id="sort-comp-sessions-icon"></span></th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody id="admin-comp-body"></tbody>
+          </table>
+        </div>
+        <div id="comp-pagination" class="pagination"></div>
+      </div>
+
+      <!-- NEW EVENT: the one place every event starts (features/templates-admin.js).
+           A blank starter per kind, or a template; both open the one create form
+           (the kind is a field there). Templates are managed here too, with a
+           Recently deleted list that restores one in a click. An event admin
+           gets templates only, through the quick-start panel (a sheet on phones). -->
+      <div id="admin-templates-tab" class="admin-tab-pane" style="display:none">
+        <div class="ev-home-head">
+          <div class="ev-home-titles">
+            <p class="eyebrow ink">Create</p>
+            <h2 class="admin-pane-title ev-home-title">New event</h2>
+            <p class="ev-home-lede">Start blank or from a template. Either way you get one form with everything in it, and you can change any of it later.</p>
+          </div>
+        </div>
+        <div class="tpl-layout">
+          <div class="tpl-main">
+            <div class="tpl-list-head" id="tpl-blank-head"><h3 class="tpl-list-title">Start blank</h3><span data-help="newevent.blank" data-help-label="Start blank"></span></div>
+            <div id="tpl-kind-cards" class="tpl-kinds" role="group" aria-label="Start a blank event"></div>
+            <div class="tpl-list-head"><h3 class="tpl-list-title">Start from a template</h3><span data-help="templates.list" data-help-label="Templates"></span><span id="tpl-list-count" class="list-count" role="status" aria-live="polite"></span><span class="p-toolbar-gap" aria-hidden="true"></span><button type="button" class="btn sm secondary" id="tpl-new-btn" data-action="tpl-new" hidden>+ New template</button></div>
+            <div id="tpl-list" class="tpl-list"></div>
+            <section id="tpl-deleted" class="tpl-deleted" aria-label="Recently deleted templates" hidden></section>
+          </div>
+          <aside id="tpl-spin" class="tpl-spin card" aria-labelledby="tpl-spin-title" hidden></aside>
+        </div>
+      </div>
+
+      <!-- Workspace: Overview. Everything an organiser needs on one screen:
+           approvals (only while the platform holds sign-ups for approval),
+           sessions with their controls, the challenge set, the top of the board
+           and the shortcuts (features/event-workspace.js). Route focus lands on
+           the event's name (data-route-focus; why: ui/nav.js). -->
+      <div id="admin-event-overview-tab" class="admin-tab-pane" data-route-focus="ws-title" style="display:none">
+        <h2 class="admin-pane-title sr-only">Overview</h2>
+        <div id="ws-overview" class="ws-overview"></div>
+      </div>
+
+      <!-- Workspace: Certificates. The event's certificate design (an override
+           of the platform design) with a live preview, per tier. -->
+      <div id="admin-event-certs-tab" class="admin-tab-pane" style="display:none">
+        <h2 class="admin-pane-title sr-only">Certificates</h2>
+        <div id="ws-certs"></div>
+      </div>
+
+      <!-- Workspace: Team & reports. The event team (report recipients per
+           role), the lead and hot-lead targets, and the four persona reports
+           with the lead list (features/event-team.js). -->
+      <div id="admin-event-team-tab" class="admin-tab-pane" style="display:none">
+        <h2 class="admin-pane-title sr-only">Team and reports</h2>
+        <div id="ws-team"></div>
+      </div>
+
+      <!-- Workspace: Settings. The event's configuration and its lifecycle
+           doors; the full form opens from here (Edit settings). -->
+      <div id="admin-event-settings-tab" class="admin-tab-pane" style="display:none">
+        <h2 class="admin-pane-title sr-only">Event settings</h2>
+        <div id="ws-settings" class="ws-settings"></div>
+      </div>
+
+      <!-- Tasks tab -->
+      <div id="admin-tasks-tab" style="display:none">
+        <!-- v8.11.7 — THE PANE'S OWN HEADING. Two findings, one cause: the
+             admin route-focus mechanism (`_focusTarget`, ui/nav.js) queries
+             `h1,h2`, so a pane with neither dumped keyboard focus onto an
+             unnamed <div> on every tab switch; and the cards inside these
+             panes are <h3>, so with no h2 above them the document skipped a
+             level (axe `heading-order`). The GROUPS pane already carried one
+             — it is the house pattern, and these were the outliers. -->
+        <h2 class="admin-pane-title">Challenges</h2>
+        <div id="task-controls-row" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+          <span data-help="library.list" data-help-label="Challenge library"></span>
+          <div class="search-wrap"><input id="task-search" placeholder="Search challenges..." aria-label="Search challenges" data-input-action="task-search"/><button class="search-clear hidden" id="task-search-clear" data-action="task-search-clear" aria-label="Clear challenges search"><span aria-hidden="true">×</span> Clear</button></div><span id="task-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="challenge" data-noun-plural="challenges"></span>
+          <div id="new-task-btn-row" style="display:flex;gap:8px">
+            <!-- v7.12.1 — top bulk-assign button (mirrors #assign-to-comp-btn on the
+                 Participants pane): shown when >=1 challenge is selected, always visible
+                 in the controls even when the sticky selection bar is scrolled below. -->
+            <button class="btn sm" id="assign-challenges-to-comp-btn" style="display:none" data-action="challenges-bulk-assign">Assign to Events</button>
+            <button class="btn sm" id="add-tasks-to-comp-btn" style="display:none" data-action="open-add-tasks-to-competition">+ Add Challenges</button>
+            <button class="btn sm secondary" id="export-tasks-btn" data-action="export-tasks">Export</button>
+            <span data-help="library.export" data-help-label="Export and import"></span>
+            <button class="btn sm secondary" id="import-tasks-btn" style="display:none" data-action="click-hidden-input" data-target-id="import-tasks-file">Import</button>
+            <input type="file" id="import-tasks-file" accept=".json" style="display:none" data-change-action="import-tasks-file"/>
+            <button class="btn sm" data-action="open-task-form">+ New Challenge</button>
+          </div>
+        </div>
+        <div id="task-filters-row" style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="btn sm secondary filters-btn" id="task-filters-btn" data-action="filters-toggle" data-panel="task-filters-panel" aria-expanded="false" aria-controls="task-filters-panel">Filters</button>
+          <span data-help="lists.filters" data-help-label="Filters"></span>
+          <span class="filters-active" id="task-filters-panel-active"></span>
+          <div class="filters-panel card" id="task-filters-panel" role="group" aria-label="Challenge filters" hidden>
+          <p class="t-eyebrow">Difficulty</p>
+          <div class="filters" style="margin:0" id="task-diff-filters">
+            <button class="filter-btn active" data-val="all" data-action="toggle-task-diff-filter">All</button>
+            <button class="filter-btn" data-val="easy" data-action="toggle-task-diff-filter"><span class="badge easy" style="font-size:var(--fs-chip);padding:1px 6px">EASY</span></button>
+            <button class="filter-btn" data-val="medium" data-action="toggle-task-diff-filter"><span class="badge medium" style="font-size:var(--fs-chip);padding:1px 6px">MEDIUM</span></button>
+            <button class="filter-btn" data-val="hard" data-action="toggle-task-diff-filter"><span class="badge hard" style="font-size:var(--fs-chip);padding:1px 6px">HARD</span></button>
+          </div>
+          <p class="t-eyebrow">Status</p>
+          <div class="filters" style="margin:0" id="task-status-filters">
+            <button class="filter-btn active" data-val="all" data-action="toggle-task-status-filter">All</button>
+            <button class="filter-btn" data-val="published" data-action="toggle-task-status-filter"><span style="color:var(--green);display:inline-flex;vertical-align:middle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></span> Published</button>
+            <button class="filter-btn" data-val="draft" data-action="toggle-task-status-filter"><span style="color:var(--muted)">&#9998;</span> Draft</button>
+          </div>
+          <p class="t-eyebrow">Shown to participants</p>
+          <div class="filters" style="margin:0" id="task-state-filters">
+            <button class="filter-btn active" data-val="all" data-action="toggle-task-state-filter">All</button>
+            <button class="filter-btn" data-val="visible" data-action="toggle-task-state-filter"><span style="color:var(--green);display:inline-flex;vertical-align:middle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span> Visible</button>
+            <button class="filter-btn" data-val="hidden" data-action="toggle-task-state-filter"><span style="color:var(--red);display:inline-flex;vertical-align:middle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span> Hidden</button>
+          </div>
+          <div class="modal-foot"><button type="button" class="btn sm secondary" data-action="filters-clear" data-panel="task-filters-panel">Clear all</button><button type="button" class="btn sm" data-action="filters-toggle" data-panel="task-filters-panel">Done</button></div>
+          </div>
+        </div>
+        <!-- v8.17.0 — THE COMPACT CHALLENGE EDITOR. One screen on open at a laptop
+             size: the question (title, description, answer) on the left, the
+             settings rail (difficulty, attempts, seal, hint, explanation,
+             attachments, author) on the right, and the Cancel / Save row pinned to
+             the foot of the scroller. On a phone it is one column with the same
+             pinned foot. Every id and data-action the editor code and the specs
+             use is unchanged; the long explanations moved behind "?" tips. -->
+        <div id="admin-task-form" class="card task-form-card ce-form" style="display:none">
+          <h2 id="task-form-title" class="task-form-title">New Challenge</h2>
+          <input type="hidden" id="edit-task-id"/>
+          <!-- v8.8.5 — shown when the server's can_edit_scoring is false: this
+               actor may edit the challenge but not the fields another
+               organiser's event is scoring on. role=status so a screen reader
+               hears why the inputs below are disabled. -->
+          <p class="settings-help" id="tf-scoring-locked-note" role="status" hidden></p>
+          <div class="ce-grid">
+            <div class="ce-main">
+              <div class="form-group"><label for="tf-title">Title <span class="req">*</span></label><input aria-required="true" id="tf-title"/></div>
+              <div class="form-group ce-desc"><label id="tf-desc-label">Description</label><div id="tf-desc" aria-labelledby="tf-desc-label"></div></div>
+              <div class="ce-answer">
+                <div class="ce-answer-head">
+                  <label for="tf-atype">Answer type</label>
+                  <select id="tf-atype" data-change-action="task-answer-type"><option value="text">Text</option><option value="file">File Upload</option><option value="json">JSON</option><option value="choice">Multiple Choice</option><option value="any">Any answer (free response)</option></select>
+                </div>
+                <div class="form-group" id="tf-answer-group"><label for="tf-answer">Correct answer <span class="req">*</span></label><input aria-required="true" id="tf-answer"/></div>
+                <!-- v8.9.0 — replaces the Correct Answer box when Answer Type is
+                     "Any answer": there is no key to type, so the box explains
+                     the rule instead of standing empty. -->
+                <div class="form-group" id="tf-any-note-group" style="display:none">
+                  <p class="settings-help" id="tf-any-note" style="margin:0">Any non-empty answer is accepted exactly as typed. No hint and no wrong-answer penalty — a hint or accepted answers this challenge already has are removed when you save.</p>
+                  <!-- Event team reports — optional options make it a PICK-ONE
+                       question: participants choose one, every option is accepted
+                       (how a qualifying question is asked). -->
+                  <div class="help-label-row"><label for="tf-any-options">Options (optional, one per line)</label><span data-help="challenge.pick-one" data-help-label="Pick-one options"></span></div>
+                  <textarea id="tf-any-options" rows="4" maxlength="6400" placeholder="Leave empty for a free answer" aria-describedby="tf-any-options-note"></textarea>
+                  <p id="tf-any-options-note" class="settings-help" hidden></p>
+                </div>
+                <!-- v8.9.0 — further accepted answers for a TEXT challenge. #tf-answer
+                     above is accepted answer #1; these rows are alternatives, each
+                     graded by the same rule. Rendered from S._tfExtraAnswers by
+                     tfExtraAnswersRender(); shown for text only. -->
+                <div class="form-group" id="tf-answers-more" style="display:none">
+                  <div id="tf-answers-extra" role="group" aria-label="Additional accepted answers" style="display:none"></div>
+                  <button type="button" class="ce-link" id="tf-add-answer" data-action="task-add-answer">+ Accepted answer</button>
+                </div>
+                <!-- v7.19.0 — multiple-choice editor. Replaces the single Correct
+                     Answer input when Answer Type is Multiple Choice; the correct
+                     answer is then DERIVED from which rows are ticked. -->
+                <div class="form-group" id="tf-choices-group" style="display:none">
+                  <div class="ce-label-row"><label id="tf-choices-label">Choices <span class="req">*</span> <span class="ce-label-note">tick each correct one</span></label><span data-help="challenge.choices" data-help-label="Choices"></span></div>
+                  <div id="tf-choices-list" role="group" aria-labelledby="tf-choices-label"></div>
+                  <button type="button" class="ce-link" id="tf-add-choice" data-action="task-add-choice" aria-describedby="tf-choices-cap-note">+ Add choice</button>
+                  <p id="tf-choices-cap-note" class="settings-help" style="margin:6px 0 0" hidden>That is the most a challenge can have: 20 choices.</p>
+                  <div id="tf-choices-err" class="form-error" role="alert"></div>
+                </div>
+              </div>
+            </div>
+            <div class="ce-rail" role="group" aria-label="Challenge settings">
+              <!-- Difficulty: a segmented control over the hidden #tf-diff select,
+                   which stays the one value the editor code reads and writes
+                   (_tfDiffSync keeps the two in step). -->
+              <div class="form-group ce-diff">
+                <span class="ce-label" id="tf-diff-label">Difficulty <span class="req">*</span></span>
+                <div class="ce-seg" role="radiogroup" aria-labelledby="tf-diff-label">
+                  <label class="ce-seg-opt"><input type="radio" name="tf-diff-seg" value="easy" data-change-action="task-diff-seg"/><span>Easy <span class="ce-pts">50</span></span></label>
+                  <label class="ce-seg-opt"><input type="radio" name="tf-diff-seg" value="medium" data-change-action="task-diff-seg"/><span>Medium <span class="ce-pts">100</span></span></label>
+                  <label class="ce-seg-opt"><input type="radio" name="tf-diff-seg" value="hard" data-change-action="task-diff-seg"/><span>Hard <span class="ce-pts">150</span></span></label>
+                </div>
+                <select id="tf-diff" hidden aria-hidden="true" tabindex="-1" aria-label="Difficulty"><option value="easy">Easy (50pts)</option><option value="medium">Medium (100pts)</option><option value="hard">Hard (150pts)</option></select>
+              </div>
+              <!-- v8.1.0 — the challenge-level attempt ceiling. Blank means no cap
+                   (sent as null); it BEATS any event-level cap. -->
+              <div class="form-group ce-attempts">
+                <div class="ce-label-row"><label for="tf-attempt-cap">Attempts</label><span data-help="challenge.attempts" data-help-label="Attempts"></span></div>
+                <input id="tf-attempt-cap" type="number" min="1" max="1000" step="1" inputmode="numeric" placeholder="No limit"/>
+              </div>
+              <!-- v8.10.0 — SEAL THE ANSWER. Offered on CREATE only (hidden in edit
+                   mode by _tfSealSetEditMode): the server refuses sealing later.
+                   A `.checkbox-row` drawn as a switch; its long explanation is
+                   #tf-seal-note behind the "?" beside it (the proxy reason opens it). -->
+              <div class="form-group ce-seal" id="tf-seal-group">
+                <div class="ce-seal-row">
+                  <label for="tf-answer-seal" class="checkbox-row ce-switch">
+                    <input type="checkbox" role="switch" id="tf-answer-seal" data-change-action="task-seal-toggle"/>
+                    <span>Seal the answer — only I, or a superadmin on the record, can see or change it</span>
+                  </label>
+                  <span class="help-tip"><button type="button" class="help-tip-btn" id="tf-seal-tip" data-action="help-tip" aria-expanded="false" aria-controls="tf-seal-note" aria-label="About sealing the answer" data-glyph="?"></button></span>
+                </div>
+                <p class="help-tip-note ce-tip-note" id="tf-seal-note" role="note" hidden>Only you then see or change the answer, the explanation and the hint, and only you can edit this challenge, restore an earlier version or recalculate its scores — not other organisers, not administrators. A participant competing in an event can still buy the hint there, as any hint. The one exception is a superadmin who reveals it; every reveal is recorded in the challenge's history, naming them. Participants are never shown the answer, even when the event reveals answers. You can unseal it later; you cannot seal it again.</p>
+              </div>
+              <!-- v8.10.1 — why sealing (or the free-response type) is unavailable.
+                   OUTSIDE #tf-seal-group: the edit form hides that group, and this
+                   note has to be visible there too. -->
+              <p class="settings-help ce-note" id="tf-seal-type-note" hidden></p>
+              <!-- v8.10.0 — the EDIT-mode counterparts, shown and hidden by
+                   _tfSealSetEditMode(). -->
+              <p class="settings-help ce-note" id="tf-sealed-note" hidden></p>
+              <div class="form-group" id="tf-reveal-row" hidden>
+                <button type="button" class="btn sm secondary" data-action="task-reveal-sealed" data-task-id="">Reveal sealed answer and hint</button>
+                <p class="settings-help" style="margin:6px 0 0">The reveal is recorded in this challenge's history and the event log, naming you.</p>
+              </div>
+              <div class="form-group" id="tf-unseal-row" hidden>
+                <label for="tf-unseal" class="checkbox-row">
+                  <input type="checkbox" id="tf-unseal"/>
+                  <span>Unseal this answer when I save — everyone who can see this challenge will be able to read it</span>
+                </label>
+                <p class="settings-help" style="margin:6px 0 0">This cannot be undone: once unsealed, the answer cannot be sealed again.</p>
+              </div>
+              <!-- v8.12.0 — stands in for the Unseal row while the challenge sits in
+                   an event where staff compete (_tfSealSetEditMode). -->
+              <p class="settings-help ce-note" id="tf-unseal-held-note" hidden></p>
+              <!-- Collapsible rows: each opens in place and, closed, shows a
+                   one-line summary of what it holds (_tfSecSync). -->
+              <div class="ce-sec" id="tf-hint-group">
+                <button type="button" class="ce-sec-toggle" data-action="task-sec-toggle" aria-expanded="false" aria-controls="tf-hint-body"><span class="ce-sec-name" id="tf-hint-label">Hint</span><span class="ce-sec-sum" id="tf-hint-sum">+ Add hint</span></button>
+                <div class="ce-sec-body" id="tf-hint-body" hidden><div id="tf-hint" aria-labelledby="tf-hint-label"></div></div>
+              </div>
+              <div class="ce-sec" id="tf-explanation-sec">
+                <button type="button" class="ce-sec-toggle" data-action="task-sec-toggle" aria-expanded="false" aria-controls="tf-explanation-body"><span class="ce-sec-name" id="tf-explanation-label">Explanation</span><span class="ce-sec-sum" id="tf-explanation-sum">+ Add explanation</span></button>
+                <div class="ce-sec-body" id="tf-explanation-body" hidden>
+                  <p class="settings-help ce-sec-help">Shown after a solve or once the event ends.</p>
+                  <div id="tf-explanation" aria-labelledby="tf-explanation-label"></div>
+                </div>
+              </div>
+              <div class="ce-sec task-form-attachments-group" id="tf-attach-sec">
+                <div class="ce-sec-head">
+                  <span class="ce-sec-name">Attachments <span class="ce-sec-count" id="tf-attach-count">(0)</span></span>
+                  <span data-help="challenge.attachments" data-help-label="Attachments"></span>
+                </div>
+                <div id="tf-attachments-list" class="tf-attachments-list" role="list" aria-label="Uploaded attachments"></div>
+                <div id="tf-attachments-picker" class="tf-attachments-picker" style="display:none" role="group" aria-label="Upload attachment">
+                  <input type="file" id="tf-attach-file" accept=".zip,application/zip" aria-label="Select ZIP file to upload"/>
+                  <input type="text" id="tf-attach-dname" placeholder="Display name (optional)" maxlength="200" aria-label="Display name"/>
+                  <div class="tf-attachments-picker-actions">
+                    <button type="button" class="btn sm secondary" data-action="cancel-attach-upload">Cancel</button>
+                    <button type="button" class="btn sm" data-action="confirm-attach-upload">Upload</button>
+                  </div>
+                  <div id="tf-attach-error" class="tf-attach-error" role="alert" style="display:none"></div>
+                  <div id="tf-attach-progress" class="tf-attach-progress" style="display:none" aria-hidden="true"><div id="tf-attach-progress-bar"></div></div>
+                </div>
+                <div class="ce-attach-actions">
+                  <button type="button" class="ce-link tf-attach-add-btn" id="tf-attach-add-btn" data-action="open-attach-picker">+ Add attachment</button>
+                  <button type="button" class="ce-link" id="tf-attach-url-toggle" data-action="task-sec-toggle" aria-expanded="false" aria-controls="tf-attach-url-body">+ Link</button>
+                </div>
+                <div class="form-group ce-sec-body" id="tf-attach-url-body" hidden><label for="tf-attach">Attachment link</label><input id="tf-attach" placeholder="https://…"/></div>
+              </div>
+              <div class="ce-sec" id="tf-author-sec">
+                <button type="button" class="ce-sec-toggle" data-action="task-sec-toggle" aria-expanded="false" aria-controls="tf-author-body"><span class="ce-sec-name">Author</span><span class="ce-sec-sum" id="tf-author-sum">+ Add author</span></button>
+                <div class="ce-sec-body" id="tf-author-body" hidden>
+                  <div class="form-group"><label for="tf-author-name">Author name</label><input id="tf-author-name" placeholder="Challenge author's name"/></div>
+                  <div class="form-group"><label for="tf-author-linkedin">Author LinkedIn</label><input id="tf-author-linkedin" type="url" placeholder="https://linkedin.com/in/..."/></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="task-feedback-section" class="task-form-feedback" style="display:none">
+            <h4 class="task-form-feedback-title">Feedback</h4>
+            <div id="task-feedback-list"></div>
+          </div>
+          <div class="task-form-actions">
+            <button class="btn sm secondary" data-action="close-task-form">Cancel</button>
+            <button class="btn sm secondary" id="save-draft-btn" data-action="save-task" data-status="draft">Save as draft</button>
+            <button class="btn sm" id="save-publish-btn" data-action="save-task" data-status="published">Save &amp; publish</button>
+            <button class="btn sm" id="save-task-btn" data-action="save-task" style="display:none">Save challenge</button>
+          </div>
+        </div>
+        <div id="admin-task-table-card" class="card table-card"><table id="admin-task-table" class="dense" data-tcols="challenges" style="width:100%">
+          <!-- v6.13.10: Attachments column added between Status and Feedback.
+               v7.12.0: leading checkbox column for bulk assign-to-competitions.
+               v8.17.0: no fixed column widths and no min-width — the table fits
+               its card; the columns past the default set are under Columns
+               (ui/table-columns.js). -->
+          <thead><tr>
+            <th scope="col" class="cb-cell" data-label=""><label class="cb-all"><input type="checkbox" id="select-all-challenges" data-change-action="toggle-all-challenges" aria-label="Select all challenges on this page"/><span class="cb-all-text">Select all</span></label></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="title">Title<span id="tsort-title-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="difficulty">Difficulty<span id="tsort-difficulty-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="type">Type<span id="tsort-type-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="status">Status<span id="tsort-status-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="attachments">Attachments<span id="tsort-attachments-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="feedback">Feedback<span id="tsort-feedback-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="last_changed">Last Changed<span id="tsort-last_changed-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="changed_by">Changed By<span id="tsort-changed_by-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="author">Author<span id="tsort-author-icon"></span></th>
+            <th scope="col" data-tcol="tags">Tags</th>
+            <th scope="col" data-tcol="events">Events</th><th scope="col" data-tcol="actions">Actions</th>
+          </tr></thead>
+          <tbody id="admin-task-body"></tbody>
+        </table></div>
+        <div id="tasks-pagination" class="pagination"></div>
+        <!-- v7.12.0 — bulk-assign selection bar (mirrors #participants-selection-bar). -->
+        <div id="challenges-selection-bar" class="selection-bar" style="display:none">
+          <span id="challenge-selection-count">0 selected</span>
+          <button class="btn sm" id="challenge-selection-bar-assign-btn" data-action="challenges-bulk-assign">Assign to Events</button>
+        </div>
+      </div>
+
+      <!-- Participants tab -->
+      <div id="admin-participants-tab" style="display:none">
+        <!-- v8.11.7 — THE PANE'S OWN HEADING. Two findings, one cause: the
+             admin route-focus mechanism (`_focusTarget`, ui/nav.js) queries
+             `h1,h2`, so a pane with neither dumped keyboard focus onto an
+             unnamed <div> on every tab switch; and the cards inside these
+             panes are <h3>, so with no h2 above them the document skipped a
+             level (axe `heading-order`). The GROUPS pane already carried one
+             — it is the house pattern, and these were the outliers. -->
+        <h2 class="admin-pane-title">Participants</h2>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="search-wrap"><input id="participants-search" placeholder="Search participants..." aria-label="Search participants" data-input-action="participants-search"/><button class="search-clear hidden" id="participants-search-clear" data-action="participants-search-clear" aria-label="Clear participants search"><span aria-hidden="true">×</span> Clear</button></div><span id="participants-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="participant" data-noun-plural="participants"></span>
+          <!-- Inside an event workspace only: the list is the event's own people;
+               ticking this searches every account on the platform, each row
+               offering "Add to event". Hidden on the cross-event People page. -->
+          <label class="checkbox-row p-ws-everyone" id="p-ws-scope" hidden><input type="checkbox" id="p-ws-everyone" data-change-action="p-ws-everyone"/> Search everyone on the platform</label>
+          <span data-help="people.everyone" data-help-label="Search everyone" id="p-ws-scope-help" hidden></span>
+          <!-- RBAC — People lists participants and organisers; the platform's
+               admin accounts are on Users & roles. Ticking this lists them here
+               too (global admins only). -->
+          <label class="checkbox-row p-ws-everyone" id="p-admins-scope" hidden><input type="checkbox" id="p-include-admins" data-change-action="p-include-admins"/> Show admin accounts</label>
+          <span data-help="people.admins" data-help-label="Show admin accounts" id="p-admins-scope-help" hidden></span>
+          <button type="button" class="btn sm secondary filters-btn" id="p-filters-btn" data-action="filters-toggle" data-panel="p-filters-panel" aria-expanded="false" aria-controls="p-filters-panel">Filters</button>
+          <span data-help="lists.filters" data-help-label="Filters"></span>
+          <span class="filters-active" id="p-filters-panel-active"></span>
+          <div class="filters-panel card" id="p-filters-panel" role="group" aria-label="Participant filters" hidden>
+          <p class="t-eyebrow">Status</p>
+          <div class="filters" style="margin:0" id="p-status-filters" role="group" aria-label="Filter participants by status (multi-select)">
+            <button class="filter-btn active" data-action="set-p-status-filter" data-value="all">All</button>
+            <button class="filter-btn" data-action="set-p-status-filter" data-value="unconfirmed">Unconfirmed</button>
+            <button class="filter-btn" data-action="set-p-status-filter" data-value="pending">Pending</button>
+            <button class="filter-btn" data-action="set-p-status-filter" data-value="denied">Denied</button>
+            <button class="filter-btn" data-action="set-p-status-filter" data-value="confirmed">Confirmed</button>
+            <button class="filter-btn" data-action="set-p-status-filter" data-value="blocked">Blocked</button>
+            <button class="filter-btn" data-action="set-p-status-filter" data-value="locked">Locked</button>
+            <span data-help="people.status" data-help-label="Statuses"></span>
+          </div>
+          <div class="modal-foot"><button type="button" class="btn sm secondary" data-action="filters-clear" data-panel="p-filters-panel">Clear all</button><button type="button" class="btn sm" data-action="filters-toggle" data-panel="p-filters-panel">Done</button></div>
+          </div>
+        </div>
+        <!-- ONE primary action (Invite); At the desk beside it; every file door
+             (CSV, JSON, Import) in one Export ▾ menu; Columns picks what the
+             table shows (kept per browser). -->
+        <div class="p-toolbar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn sm" id="invite-participants-btn" data-action="open-invite-dialog">Invite</button>
+          <!-- v8.1.0 — the AT-DESK shortcut. Beside Invite because it is the same
+               intent with the email round trip removed: Invite waits for them to
+               open their inbox, this hands the organiser a code to read out. -->
+          <button class="btn sm secondary" id="desk-invite-btn" data-action="desk-invite" title="Create an account and show a sign-in code, with no email">At the desk</button>
+          <span data-help="people.desk" data-help-label="At the desk"></span>
+          <button class="btn sm" id="assign-to-comp-btn" style="display:none">Assign to Events</button>
+          <span class="p-toolbar-gap" aria-hidden="true"></span>
+          <span class="p-export-wrap"><button type="button" class="btn sm secondary" id="p-export-menu-btn" data-action="kebab-toggle" aria-label="Export — CSV, JSON or import">Export <span aria-hidden="true">▾</span></button><span class="kebab-menu">
+            <button id="export-csv-btn" data-action="export-participants-csv">Export CSV</button>
+            <button id="export-json-btn" data-action="export-participants">Export JSON</button>
+            <button id="import-participants-btn" style="display:none" data-action="click-hidden-input" data-target-id="import-participants-file">Import JSON</button>
+          </span></span>
+          <input type="file" id="import-participants-file" accept=".json" style="display:none" data-change-action="import-participants-file"/>
+          <button type="button" class="btn sm secondary" id="p-columns-btn" data-action="p-columns" aria-haspopup="dialog" aria-expanded="false">Columns</button>
+          <span data-help="people.columns" data-help-label="Columns"></span>
+        </div>
+        <div class="card table-card p-table-card">
+          <table class="dense" id="p-table" data-tcols="participants">
+            <thead><tr>
+              <th scope="col" class="cb-cell" data-label=""><label class="cb-all"><input type="checkbox" id="select-all-participants" data-change-action="toggle-all-participants" aria-label="Select all participants"/><span class="cb-all-text">Select all</span></label></th>
+              <th data-pcol="participant"><span class="sr-only">Avatar</span></th>
+              <th scope="col" class="sortable" data-pcol="participant" data-action="sort-participants" data-col="name">Participant<span id="sort-name-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="email" data-action="sort-participants" data-col="email">Email<span id="sort-email-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="company" data-action="sort-participants" data-col="company">Company<span id="sort-company-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="title" data-action="sort-participants" data-col="title">Title<span id="sort-title-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="location" data-action="sort-participants" data-col="country">Location<span id="sort-country-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="source" data-action="sort-participants" data-col="source">Source<span id="sort-source-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="status" data-action="sort-participants" data-col="status">Status<span id="sort-status-icon"></span></th>
+              <th scope="col" data-pcol="score">Score</th>
+              <th scope="col" class="sortable" data-pcol="registered" data-action="sort-participants" data-col="registered">Registered<span id="sort-registered-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="approved" data-action="sort-participants" data-col="approved_at">Approved<span id="sort-approved_at-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="approver" data-action="sort-participants" data-col="approved_by">Approver<span id="sort-approved_by-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="invited" data-action="sort-participants" data-col="invited_at">Invited<span id="sort-invited_at-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="inviter" data-action="sort-participants" data-col="invited_by">Inviter<span id="sort-invited_by-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="role" data-action="sort-participants" data-col="role">Role<span id="sort-role-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="first_login" data-action="sort-participants" data-col="first_login">1st Login<span id="sort-first_login-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="last_active" data-action="sort-participants" data-col="last_login">Last active<span id="sort-last_login-icon"></span></th>
+              <th scope="col" class="sortable" data-pcol="events" data-action="sort-participants" data-col="competitions">Events<span id="sort-competitions-icon"></span></th>
+              <th data-pcol="tags">Tags</th>
+              <th data-pcol="groups">Groups</th>
+              <th data-pcol="actions">Actions</th>
+            </tr></thead>
+            <tbody id="admin-participants-body"></tbody>
+          </table>
+        </div>
+        <div id="participants-pagination" class="pagination"></div>
+        <div id="participants-selection-bar" class="selection-bar" style="display:none">
+          <span id="selection-count">0 selected</span>
+          <button class="btn sm" id="selection-bar-assign-btn">Assign to Events</button>
+          <button class="btn sm secondary" id="selection-bar-group-btn" data-action="bulk-add-to-group">Add to Group</button>
+          <button class="btn sm" id="selection-bar-approve-btn" data-action="bulk-approve-users">Approve</button>
+        </div>
+      </div>
+
+      <!-- Groups tab -->
+      <div id="admin-groups-tab" style="display:none">
+        <div class="admin-toolbar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <h2 style="margin:0">Participant Groups</h2>
+          <span data-help="groups.list" data-help-label="Groups"></span>
+          <span style="flex:1"></span>
+          <button class="btn sm" data-action="group-create">New Group</button>
+        </div>
+        <p class="settings-help" style="margin:0 0 12px">Groups organise participants for bulk operations. Binding a group to an event keeps that event's membership in sync as the group changes.</p>
+        <!--
+          v7.17.2 — the search box, the table shell and the pagination bar are
+          STATIC, and only #groups-tbody is re-rendered. That is what lets the
+          operator keep a half-typed search term across the re-render that
+          follows every create / rename / delete / member change: setSafeHtml on
+          the tbody never touches the input, so its value, caret and focus
+          survive for free. The chrome lives INSIDE #admin-groups-body so the
+          long-standing `#admin-groups-body table` selectors keep resolving.
+        -->
+        <div id="admin-groups-body">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+            <div class="search-wrap"><input id="groups-search" placeholder="Search groups..." aria-label="Search groups by name" data-input-action="groups-search"/><button class="search-clear hidden" id="groups-search-clear" data-action="groups-search-clear" aria-label="Clear groups search"><span aria-hidden="true">×</span> Clear</button></div><span id="groups-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="group" data-noun-plural="groups"></span>
+          </div>
+          <div class="table-wrap"><table class="data-table" data-tcols="groups"><thead><tr>
+            <th scope="col" class="sortable" data-action="groups-sort" data-col="name" tabindex="0" role="columnheader" aria-sort="none">Group<span id="groupssort-name-icon"></span></th>
+            <th scope="col" class="sortable" style="text-align:center" data-action="groups-sort" data-col="members" tabindex="0" role="columnheader" aria-sort="none">Members<span id="groupssort-members-icon"></span></th>
+            <th scope="col" class="sortable" style="text-align:center" data-action="groups-sort" data-col="comps" tabindex="0" role="columnheader" aria-sort="none">Events<span id="groupssort-comps-icon"></span></th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
+          </tr></thead><tbody id="groups-tbody"></tbody></table></div>
+          <div class="pagination" id="groups-pagination"></div>
+        </div>
+      </div>
+
+      <!-- Submissions tab -->
+      <div id="admin-submissions-tab" style="display:none">
+        <!-- v8.11.7 — THE PANE'S OWN HEADING. Two findings, one cause: the
+             admin route-focus mechanism (`_focusTarget`, ui/nav.js) queries
+             `h1,h2`, so a pane with neither dumped keyboard focus onto an
+             unnamed <div> on every tab switch; and the cards inside these
+             panes are <h3>, so with no h2 above them the document skipped a
+             level (axe `heading-order`). The GROUPS pane already carried one
+             — it is the house pattern, and these were the outliers. -->
+        <h2 class="admin-pane-title">Submissions</h2>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="search-wrap"><input id="submissions-search" placeholder="Search submissions..." aria-label="Search submissions" data-input-action="submissions-search"/><button class="search-clear hidden" id="submissions-search-clear" data-action="submissions-search-clear" aria-label="Clear submissions search"><span aria-hidden="true">×</span> Clear</button></div><span id="submissions-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="submission" data-noun-plural="submissions"></span>
+          <span data-help="activity.list" data-help-label="Activity"></span>
+        </div>
+        <div class="card table-card"><table class="dense" data-tcols="submissions">
+          <thead><tr>
+            <th scope="col" class="sortable" data-action="sort-submissions" data-col="time">Date &amp; Time<span id="sort-sub-time-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-submissions" data-col="participant">Participant<span id="sort-sub-participant-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-submissions" data-col="competition">Event<span id="sort-sub-competition-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-submissions" data-col="session">Session<span id="sort-sub-session-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-submissions" data-col="task">Challenge<span id="sort-sub-task-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-submissions" data-col="event">Activity<span id="sort-sub-event-icon"></span></th>
+            <th scope="col">Detail</th>
+            <th scope="col" class="sortable num-cell" data-action="sort-submissions" data-col="points">&#916; pts<span id="sort-sub-points-icon"></span></th>
+          </tr></thead>
+          <tbody id="admin-submissions-body"></tbody>
+        </table></div>
+        <div id="submissions-pagination" class="pagination"></div>
+      </div>
+
+      <!-- Audit tab (features/audit-admin.js, GET /api/admin/audit). The filter
+           controls are SIBLINGS of #admin-audit-body, which the loader re-renders;
+           the shared table-cards observer turns the table into cards on phones. -->
+      <div id="admin-audit-tab" style="display:none">
+        <h2 class="admin-pane-title">Audit</h2>
+        <div class="filters audit-views" role="group" aria-label="Audit view">
+          <button type="button" class="filter-btn active" id="audit-view-trail" data-action="audit-view" data-view="trail" aria-pressed="true">Audit trail</button>
+          <button type="button" class="filter-btn" id="audit-view-raw" data-action="audit-view" data-view="raw" aria-pressed="false">Raw logs</button>
+          <span id="audit-view-raw-tip" data-help="audit.raw" data-help-label="Raw logs"></span>
+        </div>
+        <div class="audit-type-row">
+          <div class="filters" id="audit-type-filters" role="group" aria-label="Record types">
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="event" aria-pressed="false">Events</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="session" aria-pressed="false">Sessions</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="person" aria-pressed="false">People</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="challenge_version" aria-pressed="false">Challenge versions</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="submission" aria-pressed="false">Submissions</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="hint" aria-pressed="false">Hints</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="log_event" aria-pressed="false">Log events</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="setting" aria-pressed="false">Settings</button>
+          </div>
+          <span data-help="audit.types" data-help-label="Record types"></span>
+        </div>
+        <div class="audit-filterbar">
+          <div class="search-wrap"><input id="audit-search" placeholder="Search activity, actor or subject..." aria-label="Search audit records" data-input-action="audit-search" autocomplete="off"/><button class="search-clear hidden" id="audit-search-clear" data-action="audit-search-clear" aria-label="Clear audit search"><span aria-hidden="true">×</span> Clear</button></div>
+          <label class="audit-field">Actor <input id="audit-actor" placeholder="Email or id" data-change-action="audit-filter" autocomplete="off"/></label>
+          <label class="audit-field">Event <select id="audit-event" data-change-action="audit-filter"><option value="">All events</option></select></label>
+          <label class="audit-field">From <input id="audit-from" type="date" data-change-action="audit-filter"/></label>
+          <label class="audit-field">To <input id="audit-to" type="date" data-change-action="audit-filter"/></label>
+          <label class="audit-field">Outcome <select id="audit-outcome" data-change-action="audit-filter"><option value="">Any</option><option value="success">Success</option><option value="failure">Failure</option><option value="unknown">Unknown</option><option value="correct">Correct</option><option value="wrong">Wrong</option></select></label>
+          <span data-help="audit.filters" data-help-label="Audit filters"></span>
+          <button type="button" class="btn sm secondary" data-action="audit-clear-filters">Clear filters</button>
+          <button type="button" class="btn sm secondary" id="audit-export" data-action="audit-export" disabled>Export this page (CSV)</button>
+        </div>
+        <p id="audit-count" class="list-count" role="status" aria-live="polite" aria-atomic="true"></p>
+        <div class="card table-card"><table class="dense audit-table" data-tcols="audit">
+          <thead><tr>
+            <th scope="col">When</th>
+            <th scope="col">Type</th>
+            <th scope="col">Activity</th>
+            <th scope="col">Actor</th>
+            <th scope="col">Subject</th>
+            <th scope="col">Event</th>
+            <th scope="col">Outcome</th>
+            <th scope="col"><span class="sr-only">Details</span></th>
+          </tr></thead>
+          <tbody id="admin-audit-body"></tbody>
+        </table></div>
+        <!-- THE RAW LOGS PAGER (features/audit-admin.js _paintPager): the bar is
+             written by paginationHtml; the page box is mounted once, here, as
+             paginationHtml's stateless-controls rule requires. -->
+        <div id="audit-pagination" class="pagination">
+          <span id="audit-pagination-bar" class="pagination-bar"></span>
+          <span id="audit-page-jump" class="page-jump" hidden>
+            <label for="audit-page-input">Go to page</label>
+            <input id="audit-page-input" type="text" inputmode="numeric" autocomplete="off" data-change-action="audit-page-goto" aria-describedby="audit-page-jump-note"/>
+            <button data-action="audit-page-goto">Go</button>
+            <span id="audit-page-jump-note" class="page-jump-note"></span>
+          </span>
+          <span data-help="audit.paging" data-help-label="Paging and export"></span>
+        </div>
+      </div>
+
+      <!-- Logs tab -->
+      <div id="admin-logs-tab" style="display:none">
+        <!-- v8.11.7 — THE PANE'S OWN HEADING. Two findings, one cause: the
+             admin route-focus mechanism (`_focusTarget`, ui/nav.js) queries
+             `h1,h2`, so a pane with neither dumped keyboard focus onto an
+             unnamed <div> on every tab switch; and the cards inside these
+             panes are <h3>, so with no h2 above them the document skipped a
+             level (axe `heading-order`). The GROUPS pane already carried one
+             — it is the house pattern, and these were the outliers. -->
+        <h2 class="admin-pane-title">Audit</h2>
+        <!-- RAW LOGS IS THE AUDIT PAGE'S SECOND VIEW (features/audit-admin.js
+             auditSetView): the same switch as the trail's, Raw logs pressed, so
+             the page reads as one and the trail is one press away. -->
+        <div class="filters audit-views" role="group" aria-label="Audit view">
+          <button type="button" class="filter-btn" id="logs-view-trail" data-action="audit-view" data-view="trail" aria-pressed="false">Audit trail</button>
+          <button type="button" class="filter-btn active" id="logs-view-raw" data-action="audit-view" data-view="raw" aria-pressed="true">Raw logs</button>
+          <span data-help="audit.raw" data-help-label="Raw logs"></span>
+        </div>
+        <div class="logs-toolbar">
+          <div class="search-wrap"><input id="logs-search" placeholder="Search logs..." aria-label="Search logs" data-input-action="logs-search"/><button class="search-clear hidden" id="logs-search-clear" data-action="logs-search-clear" aria-label="Clear logs search"><span aria-hidden="true">×</span> Clear</button></div><span id="logs-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="entry" data-noun-plural="entries"></span>
+        </div>
+        <div class="logs-filters-row">
+          <div class="filters logs-stream-filters">
+            <button class="filter-btn active" id="logs-stream-app" data-action="logs-set-stream" data-stream="app">Audit log</button>
+            <button class="filter-btn" id="logs-stream-access" data-action="logs-set-stream" data-stream="access">Request log</button>
+          </div>
+          <span data-help="logs.streams" data-help-label="Log streams"></span>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-caption);color:var(--muted)">Group
+            <select id="logs-group-filter" data-change-action="logs-set-group" style="min-width:140px"><option value="">All</option></select>
+          </label>
+          <span id="logs-range-hint" class="logs-range-hint"></span>
+        </div>
+        <div class="card table-card"><table class="dense" data-tcols="logs">
+          <colgroup id="logs-colgroup"></colgroup>
+          <thead id="logs-thead"></thead>
+          <tbody id="logs-body"></tbody>
+        </table></div>
+        <div id="logs-pagination" class="pagination">
+          <span id="logs-pagination-bar" class="pagination-bar"></span>
+          <span id="logs-page-jump" class="page-jump" hidden>
+            <label for="logs-page-input">Go to page</label>
+            <input id="logs-page-input" type="text" inputmode="numeric" autocomplete="off" data-change-action="logs-page-goto" aria-describedby="logs-page-jump-note"/>
+            <button data-action="logs-page-goto">Go</button>
+            <span id="logs-page-jump-note" class="page-jump-note"></span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Settings tab -->
+      <div id="admin-settings-tab" style="display:none">
+        <!-- v8.11.7 — THE PANE'S OWN HEADING. Two findings, one cause: the
+             admin route-focus mechanism (`_focusTarget`, ui/nav.js) queries
+             `h1,h2`, so a pane with neither dumped keyboard focus onto an
+             unnamed <div> on every tab switch; and the cards inside these
+             panes are <h3>, so with no h2 above them the document skipped a
+             level (axe `heading-order`). The GROUPS pane already carried one
+             — it is the house pattern, and these were the outliers. -->
+        <h2 class="admin-pane-title">Settings</h2>
+        <!-- TWO PANES (settings-admin.js installSettingsShell): the section list
+             on the left (a <select> on phones), the chosen section on the right.
+             The list is BUILT FROM THE MARKUP: every .settings-section below is
+             listed, in order, while it holds a card that is not display:none, so
+             a card added to a section renders with no list edit. A
+             .settings-card dropped straight into .settings-bento (outside any
+             section) is adopted into the section its data-settings-section
+             names, else Platform. The chosen section is remembered per browser
+             (localStorage "ha:settings-section"). Every card keeps its id,
+             data-action and loader. -->
+        <div class="settings-shell">
+          <nav class="settings-nav" aria-label="Settings sections">
+            <label class="settings-pick-label" for="settings-section-pick">Section</label>
+            <select id="settings-section-pick" class="settings-section-pick" data-change-action="settings-section-pick" autocomplete="off"></select>
+            <ul id="settings-section-list" class="settings-section-list"></ul>
+          </nav>
+          <div class="settings-bento">
+            <!-- v8.3.33 — the pane's own failure state. Every other admin pane
+                 renders one; this was the only loader that failed with a toast
+                 alone. Hidden until loadAdminSettings has something to say. It
+                 sits above every section, so it shows whichever is chosen. -->
+            <div id="settings-load-failure" class="card settings-card" style="display:none"></div>
+
+            <div class="settings-section" data-settings-section="platform" data-settings-label="Platform">
+              <div class="card settings-card" id="platform-name-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Platform name</h3><span data-help="settings.platform-name" data-help-label="Platform name"></span></div>
+                <!-- v7.26.0 — the card says what the name reaches; maxlength
+                     matches the server's and swagger's 120. -->
+                <p class="settings-help">Shown in the header, in every email subject and as the <strong>sender name</strong> on all outbound email.</p>
+                <div class="settings-row">
+                  <label for="settings-platform-name">Platform Name</label>
+                  <input type="text" id="settings-platform-name" placeholder="e.g. HackArena" maxlength="120"/>
+                  <button class="btn" data-action="save-platform-name">Save Name</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="look" data-settings-label="Look &amp; appearance">
+              <!-- THE PLATFORM LOOK (superadmin): filled by features/look-admin.js
+                   renderPlatformLookCard from GET /api/admin/settings. -->
+              <div class="card settings-card" id="platform-look-card" style="display:none"></div>
+            </div>
+
+            <div class="settings-section" data-settings-section="accounts" data-settings-label="Sign-in &amp; accounts">
+              <div class="card settings-card" id="account-approval-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">New accounts</h3><span data-help="settings.approval" data-help-label="New accounts"></span></div>
+                <p class="settings-help">A new account is made once its owner confirms the address with an emailed code. Hold new accounts for approval, or let them play straight away.</p>
+                <div class="settings-row settings-row-check">
+                  <label class="checkbox-row">
+                    <input type="checkbox" id="settings-require-approval" data-change-action="save-require-approval"/>
+                    <span>Require admin approval for new accounts</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="email" data-settings-label="Email">
+              <div class="card settings-card" id="email-test-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Outbound email</h3><span data-help="settings.test-email" data-help-label="Outbound email"></span></div>
+                <p class="settings-help" id="email-relay-status" role="status">Checking the mail relay…</p>
+                <div class="settings-row">
+                  <label for="settings-test-email-to">Send a test to</label>
+                  <input type="email" id="settings-test-email-to" placeholder="you@company.com" autocomplete="off" maxlength="254"/>
+                  <button class="btn secondary" data-action="send-test-email">Send test email</button>
+                </div>
+              </div>
+              <div class="card settings-card" id="unsubscribe-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Unsubscribe List</h3><span data-help="settings.unsubscribe" data-help-label="Unsubscribe list"></span></div>
+                <p class="settings-help">People who opted out of bulk email. Transactional email still reaches them.</p>
+                <!-- v7.20.7 — static search, so the term survives the re-render
+                     that follows every Remove. -->
+                <div class="search-wrap"><input id="unsub-search" placeholder="Search addresses..." aria-label="Search unsubscribed addresses" data-input-action="unsub-search"/><button class="search-clear hidden" id="unsub-search-clear" data-action="unsub-search-clear" aria-label="Clear unsubscribed search"><span aria-hidden="true">×</span> Clear</button></div>
+                <div id="unsubscribe-list-body" class="settings-scroll"></div>
+              </div>
+              <!-- Event team reports — the domains a team member's address may be at
+                   (features/event-team.js loads it; superadmin edits, global admins read). -->
+              <div class="card settings-card" id="team-domains-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Event team report domains</h3><span data-help="settings.team-domains" data-help-label="Event team report domains"></span></div>
+                <p class="settings-help">Event team reports (lead lists, scorecards) go only to addresses at these domains. One per line, for example company.com; a subdomain counts.</p>
+                <textarea id="team-domains-input" rows="4" maxlength="4000" aria-label="Allowed domains, one per line"></textarea>
+                <div class="settings-row"><button class="btn secondary" id="team-domains-save" data-action="team-domains-save">Save domains</button><span id="team-domains-note" class="settings-help" role="status"></span></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="certificates" data-settings-label="Certificates design">
+              <!-- The platform certificate design. Events inherit it and may
+                   override it from their workspace's Certificates tab. -->
+              <div class="card settings-card cert-wiz-card" id="cert-config-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Certificate design</h3><span data-help="settings.certificates" data-help-label="Certificate design"></span></div>
+                <p class="settings-help">The wording, colours and parts of every certificate the platform issues.</p>
+                <div id="cert-config-body"></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="cxone" data-settings-label="Checkmarx One">
+              <div class="card settings-card" id="cxone-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Global Default CheckmarxOne Integration</h3><span data-help="settings.cxone" data-help-label="Checkmarx One integration"></span></div>
+                <p class="settings-help">Used by every event without its own Checkmarx One settings.</p>
+                <div id="cxone-status" class="settings-status"></div>
+                <div class="settings-row">
+                  <label for="cxone-api-key">API Key</label>
+                  <input type="password" id="cxone-api-key" placeholder="Paste API key" autocomplete="off" data-block-clipboard="1" aria-describedby="cxone-api-key-hint"/>
+                  <span data-help="settings.cxone-key" data-help-label="API key"></span>
+                  <p class="settings-hint" id="cxone-api-key-hint">Tenant and URLs are derived automatically from the key.</p>
+                </div>
+                <div class="settings-row">
+                  <label for="cxone-group-name">Read-Only Group Name</label>
+                  <input type="text" id="cxone-group-name" placeholder="e.g. VisibleToAll"/>
+                  <span data-help="settings.cxone-group" data-help-label="Read-only group"></span>
+                </div>
+                <div class="settings-actions">
+                  <button class="btn" data-action="save-cxone-settings">Save Integration</button>
+                  <button class="btn danger sm" id="cxone-remove-btn" style="display:none" data-action="remove-cxone-settings">Remove</button>
+                </div>
+              </div>
+              <!-- v8.12.7 — Checkmarx One account removals. Superadmin-only, and
+                   hidden too while Checkmarx One is not in use and nothing is
+                   listed. The heading is focusable (-1) so the header banner's
+                   "Review removals" can land on it. -->
+              <div class="card settings-card cxone-wd-card" id="cxone-withdrawals-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading" id="cxone-withdrawals-heading" tabindex="-1">Checkmarx One account removals</h3><span data-help="settings.cxone-removals" data-help-label="Account removals"></span></div>
+                <p class="settings-help">Accounts the platform created for deleted participants that it could not remove, or will not remove without your say-so.</p>
+                <div id="cxone-withdrawals-body"></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="data" data-settings-label="Data &amp; retention">
+              <div class="card settings-card" id="retention-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Event history retention</h3><span data-help="settings.retention" data-help-label="Event history retention"></span></div>
+                <div id="retention-body"></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="alerts" data-settings-label="Alerts">
+              <div class="card settings-card" id="alerts-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Blocked-address alerts</h3><span data-help="settings.alerts" data-help-label="Blocked-address alerts"></span></div>
+                <div id="alerts-body"></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="breakglass" data-settings-label="Break-glass">
+              <!-- The break-glass account's own card: rendered only in that
+                   session (the server refuses every other one, user-backed
+                   superadmins too), so the section is listed only then. -->
+              <div class="card settings-card" id="breakglass-account-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Break-glass account</h3><span data-help="settings.breakglass" data-help-label="Break-glass account"></span></div>
+                <p class="settings-help">The one account that signs in with a password instead of an emailed code.</p>
+                <div class="settings-row">
+                  <label for="settings-breakglass-username">Username</label>
+                  <input type="text" id="settings-breakglass-username" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="settings-breakglass-hint"/>
+                  <button class="btn" data-action="save-breakglass-username">Save username</button>
+                  <p class="settings-hint" id="settings-breakglass-hint">3 to 64 characters, no spaces and no @. It may not be any account's email address.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rankings tab -->
+      <!-- RBAC — Users & roles (public/js/features/users-admin.js): the accounts
+           that run the platform and the roles they hold. The body is rendered. -->
+      <div id="admin-users-tab" class="admin-tab-pane" style="display:none">
+        <div class="ua-head">
+          <div class="help-label-row"><h2 class="admin-pane-title" tabindex="-1">Users &amp; roles</h2><span data-help="users.pane" data-help-label="Users and roles"></span></div>
+          <p class="t-small">The people who run events and the platform, and what each role may do. Participants are under People.</p>
+        </div>
+        <div id="ua-body"></div>
+      </div>
+      <div id="admin-rankings-tab" style="display:none">
+        <!-- v8.11.7 — THE PANE'S OWN HEADING. Two findings, one cause: the
+             admin route-focus mechanism (`_focusTarget`, ui/nav.js) queries
+             `h1,h2`, so a pane with neither dumped keyboard focus onto an
+             unnamed <div> on every tab switch; and the cards inside these
+             panes are <h3>, so with no h2 above them the document skipped a
+             level (axe `heading-order`). The GROUPS pane already carried one
+             — it is the house pattern, and these were the outliers. -->
+        <h2 class="admin-pane-title">Rankings</h2>
+        <!-- v7.22.0 — the rankings search. It MUST stay a SIBLING of
+             #admin-rankings-content, never a child: every loader in
+             rankings-admin.js replaces that container's innerHTML, and an input
+             inside it would be destroyed mid-type — the v7.20.10 swallowed-
+             keystroke / jumping-caret defect. As a sibling its value, caret and
+             focus survive every re-render for free. -->
+        <div class="controls-row" id="rankings-search-wrap" style="display:none">
+          <div class="search-wrap"><input id="rankings-search" placeholder="Search rankings..." aria-label="Search rankings by nickname, name, company or email" data-input-action="rankings-search" autocomplete="off"/><button class="search-clear hidden" id="rankings-search-clear" data-action="rankings-search-clear" aria-label="Clear rankings search"><span aria-hidden="true">×</span> Clear</button></div><span id="rankings-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="participant" data-noun-plural="participants"></span>
+          <!-- v8.11.0 — the presenter's view. A SIBLING of #admin-rankings-content
+               for the same reason the search box is: every loader replaces that
+               container, and a checkbox inside it would be destroyed and re-made
+               on every 15-second refresh, losing focus mid-keyboard-use.
+               .checkbox-row, not a hand-rolled flex label — the global
+               `input{width:100%}` rule stretches a bare checkbox across the
+               column and detaches it from its words (the v8.10.0 defect).
+               `autocomplete="off"` carries the reason the search box beside it
+               has it: a browser may RESTORE form-control state across a reload or
+               a back-forward navigation, and this mode deliberately does not
+               persist — so without it the box could come back ticked over a full
+               board, a control lying about what it is showing. DECLARED AS
+               UNLOCKED: measured, removing it leaves the whole spec green on this
+               Chromium, so no test holds it. It stays because the restoration is
+               real on other paths and the sibling control already assumes it. -->
+          <label class="checkbox-row rankings-anon-toggle" for="rankings-hide-identity">
+            <input type="checkbox" id="rankings-hide-identity" data-change-action="rankings-hide-identity" aria-describedby="rankings-hide-identity-note" autocomplete="off"/>
+            <span>Hide company &amp; email</span>
+          </label>
+          <span id="rankings-hide-identity-note" class="settings-help rankings-anon-note">For sharing your screen — the CSV export still includes both columns.</span>
+          <span data-help="rankings.board" data-help-label="How rankings work"></span>
+        </div>
+        <div id="admin-rankings-picker" style="display:none">
+          <h3 class="rankings-picker-heading">Select a Live Event</h3>
+          <div class="task-grid" id="admin-rankings-comp-grid"></div>
+        </div>
+        <!-- The top three's certificates, inside an event workspace only
+             (rankings-admin.js _rkRenderTopCerts). Static so a board re-render
+             never replaces it while an admin is downloading. -->
+        <section id="admin-rankings-certs" class="rk-certs card" aria-labelledby="rk-certs-title" hidden></section>
+        <div id="admin-rankings-content" style="display:none">
+          <div class="card rankings-table-card">
+            <div class="rankings-section-header">
+              <h3 id="admin-rankings-title">Live Rankings</h3>
+              <!-- v7.28.0 — the Export button ships in the STATIC header too, not
+                   just the dynamic one loadAdminLeaderboard emits. That block is
+                   guarded on `#admin-rankings-body` being ABSENT, and this markup
+                   supplies it — so on a first entry into Rankings with a
+                   competition focused the guard is false and the header the admin
+                   sees is this one. A button only in the dynamic header would be
+                   missing exactly when the tab is opened. -->
+              <div class="rankings-header-actions">
+                <button class="btn sm secondary" data-action="leaderboard-refresh">Refresh</button>
+                <button type="button" class="btn sm secondary rk-export-btn" data-action="rankings-export-csv" data-board-key="main" title="Download this leaderboard as a CSV file" aria-label="Export CSV of this leaderboard">Export CSV</button>
+              </div>
+            </div>
+            <table class="dense" data-tcols="rankings">
+              <!-- v7.15.0 — fallback markup only. loadAdminLeaderboard() replaces
+                   this whole card with rankingsThead('main'), which emits the
+                   sortable header; kept in sync so the pre-render frame has the
+                   same shape. v7.22.0 added the four identity columns, so this
+                   is now NINE — it is the fifth place a rankings column lives
+                   (the other four are rankingsThead's call sites), and the only
+                   one no helper keeps honest. A Docs-hygiene lock diffs it
+                   against _RK_COLS so it cannot drift again. -->
+              <thead><tr data-rk-cols="9">
+                <th scope="col" class="sortable" data-action="sort-rankings" data-key="main" data-col="place">#<span id="rksort-main-place-icon"></span></th>
+                <th scope="col" class="sortable" data-action="sort-rankings" data-key="main" data-col="player">Player<span id="rksort-main-player-icon"></span></th>
+                <th scope="col" class="sortable" data-action="sort-rankings" data-key="main" data-col="first">First Name<span id="rksort-main-first-icon"></span></th>
+                <th scope="col" class="sortable" data-action="sort-rankings" data-key="main" data-col="last">Last Name<span id="rksort-main-last-icon"></span></th>
+                <th scope="col" class="sortable" data-action="sort-rankings" data-key="main" data-col="company">Company<span id="rksort-main-company-icon"></span></th>
+                <th scope="col" class="sortable" data-action="sort-rankings" data-key="main" data-col="email">Email<span id="rksort-main-email-icon"></span></th>
+                <th scope="col" class="sortable" data-action="sort-rankings" data-key="main" data-col="score">Score<span id="rksort-main-score-icon"></span></th>
+                <th scope="col" class="sortable" data-action="sort-rankings" data-key="main" data-col="time">Time to Solve<span id="rksort-main-time-icon"></span></th>
+                <th scope="col" class="sortable lb-solved-col" data-action="sort-rankings" data-key="main" data-col="solved">All Solved<span id="rksort-main-solved-icon"></span></th>
+              </tr></thead>
+              <tbody id="admin-rankings-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics tab -->
+      <div id="admin-analytics-tab" style="display:none">
+        <!-- v8.11.7 — THE PANE'S OWN HEADING. Two findings, one cause: the
+             admin route-focus mechanism (`_focusTarget`, ui/nav.js) queries
+             `h1,h2`, so a pane with neither dumped keyboard focus onto an
+             unnamed <div> on every tab switch; and the cards inside these
+             panes are <h3>, so with no h2 above them the document skipped a
+             level (axe `heading-order`). The GROUPS pane already carried one
+             — it is the house pattern, and these were the outliers. -->
+        <h2 class="admin-pane-title">Analytics</h2>
+        <div class="card" id="analytics-filterbar"></div>
+        <div class="analytics-summary" id="analytics-summary"></div>
+        <div class="card" id="analytics-table-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div class="help-label-row"><h3 style="margin:0">Per-challenge breakdown</h3><span data-help="analytics.columns" data-help-label="Breakdown columns"></span></div>
+            <span id="analytics-table-meta" style="font-size:var(--fs-caption);color:var(--muted)"></span>
+            <!-- v7.20.7 — static chrome, so a half-typed query survives the
+                 re-render every filter change triggers. -->
+            <div class="search-wrap" style="margin-left:auto"><input id="analytics-search" placeholder="Search challenges..." aria-label="Search analytics rows by challenge number, title, difficulty or tag" data-input-action="analytics-search"/><button class="search-clear hidden" id="analytics-search-clear" data-action="analytics-search-clear" aria-label="Clear analytics search"><span aria-hidden="true">×</span> Clear</button></div>
+            <!-- v7.24.0 — exports the whole FILTERED set (not the page on
+                 screen), in the order the table is showing. Static chrome for
+                 the same reason as the search box beside it. -->
+            <button class="btn sm secondary" id="analytics-export-csv-btn" data-action="analytics-export-csv">Export CSV</button>
+          </div>
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch" tabindex="0" role="region" aria-label="Per-challenge breakdown table">
+            <table id="analytics-table" class="dense" data-tcols="analytics">
+              <thead>
+                <tr>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="task_number" style="cursor:pointer">#</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="title" style="cursor:pointer">Title</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="difficulty" style="cursor:pointer">Difficulty</th>
+                  <th>Tags</th>
+                  <th scope="col" style="min-width:160px">Breakdown</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="total" style="cursor:pointer;text-align:right">Total Activity</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="solved" style="cursor:pointer;text-align:right">Solved</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="incorrect" style="cursor:pointer;text-align:right">Incorrect</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="hint_revealed" style="cursor:pointer;text-align:right">Hints</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="navigated_away" style="cursor:pointer;text-align:right">Nav-away</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="unique_attempters" style="cursor:pointer;text-align:right">Unique Attempters</th>
+                  <th scope="col" class="sortable" aria-sort="none" data-sort="solve_rate" style="cursor:pointer;text-align:right">Solve rate</th>
+                </tr>
+              </thead>
+              <tbody id="analytics-table-body"></tbody>
+            </table>
+          <div class="pagination" id="analytics-pagination"></div>
+          </div>
+          <p id="analytics-empty" style="display:none;color:var(--muted);text-align:center;padding:24px 0">No challenge activity in the selected window.</p>
+        </div>
+      </div>
+      </div><!-- /.admin-content -->
+    </div>
+  </main>
+  <footer id="app-footer">
+    <div class="footer-logo"><img class="logo-dark" src="/checkmarx-logo-white.svg" alt="Checkmarx"/><img class="logo-light" src="/checkmarx-logo-blue.svg" alt="Checkmarx"/></div>
+    <div class="footer-copy">&copy; 2026 Checkmarx Ltd. All Rights Reserved.</div>
+    <div class="footer-social">
+      <a href="https://www.linkedin.com/company/checkmarx" target="_blank" rel="noopener" title="LinkedIn">
+        <svg viewBox="0 0 24 24"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.37V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.46C23.21 24 24 23.23 24 22.28V1.72C24 .77 23.21 0 22.23 0z"/></svg>
+      </a>
+      <a href="https://x.com/checkmarx" target="_blank" rel="noopener" title="X / Twitter">
+        <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      </a>
+      <a href="https://www.facebook.com/Checkmarx.Source.Code.Analysis/" target="_blank" rel="noopener" title="Facebook">
+        <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      </a>
+      <a href="https://www.youtube.com/checkmarx" target="_blank" rel="noopener" title="YouTube">
+        <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+      </a>
+    </div>
+  </footer>
+</div>
+
+<div id="loading-overlay"><div class="spinner"></div></div>
+<div id="modal-overlay">
+  <div class="card" id="modal-box">
+    <h3 class="modal-title" id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="modal-cancel-btn"></button>
+      <button class="btn" id="modal-confirm-btn"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Help drawer — populated by features/help-drawer.js when Help is opened. -->
+<div id="help-drawer-overlay" hidden></div>
+
+<!-- v7.0.0 — the SPA is now ES modules. <script type="module"> is deferred by
+     spec (executes after parse, in order), so the body DOM is parsed + painted
+     before main.js boot() runs. DEV serves the public/js/** modules raw (browser
+     resolves the import graph; 1:1 breakpoints); PROD serves one esbuild-bundled,
+     content-hashed /js/core/main.js (sub-modules inlined — zero extra requests). -->
+<script type="module" src="/js/core/main.js"></script>
+</body>
+</html>

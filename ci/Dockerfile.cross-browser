@@ -1,0 +1,211 @@
+# Pre-baked CI image for the three test jobs in .github/workflows/checkmarx.yml
+# (cross-browser-tests, full-suite-tests, capture-suite).
+#
+# WHY: those jobs run on a hardened (StepSecurity Harden-Runner)
+# self-hosted runner whose egress allowlist is ~github.com only. registry.npmjs.org
+# is NOT reachable (DNS dropped) — verified in CI — so `npm ci` cannot run there at
+# job time. The Playwright browsers + OS deps are already in the MCR base image; the
+# only missing piece is the project's node_modules. We install them HERE, at image
+# build time (on a machine that *does* have registry access), and bake them in.
+#
+# Built on the exact MCR Playwright image the jobs use, so the browsers match
+# @playwright/test (the LAST RUN below fails the build when they do not), and
+# with production's Node major installed below, so the native addons load for the
+# ABI production runs (both ship prebuilds; see the toolchain note further down).
+# Rebuild + push whenever ANY of package-lock.json, the Playwright version or
+# production's Node major (ARG NODE_MAJOR below) changes — ci/README.md "When +
+# how to rebuild" lists the three.
+FROM mcr.microsoft.com/playwright:v1.65.1-noble
+
+# ── v7.15.28 — run the SAME Node major as production ──────────────────────────
+# The Playwright base image ships whatever Node Microsoft chose (26 from
+# v1.65.0-noble on, 24 up to v1.64.1). Production runs `node:26-alpine` (see the
+# app Dockerfile) and developers run 26; while the base shipped 24, CI was the
+# only environment validating a version nobody ships, and the baked native
+# addons (better-sqlite3, bcrypt) were compiled for an ABI production never
+# uses. The step below keeps the major tied to production whatever the base
+# ships, and takes that major's newest release.
+#
+# NODE_MAJOR must equal the major in the app Dockerfile's
+# `FROM node:<major>-alpine`. A test ("v7.15.28: the CI image's Node major is in
+# lockstep with production's", in tests/functional-core-b.api.spec.js) fails if
+# the two drift, so this cannot silently fall behind a production bump.
+ARG NODE_MAJOR=26
+RUN set -eux; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "$ARCH" in \
+      amd64) NODE_ARCH=x64 ;; \
+      arm64) NODE_ARCH=arm64 ;; \
+      *) echo "unsupported arch $ARCH" >&2; exit 1 ;; \
+    esac; \
+    VER="$(curl -fsSL https://nodejs.org/dist/index.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const m=JSON.parse(s).find(r=>r.version.startsWith('v'+process.argv[1]+'.'));if(!m){console.error('no Node release found');process.exit(1);}process.stdout.write(m.version);})" "$NODE_MAJOR")"; \
+    echo "installing Node $VER (major $NODE_MAJOR, matching production)"; \
+    curl -fsSL "https://nodejs.org/dist/$VER/node-$VER-linux-$NODE_ARCH.tar.gz" -o /tmp/node.tar.gz; \
+    # .tar.gz, not .tar.xz: the Playwright base image has no xz binary and
+    # tar fails with an opaque "Child returned status 2".
+    tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 --no-same-owner; \
+    rm /tmp/node.tar.gz; \
+    node --version; \
+    test "$(node -p 'process.versions.node.split(".")[0]')" = "$NODE_MAJOR"
+
+# Native-addon toolchain. As of better-sqlite3 v13 (N-API refactor) BOTH native
+# deps ship prebuilds in-package — better-sqlite3 under `prebuilds/`, bcrypt via
+# node-gyp-build — so on linux-x64 neither normally compiles. The toolchain is
+# kept anyway because each can still fall back to building from source when no
+# prebuild matches the platform (better-sqlite3 ships a binding.gyp, so npm
+# synthesises an implicit `install: node-gyp rebuild` for it — hence its
+# allowScripts entry), and we have network + apt HERE at build time (unlike the
+# locked-down job) but would have neither if that fallback fired at job time.
+# Build-time cost only; nothing needs compiling on the happy path.
+# Versions pinned to noble's (24.04) upstream releases by apt's version glob, so a
+# noble-updates security revision of the same release still installs while a
+# different toolchain cannot arrive silently (KICS "Apt Get Install Pin Version
+# Not Defined"). Measured in the v1.65.1-noble base: make 4.3-4.1build2,
+# g++ 4:13.2.0-7ubuntu1, python3 3.12.3-0ubuntu2.1. A base on another Ubuntu
+# release fails this line by name: re-read `apt-cache policy make g++ python3`.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends 'make=4.3-*' 'g++=4:13.2.0-*' 'python3=3.12.3-*' \
+ && rm -rf /var/lib/apt/lists/*
+
+# Bake deps at a NON-workspace path: a `container:` job mounts the workspace
+# (/__w/...), which would shadow a node_modules baked there. The job symlinks
+# /ci-deps/node_modules into the workspace after checkout.
+WORKDIR /ci-deps
+COPY package.json package-lock.json ./
+
+# Full `npm ci` (scripts enabled) — registry + toolchain are available on the
+# builder, so better-sqlite3 picks its prebuild for this image's Node ABI (or,
+# with no matching prebuild, builds one) and bcrypt + @playwright/test install
+# normally. Record the lockfile hash so the job can detect drift.
+#
+# The two checks at the end of this RUN prove LESS than they look like they do,
+# and the next RUN is what actually proves the image works. better-sqlite3 13
+# opens its native addon lazily, on the first `new Database`, so the bare
+# require() loads no native code at all (measured: no .node file in
+# require.cache until a database is opened); and `cli.js --version` launches no
+# browser, so a base whose browser builds do not match this playwright-core
+# passes it. They are left exactly as they are on purpose: a RUN's text is part
+# of its cache key, so editing this one would rebuild the ~63 MB npm-ci layer,
+# and re-uploading that layer from a slow uplink costs hours.
+RUN npm ci --no-audit --no-fund \
+ && sha256sum package-lock.json | awk '{print $1}' > /ci-deps/.lock-hash \
+ && node -e "require('/ci-deps/node_modules/better-sqlite3'); console.log('better-sqlite3 loads OK (ABI ' + process.versions.modules + ')')" \
+ && node /ci-deps/node_modules/@playwright/test/cli.js --version
+
+# ── v8.13.4 — the image is checked by USING it, before anything is pushed ─────
+# Three proofs, each of a thing the RUN above only appears to check:
+#   (i)   better-sqlite3 opens a database and answers a query, which is what
+#         loads its native addon for this Node ABI;
+#   (ii)  bcrypt hashes and compares, both answers, at the minimum cost;
+#   (iii) every browser playwright-core's own browsers.json installs by default
+#         (chromium, its headless shell, firefox, webkit, ffmpeg) is present
+#         under $PLAYWRIGHT_BROWSERS_PATH at exactly the revision this
+#         playwright-core drives, and chromium (headless shell and full build),
+#         firefox and webkit each launch and report the version browsers.json
+#         names.
+# (iii) is the one that matters: a rebuild on the OLD base passes every other
+# guard (the lockfile hash, the Node major, `--version`) and the mismatch would
+# otherwise surface only in CI, as "Executable doesn't exist", after a base
+# upload measured in hours. Here it fails the BUILD, naming the FROM tag to use.
+#
+# A RUN of its own, not more `&&` on the npm-ci RUN: it adds one small layer
+# (the font and media caches the browsers write on first launch, which CI's
+# first launch would write anyway) on top of the cached ones, so every layer
+# below it — the ~1 GB base included — is reused byte for byte.
+RUN node <<'CHECK'
+const fs = require("fs"), path = require("path");
+const NM = "/ci-deps/node_modules";
+const fail = (m) => { console.error("CI image check FAILED: " + m); process.exit(1); };
+
+// (i) A database, not a require: the addon loads on the first Database.
+const Database = require(NM + "/better-sqlite3");
+const db = new Database(":memory:");
+const row = db.prepare("SELECT sqlite_version() AS v, 6 * 7 AS n").get();
+db.close();
+if (!row || row.n !== 42) fail("better-sqlite3 answered " + JSON.stringify(row));
+console.log("better-sqlite3 OK: SQLite " + row.v + ", Node " + process.version + ", ABI " + process.versions.modules);
+
+// (ii) bcrypt: a real hash and both answers of a compare.
+const bcrypt = require(NM + "/bcrypt");
+const hash = bcrypt.hashSync("ci-image-check", 4);
+if (!bcrypt.compareSync("ci-image-check", hash) || bcrypt.compareSync("not-it", hash)) fail("bcrypt hash/compare");
+console.log("bcrypt OK");
+
+// (iii) The base's browsers are the ones THIS playwright-core drives.
+const PC = NM + "/playwright-core";
+const pwVersion = require(PC + "/package.json").version;
+const remedy = "rebuild FROM mcr.microsoft.com/playwright:v" + pwVersion + "-noble (the package and the base move together)";
+const root = process.env.PLAYWRIGHT_BROWSERS_PATH;
+if (!root) fail("PLAYWRIGHT_BROWSERS_PATH is not set; the base image provides it");
+const all = require(PC + "/browsers.json").browsers;
+const wanted = all.filter((b) => b.installByDefault);
+if (wanted.length < 5) fail("browsers.json lists " + wanted.length + " default browsers; expected chromium, its headless shell, firefox, webkit and ffmpeg");
+// Playwright names a browser's directory with '-' as '_', then the revision.
+// revisionOverrides are keyed on macOS hosts only, so a Linux image takes `revision`.
+for (const b of wanted) {
+  const dir = path.join(root, b.name.replace(/-/g, "_") + "-" + b.revision);
+  if (!fs.existsSync(path.join(dir, "INSTALLATION_COMPLETE"))) {
+    fail(b.name + " r" + b.revision + " (wanted by playwright-core " + pwVersion + ") is not installed at " + dir + "; " + remedy);
+  }
+}
+// The base records the Playwright it was built for; compare it when present.
+const infoFile = path.join(root, ".docker-info");
+if (fs.existsSync(infoFile)) {
+  const info = JSON.parse(fs.readFileSync(infoFile, "utf8"));
+  if (info.driverVersion !== pwVersion) fail("the base was built for Playwright " + info.driverVersion + ", node_modules holds " + pwVersion + "; " + remedy);
+}
+const versionOf = (name) => (all.find((b) => b.name === name) || {}).browserVersion;
+const pw = require(PC);
+(async () => {
+  for (const [engine, opts, expectFrom] of [
+    ["chromium", {}, "chromium-headless-shell"],
+    ["chromium", { channel: "chromium" }, "chromium"],
+    ["firefox", {}, "firefox"],
+    ["webkit", {}, "webkit"],
+  ]) {
+    const browser = await pw[engine].launch(opts);
+    const got = browser.version();
+    await browser.close();
+    const want = versionOf(expectFrom);
+    if (got !== want) fail(expectFrom + " reports " + got + ", playwright-core " + pwVersion + " expects " + want + "; " + remedy);
+    console.log(expectFrom + " " + got + " launches");
+  }
+})().catch((e) => fail((e && e.stack) || String(e)));
+CHECK
+
+# ── sqlite3 and rsync, for the shell-script tests ─────────────────────────────
+# scripts/backup.sh and scripts/purge.sh refuse to run without sqlite3, and
+# backup.sh copies with rsync. Without them the behavioural arms of
+# tests/backup-attachment-reconcile.api.spec.js, tests/data-dir-required.spec.js
+# and tests/audit-v8111.spec.js skipped here and ran only on developer machines;
+# with them CI runs the real scripts. A layer of its own and the LAST one, so
+# adding it reuses every layer above: the large npm ci and browser layers are
+# not rebuilt or uploaded again. Pinned by apt's version glob like the
+# toolchain above; measured in the v1.65.1-noble base: sqlite3 3.45.1-1ubuntu2.9,
+# rsync 3.2.7-1ubuntu1.5. (Still no lsof or ss: the tests read /proc instead.)
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends 'sqlite3=3.45.1-*' 'rsync=3.2.7-*' \
+ && rm -rf /var/lib/apt/lists/* \
+ && sqlite3 --version \
+ && rsync --version | head -n 1
+
+# ── Liveness (KICS "Healthcheck Instruction Missing") ─────────────────────────
+# The image serves no network service: a `container:` job starts it with its own
+# idle command and runs every step through `docker exec`. The honest health
+# signal is that the baked dependency set is still where the steps look for it,
+# so the check is a file test — no node, no network, nothing that competes with
+# the test run. The runner waits on the health of `services:` containers only,
+# never on the job container, so the check cannot delay a job.
+HEALTHCHECK --interval=5m --timeout=10s --start-period=10s --retries=3 \
+  CMD ["test", "-s", "/ci-deps/.lock-hash"]
+
+# ── No USER instruction, deliberately (KICS "Missing User Instruction") ───────
+# This image never runs a service and is never deployed (the app image is
+# ../Dockerfile, built FROM node:<major>-alpine, which drops to `USER node`;
+# .dockerignore keeps ci/ out of its build context). It is the job container
+# of three GitHub Actions jobs, and those REQUIRE root: actions/checkout writes
+# the bind-mounted workspace and /__w/_temp as the container's default user, and
+# the jobs pin HOME=/root (root-owned) for Firefox — see the cross-browser-tests
+# job. A USER line here would fail every job at checkout. The finding is triaged
+# NOT_EXPLOITABLE in Checkmarx One with this reason; to run the image
+# unprivileged locally, pass `--user pwuser` (uid 1001, from the base).

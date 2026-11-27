@@ -1,0 +1,50 @@
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for the platform? Describe the problem you're trying to solve and what a good solution looks like.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: "What are you trying to do that isn't possible or is harder than it should be?"
+      placeholder: "When running a multi-timezone tournament, I need to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: "How would you like it to work? Be as specific as you can."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: "Other approaches you thought of and why they don't work as well."
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Area
+      options:
+        - Admin panel
+        - Participant experience
+        - Analytics / reporting
+        - API / integrations
+        - Deployment / configuration
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Platform version (if relevant)
+      placeholder: "e.g. 6.6.4"

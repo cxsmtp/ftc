@@ -1,0 +1,35 @@
+{
+  "version": "9.2.13",
+  "regenerated_at": "2026-11-24T08:56:27.111Z",
+  "last_theme": "dark",
+  "counts": {
+    "light": {
+      "participant": 27,
+      "admin": 77,
+      "event-admin": 6,
+      "superadmin": 13
+    },
+    "dark": {
+      "participant": 27,
+      "admin": 77,
+      "event-admin": 6,
+      "superadmin": 13
+    }
+  },
+  "regenerated": {
+    "light": {
+      "at": "2026-11-24T08:53:30.479Z",
+      "participant": 27,
+      "admin": 77,
+      "event-admin": 6,
+      "superadmin": 13
+    },
+    "dark": {
+      "at": "2026-11-24T08:56:27.111Z",
+      "participant": 27,
+      "admin": 77,
+      "event-admin": 6,
+      "superadmin": 13
+    }
+  }
+}

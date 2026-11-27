@@ -1,0 +1,67 @@
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Fill in as much detail as you can so we can reproduce it.
+
+  - type: input
+    id: version
+    attributes:
+      label: Platform version
+      description: "Run `node -e \"console.log(require('./version.json').version)\"` or check the footer in the admin panel."
+      placeholder: "e.g. 6.6.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Deployment method
+      options:
+        - Docker (docker-compose)
+        - Bare Node.js
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: "Numbered steps starting from a clean state."
+      placeholder: |
+        1. Log in as admin
+        2. Navigate to Analytics tab
+        3. Click "Exclude" on competition tags
+        4. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser & OS
+      placeholder: "e.g. Chrome 126 on Windows 11, Safari 18 on macOS 15"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: "Server console output, browser console errors, or screenshots. Redact any passwords or personal data."
+      render: text

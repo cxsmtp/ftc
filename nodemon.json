@@ -1,0 +1,19 @@
+{
+  "_description": "DEV-ONLY. nodemon is a devDependency and `npm start` is a bare `node server.js`; the image runs `npm ci --omit=dev` and `CMD [\"node\",\"server.js\"]`, so nothing here can reach production. WATCH WHAT THE RUNNING PROCESS HOLDS, and nothing else. The old list named three FILES (server.js, db.js, version.json) and told the reader to append each new backend module by hand — which never happened for the v7.0.0 lib/routes extraction, so 63 files and ~71% of the backend went unwatched: editing routes/*.js or lib/*.js changed nothing until a manual restart, and the edit then landed on the next unrelated restart, pointing a crash at the wrong change. Directories are watched now, so a new module is covered by existing it. public/ and docs/ are watched because THE SERVER CACHES THEM AT BOOT: _cssCache holds the MINIFIED body and _hashFile hashes the minified bytes (server.js:2299,2332) with no _MINIFY_JS gate and no invalidator, so an edited stylesheet is served stale in dev; _htmlCache holds the boot-rewritten HTML (2452); _mdCache holds the help-drawer markdown (2432). The old rationale ('frontend assets never warrant a restart') is true of public/js/** and false of everything else under public/. public/js/** is watched anyway, deliberately: it is served RAW in dev so the SERVER is never stale and breakpoints still map 1:1, but /js/core/main.js is referenced from index.html and therefore carries a ?v=<hash> frozen at boot, and any ?v= URL is answered `max-age=31536000, immutable` (2605) with no dev gate — so without a restart the browser never re-requests it. Watching the directory covers that without a fragile per-file carve-out. THE COST IS REAL AND IS ACCEPTED: every restart regenerates SESSION_SECRET (lib/config.js:22) and .superadmin-password (server.js:74), so it signs the developer out and changes the credential they sign back in with. swagger.yaml is deliberately ABSENT: it lives at the repo root, _DOCS_DIR is ./docs, and nothing serves it — grep says its only mentions are comments. scripts/ is absent for the same reason: zero require() of it from server.js, db.js, lib/ or routes/; it is CLI-only. tests/, perf/ and ci/ are not in the allow-list at all, so a spec edit does not bounce the server. IGNORE data/ AND uploads/ EVEN THOUGH THEY ARE NOT WATCHED: both are SYMLINKS to /opt/hackarena/*, nodemon stats through symlinks and chokidar sets followSymlinks:true, so anyone who later widens `watch` to '.' would have the SPA's 30s status poll append to data/logs/access-*.jsonl and restart forever. (.jsonl does not match ext json — nodemon globs `**/*.{js,json}` against the basename via minimatch, verified against the vendored copy — but do not rely on that alone.) docs/screenshots/** is ignored because `npm run docs:shots` rewrites MANIFEST.json, which DOES match ext json. delay is 500ms: it is a trailing-edge debounce reset on every qualifying change (watch.js:236), and 200ms was tuned for a three-file list — a bulk edit across the tree now writes many watched files and 500ms collapses that into one restart.",
+  "watch": [
+    "server.js",
+    "db.js",
+    "version.json",
+    "lib",
+    "routes",
+    "public",
+    "docs"
+  ],
+  "ignore": [
+    "docs/screenshots/**",
+    "data/**",
+    "uploads/**"
+  ],
+  "ext": "js,cjs,mjs,json,css,html,md,svg",
+  "delay": 500
+}

@@ -1,0 +1,22 @@
+The Noto faces in this directory, byte for byte as published by the Noto project
+(renamed to this directory's lower-case style; not subset, not modified). SIL Open
+Font License 1.1: see LICENSE-noto.txt. Fetched 14 Nov 2026.
+
+noto-sans-arabic-bold.ttf (141852 bytes)
+  https://raw.githubusercontent.com/notofonts/notofonts.github.io/3460ae9d93e7ac7a90d38a247d5d4d0f6147d239/fonts/NotoSansArabic/unhinted/ttf/NotoSansArabic-Bold.ttf
+  sha256 f4cb79f842a07d1bcf597879574358fb7010f73761396d1d0f2445dfedb4d2ca
+
+noto-sans-hebrew-bold.ttf (16900 bytes)
+  https://raw.githubusercontent.com/notofonts/notofonts.github.io/3460ae9d93e7ac7a90d38a247d5d4d0f6147d239/fonts/NotoSansHebrew/unhinted/ttf/NotoSansHebrew-Bold.ttf
+  sha256 dfdb3056de1f4542b888c77a1a8a750548a802e271479f56e52152423b64dde8
+
+noto-sans-thai-bold.ttf (20600 bytes)
+  https://raw.githubusercontent.com/notofonts/notofonts.github.io/3460ae9d93e7ac7a90d38a247d5d4d0f6147d239/fonts/NotoSansThai/unhinted/ttf/NotoSansThai-Bold.ttf
+  sha256 5227602d7f9108252cfb7d75d6f7b2a26bdb2fc2fa89a702f9063758fb2f86c7
+
+noto-sans-cjk-sc-bold.otf (17002248 bytes; Chinese, Japanese kana and Korean Hangul in one face)
+  https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf
+  sha256 b5f0d1a190a7f9b43c310a8850630af12553df32c4c050543f9059732d9b4c0a
+
+The licence text in LICENSE-noto.txt is the noto-cjk repository's Sans/LICENSE at
+the same commit (the SIL Open Font License 1.1).

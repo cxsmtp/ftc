@@ -1,0 +1,28 @@
+services:
+  hackarena-perf:
+    build: ..
+    ports:
+      - "0.0.0.0:3000:3000"
+    volumes:
+      - /opt/hackarena/data-perf:/app/data
+      - /opt/hackarena/uploads-perf:/app/uploads
+    env_file:
+      - .env.perf
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # v6.16.3 — the perf workflow requires `/app/data/.maintenance` to
+    # exist so visitor traffic is gated behind the 503 page. Without
+    # the bypass token the healthcheck would itself receive a 503 and
+    # the container would report "unhealthy" for the entire perf run.
+    # Reading the token from the file (mounted via the `data-perf`
+    # volume) keeps the healthcheck honest about whether the process
+    # is actually answering requests.
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('fs');let t='';try{t=fs.readFileSync('/app/data/.maintenance','utf8').trim();}catch(_){}fetch('http://localhost:3000/api/config',{headers:t?{'X-Maintenance-Bypass':t}:{}}).then(r=>{if(!r.ok)throw r.status;process.exit(0)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: "no"
