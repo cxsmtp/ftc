@@ -33,7 +33,7 @@ async function seededIds() {
       c[k] = rows[0].id;
     }
     for (const k of SEED_TASKS) {
-      const rows = taskList.filter((r) => r.title === `Challenge ${k}`);
+      const rows = taskList.filter((r) => r.title === `Challenge ${k}` && !r.owner_competition_id);   // the library row (lib/event-copies.js)
       expect(rows, `exactly one 'Challenge ${k}'`).toHaveLength(1);
       t[k] = rows[0].id;
     }

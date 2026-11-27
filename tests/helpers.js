@@ -159,7 +159,8 @@ function createClient(opts = {}) {
     for (const [key, diff] of [["easy1","easy"],["med1","medium"],["hard1","hard"],["easy2","easy"],["draft1","easy"]]) {
       const title = `Challenge ${key}`;
       const status = key === "draft1" ? "draft" : "published";
-      const found = existingTasks.filter(t => t.title === title);
+      // The library row: an event holds its own same-titled copy (lib/event-copies.js).
+      const found = existingTasks.filter(t => t.title === title && !t.owner_competition_id);
       if (found.length) {
         const t = found.length === 1 ? found[0] : null;
         if (!t || t.difficulty !== diff || t.status !== status || t.answer_type !== "text") {
@@ -283,7 +284,8 @@ function createClient(opts = {}) {
         const Database = require("better-sqlite3");
         const db = new Database(dbPath, { readonly: true, fileMustExist: true });
         try {
-          return db.prepare("SELECT task_id, is_correct FROM submissions WHERE competition_id=? AND user_id=?").all(liveComp.id, aliceId);
+          // Named by the library question: the event answers its own copy (lib/event-copies.js).
+          return db.prepare("SELECT COALESCE(t.copied_from_task_id, s.task_id) AS task_id, s.is_correct FROM submissions s JOIN tasks t ON t.id = s.task_id WHERE s.competition_id=? AND s.user_id=?").all(liveComp.id, aliceId);
         } finally { db.close(); }
       })();
       const _has = (tid, correct) => _done.some(r => r.task_id === tid && !!r.is_correct === correct);

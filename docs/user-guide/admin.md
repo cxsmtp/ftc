@@ -2343,8 +2343,21 @@ cancels it everywhere the moment those browsers next load the site.
 
 ## Challenges
 
-The **Challenges** tab lists every challenge in the pool, whatever
-events they're attached to.
+The **Challenges** tab lists the challenge **library** (the bank of questions),
+whatever events use them.
+
+**A challenge added to an event lives in that event.** Adding a library
+challenge to an event gives the event its **own copy** of it — the question,
+answer, options, hint, explanation, tags, attachments and seal — and the event
+uses that copy from then on. Editing the event's copy (in the event's
+**Challenges** section), its answer included, changes that event only; editing
+the library challenge changes no event at all, so a later fix to the library is
+not carried into an event that already has its copy. Cloning an event, or
+making one from a template, gives the new event fresh copies of its own. An
+event's own challenge cannot be added to another event: add the library
+challenge it was copied from instead. Events made before this change were given
+their own copies when the server was upgraded, with their answers, hints and
+results moved to them; scores and certificates are unchanged.
 
 ![Challenges tab](../screenshots/admin/02-challenges.png)
 
@@ -2878,8 +2891,8 @@ an answer out of the organising team's ordinary view, not as a secret store.
 ### Once a session has finished, the challenge is frozen
 
 When any session of an event has ended, that event's results are
-final — so {{platformName}} refuses every change to its challenges that could
-move them. That covers editing the answer, the answer type or the difficulty,
+final — so {{platformName}} refuses every change to its challenges (the event's
+own copies) that could move them. That covers editing the answer, the answer type or the difficulty,
 **publishing or unpublishing**, **hiding or showing**, deleting, and overwriting
 the challenge through an import (which skips it and tells you how many were
 skipped).
@@ -3026,8 +3039,8 @@ one or more events for the current challenge.
 
 ![Assign to Events dialog — one challenge, many events](../screenshots/admin/26-challenge-assign-comps.png)
 
-Events that already have this challenge are pre-checked; unchecking
-removes it. Ended events are hidden — their assignments are frozen. An event
+Events that already have this challenge are pre-checked; ticking another event
+gives that event its own copy, and unchecking removes the event's copy from it. Ended events are hidden — their assignments are frozen. An event
 where staff compete is also disabled for an unsealed challenge (*Sealed only*),
 and one you are competing in is disabled outright (*You compete here*) — see
 [Letting staff compete](#letting-staff-compete). For a qualifying question, an

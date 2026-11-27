@@ -268,8 +268,14 @@ though, it is yours to make only while you are not competing in it.
 
 ## Challenges
 
-This tab behaves differently from every other one, because a challenge is not
-owned by an event — it is reused across many.
+This tab behaves differently from every other one: the challenge **library** is
+shared by every organiser, while **a challenge added to an event lives in that
+event**. Adding a library challenge to your event gives the event its own copy
+(question, answer, options, hint, tags, attachments); the event uses that copy,
+and you can edit it — its answer included — in your event's **Challenges**
+section without touching the library or any other event. A later change to the
+library challenge does not reach your event's copy. Your event's own challenges
+cannot be added to another event; add the library challenge instead.
 
 ### What you can see
 
@@ -444,7 +450,8 @@ the server's database or its backups can still read the answer.
 
 ### One thing that will surprise you
 
-If a challenge you created is *also* used by an event you do not organise, you
+If a challenge you created is held by an event you do not organise (that
+event's own copy, written by you, or a qualifying question it shares), you
 can still fix its title, description, hint and explanation — but not its
 **answer (on a Text challenge that is every accepted answer, so adding or
 removing one counts), answer type, difficulty, choices, attempt limit or

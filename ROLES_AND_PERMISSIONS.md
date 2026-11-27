@@ -838,10 +838,18 @@ reconciler either.
 
 ### 9.3 Two event admins on one event
 
-A can see B's challenge (rule b) but cannot edit it, and cannot unassign B's
-assignment. Accepted: the remedy is to ask an administrator. Per-event
-co-ownership of a challenge is a second permission dimension the brief does not
-describe.
+A can see B's LIBRARY challenge (rule b) but cannot edit it, and cannot unassign
+B's assignment. Accepted: the remedy is to ask an administrator.
+
+**An event's own question is its organisers'** (owner decision, Nov 2026;
+`lib/event-copies.js`). A challenge added to an event is the event's own copy
+(`tasks.owner_competition_id`), so A and B may both edit the copy their event
+holds, scoring fields included (it is in no other event, so
+`taskScoringEditDenied` finds no event outside their scope). `taskEditDenied`
+and `taskViewDenied` grant on an owning event in scope what authorship grants;
+nothing else widens. A bank challenge is "used by one of their events" (rule b)
+while an event in scope holds an assigned copy of it. The unassign rule (only
+what they added) is unchanged.
 
 ### 9.4 Ownership is a user id, never an email
 

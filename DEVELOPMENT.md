@@ -206,7 +206,7 @@ lib/*.js               # 78 shared backend modules — regenerate this list from
                        #   audit, badge, best-effort, categories, certificate-config, certificate-dispatch, certificate-share, challenge-fit, choices, comp-allowlist,
                        #   competitions, config, csv, cxone, cxone-identity, cxone-ledger,
                        #   cxone-withdraw, data-dir, email, email-identity, email-proof, event-admin,
-                       #   event-policy, event-retention, event-team, event-template-builtins, full-export, group-sync, http, human-code,
+                       #   event-copies, event-policy, event-retention, event-team, event-template-builtins, full-export, group-sync, http, human-code,
                        #   image-refs, image-sweep,
                        #   impersonation, invitation-claim, late-entry, leaderboard, lockout, log, log-sort,
                        #   login-code, login-method, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
