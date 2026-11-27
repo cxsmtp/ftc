@@ -5952,10 +5952,11 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
       ...attemptsWire(result.attempts) });
   }
   outcome = correct ? "new_correct" : "new_wrong";
-  // v8.15.1 — a Program has no common end: the correct answer that completes a
-  // participant queues THEIR certificate and email. A no-op for any other kind
-  // (kind first) and for an answer that leaves something unsolved.
-  if (correct) enqueueCompletionCertificate(compId, req.session.userId);
+  // v8.15.1 — a Program has no common end: the answer that finishes a learner
+  // (correct, or spending their last attempt; Program grades, 27 Nov 2026) queues
+  // their certificate and email when they passed. A no-op for any other kind
+  // (kind first) and for an answer that leaves something unanswered.
+  if (correct || (result && result.attempts && result.attempts.exhausted)) enqueueCompletionCertificate(compId, req.session.userId);
   _invalidateMeCache(req.session.userId);
   // `qualifying`: the client thanks them instead of announcing a solve and a score.
   res.json({ correct, pointsDelta: pts, score: getParticipantScore(req.session.userId, compId, req.session.timeslotId),

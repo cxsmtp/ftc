@@ -1212,6 +1212,17 @@ try {
   //
   // DEFAULT 0, which is every badge minted before this release and is true of them.
   if (!abCols.includes("late_entrant")) db.exec("ALTER TABLE achievement_badges ADD COLUMN late_entrant INTEGER NOT NULL DEFAULT 0");
+  // PROGRAM GRADES (owner decision, 27 Nov 2026) — the grade a Program
+  // certificate was issued with, FROZEN at mint for the reason `basis` and
+  // `score_snapshot` are: the learner's score, the challenge set or its points
+  // can move afterwards, and a certificate must keep saying what it said.
+  // `grade_band` is one of lib/program-grade.js GRADE_BANDS' keys (excellent,
+  // very_good, good, satisfactory); `grade_permille` the share of the maximum
+  // points, in tenths of a percent, rounded down. NULL on every certificate that
+  // is not a graded Program certificate, completion certificates issued before
+  // grades included: those print as they always did.
+  if (!abCols.includes("grade_band")) db.exec("ALTER TABLE achievement_badges ADD COLUMN grade_band TEXT");
+  if (!abCols.includes("grade_permille")) db.exec("ALTER TABLE achievement_badges ADD COLUMN grade_permille INTEGER");
   // NOT PARTIAL, deliberately, and the asymmetry with the index below is the
   // point: a REVOKED code must still resolve, or the credential page cannot
   // answer "revoked" and a revoked certificate becomes indistinguishable from a
@@ -2984,6 +2995,34 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_certificate_share_links_badge ON certificate_share_links(badge_token);
   CREATE INDEX IF NOT EXISTS idx_certificate_share_links_expires ON certificate_share_links(expires_at);
+`);
+// `program_attempts` — a Program learner's CLOSED attempts (owner decision,
+// 27 Nov 2026: under 60% a learner is told to try the quiz again and may). Try
+// again (lib/program-grade.js `startProgramRetake`) closes the current attempt:
+// its grade is written here, and its answers and hints to the Program's scoring
+// challenges MOVE here as JSON (`submissions_json`, `hints_json`: each row as
+// stored, every column), leaving the live tables to the new attempt. So every
+// reader of a score, a solve, an attempt count or a hint sees the current attempt
+// alone with no filter to forget, and nothing is deleted: the rows are here, the
+// analytics stream (`challenge_events`) is untouched, and the retake itself is a
+// `program_retake_started` user event. Quick (qualifying) answers stay live: they
+// are not graded and the event team's reports read them. Cascades with the
+// person and the event, as the live rows do.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS program_attempts (
+    id              TEXT PRIMARY KEY,
+    competition_id  TEXT NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+    user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attempt_no      INTEGER NOT NULL,
+    points          INTEGER NOT NULL,
+    max_points      INTEGER NOT NULL,
+    grade_permille  INTEGER NOT NULL,
+    grade_band      TEXT NOT NULL,
+    submissions_json TEXT NOT NULL,
+    hints_json      TEXT NOT NULL,
+    closed_at       TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS uq_program_attempts_no ON program_attempts(competition_id, user_id, attempt_no);
 `);
 // THE APPROVAL QUEUE SURVIVES AN UPGRADE FROM 8.14 (operator ruling, 15 Nov 2026).
 // 8.14 and earlier held every plain sign-up for an administrator's approval;

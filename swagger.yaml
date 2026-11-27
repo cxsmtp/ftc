@@ -4052,10 +4052,17 @@ paths:
         certificate attests an ATTEMPT (`policy.certificate: "attempt"` — a Booth Event
         or an Event) the event must be fully ended, else 409: a PLACEMENT is
         not knowable until the board is final. For a COMPLETION kind (a Program) there is
-        no lifecycle gate at all — the trigger is the caller's own completion of every
-        assigned, active, published challenge, so a learner who finishes in the second
-        month of a year-long Program is not made to wait for the deadline. Running out of
-        attempts is not completing.
+        no lifecycle gate at all — the trigger is the caller FINISHING (every assigned,
+        active, published scoring challenge solved or out of attempts), so a learner who
+        finishes in the second month of a year-long Program is not made to wait for the
+        deadline. **A Program certificate is GRADED** (owner decision, 27 Nov 2026): the
+        grade is the points held (correct answers less wrong-answer penalties and hints,
+        floored at 0) over the face value of the scoring challenges (quick questions
+        excluded); 90% Excellent, 80% Very good, 70% Good, 60% Satisfactory, each
+        inclusive at its lower edge. Unfinished is 403 `not_completed`; finished under
+        60% is 403 `grade_below_pass` (the learner may try again:
+        `POST /api/competitions/{id}/program/retake`). The band and percentage are
+        frozen on the certificate (`grade`).
 
 
         **Idempotent, and the existing badge is returned BEFORE any LIFECYCLE refusal.**
@@ -4115,6 +4122,7 @@ paths:
                   rank: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "The caller's real leaderboard rank at mint time (1-based)." }
                   placement: { type: boolean, description: "true for a placement certificate (a top-three place with points above zero); false for participation or completion." }
                   rankLabel: { type: string, example: "1st Place", description: "'Nth Place' for a placement badge, 'Participant' for a participation badge, 'Completed' for a completion badge." }
+                  grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
                   name_fallback:
                     type: boolean
                     description: >
@@ -4405,6 +4413,66 @@ paths:
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
         "429": { description: Rate limited — 30/min per IP. }
 
+  /api/competitions/{id}/program/retake:
+    post:
+      tags: [Competitions]
+      summary: Try a Program again (a learner who finished under 60%)
+      security: [{ sessionAuth: [] }]
+      description: >
+        Program grades (owner decision, 27 Nov 2026): a learner who FINISHED a Program
+        (every scoring challenge solved or out of attempts) with a grade under 60% gets
+        no certificate and may try again. This closes the current attempt: its grade is
+        recorded in `program_attempts`, and its answers and hints to the Program's
+        SCORING challenges move there with it (each row as stored; nothing is deleted),
+        so every score, solve, attempt count and hint reads the new attempt alone. Quick
+        (qualifying) answers stay. The analytics stream is untouched. Recorded on the
+        learner's History as `program_retake_started` with the request's context.
+
+
+        Refused while the Program is not live (409 `program_not_live`), to a non-member
+        (403 `not_member`), before the learner has finished (409 `program_not_finished`),
+        to a learner who passed (409 `program_passed`: a learner at 60% or more does not
+        retake to improve) or holds a certificate (409 `certificate_held`), for an event
+        that is not a Program (400 `not_a_program`), and under impersonation for every
+        tier (403 `impersonation_retake_refused`). Every condition is asked again inside
+        the write.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { description: "`not_member` or `impersonation_retake_refused` (also the CSRF refusal)." }
+        "404": { $ref: '#/components/responses/EventNotFound' }
+        "400": { description: "`not_a_program`, or a malformed body." }
+        "409": { description: "`program_not_live`, `program_not_finished`, `program_passed` or `certificate_held`." }
+        "200":
+          description: The new attempt has started.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  attempt: { $ref: '#/components/schemas/SafeInteger' }
+                  closed:
+                    type: object
+                    description: The attempt just closed and its grade.
+                    properties:
+                      attempt: { $ref: '#/components/schemas/SafeInteger' }
+                      points: { $ref: '#/components/schemas/SafeInteger' }
+                      max: { $ref: '#/components/schemas/SafeInteger' }
+                      permille: { $ref: '#/components/schemas/SafeInteger' }
+                      percent: { type: string, example: "55%" }
+                      band: { type: string, enum: [try_again] }
+                      label: { type: string }
   /api/me/certificates/{token}/linkedin-post:
     get:
       tags: [Badges]
@@ -9062,6 +9130,13 @@ paths:
         never offers what the server will refuse.
 
 
+        `programs` (Program grades, owner decision 27 Nov 2026): for each Program the
+        participant is in, their grade now (`grade`, null with no scoring challenge),
+        whether it counts yet (`finished`: every scoring challenge solved or out of
+        attempts), the current attempt's number, the attempts closed with Try again and
+        `canRetake`, from the retake route's own predicate.
+
+
         While an admin views as the participant without holding `certificates.lookup`
         (read live from the acting admin, never the participant), each held certificate
         leaves out its `token`, `code`, `badgeUrl`, `imageUrl` and `pdfUrl` and carries
@@ -9108,6 +9183,7 @@ paths:
                         competitionId: { type: string, description: "the event this certificate belongs to. Match on THIS, never on `competitionName`: competition names carry no uniqueness constraint, so a recurring programme would otherwise render one event's issue date and credential code under another's heading." }
                         code: { type: string, description: "Grouped as printed. Absent on an older badge, which carries no code, and with `withheld`." }
                         tier: { type: string, enum: [gold, silver, bronze, participation, completion], description: "The variant the certificate renders as, from its frozen basis and rank." }
+                        grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
                         rank: { $ref: '#/components/schemas/SafeInteger' }
                         score: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, nullable: true, description: "The frozen score, on a placement certificate only." }
                         issuedAt: { type: string, format: date-time }
@@ -9123,6 +9199,33 @@ paths:
                         competitionId: { type: string }
                         competitionName: { type: string }
                         kind: { type: string, nullable: true }
+                  programs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        competitionId: { type: string }
+                        competitionName: { type: string }
+                        finished: { type: boolean }
+                        attempt: { $ref: '#/components/schemas/SafeInteger' }
+                        passPercent: { type: integer, enum: [60] }
+                        grade:
+                          allOf: [{ $ref: '#/components/schemas/ProgramGrade' }]
+                          nullable: true
+                        canRetake: { type: boolean }
+                        previousAttempts:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              attempt: { $ref: '#/components/schemas/SafeInteger' }
+                              points: { $ref: '#/components/schemas/SafeInteger' }
+                              max: { $ref: '#/components/schemas/SafeInteger' }
+                              permille: { $ref: '#/components/schemas/SafeInteger' }
+                              percent: { type: string, example: "55%" }
+                              band: { type: string, enum: [excellent, very_good, good, satisfactory, try_again] }
+                              label: { type: string }
+                              closedAt: { type: string, format: date-time }
 
   /api/admin/credential/{code}:
     get:
@@ -9259,6 +9362,7 @@ paths:
                   competitionName: { type: string }
                   dateLabel:       { type: string }
                   scoreLabel:      { type: string, nullable: true, description: "Absent for a completion certificate — that kind has no ranking." }
+                  grade:           { $ref: '#/components/schemas/FrozenProgramGrade' }
                   code:            { type: string, description: "The code, grouped as printed." }
         "429": { description: "A failure budget of this address is exhausted (30 wrong lookups an hour in all, or 10 for this code). Other addresses checking the same code are unaffected. Successes are never counted." }
   /api/admin/badges/{token}/revoke:
@@ -14386,7 +14490,7 @@ paths:
                   type: object
                   additionalProperties: false
                   properties:
-                    tier: { type: string, enum: [gold, silver, bronze, participation, completion], description: "Default gold." }
+                    tier: { type: string, enum: [gold, silver, bronze, participation, completion, excellent, very_good, good, satisfactory], description: "Default gold. A Program grade band previews a graded completion certificate at a sample percentage inside the band." }
                     name: { type: string, maxLength: 120 }
                     event: { type: string, maxLength: 120 }
                     score: { type: string, maxLength: 24, description: "Shown on podium tiers only." }
@@ -14530,6 +14634,60 @@ paths:
         "404": { description: Event not found }
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
 
+  /api/admin/competitions/{id}/grades:
+    get:
+      tags: [Admin - Competitions]
+      summary: Each learner's grade in a Program
+      security: [{ sessionAuth: [] }]
+      description: >
+        Program grades (owner decision, 27 Nov 2026): for every member of a Program the
+        boards would list (staff, benchmark and off-board roles left out), the current
+        attempt's grade (`grade`, null with no scoring challenge), whether it counts yet
+        (`finished`), the attempt number, how many attempts were closed with Try again
+        and the certificate held with its frozen grade. Highest grade first. The Rankings
+        pane's Progress card reads it. Permission `leaderboard.view`; an event admin reads
+        their own events only. 400 `not_a_program` for any other kind.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/EventNotFound' }
+        "400": { description: "`not_a_program` (the event is not a Program), or `query_param_repeated` (a repeated query parameter)." }
+        "200":
+          description: The grades.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passPercent: { type: integer, enum: [60] }
+                  maxPoints: { $ref: '#/components/schemas/SafeInteger' }
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId: { type: string }
+                        nickname: { type: string, nullable: true }
+                        firstName: { type: string, nullable: true }
+                        lastName: { type: string, nullable: true }
+                        email: { type: string, nullable: true }
+                        finished: { type: boolean }
+                        attempt: { $ref: '#/components/schemas/SafeInteger' }
+                        previousAttempts: { $ref: '#/components/schemas/SafeInteger' }
+                        grade:
+                          allOf: [{ $ref: '#/components/schemas/ProgramGrade' }]
+                          nullable: true
+                        certificate:
+                          type: object
+                          nullable: true
+                          properties:
+                            issuedAt: { type: string, format: date-time }
+                            grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
   /api/admin/competitions/{id}/certificates:
     get:
       tags: [Admin - Competitions]
@@ -14624,6 +14782,7 @@ paths:
                             holder by.
                         email: { type: string, nullable: true }
                         tier: { type: string, enum: [gold, silver, bronze, participation, completion] }
+                        grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
                         rank: { $ref: '#/components/schemas/SafeInteger' }
                         label: { type: string, example: 1st Place }
                         basis: { type: string, nullable: true }
@@ -18995,6 +19154,31 @@ components:
           items: { type: string }
         granted_organiser: { type: boolean, description: "True when an event admin was made the new event's organiser." }
         qualifying_questions: { $ref: '#/components/schemas/SafeInteger' }
+    ProgramGrade:
+      type: object
+      description: >
+        A Program learner's grade (owner decision, 27 Nov 2026): `points` (correct answers
+        less wrong-answer penalties and hints, floored at 0, capped at `max`) of `max` (the
+        face value of the Program's published scoring challenges; quick questions
+        excluded). `permille` is the share in tenths of a percent, rounded down; `band` is
+        decided on the exact fraction, inclusive at its lower edge.
+      properties:
+        points: { $ref: '#/components/schemas/SafeInteger' }
+        max: { $ref: '#/components/schemas/SafeInteger' }
+        permille: { type: integer, minimum: 0, maximum: 1000 }
+        percent: { type: string, example: "94%" }
+        band: { type: string, enum: [excellent, very_good, good, satisfactory, try_again] }
+        label: { type: string, example: "Excellent" }
+        passed: { type: boolean, description: "60% or more." }
+    FrozenProgramGrade:
+      type: object
+      nullable: true
+      description: "The grade a Program certificate was issued with, frozen at mint; null (or absent) on every other certificate, a completion certificate issued before grades included."
+      properties:
+        band: { type: string, enum: [excellent, very_good, good, satisfactory] }
+        label: { type: string, example: "Very good" }
+        permille: { type: integer, minimum: 600, maximum: 1000 }
+        percent: { type: string, example: "85%" }
     CertificateConfigLayer:
       type: object
       additionalProperties: false
@@ -19021,18 +19205,27 @@ components:
             footer_tagline: { type: string, maxLength: 80 }
             achievement_heading: { type: string, maxLength: 40 }
             score_heading: { type: string, maxLength: 24 }
+            grade_heading: { type: string, maxLength: 24, description: "Default GRADE: the heading over a graded Program certificate's percentage." }
             date_heading: { type: string, maxLength: 24 }
             id_heading: { type: string, maxLength: 32 }
         labels:
           type: object
           additionalProperties: false
-          description: "Per variant: `headline` (the large value) and `sub` (the caps line under it; empty hides it)."
+          description: >-
+            Per variant: `headline` (the large value) and `sub` (the caps line under it; empty hides it).
+            A graded Program certificate takes its grade band's wording (`excellent`, `very_good`,
+            `good`, `satisfactory`) and the completion tier's colours and seal; `completion` is
+            a completion certificate issued without a grade.
           properties:
             gold: { $ref: '#/components/schemas/CertificateTierLabel' }
             silver: { $ref: '#/components/schemas/CertificateTierLabel' }
             bronze: { $ref: '#/components/schemas/CertificateTierLabel' }
             participation: { $ref: '#/components/schemas/CertificateTierLabel' }
             completion: { $ref: '#/components/schemas/CertificateTierLabel' }
+            excellent: { $ref: '#/components/schemas/CertificateTierLabel' }
+            very_good: { $ref: '#/components/schemas/CertificateTierLabel' }
+            good: { $ref: '#/components/schemas/CertificateTierLabel' }
+            satisfactory: { $ref: '#/components/schemas/CertificateTierLabel' }
         colors:
           type: object
           additionalProperties: false

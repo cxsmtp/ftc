@@ -4208,6 +4208,13 @@ h1[tabindex="-1"],h2[tabindex="-1"],.page[tabindex="-1"],.admin-tab-pane[tabinde
    nothing is wrong, this kind simply has no board. */
 .rk-unranked-note{margin:0 0 10px;font-size:var(--fs-14);line-height:1.5;color:var(--muted)}
 .rk-unranked-note:last-child{margin-bottom:0}
+/* Program grades (27 Nov 2026): the Progress card's per-learner grade list. */
+.rk-grades{margin-top:16px}
+.rk-grades-title{margin:0 0 6px;font-size:var(--fs-14);font-weight:var(--fw-semibold)}
+.rk-grade-list{list-style:none;margin:0;padding:0}
+.rk-grade-row{padding:8px 0;border-top:1px solid var(--border);font-size:var(--fs-14);line-height:1.5}
+.rk-grade-who{font-weight:var(--fw-semibold);color:var(--text)}
+.rk-grade-val,.rk-grade-extra{color:var(--muted)}
 
 /* v8.1.0 (PR 21) — the unscoped Analytics prompt. Body copy on a card, not a
    warning: nothing is wrong, the pane is asking what to measure. */

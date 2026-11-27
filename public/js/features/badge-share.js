@@ -125,6 +125,9 @@ export async function openBadgeShare(compId){
         choose to share it — and it then names you and is built to be found by search engines
         and link previews. Nothing is published until you press Share or Copy post &amp; open LinkedIn.
       </p>`}
+      ${data.grade?`<p class="badge-claim-note badge-grade-note">
+        <strong>Your grade: ${esc(data.grade.label)} (${esc(data.grade.percent)}).</strong> It is printed on the certificate.
+      </p>`:''}
       ${data.lateEntrant?`<p class="badge-claim-note">
         <strong>This certificate says &ldquo;late entrant&rdquo;.</strong> You joined after the
         event had ended, during its late-entry window, so you are ranked among the other
@@ -366,12 +369,16 @@ export async function renderCertificateCta(){
   // event they were actually on and was correctly refused, contradicting the card
   // immediately above the button.
   const held=heldCertificateFor(data.certificates,comp);
+  // Program grades (owner decision, 27 Nov 2026): where this learner stands in a
+  // Program, from the server's own reading (GET /api/me/certificates `programs`).
+  const prog=(data.programs||[]).find(p=>p.competitionId===comp)||null;
+  const pg=prog&&prog.grade;
 
   if(claim){
     setSafeHtml(el,`
       <div class="cert-cta-text">
         <p class="cert-cta-title">${ICO.medal||''} Your certificate is ready</p>
-        <p class="cert-cta-sub">You have completed ${esc(claim.competitionName)}. Downloading is private &mdash; nothing is published unless you choose to share it.${
+        <p class="cert-cta-sub">You have completed ${esc(claim.competitionName)}${pg&&prog.finished&&pg.passed?` with a grade of <strong>${esc(pg.label)} (${esc(pg.percent)})</strong>`:''}. Downloading is private &mdash; nothing is published unless you choose to share it.${
           // v8.6.0 — a late entrant whose window is still open takes a PARTICIPATION
           // certificate whatever their current rank, because their board is not
           // final yet. The mint is idempotent, so collecting now means KEEPING that
@@ -392,7 +399,7 @@ export async function renderCertificateCta(){
       <div class="cert-cta-text">
         <p class="cert-cta-title">${ICO.medal||''} Your certificate</p>
         <p class="cert-cta-sub">${held.revoked?'This certificate has been revoked. Please contact the organisers.'
-          :`Issued ${esc(held.dateLabel||'')}${held.code?` &middot; code ${esc(held.code)}`:''}.${held.lateEntrant?' Late entrant.':''}${held.withheld?' While you view as this participant, its code and downloads are hidden.':''}`}${held.revoked||!held.code?'':' <span data-help="cert.held" data-help-label="Certificate code"></span>'}</p>
+          :`Issued ${esc(held.dateLabel||'')}${held.code?` &middot; code ${esc(held.code)}`:''}.${held.grade?` Grade: ${esc(held.grade.label)} (${esc(held.grade.percent)}).`:''}${held.lateEntrant?' Late entrant.':''}${held.withheld?' While you view as this participant, its code and downloads are hidden.':''}`}${held.revoked||!held.code?'':' <span data-help="cert.held" data-help-label="Certificate code"></span>'}</p>
       </div>
       ${held.revoked?'':'<button type="button" class="btn secondary" data-action="open-badge-share">View certificate</button>'}`;
     // The challenge list's poll calls this every tick: an unchanged card is left
@@ -401,7 +408,71 @@ export async function renderCertificateCta(){
     el.hidden=false;
     return;
   }
+  if(pg){
+    const html=programStandingHtml(prog);
+    if(el._ctaHtml!==html||el.hidden){ setSafeHtml(el,html); el._ctaHtml=html; }
+    el.hidden=false;
+    return;
+  }
   _hideCta(el);
+}
+
+/**
+ * Program grades (owner decision, 27 Nov 2026): "the program should tell you
+ * where you stand". The card for a learner with no certificate to claim or hold:
+ * their grade so far (it counts once every challenge is finished), or, finished
+ * under the pass mark, the grade and Try again (offered exactly where the route
+ * accepts it: the server's `canRetake`). Every value is the server's.
+ */
+const _GRADE_TIP='<span data-help="program.grade" data-help-label="Your grade"></span>';
+export function programStandingHtml(prog){
+  const g=prog.grade;
+  const pass=Number(prog.passPercent)||60;
+  const last=(prog.previousAttempts||[]).slice(-1)[0];
+  const prev=last?` Your last attempt ended on ${esc(last.percent)}.`:'';
+  const att=prog.attempt>1?` This is attempt ${esc(String(prog.attempt))}.`:'';
+  if(!prog.finished){
+    return `
+      <div class="cert-cta-text">
+        <p class="cert-cta-title">${ICO.medal||''} Where you stand: ${esc(g.percent)}</p>
+        <p class="cert-cta-sub">${esc(String(g.points))} of ${esc(String(g.max))} points so far. Your grade counts once you have finished every challenge, and a certificate needs ${esc(String(pass))}% or more: 90% Excellent, 80% Very good, 70% Good, 60% Satisfactory.${att}${prev} ${_GRADE_TIP}</p>
+      </div>`;
+  }
+  if(g.passed){
+    return `
+      <div class="cert-cta-text">
+        <p class="cert-cta-title">${ICO.medal||''} Your grade: ${esc(g.label)} (${esc(g.percent)})</p>
+        <p class="cert-cta-sub">${esc(String(g.points))} of ${esc(String(g.max))} points.${att} ${_GRADE_TIP}</p>
+      </div>`;
+  }
+  return `
+    <div class="cert-cta-text">
+      <p class="cert-cta-title">${ICO.medal||''} Your grade: ${esc(g.percent)} &mdash; try the quiz again</p>
+      <p class="cert-cta-sub">${esc(String(g.points))} of ${esc(String(g.max))} points. A certificate needs ${esc(String(pass))}% or more.${prog.canRetake?' Try again starts every challenge afresh; your answers so far are kept in your history.':' The program is not running now, so it cannot be taken again.'}${att}${prev} ${_GRADE_TIP}</p>
+    </div>
+    ${prog.canRetake?'<button type="button" class="btn" data-action="program-retake">Try again</button>':''}`;
+}
+
+/**
+ * Try again (Program grades): confirm, then start a fresh attempt. The route
+ * re-asks every condition; its refusal is shown as it is worded.
+ */
+export async function startProgramRetakeFlow(compId){
+  if(!compId)return false;
+  const go=await showModal({
+    title:'Try the program again?',
+    message:'<p>Every challenge starts afresh and your grade is counted again from zero. Your answers so far are kept in your history. Your answers to quick questions stay as they are.</p>',
+    confirmText:'Try again', confirmClass:'', cancelText:'Cancel',
+  });
+  if(!go)return false;
+  let d={};
+  try{
+    const r=await fetch(`/api/competitions/${encodeURIComponent(compId)}/program/retake`,{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:'{}'});
+    d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.ok){ showToast(d.error||'Could not start the program again.','error'); return false; }
+  }catch{ showToast('Network error: the program was not started again.','error'); return false; }
+  showToast(`Attempt ${d.attempt} started. Good luck!`,'success');
+  return true;
 }
 
 /**

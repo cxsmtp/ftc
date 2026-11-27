@@ -52,11 +52,14 @@ const ROOT = path.join(__dirname, "..");
 // pager, About & health from the route, the newest release notes inline, the
 // version at the sidebar's foot; the link items removed; about +1.2 KB each);
 // then gzip 354600 -> 354900 and brotli 310100 -> 310400 (the mail server
-// card's one test send, the Outbound email card folded into it).
+// card's one test send, the Outbound email card folded into it); then gzip
+// 354900 -> 356880 and brotli 310400 -> 312000 (Program grades: measured +1938 B
+// gzip and +1550 B brotli on its own branch, the learner's grade card and Try
+// again, the organisers' Grades list, the designer's grade bands, plus rounding).
 const AT_RULING = {
   stylesheet: { gzip: 56241, br: 52368 },
   page: { gzip: 33262, br: 31062 },
-  script: { gzip: 354900, br: 310400 },
+  script: { gzip: 356880, br: 312000 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));

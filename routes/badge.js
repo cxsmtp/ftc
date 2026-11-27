@@ -19,7 +19,7 @@ const destructiveAdminLimit = rateLimit(60_000, 30, "destructive-admin");
 const { actorPermissions, handHolds } = require("../lib/rbac");
 const { originKeyFor } = require("../lib/login-code");   // the wrong-surname budgets' source
 const { eventPolicy, eventKind, EVENT_KINDS } = require("../lib/event-policy"); // v8.1.0 — certificate mode + the kind vocabulary
-const { getCompetition, competitionFullyEnded, isDryRunCompetition, participantAttempted, participantSolvedAll, competitionEffectiveEnd, timeslotEffectiveEnd, lateEntryWindowOpen, lateEntryDeadline } = require("../lib/competitions");
+const { getCompetition, competitionFullyEnded, isDryRunCompetition, participantAttempted, competitionEffectiveEnd, timeslotEffectiveEnd, lateEntryWindowOpen, lateEntryDeadline } = require("../lib/competitions");
 const { buildLeaderboard, buildLateLeaderboard, boardSlotOf, rankedBoards } = require("../lib/leaderboard");
 const { resolveCertificateConfig, certificateTier } = require("../lib/certificate-config");
 // v8.15.1 — the automatic certificate issue and the congratulations email.
@@ -40,6 +40,7 @@ const { swallowed } = require("../lib/best-effort");
 const { impersonationActor, isImpersonating } = require("../lib/impersonation");
 const { log } = require("../lib/log");
 const { notQualifyingSql } = require("../lib/qualifying"); // sweep #92 — a Quick answer never dates a completion certificate
+const { programStanding, programGraded, programMaxPoints, retakeRefusal, startProgramRetake, closedAttemptGrades, formatGradePercent, gradeLabel, PASS_PERCENT } = require("../lib/program-grade"); // Program grades (27 Nov 2026)
 // Where a signed-in holder finds a certificate: the event's Challenges page
 // carries "Your certificate" for every kind (badge-share.js renderCertificateCta).
 const CERTIFICATE_HOME = "sign in and open the event: your certificate is on its Challenges page";
@@ -249,17 +250,34 @@ function _mintEligibility(userId, comp, tsId, { fresh = false, boards = null } =
 
   // A COMPLETION kind (a Program) has no ranking anywhere — PR 18 suppressed the
   // board, the score pill and the Leaderboard tab — so a placement badge would
-  // publish a placing the platform refuses to show. Its certificate attests one
-  // thing instead: every assigned challenge solved. Being finished by EXHAUSTION
-  // is deliberately not completion (see participantSolvedAll).
-  if (completionKind && !participantSolvedAll(userId, comp.id)) {
-    return {
-      status: 403,
-      body: {
-        error: "Your certificate is available once you have solved every challenge in this program.",
-        code: "not_completed",
-      },
-    };
+  // publish a placing the platform refuses to show. Its certificate attests the
+  // learner's GRADE instead (owner decision, 27 Nov 2026; lib/program-grade.js):
+  // issued once they have FINISHED (every scoring challenge solved or out of
+  // attempts) with 60% or more of the Program's points, the band and percentage
+  // frozen on it. Under 60% there is no certificate: the learner is told to try
+  // again.
+  let grade = null;
+  if (completionKind) {
+    const standing = programStanding(userId, comp);
+    if (!standing.finished || !standing.grade) {
+      return {
+        status: 403,
+        body: {
+          error: "Your certificate is available once you have finished every challenge in this program.",
+          code: "not_completed",
+        },
+      };
+    }
+    if (!standing.grade.passed) {
+      return {
+        status: 403,
+        body: {
+          error: `Your grade is ${formatGradePercent(standing.grade.permille)}: a certificate needs ${PASS_PERCENT}% or more. Try the program again.`,
+          code: "grade_below_pass",
+        },
+      };
+    }
+    grade = standing.grade;
   }
   // NO CERTIFICATE WITHOUT AN ATTEMPT. The attempt test runs BEFORE the placement
   // branch and for every attempt-kind basis: a member who entered the event and
@@ -292,6 +310,8 @@ function _mintEligibility(userId, comp, tsId, { fresh = false, boards = null } =
     // a placement badge TODAY, and a badge minted under a different rule must
     // still be able to say what it was.
     basis: completionKind ? "completion" : (placement ? "placement" : "participation"),
+    // Program grades — frozen at mint beside `basis` (`grade_band`, `grade_permille`).
+    grade,
   };
 }
 
@@ -373,9 +393,9 @@ const _NO_STORED_IMAGE = "";
 // participant's mint route and `_autoIssueCertificate`), so the frozen facts a
 // certificate carries cannot depend on who asked for it.
 const _BADGE_INSERT_SQL =
-  "INSERT INTO achievement_badges (token, user_id, competition_id, timeslot_id, rank, image_id, nickname_snapshot, score_snapshot, name_snapshot, basis, name_match_snapshot, public_code, date_snapshot, late_entrant, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+  "INSERT INTO achievement_badges (token, user_id, competition_id, timeslot_id, rank, image_id, nickname_snapshot, score_snapshot, name_snapshot, basis, name_match_snapshot, public_code, date_snapshot, late_entrant, created_at, grade_band, grade_permille) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 function _badgeInsertValues({ token, userId, comp, tsId, me, nickname, placement, badgeName, basis,
-  nameMatchParts, publicCode, badgeEnd, lateEntrant, ts }) {
+  nameMatchParts, publicCode, badgeEnd, lateEntrant, ts, grade = null }) {
   return [token, userId, comp.id, tsId, me.rank, _NO_STORED_IMAGE, nickname,
     placement && Number.isFinite(me.score) ? Math.round(me.score) : null, badgeName,
     basis,
@@ -393,7 +413,11 @@ function _badgeInsertValues({ token, userId, comp, tsId, me, nickname, placement
     // three snapshots above are: the event's end can move afterwards, and a
     // certificate must keep saying what it said when it was issued.
     lateEntrant ? 1 : 0,
-    ts];
+    ts,
+    // Program grades — the band and percentage the certificate was issued with,
+    // frozen for the reason the snapshots above are. NULL for every other basis.
+    grade ? grade.band : null,
+    grade ? grade.permille : null];
 }
 
 // The share image a certificate's row still names a stored copy of (one issued
@@ -445,10 +469,16 @@ function _badgeEndDate(row, comp) {
   // challenge. A Quick (qualifying) question completes nothing (lib/qualifying.js),
   // and its answer can come, or change, long after; counted here it re-dated the
   // certificate to the day of that answer.
+  //
+  // Program grades (27 Nov 2026): a learner FINISHES when every scoring challenge
+  // is solved or out of attempts, so the claim became true at their last answer
+  // to a scoring challenge, right or wrong (a wrong answer spending the last
+  // attempt finishes them too). With every challenge solved that is the last
+  // correct answer, as before: nothing is answered after a challenge is solved.
   if (eventPolicy(comp).certificate === "completion") {
     const last = db.prepare(
       `SELECT MAX(s.submitted_at) AS t FROM submissions s JOIN tasks t ON t.id = s.task_id
-        WHERE s.user_id=? AND s.competition_id=? AND s.is_correct=1 AND ${notQualifyingSql("t")}`
+        WHERE s.user_id=? AND s.competition_id=? AND ${notQualifyingSql("t")}`
     ).get(row.user_id, comp.id);
     if (last && last.t) return new Date(last.t);
   }
@@ -512,6 +542,21 @@ const _CREDENTIAL_VERIFY_DISPLAY =
 // v8.15.0 — the same page as an absolute URL, for the certificate's QR code.
 const _CREDENTIAL_VERIFY_LINK = String(BASE_URL || "").replace(/\/+$/, "") + "/credential";
 
+/**
+ * The grade a certificate was issued with (Program grades, 27 Nov 2026), from
+ * its frozen columns: `{band, label, permille, percent}` (percent as printed,
+ * "94%"), or null for a certificate issued without one.
+ */
+function _frozenGrade(row) {
+  if (!row || !row.grade_band || !gradeLabel(row.grade_band) || !Number.isFinite(row.grade_permille)) return null;
+  return {
+    band: row.grade_band,
+    label: gradeLabel(row.grade_band),
+    permille: row.grade_permille,
+    percent: formatGradePercent(row.grade_permille),
+  };
+}
+
 function _badgeArt(row, comp) {
   const owner = db.prepare("SELECT nickname, personal_title, first_name, last_name, certificate_given_name, certificate_family_name FROM users WHERE id=?").get(row.user_id);
   const name = _heldName(row, owner);
@@ -558,6 +603,11 @@ function _badgeArt(row, comp) {
     // while the picture showed the name. Read from the FROZEN column; 0 on every
     // badge minted before this release, which is true of them.
     lateEntrant: !!row.late_entrant,
+    // Program grades (27 Nov 2026) — the band and percentage this certificate was
+    // issued with, from the FROZEN columns; null on every other certificate (a
+    // completion certificate issued before grades included), which renders as
+    // it always did.
+    grade: _frozenGrade(row),
     // v8.8.20 — the printed verification code, and where to take it. Both are
     // read by `buildCertificateSvg` ALONE; `buildBadgeSvg` and the public page
     // ignore them, which is the decision recorded at that renderer. NULL on a
@@ -752,6 +802,8 @@ function _badgePayload(row, { mayReadCodes = true } = {}) {
     // at mint, so it says what the artefact says rather than what the event's
     // schedule now implies.
     lateEntrant: !!row.late_entrant,
+    // Program grades — the frozen band and percentage; absent without one.
+    ...(_frozenGrade(row) ? { grade: _frozenGrade(row) } : {}),
     // v8.1.0 (PR 27) — absent on a pre-v8.1.0 badge, which has no code at all.
     ...(mayReadCodes && row.public_code ? { publicCode: row.public_code, publicCodeFormatted: formatCredentialCode(row.public_code) } : {}),
     // v7.21.30 — rendered on request, not the copy stored at mint. See the route.
@@ -907,7 +959,7 @@ async function _autoIssueCertificate(userId, comp, { boards = null, reissue = nu
     if (getStaffOrBenchmarkSet([userId], { staffCompete: staffCompeteOn(comp) }).has(userId)) return "off_board";
     db.prepare(_BADGE_INSERT_SQL).run(..._badgeInsertValues({
       token, userId, comp, tsId, me, nickname, placement, badgeName, basis,
-      nameMatchParts, publicCode, badgeEnd, lateEntrant, ts,
+      nameMatchParts, publicCode, badgeEnd, lateEntrant, ts, grade: verdict.grade,
     }));
     return null;
   });
@@ -974,6 +1026,9 @@ function _certificateFacts(row) {
     score: (isPlacementBasis(row.basis, row.rank) && Number.isFinite(row.score_snapshot)) ? row.score_snapshot : null,
     lateEntrant: !!row.late_entrant,
     issuedAt: row.created_at,
+    // Program grades (27 Nov 2026): the band and percentage it was issued with,
+    // frozen; null for any other certificate.
+    grade: _frozenGrade(row),
   };
 }
 
@@ -1169,7 +1224,7 @@ module.exports = function register(app) {
       // badges are the only variant that shows a score.
       db.prepare(_BADGE_INSERT_SQL).run(..._badgeInsertValues({
         token, userId, comp, tsId, me, nickname, placement, badgeName, basis,
-        nameMatchParts, publicCode, badgeEnd, lateEntrant, ts,
+        nameMatchParts, publicCode, badgeEnd, lateEntrant, ts, grade: verdict.grade,
       }));
     });
     try {
@@ -1210,6 +1265,39 @@ module.exports = function register(app) {
     // resolver's own decision, read in `_badgePayload` for this row as for a held
     // one, so the note and the picture cannot disagree.
     res.json(_badgePayload(db.prepare("SELECT * FROM achievement_badges WHERE token=?").get(token), { mayReadCodes: _participantMayReadCodes(req) }));
+  });
+
+  // ── Program grades: TRY AGAIN (owner decision, 27 Nov 2026) ─────────────────
+  //
+  // Under 60% a Program learner gets no certificate and is told to try the quiz
+  // again: this starts a fresh attempt. Allowed only while the Program is live,
+  // to a member who has finished below the pass mark and holds no certificate
+  // (lib/program-grade.js `retakeRefusal`, asked again inside the write). The
+  // attempt's answers and hints to the scoring challenges move to
+  // `program_attempts` (nothing is deleted), and the retake is recorded on the
+  // learner's History (`program_retake_started`, with the request's context).
+  //
+  // REFUSED UNDER IMPERSONATION, every tier: a fresh attempt made while viewing as
+  // somebody must not count as theirs (the join's reason, 21 Nov 2026).
+  app.post("/api/competitions/:id/program/retake", requireParticipant, rateLimit(60_000, 10, "program-retake"), csrfProtection, (req, res) => {
+    const userId = req.session.userId;
+    const comp = getCompetition(req.params.id);
+    if (!comp) return res.status(404).json({ error: "Event not found" });
+    if (isImpersonating(req)) {
+      return res.status(403).json({ error: "While you view as this participant, the program cannot be started again for them.", code: "impersonation_retake_refused" });
+    }
+    const self = db.prepare("SELECT email FROM users WHERE id=?").get(userId);
+    const out = startProgramRetake(userId, comp, { changedBy: (self && self.email) || "system", context: reqContext(req) });
+    if (!out || !out.ok) {
+      const r = out || { status: 409, code: "program_retake_refused", error: "The program could not be started again." };
+      return res.status(r.status).json({ error: r.error, code: r.code });
+    }
+    res.json({
+      ok: true,
+      attempt: out.attempt,
+      closed: { attempt: out.closed.attempt, points: out.closed.points, max: out.closed.max, permille: out.closed.permille,
+        percent: formatGradePercent(out.closed.permille), band: out.closed.band, label: out.closed.label },
+    });
   });
 
   // ── Certificate PDF (v7.15.0) ─────────────────────────────────────────────
@@ -1509,6 +1597,8 @@ module.exports = function register(app) {
         ...(verdict.lateEntrant ? [["Entry", "Late entrant"]] : []),
         ["Date", verdict.dateLabel],
         ...(verdict.scoreLabel ? [["Score", verdict.scoreLabel]] : []),
+        // Program grades (27 Nov 2026): the grade the certificate prints, frozen.
+        ...(verdict.grade ? [["Grade", `${verdict.grade.label} (${verdict.grade.percent})`]] : []),
         ["Code", verdict.code],
       ].filter(([, v]) => v);
       result = `<div class="cred-card ${verdict.revoked ? "cred-revoked" : "cred-ok"}" role="status">
@@ -1628,6 +1718,8 @@ module.exports = function register(app) {
         // v8.15.1 — what the certificate says (tier, rank, frozen score) and when
         // it was issued, so the list can name every certificate without a fetch.
         tier: _certificateFacts(row).tier,
+        // Program grades — the band and percentage it was issued with (null without).
+        grade: _frozenGrade(row),
         rank: row.rank,
         score: _certificateFacts(row).score,
         issuedAt: row.created_at,
@@ -1679,7 +1771,79 @@ module.exports = function register(app) {
         latePlacementPending: !!_verdict.latePlacementPending,
       });
     }
-    res.json({ certificates: held, claimable });
+    // PROGRAM GRADES (owner decision, 27 Nov 2026) — "the program should tell you
+    // where you stand": for each Program this learner is in (narrowed as the list
+    // is), their grade now, whether it counts yet (finished), and whether Try
+    // again is open to them, from the route's own predicate (`retakeRefusal`), so
+    // the button is offered exactly where the route accepts it.
+    const programs = [];
+    for (const m of db.prepare("SELECT competition_id FROM competition_users WHERE user_id=?").all(userId)) {
+      if (_impIds !== null && !_impIds.includes(m.competition_id)) continue;
+      const comp = getCompetition(m.competition_id);
+      if (!comp || !programGraded(comp)) continue;
+      const st = programStanding(userId, comp);
+      const refused = st.grade ? retakeRefusal(userId, comp, st) : null;
+      programs.push({
+        competitionId: comp.id,
+        competitionName: comp.name,
+        finished: st.finished,
+        attempt: st.attempt,
+        passPercent: PASS_PERCENT,
+        grade: st.grade ? {
+          points: st.grade.points, max: st.grade.max, permille: st.grade.permille,
+          percent: formatGradePercent(st.grade.permille), band: st.grade.band, label: st.grade.label, passed: st.grade.passed,
+        } : null,
+        canRetake: !!st.grade && !refused,
+        // Closed attempts (Try again), oldest first: the grade each ended on.
+        previousAttempts: closedAttemptGrades(comp.id, userId).map(a => ({
+          attempt: a.attempt_no, points: a.points, max: a.max_points, permille: a.grade_permille,
+          percent: formatGradePercent(a.grade_permille), band: a.grade_band, label: gradeLabel(a.grade_band), closedAt: a.closed_at,
+        })),
+      });
+    }
+    res.json({ certificates: held, claimable, programs });
+  });
+
+  // ── Program grades: THE ORGANISERS' VIEW (owner decision, 27 Nov 2026) ───────
+  //
+  // Each learner's grade in a Program, for the Rankings pane's Progress card: the
+  // current attempt (whether it counts yet: Finished), how many attempts they
+  // have closed with Try again, and the certificate they hold. The people the
+  // boards leave out (staff, benchmark, off-board roles) are left out here too.
+  // Scoped like the certificate list (404, then `competitionDenied`); 400 for an
+  // event that is not graded.
+  app.get("/api/admin/competitions/:id/grades", requireAdmin, rateLimit(60_000, 60, "admin-grades"), (req, res) => {
+    const comp = getCompetition(req.params.id);
+    if (!comp) return res.status(404).json({ error: "Event not found" });
+    const denied = competitionDenied(req, comp.id);
+    if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
+    if (!programGraded(comp)) return res.status(400).json({ error: "Only a Program is graded.", code: "not_a_program" });
+    const members = db.prepare(
+      `SELECT u.id, u.nickname, u.first_name, u.last_name, u.email FROM competition_users cu JOIN users u ON u.id = cu.user_id
+        WHERE cu.competition_id = ?`
+    ).all(comp.id);
+    const off = getStaffOrBenchmarkSet(members.map(m => m.id), { staffCompete: staffCompeteOn(comp) });
+    const held = new Map(db.prepare("SELECT * FROM achievement_badges WHERE competition_id=? AND revoked_at IS NULL").all(comp.id).map(b => [b.user_id, b]));
+    const closed = new Map(db.prepare("SELECT user_id, COUNT(*) AS n FROM program_attempts WHERE competition_id=? GROUP BY user_id").all(comp.id).map(r => [r.user_id, r.n]));
+    const rows = members.filter(m => !off.has(m.id)).map((m) => {
+      const st = programStanding(m.id, comp);
+      const b = held.get(m.id);
+      return {
+        userId: m.id, nickname: m.nickname || null, firstName: m.first_name || null, lastName: m.last_name || null, email: m.email || null,
+        finished: st.finished,
+        attempt: st.attempt,
+        previousAttempts: closed.get(m.id) || 0,
+        grade: st.grade ? {
+          points: st.grade.points, max: st.grade.max, permille: st.grade.permille, percent: formatGradePercent(st.grade.permille),
+          band: st.grade.band, label: st.grade.label, passed: st.grade.passed,
+        } : null,
+        certificate: b ? { issuedAt: b.created_at, grade: _frozenGrade(b) } : null,
+      };
+    });
+    rows.sort((a, b) => ((b.grade ? b.grade.permille : -1) - (a.grade ? a.grade.permille : -1))
+      || String(a.nickname || "").localeCompare(String(b.nickname || ""), undefined, { sensitivity: "base" })
+      || String(a.userId).localeCompare(String(b.userId)));
+    res.json({ passPercent: PASS_PERCENT, maxPoints: programMaxPoints(comp.id), rows });
   });
 
   // ── v8.15.1 — ADMIN: THE CERTIFICATES ISSUED FOR AN EVENT ─────────────────────
@@ -2156,6 +2320,7 @@ module.exports = function register(app) {
       competitionName: comp.name,
       dateLabel: art.dateLabel,
       scoreLabel: art.scoreLabel,
+      grade: art.grade,
       code: formatCredentialCode(row.public_code),
     });
   });
@@ -2245,7 +2410,9 @@ module.exports = function register(app) {
     // what the rank means — first on the late board, not first at the event.
     const _late = art.lateEntrant;
     const desc = row.basis === "completion"
-      ? `${shownName} completed ${comp.name} on ${platform}.`
+      ? (art.grade
+        ? `${shownName} completed ${comp.name} on ${platform}, graded ${art.grade.label} (${art.grade.percent}).`
+        : `${shownName} completed ${comp.name} on ${platform}.`)
       : isPlacementBasis(row.basis, row.rank)
         ? (_late
           ? `${shownName} finished ${rankLabel.toLowerCase()} among the late entrants in ${comp.name} on ${platform}.`

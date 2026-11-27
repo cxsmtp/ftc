@@ -78,6 +78,7 @@ export const HELP_TIPS = {
   "events.other": "As staff you can open any event to look around without joining it. You are not ranked unless the event lets staff compete.",
   "tasks.filters": "Solved and Unsolved show the challenges you have, or have not yet, answered correctly. The difficulty chips show what a correct answer is worth.",
   "lb.board": "Ranked by score. On a tie the faster Time to Solve wins: it runs from when you first opened the event until you finished every challenge, or until now. All Solved marks the people who finished.",
+  "program.grade": "Your grade is the points you hold out of the most this Program's challenges can give. Wrong answers and hints count against it; quick questions do not count. 90% Excellent, 80% Very good, 70% Good, 60% Satisfactory; under 60% there is no certificate, and you can try again while the Program runs.",
   "cert.held": "Anyone can check that a certificate is genuine on the verify page, with its code and your family name. Nothing about you is public until you press Share.",
   "profile.emails": "Sign-in codes go to the primary address only. A new primary email takes effect only once it is confirmed from the message sent to that address.",
   "profile.identity": "The nickname is the name shown on leaderboards. First and last names print on certificates, unless a certificate name is set below.",
