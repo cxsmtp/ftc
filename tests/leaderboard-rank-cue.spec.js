@@ -67,6 +67,7 @@ test("v7.23.0: top-3 leaderboard rows carry a VISIBLE rank ordinal, not colour a
       name: `Rank Cue ${Date.now()}`,
       start_time: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
       duration_minutes: 600, timezone: "UTC",
+      clock_start: "entry",   // the board's rows come from entering it
     },
   });
   expect(comp.status(), await comp.text()).toBe(200);

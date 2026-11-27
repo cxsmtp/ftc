@@ -177,7 +177,9 @@ test.describe("A quick answer never moves the tie-break finish time", () => {
 
 test.describe("A quick answer alone is not taking part", () => {
   test("no participation certificate is offered or minted for it; a wrong scoring answer earns one (control)", async () => {
-    const ev = await makeCompetition(sa, saCsrf, "tookpart", { start_time: iso(Date.now() - HOUR), duration_minutes: 600, add_qualifying: true });
+    // The entry clock: each of the three is on the board by ENTERING it (on a
+    // first-open clock a quick answer alone leaves its author off the board).
+    const ev = await makeCompetition(sa, saCsrf, "tookpart", { start_time: iso(Date.now() - HOUR), duration_minutes: 600, add_qualifying: true, clock_start: "entry" });
     const quick = quickOf(ev.id);
     expect(quick.length, "PRECONDITION: the four quick questions").toBe(4);
     const s1 = await makeTask(sa, saCsrf, "tp-s1"), s2 = await makeTask(sa, saCsrf, "tp-s2");
@@ -210,7 +212,7 @@ test.describe("A quick answer alone is not taking part", () => {
   });
 
   test("a hint revealed on an older qualifying question alone is not taking part; a hint on a scoring challenge is (control)", async () => {
-    const ev = await makeCompetition(sa, saCsrf, "hinted", { start_time: iso(Date.now() - HOUR), duration_minutes: 600, add_qualifying: false });
+    const ev = await makeCompetition(sa, saCsrf, "hinted", { start_time: iso(Date.now() - HOUR), duration_minutes: 600, add_qualifying: false, clock_start: "entry" });
     // An older qualifying challenge of another type, which may still carry a
     // hint: the tag written as a release before the pick-one rule left it (no
     // route tags a text challenge now: tests/qualifying-pick-one.spec.js).
