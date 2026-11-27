@@ -521,6 +521,12 @@ test.describe("Superadmin UI", () => {
         headers: { "x-csrf-token": csrf, "content-type": "application/json" },
         data: { competitionId: liveComp.id },
       });
+      // The seeded event's clock may start at the first open of a challenge rather
+      // than on entry, so open one: the board then lists the caller either way.
+      { const tl = await (await page.request.get("/api/tasks")).json();
+        const first = (Array.isArray(tl) ? tl : (tl.tasks || [])).find(t => !t.qualifying);
+        expect(first, "PRECONDITION: the event has a scoring challenge to open").toBeTruthy();
+        expect((await page.request.get(`/api/tasks/${first.id}`)).ok(), "PRECONDITION: the challenge opens").toBeTruthy(); }
       await page.goto("/");
       await page.locator(".nav-btn:not([aria-disabled=true]):has-text('Leaderboard')").first().click();
       await page.locator("#leaderboard-page").waitFor({ state: "visible", timeout: 15000 });
@@ -1552,7 +1558,8 @@ test.describe("v7.11.0 — participant team/group leaderboard", () => {
     const t = Date.now();
     // v7.11.7 — the board is opt-in AND needs >=2 non-empty teams, so enable it and
     // bind the viewer's Squad + a Rivals team.
-    const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: `PTeam ${t}`, start_time: new Date(t - 60_000).toISOString(), duration_minutes: 240, group_leaderboard_enabled: true } })).json()).competition.id;
+    // The entry clock: each member is on the board from ENTERING it (below).
+    const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: `PTeam ${t}`, start_time: new Date(t - 60_000).toISOString(), duration_minutes: 240, group_leaderboard_enabled: true, clock_start: "entry" } })).json()).competition.id;
     let taskId = (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title: `PTeam-T ${t}`, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
     taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     // Fresh verified+approved participants with a known password.
