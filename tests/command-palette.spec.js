@@ -348,10 +348,12 @@ test.describe("command palette — inside an event, a participant's jumps, and t
       expect((await offered(page, sec, "Go to")).filter((o) => o.hint === here).map((o) => o.label), `the workspace's ${sec} section`).toContain(sec);
     }
     expect((await offered(page, "invite", "Actions")).find((o) => o.label === "Invite people"), "Invite, to this event").toMatchObject({ hint: `To ${X.live.name}` });
-    for (const door of ["Add from bank", "Edit settings", "History", "Clone"]) {
+    for (const door of ["Edit settings", "History", "Clone"]) {
       expect((await offered(page, door, "Actions")).filter((o) => o.hint === here).map((o) => o.label), `the ⋯ menu's ${door}`).toContain(door);
     }
-    for (const door of ["End now", "Delete event"]) {
+    // Stage B (owner ruling, 27 Nov 2026) — the ⋯ menu has no Add from bank (the
+    // event's one door is its Questions section's), so neither does the palette.
+    for (const door of ["End now", "Delete event", "Add from bank"]) {
       expect((await offered(page, door, "Actions")).map((o) => o.label), `${door} is never offered`).not.toContain(door);
     }
     // An Actions item RUNS: History opens the event's history.
@@ -392,7 +394,7 @@ test.describe("command palette — inside an event, a participant's jumps, and t
       await signInSuperadmin(sp);
       await openWorkspace(sp, X.compete);
       await openPalette(sp);
-      for (const door of ["Invite people", "Add from bank", "Edit settings"]) {
+      for (const door of ["Invite people", "Edit settings"]) {
         expect((await offered(sp, door, "Actions")).map((o) => o.label), `CONTROL: the superadmin (not competing) is offered ${door}`).toContain(door);
       }
     } finally { await ctx.close(); }

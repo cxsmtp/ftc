@@ -163,6 +163,7 @@ test.describe("Stage B — the Question bank", () => {
     expect(rows.map(r => r.owner_competition_id), "one question, owned by the event (no bank row)").toEqual([comp.id]);
     const own = rows[0].id;
 
+    await narrowChallengesTable(page, title);
     const row = page.locator("#admin-task-body tr", { hasText: title }).first();
     await expect(row).toBeVisible({ timeout: 10000 });
     const btn = row.locator('[data-action="task-save-to-bank"]');

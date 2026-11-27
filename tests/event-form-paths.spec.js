@@ -6,16 +6,14 @@
 //
 //   * A template create whose settings PUT is refused stays the CREATE that
 //     made the event: "Finish creating" sends the settings to that event, then
-//     the ticked challenges and the Checkmarx One group, and never spawns twice.
+//     the Checkmarx One group, and never spawns twice.
 //     A refusal that carries a list keeps its modal. When the save's ANSWER is
 //     lost after it landed, the next press finishes on the token that save
 //     produced, and never overwrites a change someone else made meanwhile.
-//   * Tick all shown and Clear ticks act on what is listed; a ticked challenge
-//     the server refuses is named and the rest are added; a staff-compete
-//     create's refusal list reaches its modal.
+//   * Stage B (owner ruling, 27 Nov 2026): the form picks no questions; the
+//     event's one door, + Add from bank, names a refused question and adds the rest.
 //   * The template + staff compete + qualifying pre-check stops before anything
 //     is made, and the create route refuses the same pair by name.
-//   * "Create and pick challenges" opens the picker on the new event.
 //   * A template's "one board across sessions" survives the PUT after its spawn.
 //   * A Program's create confirmation names its deadline and how long it is open.
 //   * A clone's message names what it did not carry over, and its dialog says
@@ -212,13 +210,11 @@ test.describe("An event create whose answer is lost after it landed", () => {
   }
   const lostToast = "so they may not have been saved. Press Finish creating";
 
-  test("the next press finishes it without saving the settings twice, and the ticks and the Checkmarx One group land", async ({ page }) => {
+  test("the next press finishes it without saving the settings twice, and the Checkmarx One group lands", async ({ page }) => {
     test.setTimeout(120_000);
     const tplName = uniq("Landed tpl");
     const { api: sa, csrf } = await apiLogin("superadmin");
-    let t1;
     try {
-      t1 = await makeTask(sa, csrf, "landed-one");
       await makeTemplate(sa, csrf, { name: tplName, event_kind: "tournament", settings: { duration_minutes: 60 }, task_ids: [] });
     } finally { await sa.dispose(); }
 
@@ -228,7 +224,6 @@ test.describe("An event create whose answer is lost after it landed", () => {
     await form.locator("#comp-name").fill(evName);
     await form.locator("#comp-date").fill(dateIn(3));
     await form.locator("#comp-attempt-cap").fill("3");
-    await tick(form, t1.title);
     await openCompAdvanced(page);
     const group = `grp-${Date.now().toString(36)}`;
     await form.locator("#comp-cxone-group").fill(group);
@@ -246,18 +241,16 @@ test.describe("An event create whose answer is lost after it landed", () => {
     const id = made[0];
     expect(dbGet("SELECT attempt_cap a, cxone_group_name g FROM competitions WHERE id=?", id),
       "PRECONDITION: the settings are stored; the group, sent after them, is not").toEqual({ a: 3, g: null });
-    expect(eventsOfTask(t1.id), "PRECONDITION: nor is the tick").not.toContain(id);
 
     await saveAndConfirm(page, /^Finish creating /);
     await expect(form, "the finished create closes the form").toHaveCount(0, { timeout: 20000 });
     expect(net.spawn, "nothing spawned twice").toBe(1);
     expect(net.sent, "the settings were not sent again: the event already held them").toBe(1);
     expect(net.answered, "so no save was answered at all, and none refused as a conflict").toEqual([]);
-    await expect.poll(() => eventsOfTask(t1.id), { timeout: 10000, message: "the tick was added" }).toContain(id);
+    expect(net.assign || [], "the form assigns no question (the event's one door is + Add from bank)").toEqual([]);
     expect(net.cxone, "the Checkmarx One group is saved once").toBe(1);
     expect(dbGet("SELECT attempt_cap a, cxone_group_name g FROM competitions WHERE id=?", id)).toEqual({ a: 3, g: group });
     expect(eventsNamed(evName), "one event, the one the first press made").toEqual([id]);
-    await expect(page.locator("#toast-stack")).toContainText("1 ticked challenge added");
   });
 
   test("a value changed since is sent with the token that lost save produced, for a Booth Event and a Program", async ({ page }) => {
@@ -448,9 +441,8 @@ test.describe("An event create whose answer is lost after it landed", () => {
     test.setTimeout(120_000);
     const tplName = uniq("Conflict tpl");
     const { api: sa, csrf } = await apiLogin("superadmin");
-    let t1, other;
+    let other;
     try {
-      t1 = await makeTask(sa, csrf, "conflict-one");
       await makeTemplate(sa, csrf, { name: tplName, event_kind: "tournament", settings: { duration_minutes: 60 }, task_ids: [] });
       other = await makeParticipant(sa, csrf, "other-admin");
       const pr = await sa.post(`/api/admin/participants/${other.id}/role`, { headers: H(csrf), data: { role: "admin" } });
@@ -464,7 +456,6 @@ test.describe("An event create whose answer is lost after it landed", () => {
       await form.locator("#comp-name").fill(evName);
       await form.locator("#comp-date").fill(dateIn(3));
       await form.locator("#comp-attempt-cap").fill("3");
-      await tick(form, t1.title);
       const net = watchNet(page);
       await loseFirstAnswer(page, net);
       await saveAndConfirm(page, /^Create /);
@@ -482,7 +473,6 @@ test.describe("An event create whose answer is lost after it landed", () => {
         .toContainText("the event was changed after it was created", { timeout: 15000 });
       expect(net.answered, "the press was refused as a conflict").toEqual([409]);
       expect(dbGet("SELECT attempt_cap a FROM competitions WHERE id=?", id).a, "their change stands").toBe(7);
-      expect(eventsOfTask(t1.id), "nothing ticked was added behind a refused save").not.toContain(id);
       await expect(form, "the form stays open, the admin's values on it").toBeVisible();
       expect(net.spawn, "nothing spawned twice").toBe(1);
       expect(eventsNamed(evName)).toEqual([id]);
