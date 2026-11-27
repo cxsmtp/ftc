@@ -166,7 +166,7 @@ ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
 PodmanArgs=--pids-limit=1024 --memory=$MEMORY --cpus=$CPUS
-HealthCmd=node -e "fetch('http://localhost:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HealthCmd=wget -q -O /dev/null http://127.0.0.1:3000/readyz
 HealthInterval=30s
 HealthTimeout=5s
 HealthStartPeriod=20s
