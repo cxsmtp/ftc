@@ -740,7 +740,8 @@ export async function showCompetitionHistory(compId){
 }
 
 export async function showUserHistory(userId){
-  const user=S.adminParticipantsData.find(p=>p.id===userId);
+  // People's row, else the admin account a Roles & permissions row names.
+  const user=(S.adminParticipantsData||[]).find(p=>p.id===userId)||(S.adminUserRows||[]).find(p=>p.id===userId);
   const name=user?`${user.first_name||''} ${user.last_name||''}`.trim()||user.nickname||user.email:'';
   const seq=++_histOpenSeq;
   const {events,total,snapshotBefore,snapshotTie,failed}=await _fetchEventsPaged(`/api/admin/participants/${userId}/events`);

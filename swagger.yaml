@@ -10552,8 +10552,8 @@ paths:
           schema: { type: string }
         - name: kind
           in: query
-          description: "`participants` (default) — every account except those whose role acts on every event; `all` — every role (an event workspace's roster, and People with Show admin accounts)."
-          schema: { type: string, enum: [participants, all], default: participants }
+          description: "`participants` (default) — every account except those whose role acts on every event; `all` — every role (an event workspace's roster, and People reached through a link to an admin account); `admins` — only accounts holding a role other than Participant (the rows of Roles & permissions, which offers their account doors). Ignored with `competitionId`, whose roster is never narrowed by role."
+          schema: { type: string, enum: [participants, all, admins], default: participants }
         - name: page
           in: query
           schema: { type: integer, format: int32, default: 1, minimum: 1, maximum: 1000000000 }

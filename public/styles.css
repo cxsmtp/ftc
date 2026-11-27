@@ -1893,6 +1893,13 @@ table tbody tr{transition:background var(--duration-fast) var(--ease-out)}
   border:1px solid var(--border-strong);border-left:4px solid var(--accent);padding:14px 20px;border-radius:var(--r-m);
   min-height:44px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-3);
   animation:toast-in var(--duration-normal) var(--ease-spring)}
+/* While a dialog is open the stack sits at the TOP: a dialog's primary action is
+   in its footer, bottom right, where a toast otherwise lands, and pointing at a
+   toast pauses its countdown, so one over the action never left (modal.js
+   overlayDismiss keeps body.dialog-open). !important: the page placements below
+   (the phone bar, the challenge view's submit row) are written for pages, and
+   a dialog sits over all of them. */
+body.dialog-open #toast-stack{top:calc(24px + env(safe-area-inset-top, 0px))!important;bottom:auto!important}
 .toast.toast-error{border-left-color:var(--red)}
 .toast.toast-success{border-left-color:var(--green)}
 .toast.toast-warning{border-left-color:var(--yellow)}

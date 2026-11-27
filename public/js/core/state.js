@@ -251,6 +251,9 @@ export const S = {
   _histState: null,
   _pendingStagingAttachments: [],
   adminParticipantsData: [],
+  // The admin accounts Roles & permissions offers account doors on (People's rows
+  // for them, GET /api/admin/participants?kind=admins); null until read or on failure.
+  adminUserRows: null,
   pSortCol: 'name',
   pSortAsc: true,
   pPage: 1,

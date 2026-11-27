@@ -130,6 +130,16 @@ export function _countdownConfirm(name,typeLabel){
   });
 }
 
+// WHILE A DIALOG IS OPEN, TOASTS SIT AT THE TOP (styles.css `body.dialog-open
+// #toast-stack`): a dialog keeps its primary action in its footer, at the bottom
+// right, which is where a toast otherwise lands; a toast there covered the
+// action, and pointing at it paused the toast's countdown, so it never left
+// (the event form's "Finish creating"). Every dialog goes through
+// overlayDismiss, so the live set of its overlays is the one answer.
+const _openDialogs=new Set();
+function _syncDialogOpen(){
+  try{document.body.classList.toggle('dialog-open',_openDialogs.size>0);}catch(_){/* no body yet: nothing to place */}
+}
 export function overlayDismiss(overlay,fn){
   // v6.8.10: no backdrop-click-close. Callers still pass `fn` — it's
   // wired to Escape below and (externally) to explicit Cancel / X
@@ -140,6 +150,8 @@ export function overlayDismiss(overlay,fn){
   // ruling, 14 Nov 2026.
   const entry={overlay,fn};
   window._modalEscStack.push(entry.fn);
+  _openDialogs.add(entry);
+  _syncDialogOpen();
   // ext-audit batch 3 (F4): systemic focus restoration. Snapshot the element
   // that had focus when the overlay mounted — but ONLY if it's a real control
   // OUTSIDE this overlay (the opener). Overlays that call overlayDismiss BEFORE
@@ -170,6 +182,8 @@ export function overlayDismiss(overlay,fn){
     cleaned=true;
     const i=window._modalEscStack.indexOf(entry.fn);
     if(i>=0)window._modalEscStack.splice(i,1);
+    _openDialogs.delete(entry);
+    _syncDialogOpen();
     try{removeTrap();}catch(_){/* no-op */}
     if(mo){try{mo.disconnect();}catch(_){/* no-op */}}
     // Restore focus to the opener (ext-audit batch 3 F4) — only if focus is

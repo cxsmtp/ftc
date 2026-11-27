@@ -275,6 +275,9 @@ test.describe("An event create whose answer is lost after it landed", () => {
         await form.locator("#comp-deadline-time").fill("18:00");
       }
       await form.locator("#comp-attempt-cap").fill("3");
+      // The previous kind's toast says the same words and may still be up (a
+      // toast lives up to 15 s): this kind's must be its own.
+      await page.evaluate(() => document.querySelectorAll("#toast-stack .toast").forEach((t) => t.remove()));
       const net = watchNet(page);
       await loseFirstAnswer(page, net);
       await saveAndConfirm(page, /^Create /);

@@ -1220,9 +1220,12 @@ app.get("/api/admin/participants", requireAdmin, rateLimit(60_000, 120, "admin-p
   // of class `all` (see the SQL below) unless the caller asks for `?kind=all` (an event workspace does, so an event's roster keeps
   // the staff who compete in it). An event's own roster (`competitionId`) is
   // never narrowed by role. The kind is part of the cache key.
-  const _kind = req.query.kind === "all" ? "all" : "participants";
+  // `?kind=admins` — only the accounts holding a role other than Participant:
+  // the rows Roles & permissions offers their account doors on (owner decision,
+  // 27 Nov 2026), in the same shape and with the same per-row answers as People.
+  const _kind = req.query.kind === "all" ? "all" : req.query.kind === "admins" ? "admins" : "participants";
   const _mayDelete = _mayDeleteAccounts(req);
-  const _cacheActor = (competitorIds(req).join("+") || "builtin") + (_mayDelete ? ":del" : "") + `|k=${_kind === "all" ? "a" : "p"}`;
+  const _cacheActor = (competitorIds(req).join("+") || "builtin") + (_mayDelete ? ":del" : "") + `|k=${_kind === "all" ? "a" : _kind === "admins" ? "s" : "p"}`;
   const cachedBody = getCachedParticipantsPage(competitionId, page, limit, _cacheActor);
   if (cachedBody) return res.json(cachedBody);
 
@@ -1272,6 +1275,7 @@ app.get("/api/admin/participants", requireAdmin, rateLimit(60_000, 120, "admin-p
     // panel" door start from their People row. The unscoped (class `all`) admin
     // accounts are Users & roles only.
     const _vis = _kind === "all" ? _vis0
+      : _kind === "admins" ? { clause: (_vis0.clause ? `${_vis0.clause} AND` : " WHERE") + " COALESCE(users.role, 'participant') <> 'participant'", params: _vis0.params }
       : { clause: (_vis0.clause ? `${_vis0.clause} AND` : " WHERE") + " COALESCE(users.role, 'participant') NOT IN (SELECT value FROM json_each(?))",
           params: [..._vis0.params, JSON.stringify(_roleIdsOfClass("all"))] };
     total = db.prepare(`SELECT COUNT(*) as c FROM users${_vis.clause}`).get(..._vis.params).c;

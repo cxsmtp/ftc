@@ -82,6 +82,13 @@ role organises, and when they last signed in. From there you:
   If you compete alongside someone in an event where staff can compete, their
   row says so instead: another organiser changes their role.
 - **Events** on a scoped role's row chooses which events they organise.
+- **⋮** on a row holds the account's own actions, the ones People offers for a
+  participant: **Edit Profile** (or **View Profile** where you may not edit
+  it), **History**, **Block** or **Unblock**, **Unlock** for a locked account
+  and **Email sign-in code**. They act exactly as they do on People, so an
+  administrator who is not a superadmin sees a fellow admin's profile and
+  history only, with a note that only superadmins manage that account, and a
+  role that cannot see People gets none of them.
 
 The **Roles** view lists the four built-in roles — Participant, Event admin,
 Admin, Superadmin — which never change, and the **custom roles** you create.

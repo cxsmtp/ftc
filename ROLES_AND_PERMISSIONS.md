@@ -157,7 +157,12 @@ account off its role: `GET /api/admin/roles` carries both answers per role
 (`can_give`, `can_take`), computed by `roleAssignDenied` itself. They never offer
 the built-in Event admin (its scope is granted per event), and before a change
 that leaves a role scoped to its events they say that every organiser grant goes
-with it, and afterwards how many did.
+with it, and afterwards how many did. Each user row also offers the account's own doors People offers a participant's
+row (Edit or View profile, History, Block or Unblock, Unlock, Email sign-in code;
+owner decision, 27 Nov 2026: admin accounts are not on People), with People's
+predicates over People's own rows for those accounts (`GET
+/api/admin/participants?kind=admins`, `participants.view`), so a regular admin
+gets a privileged account's note, profile and History only, as on People.
 
 **A platform-wide permission needs a role that acts on every event.** Its routes
 reach beyond any one event, so nothing narrows them to a role's events: some read

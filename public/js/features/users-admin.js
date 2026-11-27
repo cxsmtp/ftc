@@ -20,8 +20,18 @@ import { showToast } from "../ui/toast.js";
 import { renderLoadFailure } from "../ui/list-controls.js";
 import { registerHelpTips } from "../ui/help-tips.js";
 import { compareCompsForPicker } from "./competitions-admin.js";
+import { adminCan } from "../ui/nav.js";
+import { ICO } from "../ui/icons.js";
+// People's account doors, one definition. participants-admin.js imports this
+// module too (showUserInRoles); neither reads the other at load time, so the
+// cycle is only between functions called later.
+import { accountDoors, accountPeerNoteHtml, accountProfileLabel, accountBlockDoorHtml } from "./participants-admin.js";
 
 const _st = { view: "users", perms: new Set(), me: null, users: null, roles: null, sections: [], catalogue: [], comps: null, q: "" };
+// The account doors on each user row (owner decision, 27 Nov 2026: admin accounts
+// are not on People any more, so their row here offers what People's row menu
+// offered them: Edit or View profile, History, Block or Unblock, Unlock, Email
+// sign-in code), People's own (participants-admin.js `accountDoors`).
 let _loadSeq = 0;
 
 export const USERS_HELP_TIPS = {
@@ -70,12 +80,22 @@ export async function loadUsersPane() {
   const seq = ++_loadSeq;
   const body = document.getElementById("ua-body");
   if (!body) return;
-  const [me, users, roles] = await Promise.all([
+  // The rows the account doors act on: People's own projection of these accounts
+  // (GET /api/admin/participants?kind=admins: each row's privileged-target answer,
+  // rival mark, lock and status, the profile the editor opens), read only by a
+  // role that may read People (`participants.view`, the route's permission).
+  const canPeople = adminCan("participants.view");
+  const [me, users, roles, people] = await Promise.all([
     fetchJsonObject("/api/admin/me"),
     fetchJsonObject("/api/admin/users"),
     fetchJsonObject("/api/admin/roles"),
+    canPeople ? fetchJsonObject("/api/admin/participants?kind=admins&limit=5000") : Promise.resolve(null),
   ]);
   if (seq !== _loadSeq) return;
+  // A failed read of the doors' rows leaves the doors off, with a sentence (the
+  // list itself still renders): never a door acting on a row it could not read.
+  S.adminUserRows = people && Array.isArray(people.participants) ? people.participants : null;
+  _st.doorsUnread = canPeople && !S.adminUserRows;
   if (!me || !users || !roles || !Array.isArray(users.users) || !Array.isArray(roles.roles)) {
     renderLoadFailure("ua-body", { noun: "users and roles", retryAction: "ua-reload" });
     return;
@@ -131,7 +151,10 @@ function _renderUsers() {
   // An admin data table (ui/table-columns.js, PLAIN_TABLES.users): Columns,
   // and sort and filter on every heading. Last sign-in shows a date as words, so
   // its cell carries the instant (data-sort-value) a sort and a date filter read.
-  setSafeHtml(host, `<div class="table-card ua-table-wrap"><table class="ua-table" data-tcols="users">
+  // The account doors act on People's own rows for these accounts; when that read
+  // failed, say so rather than leave the doors silently missing.
+  const unread = _st.doorsUnread ? `<p class="t-small" id="ua-doors-unread" role="status">These accounts' details could not be read, so their account actions (profile, history, block, unlock, sign-in code) are not offered. Reload the page to try again.</p>` : "";
+  setSafeHtml(host, `${unread}<div class="table-card ua-table-wrap"><table class="ua-table" data-tcols="users">
     <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Events</th><th scope="col">Status</th><th scope="col" data-tcol="last_sign_in">Last sign-in</th><th scope="col" data-tcol="actions">Actions</th></tr></thead>
     <tbody>${rows.map(u => {
       const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.nickname || "—";
@@ -146,6 +169,7 @@ function _renderUsers() {
       if (canManage && rival) acts.push(`<span class="t-muted ua-rival-note">You compete alongside them in “${esc(rival.name || "an event")}”, so their role cannot be changed from here</span>`);
       if (canGrant && u.scope_mode === "granted") acts.push(`<button type="button" class="btn secondary sm" data-action="ua-events" data-user-id="${esc(u.id)}" aria-label="Events — choose which events ${esc(name)} organises">Events</button>`);
       if (self) acts.push(`<span class="t-muted">You</span>`);
+      acts.push(_doorsMenu(u, name));
       return `<tr>
         <td>${esc(name)}</td><td>${esc(u.email || "")}</td>
         <td><span class="chip ua-role-chip">${esc(u.role_label || u.role)}</span></td>
@@ -154,6 +178,25 @@ function _renderUsers() {
         <td data-sort-value="${esc(u.last_login_time || "")}">${u.last_login_time ? esc(fmtDt(u.last_login_time, "short")) : '<span class="t-muted">Never</span>'}</td>
         <td class="ua-actions">${acts.join(" ") || '<span class="t-muted">—</span>'}</td></tr>`;
     }).join("")}</tbody></table></div>`);
+}
+
+/**
+ * The row's account doors, as People's row menu offers them (its predicates,
+ * `accountDoors`), behind one "⋮" menu. A door the role may not use is withheld,
+ * and a privileged account's note says who manages it. Nothing for a role that
+ * cannot read People's rows: the doors act on those rows.
+ */
+function _doorsMenu(u, name) {
+  const p = (S.adminUserRows || []).find(x => x.id === u.id);
+  if (!p) return "";
+  // The same items, in the same order and words, as People's row menu.
+  const items = [accountPeerNoteHtml(p),
+    `<button data-action="participant-edit-profile" data-user-id="${esc(p.id)}">${ICO.edit} ${esc(accountProfileLabel(p))}</button>`,
+    `<button data-action="participant-history" data-user-id="${esc(p.id)}">${ICO.clock} History</button>`,
+    accountBlockDoorHtml(p),
+    accountDoors(p).canReset ? `<button data-action="participant-email-code" data-user-id="${esc(p.id)}">${ICO.key} Email sign-in code</button>` : "",
+  ].filter(Boolean).join("");
+  return `<button type="button" class="kebab-btn kebab-always ua-doors" data-action="kebab-toggle" aria-label="More actions for ${esc(name)}">⋮</button><div class="kebab-menu">${items}</div>`;
 }
 
 function _renderRoles() {
@@ -414,6 +457,12 @@ export async function deleteRole(roleId) {
 
 export function initUsersAdmin(registerAction) {
   registerHelpTips(USERS_HELP_TIPS);
+  // An account door (People's own handlers) changed an account: the list here
+  // follows while it is on screen.
+  document.addEventListener("admin:account-changed", () => {
+    const pane = document.getElementById("admin-users-tab");
+    if (pane && pane.offsetParent !== null) loadUsersPane();
+  });
   registerAction("ua-reload", () => loadUsersPane());
   registerAction("ua-view", (e, el) => setUsersView(el.dataset.view));
   registerAction("ua-add-user", () => openAddUser());
