@@ -165,13 +165,17 @@ test.describe("RBAC — a custom role in the browser", () => {
     const gbind = await sa.post("/api/admin/competitions/assign", { headers: H(saCsrf), data: { groupIds: [group.id], competitionIds: [comp.id] } });
     expect(gbind.ok(), `bind group: ${gbind.status()} ${await gbind.text()}`).toBeTruthy();
     // A capped challenge on the live event (Grant Attempts is offered only where
-    // a cap holds), and the participant entered it, so the board lists them.
+    // a cap holds), and the participant entered it and opened that challenge, so
+    // the board lists them (its clock starts at the first open; opening spends no
+    // attempt).
     capTask = await makeTask(sa, saCsrf, "crcap", { attempt_cap: 2 });
-    await assignTask(sa, saCsrf, capTask.id, [comp.id]);
+    const capAsg = await assignTask(sa, saCsrf, capTask.id, [comp.id]);
     const p = await apiLogin(partU.email, PARTICIPANT_PASS);
     try {
       const sel = await p.api.post("/api/select-competition", { headers: H(p.csrf), data: { competitionId: comp.id } });
       expect(sel.ok(), `PRECONDITION: the participant entered the event: ${sel.status()} ${await sel.text()}`).toBeTruthy();
+      const opened = await p.api.get(`/api/tasks/${capAsg.copies[0].task_id}`);
+      expect(opened.ok(), `PRECONDITION: the participant opened its challenge: ${opened.status()}`).toBeTruthy();
     } finally { await p.api.dispose(); }
     // A built-in event admin organising `comp` and an event with nobody in it.
     emptyComp = await makeCompetition(sa, saCsrf, "crempty");

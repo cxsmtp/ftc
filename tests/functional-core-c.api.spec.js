@@ -1931,6 +1931,7 @@ test.describe("Group-level leaderboard (v7.11.0)", () => {
     const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: {
       name: `EAGER ${t}`, start_time: new Date(t - 60_000).toISOString(), duration_minutes: 240,
       group_leaderboard_enabled: true,
+      clock_start: "entry",   // members join the board by entering it
     } })).json()).competition.id;
     const mkTask = async (title, ans) => (await (await sa.post("/api/admin/tasks", { headers: saH, data: {
       title, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: ans, status: "published",
@@ -2202,7 +2203,8 @@ test.describe("Group-level leaderboard (v7.11.0)", () => {
     const saH = GH(saCsrf);
     const t = Date.now();
     const mkLiveComp = async (name) => {
-      const cid = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: `${name} ${t}`, start_time: new Date(t - 60_000).toISOString(), duration_minutes: 240, group_leaderboard_enabled: true } })).json()).competition.id;
+      // `entry`: each member joins the board by entering it.
+      const cid = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: `${name} ${t}`, start_time: new Date(t - 60_000).toISOString(), duration_minutes: 240, group_leaderboard_enabled: true, clock_start: "entry" } })).json()).competition.id;
       const tid = (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title: `${name}-T ${t}`, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
       await sa.post(`/api/admin/tasks/${tid}/competitions`, { headers: saH, data: { competitionIds: [cid] } });
       return { cid, tid };
