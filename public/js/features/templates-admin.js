@@ -430,7 +430,7 @@ async function _spin(t) {
   if (!r) { err('No answer came back from the server, so the event may or may not have been made. Check the Events list before you try again.'); return; }
   if (!r.ok || !d.competition) { err((d && d.error) || 'Could not create the event.'); return; }
   const skipped = Array.isArray(d.skipped_challenges) ? d.skipped_challenges : [];
-  showToast(`Created “${d.competition.name}” with ${d.assigned_challenges || 0} challenge${d.assigned_challenges === 1 ? '' : 's'}.${skippedSummary(skipped)}`, skipped.length ? 'info' : 'success');
+  showToast(`Created “${d.competition.name}” with ${d.assigned_challenges || 0} question${d.assigned_challenges === 1 ? '' : 's'}.${skippedSummary(skipped)}`, skipped.length ? 'info' : 'success');
   _closeSpin();
   await loadAdminCompetitions();
   openEventWorkspace(d.competition.id, d.competition.name);

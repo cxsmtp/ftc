@@ -14,7 +14,7 @@
 import { S } from "../core/state.js";
 import { csrfHeaders, fetchJsonObject, fetchJsonList } from "../core/api.js";
 import { setSafeHtml } from "../core/trusted-types.js";
-import { esc, fmtDt } from "../ui/format.js";
+import { esc, fmtDt, addrBreakHtml } from "../ui/format.js";
 import { overlayDismiss, showModal } from "../ui/modal.js";
 import { showToast } from "../ui/toast.js";
 import { renderLoadFailure } from "../ui/list-controls.js";
@@ -128,7 +128,7 @@ function _render() {
 function _usersToolbarHtml() {
   return `<div class="ua-toolbar">
       <div class="search-wrap"><input id="ua-search" placeholder="Search name, email or role…" aria-label="Search platform users" autocomplete="off"/></div>
-      ${!_has("users.manage") ? "" : _addUserRoles().length ? `<button type="button" class="btn" data-action="ua-add-user">Add user</button> <span data-help="users.add" data-help-label="Add user"></span>`
+      ${!_has("users.manage") ? "" : _addUserRoles().length ? `<span class="ua-add-row"><button type="button" class="btn" data-action="ua-add-user">Add user</button><span data-help="users.add" data-help-label="Add user"></span></span>`
         : `<p class="t-small" id="ua-add-none">Your role cannot give any admin role, so it cannot add users.</p>`}
     </div>`;
 }
@@ -171,7 +171,7 @@ function _renderUsers() {
       if (self) acts.push(`<span class="t-muted">You</span>`);
       acts.push(_doorsMenu(u, name));
       return `<tr>
-        <td>${esc(name)}</td><td>${esc(u.email || "")}</td>
+        <td>${esc(name)}</td><td class="cell-addr">${addrBreakHtml(u.email)}</td>
         <td><span class="chip ua-role-chip">${esc(u.role_label || u.role)}</span></td>
         <td>${events}</td>
         <td>${esc(u.status)}</td>

@@ -633,7 +633,7 @@
           <div class="ev-home-titles">
             <p class="eyebrow ink">Organise</p>
             <h2 class="admin-pane-title ev-home-title">Events</h2>
-            <p class="ev-home-lede">Every event runs as its own campaign. Open one to manage its people, challenges, rankings and certificates in one place.</p>
+            <p class="ev-home-lede">Every event runs as its own campaign. Open one to manage its people, questions, rankings and certificates in one place.</p>
           </div>
           <div class="ev-home-actions">
             <button id="new-competition-btn" class="btn" data-action="open-competition-form">+ New Event</button>
@@ -756,17 +756,18 @@
              — it is the house pattern, and these were the outliers. -->
         <h2 class="admin-pane-title" id="tasks-pane-title">Question bank</h2>
         <div id="task-controls-row" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
-          <span data-help="library.list" data-help-label="Question bank"></span>
-          <div class="search-wrap"><input id="task-search" placeholder="Search questions..." aria-label="Search questions" data-input-action="task-search"/><button class="search-clear hidden" id="task-search-clear" data-action="task-search-clear" aria-label="Clear questions search"><span aria-hidden="true">×</span> Clear</button></div><span id="task-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="challenge" data-noun-plural="challenges"></span>
+          <!-- The list's "?" sits beside the count of what it explains (on the bank's
+               page and in a workspace, where the pane's title is visually hidden). -->
+          <div class="search-wrap"><input id="task-search" placeholder="Search questions..." aria-label="Search questions" data-input-action="task-search"/><button class="search-clear hidden" id="task-search-clear" data-action="task-search-clear" aria-label="Clear questions search"><span aria-hidden="true">×</span> Clear</button></div><span class="task-count-row"><span id="task-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="question" data-noun-plural="questions"></span><span data-help="library.list" data-help-label="Questions"></span></span>
           <!-- Stage B — the bank's Topic filter (features/topics-admin.js): every
                topic with how many of the reader's bank questions it holds. -->
-          <span class="topic-filter"><label for="task-topic-filter">Topic</label><select id="task-topic-filter" data-change-action="task-topic-filter"><option value="">All topics</option></select><span data-help="library.topics" data-help-label="Topics"></span></span>
+          <span class="topic-filter"><label for="task-topic-filter">Topic</label><span data-help="library.topics" data-help-label="Topics"></span><select id="task-topic-filter" data-change-action="task-topic-filter"><option value="">All topics</option></select></span>
           <div id="new-task-btn-row" style="display:flex;gap:8px">
             <button class="btn sm" id="add-tasks-to-comp-btn" style="display:none" data-action="open-add-tasks-to-competition">+ Add from bank</button>
             <button class="btn sm secondary" id="task-topics-btn" data-action="open-topics-dialog">Topics</button>
             <button class="btn sm secondary" id="export-tasks-btn" data-action="export-tasks">Export</button>
-            <span data-help="library.export" data-help-label="Export and import"></span>
             <button class="btn sm secondary" id="import-tasks-btn" style="display:none" data-action="click-hidden-input" data-target-id="import-tasks-file">Import</button>
+            <span data-help="library.export" data-help-label="Export and import"></span>
             <input type="file" id="import-tasks-file" accept=".json" style="display:none" data-change-action="import-tasks-file"/>
             <button class="btn sm" data-action="open-task-form">+ New question</button>
           </div>
@@ -775,7 +776,7 @@
           <button type="button" class="btn sm secondary filters-btn" id="task-filters-btn" data-action="filters-toggle" data-panel="task-filters-panel" aria-expanded="false" aria-controls="task-filters-panel">Filters</button>
           <span data-help="lists.filters" data-help-label="Filters"></span>
           <span class="filters-active" id="task-filters-panel-active"></span>
-          <div class="filters-panel card" id="task-filters-panel" role="group" aria-label="Challenge filters" hidden>
+          <div class="filters-panel card" id="task-filters-panel" role="group" aria-label="Question filters" hidden>
           <p class="t-eyebrow">Difficulty</p>
           <div class="filters" style="margin:0" id="task-diff-filters">
             <button class="filter-btn active" data-val="all" data-action="toggle-task-diff-filter">All</button>
@@ -1387,15 +1388,13 @@
                 <p class="settings-help">Used by every event without its own Checkmarx One settings.</p>
                 <div id="cxone-status" class="settings-status"></div>
                 <div class="settings-row">
-                  <label for="cxone-api-key">API Key</label>
+                  <span class="help-label-row settings-row-label"><label for="cxone-api-key">API Key</label><span data-help="settings.cxone-key" data-help-label="API key"></span></span>
                   <input type="password" id="cxone-api-key" placeholder="Paste API key" autocomplete="off" data-block-clipboard="1" aria-describedby="cxone-api-key-hint"/>
-                  <span data-help="settings.cxone-key" data-help-label="API key"></span>
                   <p class="settings-hint" id="cxone-api-key-hint">Tenant and URLs are derived automatically from the key.</p>
                 </div>
                 <div class="settings-row">
-                  <label for="cxone-group-name">Read-Only Group Name</label>
+                  <span class="help-label-row settings-row-label"><label for="cxone-group-name">Read-Only Group Name</label><span data-help="settings.cxone-group" data-help-label="Read-only group"></span></span>
                   <input type="text" id="cxone-group-name" placeholder="e.g. VisibleToAll"/>
-                  <span data-help="settings.cxone-group" data-help-label="Read-only group"></span>
                 </div>
                 <div class="settings-actions">
                   <button class="btn" data-action="save-cxone-settings">Save Integration</button>

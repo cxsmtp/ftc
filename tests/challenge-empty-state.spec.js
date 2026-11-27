@@ -61,7 +61,7 @@ test.describe("v8.8.4 — an empty challenge list names the truth", () => {
     await expect(empty, "the list is empty").toHaveCount(1);
     await expect(empty, "a focus removes no rows, so no filter is to blame")
       .not.toContainText(/match the current filters/i);
-    await expect(empty, "…it says the truth instead").toContainText(/no challenges yet/i);
+    await expect(empty, "…it says the truth instead").toContainText(/no questions yet/i);
   });
 
   test("CONTROL — a REAL filter is still named as one", async ({ page }) => {

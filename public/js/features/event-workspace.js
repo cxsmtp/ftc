@@ -613,7 +613,7 @@ function _renderKpis(c) {
     const scoring = _scoringTasks(c);
     const tasksN = scoring ? scoring.length : null;
     const unready = scoring ? scoring.filter(_notVisible).length : 0;
-    tiles.push({ key: 'tasks', label: 'Challenges', n: tasksN, text: '—',
+    tiles.push({ key: 'tasks', label: 'Questions', n: tasksN, text: '—',
       sub: scoring === null ? pending : (!tasksN ? 'none yet' : (unready ? `${unready} not visible yet` : 'all published')) });
   } else if (m.ranked && pt && pt.answers > 0) {
     // Only once there are answers: a zero here says nothing the attention row
@@ -1171,7 +1171,7 @@ function _actionKey(a) {
   return `[data-action="${CSS.escape(act)}"]${tgt ? `[data-target="${CSS.escape(tgt)}"]` : ''}`;
 }
 
-function _detailLabel(open) { return `${open ? 'Hide' : 'Show'} challenges, activity and organisers`; }
+function _detailLabel(open) { return `${open ? 'Hide' : 'Show'} questions, activity and organisers`; }
 
 // The selector that finds the same control in a rebuilt Overview: its id, else
 // its action and the thing it acts on. '' when it has neither (the fallback).
@@ -1231,7 +1231,7 @@ export async function loadEventOverview() {
   const top3 = top3Offered(c) ? `<button type="button" class="btn sm gold ws-top3-btn" data-action="comp-top3" data-comp-id="${esc(compId)}">${ICO.download} Download top 3 certificates</button>` : '';
   const ratesOnFace = status !== 'upcoming';
   const progress = ratesOnFace
-    ? _card('Progress', `<div id="ws-ov-progress"><p class="ws-empty">Loading…</p></div><h4 class="ws-sub-h">Solved, challenge by challenge</h4><div id="ws-ov-rates"><p class="ws-empty">Loading…</p></div>`,
+    ? _card('Progress', `<div id="ws-ov-progress"><p class="ws-empty">Loading…</p></div><h4 class="ws-sub-h">Solved, question by question</h4><div id="ws-ov-rates"><p class="ws-empty">Loading…</p></div>`,
       openLink('admin-analytics-tab', 'Open Analytics'), 'ws.progress', 'ws-progress-card ws-wide')
     : '';
   const rates = ratesOnFace ? '' : _card('Solve rate', '<div id="ws-ov-rates"><p class="ws-empty">Loading…</p></div>', '', 'ws.rates');
@@ -1241,8 +1241,8 @@ export async function loadEventOverview() {
   const chart = _card('Activity over time', '<div id="ws-ov-chart"><p class="ws-empty">Loading…</p></div>', '', 'ws.activity', 'ws-chart-card ws-wide');
   // The challenge set (from the Challenges model, which may still be loading),
   // each row opening its key facts in place.
-  const tasks = _card(`Challenges · ${c.task_count ?? 0}`, `<div id="ws-ov-tasks"><p class="ws-empty">Loading…</p></div>${_moreBtn('tasks', 'ws-ov-tasks')}`,
-    openLink('admin-tasks-tab', 'Open Challenges'), 'ws.challenges');
+  const tasks = _card(`Questions · ${c.task_count ?? 0}`, `<div id="ws-ov-tasks"><p class="ws-empty">Loading…</p></div>${_moreBtn('tasks', 'ws-ov-tasks')}`,
+    openLink('admin-tasks-tab', 'Open Questions'), 'ws.challenges');
   // Organisers: the list (Remove per row), its toggle, the outcome line, and the
   // add picker — four siblings, so a repaint of one never takes another's focus.
   const orgs = _card('Organisers', `<div id="ws-ov-orgs">${_organisersListHtml(c)}</div>${_moreBtn('orgs', 'ws-ov-orgs')}<p id="ws-ov-orgs-msg" class="ws-orgs-msg" role="status"></p><div id="ws-ov-orgs-add"></div>`,
@@ -1392,7 +1392,7 @@ function _renderOverviewAttn(c) {
     const tasks = p.tasks || [];
     const hidden = tasks.filter(t => t.status !== 'published' || !t.active).length;
     if (hidden) {
-      items.push(`<div class="ws-attn ws-attn-warn">${ICO.eyeOff}<span><b>${hidden} ${hidden === 1 ? 'challenge is' : 'challenges are'} not visible to participants.</b> Drafts and hidden challenges are not played.</span>`
+      items.push(`<div class="ws-attn ws-attn-warn">${ICO.eyeOff}<span><b>${hidden} ${hidden === 1 ? 'question is' : 'questions are'} not visible to participants.</b> Drafts and hidden questions are not played.</span>`
         + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Questions</button>' : '') + '</div>');
     }
     // Nobody ENROLLED (`_joinedCount`, the roster): an organiser playing an
@@ -1412,7 +1412,7 @@ function _renderOverviewAttn(c) {
       .sort((a, b) => b.attempters - a.attempters);
     if (stuck.length) {
       const names = stuck.slice(0, 2).map(t => `${t.task_number ? `#${t.task_number} ` : ''}${t.title} (${t.attempters} tried)`).join(', ');
-      items.push(`<div class="ws-attn ws-attn-info">${ICO.alertTriangle}<span><b>Nobody has solved ${stuck.length === 1 ? 'this challenge' : `${stuck.length} challenges`} yet:</b> ${esc(names)}${stuck.length > 2 ? ` and ${stuck.length - 2} more` : ''}.</span></div>`);
+      items.push(`<div class="ws-attn ws-attn-info">${ICO.alertTriangle}<span><b>Nobody has solved ${stuck.length === 1 ? 'this question' : `${stuck.length} questions`} yet:</b> ${esc(names)}${stuck.length > 2 ? ` and ${stuck.length - 2} more` : ''}.</span></div>`);
     }
   }
   let html = items.join('');
@@ -1444,21 +1444,21 @@ function _paintReady(c) {
   const n = scoring ? scoring.length : 0;
   const unready = scoring ? scoring.filter(_notVisible).length : 0;
   if (!p) {
-    if (competing) items.push(`${info('Challenges', 'Whether participants can see them is kept off this page while you compete.')}</li>`);
+    if (competing) items.push(`${info('Questions', 'Whether participants can see them is kept off this page while you compete.')}</li>`);
     else if (_pulse && _pulse.compId === c.id && _pulse.failed) {
       open++;
-      items.push(todo('Could not check the challenges', 'Nothing is known about them until the check succeeds.')
+      items.push(todo('Could not check the questions', 'Nothing is known about them until the check succeeds.')
         + '<button type="button" class="btn sm secondary" data-action="ws-pulse-retry">Try again</button></li>');
-    } else items.push(`${info('Checking the challenges…', '')}</li>`);
+    } else items.push(`${info('Checking the questions…', '')}</li>`);
   } else if (!n) {
     open++;
-    items.push(todo('No challenges yet', 'Participants need at least one to play.')
+    items.push(todo('No questions yet', 'Participants need at least one to play.')
       + (competing || !adminCan('challenges.assign') || !adminCan('challenges.view') ? '' : `<button type="button" class="btn sm secondary" data-action="ws-add-from-bank">Add from bank</button>`) + '</li>');
   } else if (unready) {
     open++;
-    items.push(todo(`${unready} of ${n} challenges are not visible to participants`, 'Drafts and hidden challenges are not played.')
+    items.push(todo(`${unready} of ${n} questions are not visible to participants`, 'Drafts and hidden questions are not played.')
       + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Questions</button>' : '') + '</li>');
-  } else items.push(`${ok(`${n} ${n === 1 ? 'challenge' : 'challenges'} published`, '')}</li>`);
+  } else items.push(`${ok(`${n} ${n === 1 ? 'question' : 'questions'} published`, '')}</li>`);
   const canJoinLink = adminCan('events.join_link');
   if (c.self_enroll_enabled) items.push(`${ok('Join link is on', 'Walk-ups join with the event code.')}${canJoinLink ? showMe('join') : ''}</li>`);
   else {
@@ -1513,7 +1513,7 @@ function _paintProgress(c) {
   const fin = Number(t.finished || 0);
   const pct = Math.round((fin / joined) * 1000) / 10;
   const started = Number(t.solvers || 0);
-  const html = `<p class="ws-prog-fig"><span class="bignum ws-prog-num">${esc(String(fin))}</span><span class="ws-prog-of">of ${esc(String(joined))} solved every challenge</span></p>`
+  const html = `<p class="ws-prog-fig"><span class="bignum ws-prog-num">${esc(String(fin))}</span><span class="ws-prog-of">of ${esc(String(joined))} solved every question</span></p>`
     + `<span class="ws-bar-track ws-prog-track" aria-hidden="true"><span class="ws-bar-fill ws-prog-fill" data-pct="${pct}"></span></span>`
     + `<p class="ws-prog-sub">${esc(String(started))} of ${esc(String(joined))} have solved at least one.</p>`;
   if (!_paintKeepingFocus(el, html, () => null)) return;
@@ -1661,7 +1661,7 @@ function _renderOverviewTasks(c) {
   const focusKey = a => { const id = a.closest('[data-task-id]')?.dataset.taskId; return id ? `[data-action="ws-task-facts"][data-task-id="${CSS.escape(id)}"]` : null; };
   if (!tasks.length && (c.task_count || 0) > 0) { _paintKeepingFocus(el, '<p class="ws-empty">Loading…</p>', focusKey); return; }
   if (!tasks.length) {
-    _paintKeepingFocus(el, `<p class="ws-empty">No challenges yet.${status !== 'ended' && !c.competing ? ' Add some from the library.' : ''}</p>`, focusKey);
+    _paintKeepingFocus(el, `<p class="ws-empty">No questions yet.${status !== 'ended' && !c.competing ? ' Add some from the bank.' : ''}</p>`, focusKey);
     return;
   }
   tasks.sort((a, b) => String(_taskNum(a, c.id)).localeCompare(String(_taskNum(b, c.id)), undefined, { numeric: true }) || String(a.title).localeCompare(String(b.title)));
@@ -1839,7 +1839,7 @@ function _paintTicker(c) {
     const fresh = seen !== null && !seen.has(key);
     const who = esc(it.nickname || 'A participant');
     const what = it.type === 'solved'
-      ? `solved <span class="ws-tk-task">${it.task_number ? `#${esc(String(it.task_number))} ` : ''}${esc(it.task_title || 'a challenge')}</span>`
+      ? `solved <span class="ws-tk-task">${it.task_number ? `#${esc(String(it.task_number))} ` : ''}${esc(it.task_title || 'a question')}</span>`
       : 'joined';
     const solvedRow = it.type === 'solved';
     const mark = solvedRow ? ICO.check : ICO.userPlus;
@@ -1861,8 +1861,8 @@ function _paintSolveRates(c) {
   // so its bar would read 100% and measure nothing (Analytics leaves it out too).
   const tasks = [...(_pulse.data.tasks || [])].filter(t => !t.qualifying).sort((a, b) =>
     String(a.task_number || '').localeCompare(String(b.task_number || ''), undefined, { numeric: true }) || String(a.title).localeCompare(String(b.title)));
-  if (!tasks.length) { _paintKeepingFocus(el, '<p class="ws-empty">No challenges yet.</p>', () => null); return; }
-  const html = `<ol class="ws-bars" aria-label="Solve rate by challenge">${tasks.map(t => {
+  if (!tasks.length) { _paintKeepingFocus(el, '<p class="ws-empty">No questions yet.</p>', () => null); return; }
+  const html = `<ol class="ws-bars" aria-label="Solve rate by question">${tasks.map(t => {
     const rate = t.attempters ? t.solvers / t.attempters : null;
     const pct = rate == null ? 0 : Math.round(rate * 1000) / 10;
     const val = rate == null ? 'no attempts yet' : `${t.solvers} of ${t.attempters} · ${Math.round(rate * 100)}%`;
@@ -2015,7 +2015,7 @@ export async function wsOrgAdd(el) {
   try {
     ok = await showModal({
       title: 'Make organiser?',
-      message: `<p><strong>${esc(name)}</strong> will organise <strong>${esc(c.name)}</strong> — its challenges, its participants and its rankings.</p>${roleLine}`,
+      message: `<p><strong>${esc(name)}</strong> will organise <strong>${esc(c.name)}</strong> — its questions, its participants and its rankings.</p>${roleLine}`,
       confirmText: 'Make organiser',
       confirmClass: 'warning',
     });
@@ -2167,7 +2167,7 @@ export function loadEventSettings() {
     row('Sessions', slots.length ? esc(slots.map(t => t.name).join(', ')) : 'None — one sitting'),
     row('Join link', yes(c.self_enroll_enabled) + (c.self_enroll_enabled ? ` · ${esc(_JOIN_RULE_TEXT)}` : '')),
     pol.ranking_enabled !== false ? row('Leaderboard', esc(c.leaderboard_mode === 'global' ? 'One board across sessions' : 'Per session')) : '',
-    row('Attempts per challenge', c.attempt_cap ? esc(String(c.attempt_cap)) : 'Unlimited'),
+    row('Attempts per question', c.attempt_cap ? esc(String(c.attempt_cap)) : 'Unlimited'),
     pol.reveal_answers !== 'forbidden' ? row('Show answers when it ends', yes(c.reveal_answers_on_end)) : '',
     pol.group_leaderboard !== 'forbidden' ? row('Team leaderboard', yes(c.group_leaderboard_enabled)) : '',
     pol.late_entry === 'allowed' ? row('Late entry', yes(c.late_entry_enabled)) : '',
@@ -2318,7 +2318,7 @@ export function wsClone() {
   const start = new Date(Date.now() + 24 * 3600e3); start.setMinutes(0, 0, 0);
   const n = Number(c.task_count || 0);
   _formDialog('ws-clone-dialog', 'Clone event', `
-    <p class="ws-dialog-lede">Copies the settings and ${n} challenge${n === 1 ? '' : 's'}. Participants, scores, the join link, the event team and its lead targets, the event's look and its own certificate design are not copied. The new event starts empty.</p>
+    <p class="ws-dialog-lede">Copies the settings and ${n} question${n === 1 ? '' : 's'}. Participants, scores, the join link, the event team and its lead targets, the event's look and its own certificate design are not copied. The new event starts empty.</p>
     ${_ownKeyAccountsOffNote(c, 'copy')}
     <div class="form-group"><label for="ws-clone-name">Name</label><input id="ws-clone-name" type="text" maxlength="120" required value="${esc(`${c.name} (copy)`.slice(0, 120))}"/></div>
     <div class="form-group"><label for="ws-clone-start">Starts</label><input id="ws-clone-start" type="datetime-local" value="${esc(_localInputValue(start))}"/><p class="settings-hint">Your local time.</p></div>
@@ -2343,7 +2343,7 @@ export function wsClone() {
     close();
     const skippedList = Array.isArray(d.skipped_challenges) ? d.skipped_challenges : [];
     const notCarried = notCarriedSummary(d.forced_settings, d.skipped_sessions);
-    showToast(`Created “${d.competition.name}” with ${d.assigned_challenges || 0} challenge${d.assigned_challenges === 1 ? '' : 's'}${d.sessions_copied ? ` and ${d.sessions_copied} session${d.sessions_copied === 1 ? '' : 's'}` : ''}.${skippedSummary(skippedList)}${notCarried}`, skippedList.length || notCarried ? 'info' : 'success');
+    showToast(`Created “${d.competition.name}” with ${d.assigned_challenges || 0} question${d.assigned_challenges === 1 ? '' : 's'}${d.sessions_copied ? ` and ${d.sessions_copied} session${d.sessions_copied === 1 ? '' : 's'}` : ''}.${skippedSummary(skippedList)}${notCarried}`, skippedList.length || notCarried ? 'info' : 'success');
     await loadAdminCompetitions();
     openEventWorkspace(d.competition.id, d.competition.name, { tab: OVERVIEW });
   });
@@ -2366,7 +2366,7 @@ export function skippedSummary(list) {
   if (!Array.isArray(list) || !list.length) return '';
   // A challenge the actor may not view comes with no title (`not_visible`): it
   // is counted as "a challenge", never captioned as if that were its name.
-  const shown = list.slice(0, 3).map(s => `${s.title ? `“${s.title}”` : 'a challenge'} (${s.message || SKIP_REASON_TEXT[s.reason] || 'it could not be copied'})`);
+  const shown = list.slice(0, 3).map(s => `${s.title ? `“${s.title}”` : 'a question'} (${s.message || SKIP_REASON_TEXT[s.reason] || 'it could not be copied'})`);
   return ` Not copied: ${shown.join('; ')}${list.length > 3 ? ` and ${list.length - 3} more` : ''}.`;
 }
 
@@ -2410,7 +2410,7 @@ export function wsSaveTemplate() {
   const c = _comp();
   if (!c) return;
   _formDialog('ws-tpl-dialog', 'Save as template', `
-    <p class="ws-dialog-lede">Keeps this event's type, settings, tags and challenges so anyone can spin up the same event in a minute. People, scores and dates are not kept.</p>
+    <p class="ws-dialog-lede">Keeps this event's type, settings, tags and questions so anyone can spin up the same event in a minute. People, scores and dates are not kept.</p>
     ${_ownKeyAccountsOffNote(c, 'template')}
     <div class="form-group"><label for="ws-tpl-name">Template name</label><input id="ws-tpl-name" type="text" maxlength="120" required value="${esc(c.name.slice(0, 120))}"/></div>
     <div class="form-group"><label for="ws-tpl-desc">Description <span class="muted">(optional)</span></label><textarea id="ws-tpl-desc" rows="2" maxlength="500"></textarea></div>`,

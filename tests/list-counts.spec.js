@@ -204,7 +204,7 @@ test.describe("v7.20.10 — the admin tables count what matched", () => {
     // and the missing case is covered by its own test rather than skipped, so
     // this is not a guard that can switch a check off.
     { tab: "Events", pane: "competitions", search: "#comp-search", count: "#comp-search-count", noun: "events", hit: "Live", zeroWording: false },
-    { tab: "Challenges", pane: "tasks", search: "#task-search", count: "#task-search-count", noun: "challenges", hit: "hard1", zeroWording: true },
+    { tab: "Challenges", pane: "tasks", search: "#task-search", count: "#task-search-count", noun: "questions", hit: "hard1", zeroWording: true },
     { tab: "Participants", pane: "participants", search: "#participants-search", count: "#participants-search-count", noun: "participants", hit: "alice", zeroWording: true },
   ];
 

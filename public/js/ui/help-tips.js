@@ -87,8 +87,8 @@ export const HELP_TIPS = {
   // ── Organiser screens ────────────────────────────────────────────────────
   "ws.join": "Walk-ups scan the QR code or type the code to join this event. Anyone who has it can join, so if it leaks, regenerate it in Join-link settings.",
   "ws.sessions": "Each session is a separate sitting of this event with its own start and end, and each participant picks one. Only sessions that have not started can be edited or deleted.",
-  "ws.challenges": "The challenges this event's participants play. Press one to see its points, how many solved it and whether participants can see it. Open Questions lists this event's own questions first, then the Question bank, where you add more.",
-  "ws.progress": "How many have finished every challenge, and how many solved each one, so you can see where people are stuck (the leaderboard is under Rankings). Staff, event admins and roles like theirs are not counted unless they take part in an event where staff compete, and answers given while impersonating never are.",
+  "ws.challenges": "The questions this event's participants play. Press one to see its points, how many solved it and whether participants can see it. Open Questions lists this event's own questions first, then the Question bank, where you add more.",
+  "ws.progress": "How many have finished every question, and how many solved each one, so you can see where people are stuck (the leaderboard is under Rankings). Staff, event admins and roles like theirs are not counted unless they take part in an event where staff compete, and answers given while impersonating never are.",
   "ws.ready": "What still needs doing before the start. Each open item has the button that fixes it; Show me points at the button in the header.",
   "ws.certs": "Whether this event's certificates were issued and emailed. They go out a few minutes after the end. Open Certificates to see each one or send one again.",
   "ws.walkups": "Walk-ups join with the event's code. Full-screen QR puts it on the stand's screen; the first press shows the code, which is recorded in the event's History.",
@@ -97,8 +97,8 @@ export const HELP_TIPS = {
     event_admin: "The organisers of this event. Only an administrator can add or remove one.",
   },
   "ws.activity": "Joins, answers and correct answers over the event so far, in equal slices of time, updated every 15 seconds. Staff, event admins and roles like theirs are not counted unless they take part in an event where staff compete, and answers given while impersonating never are, so its Joins can be fewer than Joined, which counts everyone enrolled.",
-  "ws.feed": "The latest people to join and to solve a challenge, newest first. It updates every 15 seconds.",
-  "ws.rates": "For each challenge, how many of the people who tried it have solved it. Staff, organisers and anything done while impersonating are not counted, except the staff and organisers taking part in an event where staff compete.",
+  "ws.feed": "The latest people to join and to solve a question, newest first. It updates every 15 seconds.",
+  "ws.rates": "For each question, how many of the people who tried it have solved it. Staff, organisers and anything done while impersonating are not counted, except the staff and organisers taking part in an event where staff compete.",
   "ws.settings": "A summary of how this event is set up. Edit settings opens the full form; some settings lock once the event starts.",
   "ws.look": "The colours this event's join page and participants see. Lock it to stop participants picking their own look while they are in it.",
   "invite.events": {

@@ -201,14 +201,14 @@ test.describe("an event asks each qualifying question once (ruling N7)", () => {
     // B's own four are listed (ticked: in the event); A's four are not.
     for (const k of Object.keys(W.qb)) await expect(row(W.qb[k].id), `B's own ${k}`).toBeChecked();
     for (const k of Object.keys(W.qa)) await expect(row(W.qa[k].id), `A's ${k}: B already asks it`).toHaveCount(0);
-    await expect(overlay.locator("#task-picker-note")).toContainText(/\d+ qualifying question\(s\) are not listed: this event already asks a question on each one's topic\./);
+    await expect(overlay.locator("#task-picker-note")).toContainText(/\d+ quick question\(s\) are not listed: this event already asks each of them\./);
     // A NEW topic is listed — both questions on it — and only one may be ticked.
     const [o1, o2] = W.own;
     await expect(row(o1)).toBeEnabled();
     await expect(row(o2)).toBeEnabled();
     await row(o1).check();
     await expect(row(o2), "a second question on the topic is not offered").toBeDisabled();
-    await expect(overlay.locator(".picker-row", { has: page.locator(`input[value="${o2}"]`) }).locator(".picker-row-flag.is-topic")).toHaveText("Same topic as a ticked question");
+    await expect(overlay.locator(".picker-row", { has: page.locator(`input[value="${o2}"]`) }).locator(".picker-row-flag.is-topic")).toHaveText("Same quick question as a ticked one");
     await expect(row(o1), "the tick keeps its focus").toBeFocused();
     await row(o1).uncheck();
     await expect(row(o2), "free again").toBeEnabled();
@@ -244,7 +244,7 @@ test.describe("an event asks each qualifying question once (ruling N7)", () => {
       await expect(row(q.id)).toBeEnabled();
       await expect(row(q.id)).not.toBeChecked();
     }
-    await expect(overlay.locator("#task-picker-note"), "nothing left out").not.toContainText("qualifying question");
+    await expect(overlay.locator("#task-picker-note"), "nothing left out").not.toContainText("quick question");
     await row(W.qa.developers.id).check();
     await expect(overlay.locator("#task-picker-count")).toContainText("1 to add");
     await overlay.locator("#task-picker-save").click();
@@ -261,7 +261,7 @@ test.describe("an event asks each qualifying question once (ruling N7)", () => {
     await expect(row(W.qa.developers.id), "the shared one is in D").toBeChecked();
     await expect(row(W.qb.developers.id), "the same topic's other question is left out").toHaveCount(0);
     await expect(row(W.qb.scanner.id), "CONTROL: a topic D does not ask").toBeEnabled();
-    await expect(overlay.locator("#task-picker-note")).toContainText("qualifying question(s)");
+    await expect(overlay.locator("#task-picker-note")).toContainText("quick question(s)");
   });
 
   test("the Assign dialog offers an event that already asks the topic disabled, with the reason; the bulk door's skip is in its toast", async ({ page }) => {
@@ -368,7 +368,7 @@ test.describe("an event asks each qualifying question once, through a draft or a
     await expect(overlay.locator(".picker-row", { has: page.locator(`input[value="${V.eHidden}"]`) }).locator(".picker-row-flag", { hasText: "Hidden" })).toHaveCount(1);
     await expect(row(V.eDraft)).toHaveCount(0);
     // Each count is anchored on the dash the note writes before it, so "11" is no match.
-    await expect(overlay.locator("#task-picker-note"), "the one draft, counted").toContainText(" — 1 assigned draft challenge(s) are not listed and are unaffected.");
+    await expect(overlay.locator("#task-picker-note"), "the one draft, counted").toContainText(" — 1 assigned draft question(s) are not listed and are unaffected.");
     // CONTROL: a topic E does not ask is listed, offered, not ticked.
     await expect(row(V.f.fresh), "F's question on a topic E does not ask").toHaveCount(1);
     await expect(row(V.f.fresh)).toBeEnabled();
@@ -378,7 +378,7 @@ test.describe("an event asks each qualifying question once, through a draft or a
     await expect(row(V.f.hidden), "F's question on the topic E's HIDDEN question asks: not listed").toHaveCount(0);
     // The whole note: the listing's count, then exactly these two parts, by value.
     await expect(overlay.locator("#task-picker-note"), "the draft and F's two questions, counted").toHaveText(
-      /^[^—]+ — 1 assigned draft challenge\(s\) are not listed and are unaffected\. — 2 qualifying question\(s\) are not listed: this event already asks a question on each one's topic\.$/);
+      /^[^—]+ — 1 assigned draft question\(s\) are not listed and are unaffected\. — 2 quick question\(s\) are not listed: this event already asks each of them\.$/);
     await overlay.locator('[data-action="overlay-close"]').click();
     await expect(overlay).toHaveCount(0);
 

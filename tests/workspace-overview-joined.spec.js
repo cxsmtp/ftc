@@ -212,7 +212,7 @@ test("Joined is the roster the Events list shows, at once, before the live figur
   await expect(fig(page, "active"), "CONTROL: Playing now counts the two participants, not the organiser").toHaveAttribute("data-count", "2", { timeout: 15000 });
   await expect(fig(page, "answers"), "CONTROL: Answers counts theirs only").toHaveAttribute("data-count", "2");
   const prog = page.locator("#ws-ov-progress");
-  await expect(prog.locator(".ws-prog-of"), "CONTROL: Progress counts the two participants").toHaveText("of 2 solved every challenge");
+  await expect(prog.locator(".ws-prog-of"), "CONTROL: Progress counts the two participants").toHaveText("of 2 solved every question");
   await expect(prog.locator(".ws-prog-num")).toHaveText("0");
   await expect(prog.locator(".ws-prog-sub")).toHaveText("1 of 2 have solved at least one.");
   await expect(fig(page, "joined"), "Joined still counts everyone enrolled").toHaveAttribute("data-count", "3");
@@ -241,7 +241,7 @@ test("Ready to start? and the chart count everyone enrolled, while the read fail
   await expect(page.locator("#ws-overview")).toHaveAttribute("data-ov-state", "upcoming", { timeout: 15000 });
   const ready = page.locator("#ws-ov-ready");
   const joinedRow = ready.locator(".ws-ready-item").filter({ hasText: "joined" });
-  await expect(ready, "CONTROL: the failed read is reported on the challenges row").toContainText("Could not check the challenges", { timeout: 15000 });
+  await expect(ready, "CONTROL: the failed read is reported on the challenges row").toContainText("Could not check the questions", { timeout: 15000 });
   await expect(joinedRow, "who has joined: everyone enrolled, organiser included").toHaveText(/3 people have joined/);
   await expect(joinedRow).toHaveAttribute("data-ready", "ok");
   await expect(ready).not.toContainText("Could not check who has joined");
@@ -254,7 +254,7 @@ test("Ready to start? and the chart count everyone enrolled, while the read fail
   const held = await holdPulse(page, ev.up.id);
   try {
     await ready.locator('[data-action="ws-pulse-retry"]').click();
-    await expect(ready, "CONTROL: the challenges row waits for the read").toContainText("Checking the challenges…");
+    await expect(ready, "CONTROL: the challenges row waits for the read").toContainText("Checking the questions…");
     await expect.poll(() => held.asked, { message: "PRECONDITION: the retry asked" }).toBeGreaterThan(0);
     await expect(joinedRow, "who has joined never waits").toHaveText(/3 people have joined/);
     await expect(ready).not.toContainText("Checking who has joined");
@@ -262,7 +262,7 @@ test("Ready to start? and the chart count everyone enrolled, while the read fail
 
   // Answered: the same figure, and the chart's line agrees (the pulse's own
   // `joined`, 2, leaves the organiser out).
-  await expect(ready, "PRECONDITION: the read has answered").toContainText("2 challenges published", { timeout: 15000 });
+  await expect(ready, "PRECONDITION: the read has answered").toContainText("2 questions published", { timeout: 15000 });
   await expect(joinedRow).toHaveText(/3 people have joined/);
   await expect(ready.locator('.ws-ready-item[data-ready="todo"]'), "nothing left to do").toHaveCount(0);
   await expect(fig(page, "joined")).toHaveAttribute("data-count", "3");
@@ -499,7 +499,7 @@ test("only an event admin has joined, then an ordinary participant: Progress wai
     await expect(fig(page, "joined"), "Joined follows the roster").toHaveAttribute("data-count", "2");
     await expect(prog, "the last read predates the join: Progress claims neither").toHaveText("Counting…");
   } finally { held.release(); }
-  await expect(prog.locator(".ws-prog-of"), "the next read counts the participant").toHaveText("of 1 solved every challenge", { timeout: 25000 });
+  await expect(prog.locator(".ws-prog-of"), "the next read counts the participant").toHaveText("of 1 solved every question", { timeout: 25000 });
 });
 
 test("a competitor across a move of the start: the band's time tile follows each poll and the face the start rebuilds", async ({ page }) => {
@@ -610,7 +610,7 @@ test("the live read newer than the events model (opened just after a join): neve
   await firstRead;
   await expect(fig(page, "joined"), "Joined catches up with the read at once, though no poll runs").toHaveAttribute("data-count", "1", { timeout: 5000 });
   await expect(page.locator("#ws-count-participants")).toHaveText("1");
-  await expect(page.locator("#ws-ov-progress .ws-prog-of"), "…and Progress counts the newcomer").toHaveText("of 1 solved every challenge");
+  await expect(page.locator("#ws-ov-progress .ws-prog-of"), "…and Progress counts the newcomer").toHaveText("of 1 solved every question");
   const rec = await page.evaluate(() => ({ first: window.__joinedFirst, nobody: [...new Set(window.__nobody)] }));
   expect(rec.first, "PRECONDITION: the page opened on a model from before the join").toBe("0");
   expect(rec.nobody, "nothing said nobody has joined beside the read that saw them").toEqual([]);

@@ -606,23 +606,23 @@ Below the header, a band of live figures led by the countdown (time left with a
 bar of how much has gone, the time until the start, or when it ended; **No fixed
 deadline** for a running Program whose deadline is five years or more away), then only
 the figures that matter now: people playing (answered in the last five minutes)
-while it is live, how many joined, the challenges before the start, and the
+while it is live, how many joined, the questions before the start, and the
 answers with how many were correct on a ranked event, once there are any. They count up and flash
 when they change. Then the event's **sections**, a strip of tabs:
 
 - **Overview** — the event's command centre, refreshed every 15 seconds while it
   is on screen, and built around what you do next:
-  - **Before the start**, **Ready to start?** checks the challenges (published
+  - **Before the start**, **Ready to start?** checks the questions (published
     and visible; the quick questions do not count, so an event holding only
-    them has no challenges yet), the join link, who has joined and, on a Competition, the
-    sessions. Each item still to do has the button that fixes it (**Add
-    challenges**, **Join-link settings**, **Add session**), or **Show me**, which
+    them has no questions yet), the join link, who has joined and, on a Competition, the
+    sessions. Each item still to do has the button that fixes it (**Add from
+    bank**, **Join-link settings**, **Add session**), or **Show me**, which
     takes you to **Invite** or the join code at the top.
   - **While it is live**, a row of what needs you now: people waiting for
-    approval, nobody joined yet, challenges participants cannot see, challenges
+    approval, nobody joined yet, questions participants cannot see, questions
     nobody has solved yet. It reads **Nothing needs you right now** when that is
     so. Below it, **Progress**: how many of the event's people have solved every
-    challenge (the quick questions are not counted) and how many solved each one,
+    question (the quick questions are not counted) and how many solved each one,
     so you can see where people are stuck (the
     leaderboard itself is under **Rankings**), the **Live feed** of joins and solves once there
     are any, the **Sessions** card with each session's **Start now**, **End now**,
@@ -632,13 +632,13 @@ when they change. Then the event's **sections**, a strip of tabs:
     issued and emailed (with **Download top 3 certificates** on that card for a
     ranked event).
 
-  Everything else is behind **Show challenges, activity and organisers**: the
-  challenge set, where pressing a challenge opens its difficulty, points, how
+  Everything else is behind **Show questions, activity and organisers**: the
+  question set, where pressing a question opens its difficulty, points, how
   many solved it and whether participants can see it (a quick question says it
-  scores no points); before the start, **Solve rate**, a bar per challenge (from
+  scores no points); before the start, **Solve rate**, a bar per question (from
   the start the bars are in **Progress**); **Activity over time**, a chart of
   joins, answers and correct answers since the start; and the organisers. Long
-  lists open in place with **Show more**, and **Open Challenges**, **Open
+  lists open in place with **Show more**, and **Open Questions**, **Open
   Analytics** and **Open Certificates** still take you to those sections.
   **Joined**, and every line saying how many people have joined apart from the
   activity chart's Joins and its summary, counts everyone enrolled, like the Events list and the
@@ -1938,14 +1938,16 @@ press **Add to events** on the selection bar (see below).
 
 ![Task picker — assign challenges to an event](../screenshots/admin/23-task-picker.png)
 
-**The ticks show what is in the event right now.** Challenges already
-assigned open ticked and are marked *In this event*; the rest open
+**The ticks show what is in the event right now.** Questions already
+in the event open ticked and are marked *In this event*; the rest open
 unticked. Tick to add, untick to remove, then click **Save Changes** — so this
 one dialog is where you both add and take away, and it always shows you the
-event's actual challenge list.
+event's actual question list. Each row shows its difficulty and its topic; a
+qualifying question is marked *Quick question*.
 
-Use the **search box** and the **Easy / Medium / Hard** filters (they combine)
-to narrow the list; your ticks are kept as you change filters, and the counter
+Use the **search box** (title, difficulty or topic), the **Easy / Medium / Hard**
+filters and the **Topic** filter, the same one as on the Question bank (they
+combine), to narrow the list; your ticks are kept as you change filters, and the counter
 above the list tells you what Save is about to do — how many to add and how
 many to remove.
 
@@ -1957,7 +1959,7 @@ stops counting toward the leaderboard and participants can no longer open it.
 If the event is live, the confirmation says so — changes take effect
 immediately.
 
-> **Select All Shown** and **Unselect All Shown** apply to the challenges
+> **Select all shown** and **Unselect all shown** apply to the questions
 > currently *visible*, which is what the labels say. With a filter active they
 > leave everything hidden by that filter exactly as it was.
 
@@ -1966,7 +1968,7 @@ failing at Save:
 
 - **A locked challenge** can only be moved by a superadmin, so for everyone
   else its row is greyed out, outlined with dashes and marked *Locked*.
-- **An event with a finished session** has a frozen challenge list. The
+- **An event with a finished session** has a frozen question list. The
   dialog says so and Save is disabled. Unassigning it is refused too, for the
   same reason — reopening the event is a superadmin action, and for a
   multi-session event every finished session has to be reopened.

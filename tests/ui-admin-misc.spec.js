@@ -1364,7 +1364,7 @@ test.describe("v7.20.10 — Assign Challenges is a set operation", () => {
     // It is not on screen (drafts cannot be assigned, so they are not listed)…
     await expect(rowFor(picker, draftTitle), "the draft is not listed").toHaveCount(0);
     // …and the dialog says so rather than silently hiding it.
-    await expect(picker.locator("#task-picker-note")).toContainText("assigned draft challenge");
+    await expect(picker.locator("#task-picker-note")).toContainText("assigned draft question");
 
     // Make an UNRELATED change and save it.
     await boxFor(picker, f.B.title).check();
@@ -1383,7 +1383,7 @@ test.describe("v7.20.10 — Assign Challenges is a set operation", () => {
   // Mutation: in main.js, `…querySelectorAll('#task-picker-list input…')…delete(c.value)`
   // → `S._pickerCheckedIds?.clear()` (act on the whole set rather than the shown
   // rows). Bravo is then removed too and both assertions fail.
-  test("'Unselect All Shown' is scoped to the filter — a hidden row is not unassigned", async ({ page }) => {
+  test("'Unselect all shown' is scoped to the filter — a hidden row is not unassigned", async ({ page }) => {
     const f = await fixture(page);
     await f.assign(f.B.id);            // both A and B assigned this time
     await f.dispose();

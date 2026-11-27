@@ -1,7 +1,7 @@
 "use strict";
 
 import { S } from "../core/state.js";
-import { loadTopics, renderTopicFilter, renderTopicPicker, taskInTopicFilter, topicName, NO_TOPIC } from "./topics-admin.js"; // stage B — the Question bank's topics
+import { loadTopics, renderTopicFilter, renderTopicPicker, taskInTopicFilter, taskInTopic, paintTopicFilter, topicName, NO_TOPIC } from "./topics-admin.js"; // stage B — the Question bank's topics
 import { applyColumnFilters, applyColumnSort, columnSortActive, hasColumnFilters } from "../ui/table-columns.js"; // v8.17.0 — Columns + heading sort/filter
 import { colspanFor, countText, paginationHtml, pickerFilterHtml, renderLoadFailure, setListCount, wirePickerFilter } from "../ui/list-controls.js"; // v7.17.1 — shared list chrome; v8.1.4 — the grant dialog's participant search
 import { csrfHeaders, readyToWrite, trackInflightWrite, fetchWithLoading, loadCsrfToken, fetchJsonList, announceImpersonationEnded } from "../core/api.js";
@@ -16,7 +16,7 @@ import { showSkeletonRows, showLoading, hideLoading } from "../ui/loading.js";
 import { overlayDismiss, showModal } from "../ui/modal.js";
 import { createRichEditor, highlightCodeElement, renderRich } from "../ui/richtext.js";
 import { showToast } from "../ui/toast.js";
-import { taskMatchesQuery, isQualifyingTask, bankTasks, workspaceTasks, pickerTasks } from "../ui/task-search.js"; // the one challenge search: title, difficulty, tags; the one qualifying test
+import { taskMatchesQuery, isQualifyingTask, isQualifyingTag, bankTasks, workspaceTasks, pickerTasks } from "../ui/task-search.js"; // the one challenge search: title, difficulty, tags; the one qualifying test
 import { addTasksToCompetition, runBoundedCollect } from "./task-assign.js"; // the one add-to-event path
 import { tipsAllOn } from "../ui/help-tips.js";
 import { _stopAllPolls, _announceSignout } from "./session-monitor.js";
@@ -107,7 +107,7 @@ export async function openTaskPickerForCompetition(compId){
   const seq=++_taskPickerOpenSeq;
   const tasks=await _loadAdminTaskList();
   if(seq!==_taskPickerOpenSeq)return;   // v8.12.6 — superseded by a later open (the list is parsed inside the loader)
-  if(!tasks){ showToast('Could not load the challenge list. Please try again.','error'); return; }
+  if(!tasks){ showToast('Could not load the question list. Please try again.','error'); return; }
   // Bank questions (ticked where the event holds its copy) and the event's own
   // questions no bank question stands for (lib/event-copies.js).
   const published=pickerTasks(tasks,compId).filter(t=>t.status==='published');
@@ -189,12 +189,13 @@ export async function openTaskPickerForCompetition(compId){
   overlay.className='picker-overlay';
   setSafeHtml(overlay,`<div class="picker-modal picker-modal-flow" role="dialog" aria-modal="true" aria-labelledby="task-picker-title">
     <div class="picker-modal-head">
-      <h3 id="task-picker-title">Challenges in ${comp?esc(comp.name):'this event'}</h3>
+      <h3 id="task-picker-title">Questions in ${comp?esc(comp.name):'this event'}</h3>
     </div>
-    ${frozen?`<p class="picker-note" id="task-picker-frozen" style="color:var(--red)">A session of this event has already ended, so its challenge list is frozen. Reopening it is a superadmin action — and for a multi-session event every finished session has to be reopened, not just one.</p>`:''}
-    ${_sealOnly?`<p class="picker-note" id="task-picker-seal-note">Staff compete in this event, so only challenges with a <strong>sealed</strong> answer can be added — and never one created by somebody who is competing in it.</p>`:''}
+    ${frozen?`<p class="picker-note" id="task-picker-frozen" style="color:var(--red)">A session of this event has already ended, so its question list is frozen. Reopening it is a superadmin action — and for a multi-session event every finished session has to be reopened, not just one.</p>`:''}
+    ${_sealOnly?`<p class="picker-note" id="task-picker-seal-note">Staff compete in this event, so only questions with a <strong>sealed</strong> answer can be added — and never one created by somebody who is competing in it.</p>`:''}
     ${listed.length?`<div class="picker-filters">
-      <input id="task-picker-search" type="search" class="picker-search" aria-label="Search challenges by title, difficulty or tag" placeholder="Search by title, difficulty or tag…" autocomplete="off">
+      <input id="task-picker-search" type="search" class="picker-search" aria-label="Search questions by title, difficulty or topic" placeholder="Search by title, difficulty or topic…" autocomplete="off">
+      <span class="topic-filter"><label for="task-picker-topic">Topic</label><select id="task-picker-topic"><option value="">All topics</option></select></span>
       <div class="picker-diff-filters" id="task-picker-diff-filters">
         <button class="filter-btn active" data-diff="all">All</button>
         <button class="filter-btn" data-diff="easy">Easy</button>
@@ -204,12 +205,12 @@ export async function openTaskPickerForCompetition(compId){
     </div>
     <p class="picker-note" id="task-picker-note"></p>
     <div class="picker-toolbar">
-      <button class="btn sm secondary" data-action="task-picker-select-all" ${frozen?'disabled':''}>Select All Shown</button>
-      <button class="btn sm secondary" data-action="task-picker-unselect-all" ${frozen?'disabled':''}>Unselect All Shown</button>
+      <button class="btn sm secondary" data-action="task-picker-select-all" ${frozen?'disabled':''}>Select all shown</button>
+      <button class="btn sm secondary" data-action="task-picker-unselect-all" ${frozen?'disabled':''}>Unselect all shown</button>
       <span id="task-picker-count" class="picker-toolbar-count"></span>
     </div>
     <div class="picker-rows" id="task-picker-list"></div>`:
-    '<p class="picker-note">No published challenges exist yet.</p>'}
+    '<p class="picker-note">No published questions exist yet.</p>'}
     <div class="picker-modal-foot">
       <button class="btn secondary" data-action="overlay-close" data-overlay-id="task-picker-overlay">${listed.length?'Cancel':'Close'}</button>
       <button class="btn" id="task-picker-save" data-action="task-picker-assign" data-comp-id="${esc(compId)}" ${frozen?'disabled':''}>Save Changes</button>
@@ -223,10 +224,13 @@ export async function openTaskPickerForCompetition(compId){
     let visible=listed;
     if(q)visible=visible.filter(t=>taskMatchesQuery(t,q));
     if(_pickerDiff!=='all')visible=visible.filter(t=>t.difficulty===_pickerDiff);
-    return {visible,q};
+    // The bank's own Topic filter (features/topics-admin.js), never a copy.
+    const topic=overlay.querySelector('#task-picker-topic')?.value||'';
+    if(topic)visible=visible.filter(t=>taskInTopic(t,topic));
+    return {visible,q,topic};
   }
   function _renderPickerRows(){
-    const {visible,q}=_visibleTasks();
+    const {visible,q,topic}=_visibleTasks();
     const list=overlay.querySelector('#task-picker-list');
     if(!list)return;
     setSafeHtml(list,visible.map(t=>{
@@ -235,18 +239,22 @@ export async function openTaskPickerForCompetition(compId){
       const lock=lockedIds.has(id);
       const noRm=!lock&&noUnassignIds.has(id);
       const unsealed=!lock&&!noRm&&unsealedIds.has(id);
-      const tags=(t.tags||[]).map(tg=>`<span class="tag">${esc(tg)}</span>`).join('');
+      // Topics group the questions; a qualifying question is named in words, never
+      // by its internal `qualifying:` tag (ui/task-search.js decides which is one).
+      const quick=isQualifyingTask(t);
+      const topicChip=t.topic_name?`<span class="topic-chip" title="${esc(t.topic_name)}">${esc(t.topic_name)}</span>`:'';
+      const tags=(t.tags||[]).filter(tg=>!isQualifyingTag(tg)).map(tg=>`<span class="tag">${esc(tg)}</span>`).join('');
       const wasOn=baseline.has(id);
-      return `<label class="picker-row${lock||noRm||unsealed?' is-disabled':''}"${lock?' title="This challenge is locked — only a superadmin can change its events."':(noRm?' title="Added to this event by someone else — only they or an administrator can remove it."':(unsealed?' title="Its answer is not sealed — an event where staff compete only admits sealed challenges."':''))}>
+      return `<label class="picker-row${lock||noRm||unsealed?' is-disabled':''}"${lock?' title="This question is locked — only a superadmin can change its events."':(noRm?' title="Added to this event by someone else — only they or an administrator can remove it."':(unsealed?' title="Its answer is not sealed — an event where staff compete only admits sealed questions."':''))}>
         <input type="checkbox" value="${esc(id)}" ${checked} ${lock||noRm||unsealed||frozen?'disabled data-base-disabled="1"':''} data-change-action="update-task-picker-count" class="picker-row-check"/>
-        <span class="picker-row-body"><strong>${esc(t.title)}</strong> <span class="badge ${esc(t.difficulty)}">${esc(t.difficulty)}</span>${tags}${t.active?'':'<span class="picker-row-flag">Hidden</span>'}${wasOn?'<span class="picker-row-flag is-on">In this event</span>':''}${lock?'<span class="picker-row-flag">Locked</span>':''}${noRm?'<span class="picker-row-flag">Added by someone else</span>':''}${unsealed?'<span class="picker-row-flag">Not sealed</span>':''}</span>
+        <span class="picker-row-body"><strong>${esc(t.title)}</strong> <span class="badge ${esc(t.difficulty)}">${esc(t.difficulty)}</span>${quick?'<span class="picker-row-flag is-quick">Quick question</span>':''}${topicChip}${tags}${t.active?'':'<span class="picker-row-flag">Hidden</span>'}${wasOn?'<span class="picker-row-flag is-on">In this event</span>':''}${lock?'<span class="picker-row-flag">Locked</span>':''}${noRm?'<span class="picker-row-flag">Added by someone else</span>':''}${unsealed?'<span class="picker-row-flag">Not sealed</span>':''}</span>
       </label>`;
     }).join(''));
     const note=overlay.querySelector('#task-picker-note');
     if(note){
-      note.textContent=countText({matched:visible.length,total:listed.length,filtered:!!q||_pickerDiff!=='all',noun:'challenge'})
-        +(hiddenAssigned?` — ${hiddenAssigned} assigned draft challenge(s) are not listed and are unaffected.`:'')
-        +(hiddenTopics?` — ${hiddenTopics} qualifying question(s) are not listed: this event already asks a question on each one's topic.`:'');
+      note.textContent=countText({matched:visible.length,total:listed.length,filtered:!!q||_pickerDiff!=='all'||!!topic,noun:'question'})
+        +(hiddenAssigned?` — ${hiddenAssigned} assigned draft question(s) are not listed and are unaffected.`:'')
+        +(hiddenTopics?` — ${hiddenTopics} quick question(s) are not listed: this event already asks each of them.`:'');
     }
     updateTaskPickerCount();
   }
@@ -257,6 +265,9 @@ export async function openTaskPickerForCompetition(compId){
     }
   });
   overlay.querySelector('#task-picker-search').addEventListener('input',_renderPickerRows);
+  const topicSel=overlay.querySelector('#task-picker-topic');
+  paintTopicFilter(topicSel,'');
+  topicSel.addEventListener('change',_renderPickerRows);
   overlay.querySelector('#task-picker-diff-filters').addEventListener('click',e=>{
     const btn=e.target.closest('.filter-btn');
     if(!btn)return;
@@ -296,9 +307,9 @@ function _syncPickerTopics(){
     row.classList.toggle('is-disabled',taken);
     let flag=row.querySelector('.picker-row-flag.is-topic');
     if(taken&&!flag){
-      flag=document.createElement('span');flag.className='picker-row-flag is-topic';flag.textContent='Same topic as a ticked question';
+      flag=document.createElement('span');flag.className='picker-row-flag is-topic';flag.textContent='Same quick question as a ticked one';
       row.querySelector('.picker-row-body')?.appendChild(flag);
-      row.title='Another qualifying question on this topic is ticked: an event asks each one once.';
+      row.title='A ticked question asks the same quick question: an event asks each one once.';
     }else if(!taken&&flag){flag.remove();row.removeAttribute('title');}
   }
 }
@@ -705,8 +716,8 @@ export function renderAdminTasks(){
     const taskEmptyMsg=hasFilter
       ?(S.tTopicFilter&&!q&&!S.tDiffFilters.size&&!S.tStatusFilters.size&&!S.tStateFilters.size&&!hasColumnFilters('challenges')
         ?(S.tTopicFilter===NO_TOPIC?'Every question here has a topic.':`No questions in the topic “${esc(topicName(S.tTopicFilter))}” yet.`)
-        :'No challenges match the current filters.')
-      :'No challenges yet.';
+        :'No questions match the current filters.')
+      :'No questions yet.';
     setSafeHtml(document.getElementById('admin-task-body'),`<tr><td colspan="13" class="table-empty-row">${taskEmptyMsg}</td></tr>`);
   }else setSafeHtml(document.getElementById('admin-task-body'), pageData.map(t=>{
     const hidden=!t.active;
@@ -983,7 +994,7 @@ export function renderAdminTasks(){
       <td class="cell-ts ${cellDim}">${fmtDt(t.last_changed)}</td>
       <td class="cell-ts ${cellDim}">${esc(t.changed_by||'—')}</td>
       <td class="cell-ts ${cellDim}">${esc(t.author_name||'—')}</td>
-      <td class="${cellDim}" data-col="topic">${t.topic_name?`<span class="topic-chip">${esc(t.topic_name)}</span>`:'<span class="cell-empty">&mdash;</span>'}</td>
+      <td class="${cellDim}" data-col="topic">${t.topic_name?`<span class="topic-chip" title="${esc(t.topic_name)}">${esc(t.topic_name)}</span>`:'<span class="cell-empty">&mdash;</span>'}</td>
       <td class="${cellDim}" style="white-space:normal;min-width:160px"><div class="cell-chips">${compBadgesHtml}</div></td>
       <td><div class="action-cell task-actions" style="gap:4px">${primaryBtn}</div>
         <button class="kebab-btn kebab-always" aria-label="More actions" data-action="kebab-toggle">⋮</button>
@@ -3349,7 +3360,7 @@ export const hintEditor=createRichEditor(document.getElementById('tf-hint'),'Opt
 // filters read the MODEL, so they narrow the whole library before paging.
 function _taskStatusLabel(t){return t.status==='draft'?'Draft':(t.active?'Published':'Hidden');}
 export const CHALLENGE_TABLE_COLUMNS={
-  noun:'challenge',
+  noun:'question',
   // Type is under Columns: with it the default set does not fit a 1024 px window.
   defaults:['title','difficulty','status','topic','events','actions'],
   fixed:['title','actions'],

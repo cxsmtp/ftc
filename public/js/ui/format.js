@@ -75,6 +75,11 @@ export function formatCountdown(ms){
 
 export function esc(str){return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');}
 
+/** An email address as HTML that may break only where an address reads well:
+ *  after a "." or "-" and before the "@" (`<wbr>`), never inside a word. Every
+ *  piece is escaped; the text, and so a search or copy, is the address as typed. */
+export function addrBreakHtml(addr){return String(addr||'').split(/(?<=[.-])|(?=@)/).map(p=>esc(p)).join('<wbr>');}
+
 export function toggleSearchClear(input){const btn=document.getElementById(input.id+'-clear');if(btn)btn.classList.toggle('hidden',!input.value);const wrap=input.closest&&input.closest('.search-wrap');if(wrap)wrap.classList.toggle('has-value',!!input.value);}
 
 export function clearSearch(inputId,cb){const el=document.getElementById(inputId);if(el){el.value='';const wrap=el.closest&&el.closest('.search-wrap');if(wrap)wrap.classList.remove('has-value');}const btn=document.getElementById(inputId+'-clear');if(btn)btn.classList.add('hidden');if(cb)cb();}

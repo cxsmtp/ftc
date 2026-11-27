@@ -877,7 +877,9 @@ export const PLAIN_TABLES = {
   // Users & roles (features/users-admin.js): every platform user is on screen.
   // Last sign-in carries the instant as data-sort-value, so it sorts in time
   // order and filters by a date range.
-  users: { noun: 'user', paged: false, cols: { name: { grow: true }, role: { filter: 'enum' }, status: { filter: 'enum' }, last_sign_in: { filter: 'date' } } },
+  // The address takes the spare width (not the name, which is short): at a
+  // desktop width it stays on one line.
+  users: { noun: 'user', paged: false, cols: { email: { grow: true }, role: { filter: 'enum' }, status: { filter: 'enum' }, last_sign_in: { filter: 'date' } } },
   // Rankings (both boards) and Analytics filter their whole data set, which
   // their exports share: features/rankings-admin.js RANKINGS_TABLE_COLUMNS,
   // features/analytics-admin.js ANALYTICS_TABLE_COLUMNS.

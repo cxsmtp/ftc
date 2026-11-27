@@ -1345,7 +1345,7 @@ export function openCompetitionForm(editId,opts){
   const _kindLocked=!!(comp&&_lockReason&&!_kindChanged);
   const _kindEntry=_kinds.find(k=>k.value===kind)||null;
   const kindChooserHtml=`<div class="form-group comp-kind-field">
-         <span class="comp-field-label" id="comp-kind-label">Event type</span><span data-help="event.kind" data-help-label="Event type"></span>
+         <div class="help-label-row comp-kind-head"><span class="comp-field-label" id="comp-kind-label">Event type</span><span data-help="event.kind" data-help-label="Event type"></span></div>
          <div class="comp-kind-current">${eventKindChipHtml(kind)}${_kindLocked?'':`<button type="button" class="link-btn comp-kind-change" data-action="comp-kind-change" aria-expanded="false" aria-controls="comp-kind-seg-box">Change type</button>`}</div>
          <div class="kind-seg" id="comp-kind-seg-box" role="radiogroup" aria-labelledby="comp-kind-label" aria-describedby="comp-kind-note" hidden>${
            _kinds.map(k=>`<label class="kind-seg-opt"><input type="radio" name="comp-kind-seg" value="${esc(k.value)}" data-change-action="comp-kind-select" ${k.value===kind?'checked':''} ${_kindLocked?'disabled':''}/><span>${esc(k.label)}</span></label>`).join('')
@@ -3672,7 +3672,7 @@ export async function saveCompetition(){
     if(spawned){
       const _sk=Array.isArray(spawned.skipped_challenges)?spawned.skipped_challenges:[];
       const _n=spawned.assigned_challenges||0;
-      _msg=`Created “${spawned.competition.name}” from the template with ${_n} challenge${_n===1?'':'s'}.${skippedSummary(_sk)}`;
+      _msg=`Created “${spawned.competition.name}” from the template with ${_n} question${_n===1?'':'s'}.${skippedSummary(_sk)}`;
     }
     if(!creating){
       const _allSolved=(fd.mode==='single')?!!d.allSolved:_anyTsStaysEndedAllSolved;
