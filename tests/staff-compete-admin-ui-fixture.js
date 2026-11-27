@@ -24,7 +24,7 @@ const { expect } = require("@playwright/test");
 const { BASE, apiLogin, PARTICIPANT_PASS } = require("./helpers");
 const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin } = require("./event-admin-helpers");
 const {
-  loginViaApi, login: formLogin, adminLogin, clickTab, openKebab, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
+  loginViaApi, login: formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
   textContrast, rowMarking,
   showEveryoneInWorkspace, narrowPeopleTable } = require("./ui-admin-helpers");
 
@@ -578,5 +578,5 @@ module.exports = {
   adminPanel, eventRow, openEdit, saveEdit, challengeRow, participantRow, closeKebab, focus,
   expectInactiveRow, toDarkTheme,
   H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin,
-  loginViaApi, formLogin, adminLogin, clickTab, openKebab, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
+  loginViaApi, formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
 };

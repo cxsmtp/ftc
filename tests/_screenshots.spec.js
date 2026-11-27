@@ -3076,10 +3076,11 @@ test.describe("admin", () => {
     // "Challenge draft1" is first in the list; target easy1 instead.
     await gotoTab(page, "Challenges");
     await page.locator("#admin-task-body tr").first().waitFor({ state: "attached", timeout: 10000 }).catch(() => {});
+    // Stage B — the Question bank's one door into events: tick ONE question and
+    // press Add to events on the selection bar, which opens its own dialog.
     const row = page.locator("#admin-task-body tr:has-text('Challenge easy1')").first();
-    await row.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Assign to Events')").first().click();
+    await row.locator('input[data-change-action="challenge-select-toggle"]').check();
+    await page.locator("#challenge-selection-bar-assign-btn").click();
     await page.locator("#assign-task-overlay").waitFor({ state: "visible", timeout: 5000 });
     await settle(page, 400);
     await page.screenshot({ path: shotPath("admin", "26-challenge-assign-comps") });

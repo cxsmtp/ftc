@@ -35,7 +35,7 @@
 // to the first only.
 const { test, expect } = require("./isolated-test");
 const { BASE, apiLogin, appearanceSettled } = require("./helpers");
-const { adminLogin, clickTab, openKebab, findSeededTaskRow, textContrast } = require("./ui-admin-helpers");
+const { adminLogin, clickTab, openAddToEventsFor, findSeededTaskRow, textContrast } = require("./ui-admin-helpers");
 const { makeCompetition, makeTask, assignTask } = require("./event-admin-helpers");
 const { lookCombos } = require("./look-tokens");
 
@@ -97,11 +97,8 @@ test.describe("the Assign to Events dialog's Save button", () => {
     await clickTab(page, "Challenges");
     const row = await findSeededTaskRow(page, task.title);
     await expect(row.first(), `the challenge "${task.title}" is listed`).toBeVisible({ timeout: 15000 });
-    await openKebab(page, row.first());
-    const item = page.locator('#kebab-portal [data-action="task-assign-to-comps"]');
-    await expect(item, "Assign to Events is offered").toHaveCount(1);
-    await item.click();
-    const overlay = page.locator("#assign-task-overlay");
+    // Stage B — the bank's one door into events (the selection bar's Add to events).
+    const overlay = await openAddToEventsFor(page, row.first());
     await expect(overlay, "the Assign to Events dialog opened").toBeVisible({ timeout: 20000 });
     const heldBox = overlay.locator(`input[type="checkbox"][value="${held.id}"]`);
     const spareBox = overlay.locator(`input[type="checkbox"][value="${spare.id}"]`);

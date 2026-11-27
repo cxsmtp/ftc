@@ -628,7 +628,9 @@ export function renderAdminTasks(){
   let tasks=_listedTasks();
   // RBAC — a row is selected only to assign it (`challenges.assign`): a role
   // that may not gets no checkboxes and no Select all.
-  const _canSelect=adminCan('challenges.assign');
+  // Stage B — only on the bank's own page: inside an event the one door is
+  // + Add from bank (owner ruling, 27 Nov 2026).
+  const _canSelect=adminCan('challenges.assign')&&!S.adminSelectedCompetitionId;
   { const sa=document.getElementById('select-all-challenges'); const lb=sa&&sa.closest('label'); if(lb)lb.style.display=_canSelect?'':'none'; }
   // Search
   const q=(document.getElementById('task-search')?.value||'').toLowerCase().trim();
@@ -887,8 +889,8 @@ export function renderAdminTasks(){
           kebabActions+=`<button class="${hideCls}" data-action="task-toggle-visibility" data-task-id="${esc(t.id)}">${ICO.eyeOff} Hide</button>`;
         }
       }
-      // Its dialog lists the events to assign to (`events.view`).
-      if(_permAssign&&adminCan('events.view'))kebabActions+=`<button data-action="task-assign-to-comps" data-task-id="${esc(t.id)}">${ICO.target} Assign to Events</button>`;
+      // Stage B — no per-row door into events: the bank's one door is the
+      // selection bar's Add to events (owner ruling, 27 Nov 2026).
     }
     // v8.7.0 — `can_unassign` is PER COMPETITION, because "may I take this out of
     // THAT event" depends on who put it there: an event admin may remove only
@@ -1029,9 +1031,7 @@ export function updateChallengeSelectionBar(){
   const comp=S.adminSelectedCompetitionId?S.adminCompetitionsData.find(c=>c.id===S.adminSelectedCompetitionId):null;
   // v8.12.0 — a competitor may not add challenges to the event they compete in.
   const directAdd=comp&&computeCompStatus(comp)!=='ended'&&!comp.competing;
-  const label=directAdd?`Assign to "${comp.name}"`:'Assign to Events'; // v7.12.1 — match the participants wording
   const barBtn=document.getElementById('challenge-selection-bar-assign-btn');
-  const topBtn=document.getElementById('assign-challenges-to-comp-btn'); // v7.12.1 — top button (mirrors participants)
   const countEl=document.getElementById('challenge-selection-count');
   if(count>0){
     bar.style.display='flex';
@@ -1039,23 +1039,17 @@ export function updateChallengeSelectionBar(){
     // bottom-of-page focusables aren't trapped under it (see styles.css).
     document.body.classList.add('selection-bar-open');
     if(countEl)countEl.textContent=count+' selected';
-    // RBAC — assigning is `challenges.assign`; outside an event its dialog also
-    // reads the event list (`events.view`).
-    const canAssign=adminCan('challenges.assign')&&(!!directAdd||adminCan('events.view'));
-    if(barBtn){barBtn.textContent=label;barBtn.style.display=canAssign?'':'none';}
-    if(topBtn){topBtn.style.display=canAssign?'':'none';topBtn.textContent=label;}
+    // RBAC — assigning is `challenges.assign`; its dialog reads the event list
+    // (`events.view`).
+    const canAssign=adminCan('challenges.assign')&&adminCan('events.view');
+    if(barBtn)barBtn.style.display=canAssign?'':'none';
   }else{
     bar.style.display='none';
     document.body.classList.remove('selection-bar-open');
-    if(topBtn)topBtn.style.display='none';
   }
-  // v7.12.2 — the "+ Add Challenges" picker button and the bulk "Assign to <comp>"
-  // button both add to the focused competition; never show BOTH (the participants
-  // pane shows only one). So the picker button appears ONLY when a comp is focused
-  // AND nothing is selected — the moment you tick a challenge it yields to the bulk
-  // button, and returns when you clear the selection.
+  // Inside an event the one door is + Add from bank (rows carry no box there).
   const addBtn=document.getElementById('add-tasks-to-comp-btn');
-  if(addBtn)addBtn.style.display=(directAdd&&count===0&&adminCan('challenges.assign'))?'':'none';   // RBAC — `challenges.assign`
+  if(addBtn)addBtn.style.display=(directAdd&&adminCan('challenges.assign'))?'':'none';   // RBAC — `challenges.assign`
   // Reflect the current page's selection state on the select-all checkbox
   // (checked when every visible box is selected; indeterminate when partial).
   const boxes=[...document.querySelectorAll('#admin-task-body input[type="checkbox"]')];
@@ -1067,22 +1061,13 @@ export function updateChallengeSelectionBar(){
   }
 }
 
-// Entry point for the selection-bar button: direct-add when a competition is
-// focused, otherwise open the competition picker.
+// The Question bank's one door into events (owner ruling, 27 Nov 2026): the
+// selection bar's Add to events. One question opens its own dialog (which lists
+// the events holding it and also takes it out of them); several open the bulk one.
 export function challengesBulkAssign(){
-  if(!S.selectedChallenges.size){showToast('Select challenges first.');return;}
-  // v8.12.0 — ONE predicate for the label and the handler. The label already
-  // read "Assign to Events" for a competitor (the focused event refuses them),
-  // while this branch re-derived the direct-add decision without `competing`
-  // and posted straight into the refusal — two copies of one rule, one drifted
-  // (the v7.21.13 class; the participants twin derives both from one value).
-  const comp=S.adminSelectedCompetitionId?S.adminCompetitionsData.find(c=>c.id===S.adminSelectedCompetitionId):null;
-  const directAdd=!!(comp&&computeCompStatus(comp)!=='ended'&&!comp.competing);
-  if(directAdd){
-    quickAssignSelectedChallengesToCompetition();
-  }else{
-    openBulkAssignChallengesModal();
-  }
+  if(!S.selectedChallenges.size){showToast('Select questions first.');return;}
+  if(S.selectedChallenges.size===1){openAssignTaskToComps([...S.selectedChallenges][0]);return;}
+  openBulkAssignChallengesModal();
 }
 
 async function _postBulkAssignChallenges(competitionIds){
@@ -1125,15 +1110,6 @@ async function _postBulkAssignChallenges(competitionIds){
     S.selectedChallenges.clear();
     loadAdminTasks();loadAdminCompetitions();
   }else{showToast(res.d.error||'Failed to assign challenges.','error');}
-}
-
-export async function quickAssignSelectedChallengesToCompetition(){
-  if(!S.adminSelectedCompetitionId||!S.selectedChallenges.size)return;
-  const comp=S.adminCompetitionsData.find(c=>c.id===S.adminSelectedCompetitionId);
-  const count=S.selectedChallenges.size;
-  const ok=await showModal({title:`Assign to ${comp?.name||'Event'}`,message:`Assign <strong>${count}</strong> selected challenge(s) to <strong>${esc(comp?.name||'')}</strong>?<br><br>Draft challenges, and challenges already assigned, are skipped.`,confirmText:'Assign'});
-  if(!ok)return;
-  await _postBulkAssignChallenges([S.adminSelectedCompetitionId]);
 }
 
 export async function openBulkAssignChallengesModal(){

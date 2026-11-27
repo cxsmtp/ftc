@@ -175,10 +175,13 @@ test.describe("v8.12.0 — the challenge-side bulk picker, Remove from Event, an
 
   test("the challenge-side bulk picker disables the event the actor competes in as 'You compete here', flags a compete event as 'Sealed challenges only', and offers a plain one (CONTROL)", async ({ page }) => {
     await adminPanel(page, competitor.email);
-    const row = await challengeRow(page, plainHinted.title);
-    await row.locator('td.cb-cell input[type="checkbox"]').check();
-    const btn = page.locator("#assign-challenges-to-comp-btn");
-    await expect(btn, "the bulk button renders once a challenge is ticked").toBeVisible({ timeout: 15000 });
+    // Stage B — the bank's one door: two ticked questions open the bulk picker.
+    for (const t of [plainHinted, cTask]) {
+      const row = await challengeRow(page, t.title);
+      await row.locator('td.cb-cell input[type="checkbox"]').check();
+    }
+    const btn = page.locator("#challenge-selection-bar-assign-btn");
+    await expect(btn, "the bar's door renders once questions are ticked").toBeVisible({ timeout: 15000 });
     await btn.click();
     const overlay = page.locator("#challenge-bulk-assign-overlay");
     await expect(overlay, "the bulk picker opened").toBeVisible({ timeout: 15000 });
@@ -198,51 +201,30 @@ test.describe("v8.12.0 — the challenge-side bulk picker, Remove from Event, an
     await expect(overlay).toBeHidden();
   });
 
-  test("with the event they compete in FOCUSED, the selection bar reads 'Assign to Events', opens the PICKER rather than posting into it, and the direct-add button is withheld", async ({ page }) => {
-    // Round 3: the label and the handler derive from ONE predicate. The label
-    // already read "Assign to Events" for a competitor while the handler
-    // re-derived direct-add without `competing` and posted straight into the
-    // refusal (two copies of one rule, one drifted). And `+ Add Challenges` is
-    // the other direct door into the focused event.
+  // Stage B (owner ruling, 27 Nov 2026) — inside an event the one door into it
+  // is + Add from bank; rows carry no selection box there, so no second door can
+  // post into the event they compete in.
+  test("with the event they compete in FOCUSED, no row carries a box and the direct-add button is withheld", async ({ page }) => {
     await adminPanel(page, competitor.email);
     await focus(page, competeLive.name);
     await clickTab(page, "Challenges");
     await expect.poll(() => page.evaluate(() => (window.adminTasksData || []).length), { timeout: 20000 }).toBeGreaterThan(0);
     await expect(page.locator("#add-tasks-to-comp-btn"), "no direct-add into the event they compete in").toBeHidden();
-    /** @type {string[]} */ const posts = [];
-    await page.route("**/api/admin/tasks/assign-competitions", async (route, req) => {
-      if (req.method() === "POST") posts.push(req.postData() || "");
-      await route.continue();
-    });
     const row = await challengeRow(page, plainHinted.title);
-    await row.locator('td.cb-cell input[type="checkbox"]').check();
-    const btn = page.locator("#assign-challenges-to-comp-btn");
-    await expect(btn).toBeVisible({ timeout: 15000 });
-    await expect(btn, "the label does not name the event they compete in").toHaveText(/Assign to Events/);
-    await expect(btn).not.toContainText(competeLive.name);
-    await btn.click();
-    const overlay = page.locator("#challenge-bulk-assign-overlay");
-    await expect(overlay, "the PICKER opens instead of a direct add").toBeVisible({ timeout: 15000 });
-    const mine = overlay.locator(`#challenge-bulk-comp-list label.picker-row:has-text("${competeLive.name}")`);
-    await expect(mine.locator("input")).toBeDisabled();
-    await expect(mine.locator(".picker-row-flag")).toContainText("You compete here");
-    expect(posts.length, "nothing was posted on the click").toBe(0);
-    await overlay.locator('[data-action="overlay-close"]').first().click();
-    await expect(overlay).toBeHidden();
+    await expect(row, "PRECONDITION: the bank question is listed").toBeVisible();
+    await expect(row.locator('td.cb-cell input[type="checkbox"]'), "no selection box inside an event").toHaveCount(0);
+    await expect(page.locator("#assign-challenges-to-comp-btn"), "and no second door").toHaveCount(0);
   });
 
-  test("CONTROL — with the same event focused, the built-in's selection bar reads 'Assign to \"<event>\"' and the direct-add button is offered", async ({ page }) => {
+  test("CONTROL — with the same event focused, the built-in is offered the direct-add button, and still no row box", async ({ page }) => {
     await adminLogin(page);
     await focus(page, competeLive.name);
     await clickTab(page, "Challenges");
     await expect.poll(() => page.evaluate(() => (window.adminTasksData || []).length), { timeout: 20000 }).toBeGreaterThan(0);
     await expect(page.locator("#add-tasks-to-comp-btn"), "the direct-add button is offered to an actor who competes nowhere").toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#add-tasks-to-comp-btn")).toHaveText("+ Add from bank");
     const row = await challengeRow(page, plainHinted.title);
-    await row.locator('td.cb-cell input[type="checkbox"]').check();
-    const btn = page.locator("#assign-challenges-to-comp-btn");
-    await expect(btn).toBeVisible({ timeout: 15000 });
-    await expect(btn, "the label names the focused event").toHaveText(`Assign to "${competeLive.name}"`);
-    await expect(page.locator("#add-tasks-to-comp-btn"), "…and the picker button yields to it while something is ticked").toBeHidden();
+    await expect(row.locator('td.cb-cell input[type="checkbox"]'), "the one door is the button, not a selection").toHaveCount(0);
   });
 
   test("with the event they compete in focused, 'Remove from Event' is withheld on its challenge row (can_unassign:false)", async ({ page }) => {

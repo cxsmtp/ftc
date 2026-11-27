@@ -31,7 +31,7 @@
 const { test, expect } = require("./isolated-test");
 const { BASE, PARTICIPANT_PASS } = require("./helpers");
 const {
-  clickTab, openKebab, findSeededTaskRow, loginViaApi,
+  clickTab, openAddToEventsFor, findSeededTaskRow, loginViaApi,
 } = require("./ui-admin-helpers");
 const {
   H, buildWorld, makeParticipant, makeTask, assignTask,
@@ -72,13 +72,8 @@ async function openAssignDialog(page, title) {
   await clickTab(page, "Challenges");
   const row = await findSeededTaskRow(page, title);
   await expect(row.first(), `the challenge "${title}" is visible`).toBeVisible();
-  await openKebab(page, row.first());
-  const item = page.locator('#kebab-portal [data-action="task-assign-to-comps"]');
-  await expect(item, "Assign to Events is offered").toHaveCount(1);
-  await item.click();
-  const overlay = page.locator("#assign-task-overlay");
-  await overlay.waitFor({ state: "visible", timeout: 20000 });
-  return overlay;
+  // Stage B — the bank's one door into events (the selection bar's Add to events).
+  return openAddToEventsFor(page, row.first());
 }
 
 /**

@@ -755,10 +755,6 @@
                topic with how many of the reader's bank questions it holds. -->
           <span class="topic-filter"><label for="task-topic-filter">Topic</label><select id="task-topic-filter" data-change-action="task-topic-filter"><option value="">All topics</option></select><span data-help="library.topics" data-help-label="Topics"></span></span>
           <div id="new-task-btn-row" style="display:flex;gap:8px">
-            <!-- v7.12.1 — top bulk-assign button (mirrors #assign-to-comp-btn on the
-                 Participants pane): shown when >=1 challenge is selected, always visible
-                 in the controls even when the sticky selection bar is scrolled below. -->
-            <button class="btn sm" id="assign-challenges-to-comp-btn" style="display:none" data-action="challenges-bulk-assign">Assign to Events</button>
             <button class="btn sm" id="add-tasks-to-comp-btn" style="display:none" data-action="open-add-tasks-to-competition">+ Add from bank</button>
             <button class="btn sm secondary" id="task-topics-btn" data-action="open-topics-dialog">Topics</button>
             <button class="btn sm secondary" id="export-tasks-btn" data-action="export-tasks">Export</button>
@@ -1010,10 +1006,13 @@
           <tbody id="admin-task-body"></tbody>
         </table></div>
         <div id="tasks-pagination" class="pagination"></div>
-        <!-- v7.12.0 — bulk-assign selection bar (mirrors #participants-selection-bar). -->
+        <!-- Stage B (owner ruling, 27 Nov 2026) — the Question bank's ONE door into
+             events: tick questions, then Add to events (one question opens its own
+             dialog, which also takes it out of events; several, the bulk one).
+             Inside an event the one door is + Add from bank, and rows carry no box. -->
         <div id="challenges-selection-bar" class="selection-bar" style="display:none">
           <span id="challenge-selection-count">0 selected</span>
-          <button class="btn sm" id="challenge-selection-bar-assign-btn" data-action="challenges-bulk-assign">Assign to Events</button>
+          <button class="btn sm" id="challenge-selection-bar-assign-btn" data-action="challenges-bulk-assign">Add to events</button>
         </div>
       </div>
 

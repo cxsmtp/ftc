@@ -71,7 +71,7 @@ four groups:
   sections (Overview, Participants, Challenges, Rankings and the rest);
 - **Actions** — what you can do from here: **New event**, **New challenge**,
   **Invite people**, **Sign up at the desk**, **New template** and the exports,
-  and inside an event the doors of its **⋯** menu (Add from bank, Clone,
+  and inside an event the doors of its **⋯** menu (Clone,
   Export everything, Join-link settings, Edit settings, History, …). Only what
   your role may use is listed. The irreversible doors — **End now**, **Close
   late entries now**, **Delete** — stay in the **⋯** menu, behind their confirm;
@@ -395,12 +395,12 @@ with options until the event ends (**Change answer** on the answered question),
 so a slip of the thumb is not final; the reports read each person's latest answer.
 
 **One question per topic.** Another event's qualifying question can be added to
-this one (through **Add from bank**, **Assign to Events** or the bulk assign);
+this one (through **Add from bank**, or **Add to events** on the Question bank);
 the two events then share that question's wording, while each keeps its own
 answers. But an event asks each one once: a question on a topic the event
 already asks (its own developers question, say) is not listed in **Add
-challenges**, is greyed out as *Topic already asked* in **Assign to Events**, and
-is skipped, and counted in the toast, by the bulk assign. Only one question per
+from bank**, is greyed out as *Topic already asked* in a single question's **Add to events**
+dialog, and is skipped, and counted in the toast, by the bulk one. Only one question per
 topic can be ticked in **Add from bank** at a time. A question the event holds
 counts even while it is hidden or a draft. Tagging a challenge, restoring one of
 its versions or importing a challenge file cannot make an event ask a topic twice
@@ -595,8 +595,7 @@ at the top as you scroll.
 - **Invite** — the one primary button (see [Inviting
   participants](#inviting-participants)). **Approve** joins it while somebody in
   the event is waiting for approval.
-- **⋯** — every other door for the event, in one place: **Add from bank**,
-  **Clone**, **Export everything** (a ZIP), **Export activity (CSV)** (once it is
+- **⋯** — every other door for the event, in one place: **Clone**, **Export everything** (a ZIP), **Export activity (CSV)** (once it is
   live or ended), **Sign up at the desk**, **Save as template** (administrators),
   **Join-link settings**, **Edit settings**, **History**, **Organisers**, **Email
   delivery** and **Start now** (an upcoming single-session event). The
@@ -973,23 +972,9 @@ One. Folded or not, its heading line says whether Checkmarx One accounts will
 be created (**Checkmarx One accounts: on** or **off**, following the box and the
 type you picked), and the **Create** confirmation says it again. Every setting
 that is not obvious has a **?** beside it that explains it.
-**Create event** makes it; for a blank event, **Create and pick challenges**
-goes straight on to the Add from bank dialog.
-
-**Challenges** lets you pick the challenges the event starts with while you
-create it. Type in the search box (it matches a challenge's title, difficulty or
-any tag, `category:web` and plain `web` alike), or press the **tag chips** under
-it: each tag and category in the library is a chip, and pressing several shows
-challenges carrying any of them. Tick the ones you want; **Tick all shown** ticks
-every challenge on screen, and the count says how many are ticked. Only published
-challenges you may use are listed (qualifying questions are not: the event gets
-its own through **Add the qualifying questions**), and the platform's own markers
-(`needs:` tags, `public-domain`, `test/dry run`) are never chips. The ticked
-challenges are added once the event exists. A challenge that does not fit the
-event's type (a Booth Event refuses file answers and `needs:` tags), or that is
-locked, is left out and named in the message, and the rest are added. From a template, the
-template's challenges are already ticked, marked **From the template**, and come
-with it; tick more to add them as well.
+**Create event** makes it. The form picks no questions: a blank event gets them
+afterwards from its **Questions** section (**+ Add from bank**), and an event made
+from a template gets the template's questions with it.
 
 **Add the qualifying questions** (under Advanced settings) is offered on every
 create, from a template too, ticked by default for a Booth Event. It cannot be
@@ -1275,7 +1260,7 @@ compete in, for the same reason.) In practice:
   **Some challenges were not added** names each refused challenge and why. The
   refused ones are left out; every other challenge you ticked is still added
   (or removed), so read the list before assuming the event is unchanged.
-- The per-challenge **Assign to Events** dialog greys out such an event for an
+- A single question's **Add to events** dialog greys out such an event for an
   unsealed challenge and marks it *Sealed only*; where the author rule refuses
   the save, nothing changes on any of the ticked events, and the dialog names
   every event that refused, not just the first. The bulk **Assign to
@@ -1935,9 +1920,10 @@ section.
 
 ### Choosing an event's challenges
 
-From the event's three-dot menu on the Events list, click **Assign Challenges**
-(**Add from bank** in its workspace's **⋯** menu), or press **Create and pick
-challenges** when you create a blank event.
+**One door puts bank questions into an event: + Add from bank**, in the event's
+**Questions** section (the Overview's *Ready to start?* checklist offers the same
+door while the event has none). From the Question bank itself, tick questions and
+press **Add to events** on the selection bar (see below).
 
 ![Task picker — assign challenges to an event](../screenshots/admin/23-task-picker.png)
 
@@ -3025,10 +3011,11 @@ Use it to sanity-check formatting and confirm the answer matches your
 grading rules. The preview never counts as a submission and has no side
 effects.
 
-### Assigning a challenge to events
+### Adding questions to events from the bank
 
-From the Challenges tab's three-dot menu, **Assign to Events** picks
-one or more events for the current challenge.
+On the **Question bank**, tick the questions you want and press **Add to events**
+on the selection bar: the bank's one door into events. With **one** question
+ticked it opens that question's own dialog, which picks one or more events for it.
 
 ![Assign to Events dialog — one challenge, many events](../screenshots/admin/26-challenge-assign-comps.png)
 
@@ -3043,22 +3030,21 @@ reports](#event-team-and-lead-reports)).
 
 ### Bulk-adding challenges to events
 
-To add **several challenges at once**, tick the checkbox at the start of each
-published challenge's row (or the header checkbox to select the whole page — only
-published challenges are selectable). An **Assign to Events** button then
-appears at the top of the tab **and** in a bar at the bottom (either works):
+To add **several questions at once**, tick the checkbox at the start of each
+published question's row (or the header checkbox to select the whole page — only
+published questions are selectable), then **Add to events** on the selection bar:
 
 ![Bulk-select challenges with the Assign to Events button](../screenshots/admin/35-challenges-bulk-assign.png)
 
-- If you are in an **event's workspace** (see [The event workspace](#the-event-workspace)), the button assigns the selected challenges straight to it — and challenges **already in** that event don't show a checkbox (nothing to add). The moment you tick a challenge, the open event's **+ Add Challenges** picker button gives way to **Assign to Events**, so you only ever see one — clear the selection to bring the picker back.
-- Otherwise it opens a picker to choose one or more events.
+It opens a picker to choose one or more events. Inside an event's workspace the
+rows carry no checkboxes: there the one door is **+ Add from bank**.
 
 Assignments are best-effort: drafts, and any challenge already in a chosen
 event, are skipped, and ended events are left out — the toast tells
 you what went in and what was skipped. A challenge a Booth Event cannot use is
 skipped too, but the bulk toast does not name it — so if the count comes back
-lower than you expected with no reason listed, open that challenge's own
-**Assign to Events** dialog, which names the challenge, says what the objection is — a file answer,
+lower than you expected with no reason listed, tick that one question alone and press
+**Add to events**: its own dialog names the challenge, says what the objection is — a file answer,
 or a `needs:` tag — and names the kind of event that refuses it. It stops short
 of naming the event itself, so with two Booth Events ticked you may have to try
 them one at a time. On an event that lets staff compete, a challenge whose

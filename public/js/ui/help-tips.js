@@ -59,7 +59,6 @@ export const HELP_TIPS = {
   "event.deadline": "The moment the event closes. People can start any time before it and go at their own pace. Tick No fixed deadline for an always-open program.",
   "event.lbmode": "Per session: each session has its own leaderboard. Global: one board across every session, each person timed within their own session.",
   "event.reveal": "When the event ends, participants can read the correct answer and the explanation of each challenge. Leave it off if you will reuse the same challenges at another event.",
-  "event.challenges": "Pick the challenges this event starts with. Type a title, difficulty or tag, or press tag chips to narrow the library (a challenge with any pressed tag is shown). They are added when you create the event; one that does not fit the event's type is named and left out. You can add or remove challenges later.",
   "event.attempts": "How many answers each participant may submit per challenge. Blank means no limit. A challenge with its own limit overrides this, and an organiser can grant someone more attempts later.",
   "event.team": "Adds a team ranking (each group's average score) beside the individual one. It appears only once at least two groups with members are assigned to the event.",
   "event.staff": "Normally staff and organisers never appear on the leaderboard. Turn this on to let enrolled staff compete like anyone else; while they compete they cannot edit this event or its challenges, and only sealed challenges can be assigned.",

@@ -51,7 +51,7 @@ const OVERVIEW = 'admin-event-overview-tab';
 const SECTION_LABELS = {
   'admin-event-overview-tab': 'Overview',
   'admin-participants-tab': 'Participants',
-  'admin-tasks-tab': 'Challenges',
+  'admin-tasks-tab': 'Questions',
   'admin-rankings-tab': 'Rankings',
   'admin-submissions-tab': 'Activity',
   'admin-analytics-tab': 'Analytics',
@@ -490,7 +490,8 @@ export function wsMenuItemsHtml(c) {
   const b = (action, icon, label, extra = '') => `<button data-action="${action}" data-comp-id="${id}" data-comp-name="${nm}"${extra}>${icon} ${esc(label)}</button>`;
   const items = [];
   if (competing) items.push(`<div class="kebab-note" role="presentation">${ICO.lock} You are competing in this event — you can view it, not change it</div>`);
-  if (status !== 'ended' && !competing && adminCan('challenges.assign') && adminCan('challenges.view')) items.push(b('comp-assign-challenges', ICO.clipboardCheck, 'Add from bank'));
+  // Stage B — no Add from bank here: the event's one door into the bank is its
+  // Questions section's + Add from bank (owner ruling, 27 Nov 2026).
   if (!competing && adminCan('events.clone')) items.push(b('ws-clone', ICO.copy, 'Clone'));
   // The full export needs `export.data` (the route's permission).
   if (!competing && adminCan('export.data')) items.push(b('ws-export-zip', ICO.download, 'Export everything'));
@@ -1437,7 +1438,7 @@ function _paintReady(c) {
   } else if (!n) {
     open++;
     items.push(todo('No challenges yet', 'Participants need at least one to play.')
-      + (competing || !adminCan('challenges.assign') || !adminCan('challenges.view') ? '' : `<button type="button" class="btn sm secondary" data-action="comp-assign-challenges" data-comp-id="${id}" data-comp-name="${nm}">Add from bank</button>`) + '</li>');
+      + (competing || !adminCan('challenges.assign') || !adminCan('challenges.view') ? '' : `<button type="button" class="btn sm secondary" data-action="ws-add-from-bank">Add from bank</button>`) + '</li>');
   } else if (unready) {
     open++;
     items.push(todo(`${unready} of ${n} challenges are not visible to participants`, 'Drafts and hidden challenges are not played.')

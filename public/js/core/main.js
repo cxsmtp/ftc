@@ -15,7 +15,7 @@ import { _analyticsClosePicker, _analyticsParseLocalDate, _analyticsRowCharts, _
 import { _autoFillCityFromTz, leaveJoinedEvent, checkInvitation, confirmParticipantViewProfile, doLogin, doLogout, doRegister, openProfileCompletionGate, openProfileEditor, saveProfile, selectAvatar, toggleJobFunctionOther, updateProfileTimezones, signinCodeRedeem, signinCodeRestart, signinCodeResend, syncLoginEmailHint, loginCodeInstead, openSignInMethodDialog, saveSignInMethod, savePasswordPrompt, keepCodesPrompt, registerCancel, paintRegLocation, regLocationChange, paintCsrfBusy, _paintCodeCells } from "./../features/auth.js";
 import { _renderTaskFormAttachments, tfAddChoice, tfRemoveChoice, tfSetChoiceText, tfSetChoiceCorrect, tfSyncAnswerType, tfAddExtraAnswer, tfRemoveExtraAnswer, tfSetExtraAnswer, _closeAttachPicker, _deleteSavedAttachment, _deleteStagingAttachment, _openAttachPicker, _renameSavedAttachment, _renameStagingAttachment, _uploadAttachmentNow,  assignPickedTasks, challengeBulkAssignExecute, challengesBulkAssign, toggleAllChallenges, toggleChallengeSelection, closeTaskForm, closeTaskPreview, deleteAllFeedback, deleteFeedback, deleteTask, editTask, loadAdminTasks, openAddTasksToCompetition, openAssignTaskToComps, openAttemptGrant, openTaskForm, openTaskPickerForCompetition, publishTask, recalculateTaskScores, revealSealedAnswer, removeTaskFromComp, renderAdminTasks, restoreTaskVersion, saveTask, saveTaskCompAssignments, sortAdminTasks, toggleTaskDiffFilter, toggleTaskLock, toggleTaskStateFilter, toggleTaskStatusFilter, toggleTaskVisibility, updateAssignSaveBtn, updateTaskPickerCount, viewTaskAsParticipant } from "./../features/challenges-admin.js";
 import { chooseTimeslot, COMP_CATEGORY_LABEL, compDisplayCategory, handleCompetitionsNav, loadMyCompetitions, pickCompetition, renderCompetitionPicker, requestReminder, selectCompetition, setCompFilter, setCompOtherFilter, showCompetitionsPage, showPendingPageForCompetition, showTimeslotPicker, startCompDataPoll, leaveCompetition } from "./../features/competition-picker.js";
-import { closeLateEntriesNow, compareCompsForPicker, compKindSelect, openNewEventPage, openCompetitionForm, compFormDeadlineChanged, toggleNoDeadline, toggleLateEntry, toggleLateAuto, compFormLateDeadlineChanged, addCompFormSession, addCompTag, compFormDurChanged, compFormUpdateEndTime, compRegFieldChanged, deleteCompetition, editCompetition, endNow, loadAdminCompetitions, removeCompCxOne, removeCompTag, renderAdminCompetitions, renderScopeBanner, saveCompCxOne, saveCompetition, saveCompetitionAndPickTasks, setAdminTimeslotScope, showCompetitionDelivery, showCompetitionOrganisers, sortCompetitions, startAdminCompPoll, startNow, toggleCompFilter, toggleCompKindFilter, toggleCompFormMode, toggleCxoneDisabled, updateSessionRemoveBtns } from "./../features/competitions-admin.js";
+import { closeLateEntriesNow, compareCompsForPicker, compKindSelect, openNewEventPage, openCompetitionForm, compFormDeadlineChanged, toggleNoDeadline, toggleLateEntry, toggleLateAuto, compFormLateDeadlineChanged, addCompFormSession, addCompTag, compFormDurChanged, compFormUpdateEndTime, compRegFieldChanged, deleteCompetition, editCompetition, endNow, loadAdminCompetitions, removeCompCxOne, removeCompTag, renderAdminCompetitions, renderScopeBanner, saveCompCxOne, saveCompetition, setAdminTimeslotScope, showCompetitionDelivery, showCompetitionOrganisers, sortCompetitions, startAdminCompPoll, startNow, toggleCompFilter, toggleCompKindFilter, toggleCompFormMode, toggleCxoneDisabled, updateSessionRemoveBtns } from "./../features/competitions-admin.js";
 import { executeConflictImport, exportCompetitionActivityCsv, exportParticipants, exportParticipantsCSV, exportTasks, importParticipantsFile, importTasksFile, onConflictResChange, proceedToConflictCheck, renderImportParticipantRows, setAllConflictResolutions, toggleAllImportParticipants, toggleImportParticipant } from "./../features/export-import.js";
 import { bulkAddToGroup, createGroupDialog, deleteGroup, loadAdminGroups, manageGroupCompetitions, manageGroupMembers, renameGroupDialog, renderAdminGroups } from "./../features/groups-admin.js";
 import { _helpLoadDoc, closeHelpDrawer, openHelpDrawer } from "./../features/help-drawer.js";
@@ -383,7 +383,6 @@ function boot() {
 
   registerAction('task-toggle-visibility',     (e, el) => toggleTaskVisibility(el.dataset.taskId));
 
-  registerAction('task-assign-to-comps',       (e, el) => openAssignTaskToComps(el.dataset.taskId));
 
   registerAction('task-remove-from-comp',      (e, el) => removeTaskFromComp(el.dataset.taskId, el.dataset.compId));
 
@@ -595,7 +594,6 @@ function boot() {
 
   registerAction('comp-save',                  () => saveCompetition());
 
-  registerAction('comp-save-and-pick-tasks',   () => saveCompetitionAndPickTasks());
 
   registerAction('comp-add-form-session',      () => addCompFormSession());
 
@@ -1887,6 +1885,9 @@ function boot() {
   registerAction("comp-open",               (e, el) => _ns50.openEventWorkspace(el.dataset.compId, el.dataset.compName));
   registerAction("comp-open-ts",            (e, el) => _ns50.openEventWorkspaceSession(el.dataset.compId, el.dataset.compName, el.dataset.tsId, el.dataset.tsName));
   registerAction("ws-tab",                  (e, el) => _ns50.wsTab(el.dataset.section));
+  // Stage B — the Overview checklist's Add from bank is the Questions section's
+  // own door (owner ruling, 27 Nov 2026): open the section, then its picker.
+  registerAction("ws-add-from-bank",        () => { _ns50.wsTab("admin-tasks-tab"); _ns7.openAddTasksToCompetition(); });
   registerAction("ws-section-pick",         () => _ns50.openSectionSheet());
   registerAction("ws-section-sheet-close",  () => _ns50.closeSectionSheet());
   registerAction("ws-join-reveal",          () => _ns50.wsJoinReveal());

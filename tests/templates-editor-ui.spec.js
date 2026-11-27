@@ -452,7 +452,10 @@ test.describe("Templates — a competitor's challenges", () => {
     } finally { await ctx2.close(); }
   });
 
-  test("the New event form from a template marks a challenge of an event you compete in as left out, unticked, and does not count it as coming from the template", async ({ page, browser }) => {
+  // Stage B (owner ruling, 27 Nov 2026) — the form no longer lists questions; a
+  // template's come with its spawn. What the spawn leaves out (a question of an
+  // event the creator competes in) is named when the event is made.
+  test("a create from a template leaves out a challenge of an event you compete in, and says so", async ({ page, browser }) => {
     const f = await competitorFixture("c63nf");
     const tplName = `C63 form ${Date.now().toString(36)}`;
     try {
@@ -461,7 +464,8 @@ test.describe("Templates — a competitor's challenges", () => {
       } });
       expect(r.ok(), `template: ${r.status()} ${await r.text()}`).toBeTruthy();
     } finally { await f.sa.dispose(); }
-    const openForm = async (p, who) => {
+    const { originsHeldBy } = require("./event-admin-helpers");
+    const create = async (p, who) => {
       await loginViaApi(p, who.email, PARTICIPANT_PASS);
       await p.goto("/");
       await expect(p.locator("#admin-page")).toBeVisible({ timeout: 20000 });
@@ -470,24 +474,26 @@ test.describe("Templates — a competitor's challenges", () => {
       await tplRow.locator("button.card-open").click();
       const form = p.locator("#comp-form-overlay");
       await expect(form.locator("#comp-name")).toBeVisible({ timeout: 10000 });
-      const row = (t) => form.locator("#comp-ch-list .picker-row", { hasText: t.title });
-      await expect(row(f.free), "PRECONDITION: the library has loaded").toBeVisible({ timeout: 15000 });
-      return { form, row };
+      await expect(form.locator("#comp-ch"), "the form lists no questions").toHaveCount(0);
+      const name = `C63 ev ${who.email.slice(0, 12)} ${Date.now().toString(36)}`;
+      await form.locator("#comp-name").fill(name);
+      await form.locator("#comp-date").fill(new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10));
+      await form.locator('[data-action="comp-save"]').click();
+      await p.locator("#modal-confirm-btn").click();
+      await expect(form).toHaveCount(0, { timeout: 20000 });
+      const ev = (await (await p.request.get("/api/admin/competitions")).json()).find((c) => c.name === name);
+      expect(ev, "the event was made").toBeTruthy();
+      return ev;
     };
-    const { form, row } = await openForm(page, f.competitor);
-    await expect(row(f.held)).toContainText("Left out: you compete in an event that holds it");
-    await expect(row(f.held).locator('input[type="checkbox"]'), "not ticked").not.toBeChecked();
-    await expect(row(f.free)).toContainText("From the template");
-    await expect(row(f.free).locator('input[type="checkbox"]')).toBeChecked();
-    await expect(form.locator("#comp-ch-count"), "the count does not promise it").toContainText("0 ticked (plus 1 from the template; 1 left out)");
+    const ev = await create(page, f.competitor);
+    await expect(page.locator("#toast-stack"), "what was left out is named").toContainText(f.held.title, { timeout: 15000 });
+    await expect.poll(() => originsHeldBy(ev.id), { timeout: 10000 }).toEqual([f.free.id]);
 
     const ctx2 = await browser.newContext({ baseURL: BASE });
     try {
       const p2 = await ctx2.newPage();
-      const other = await openForm(p2, f.bystander);
-      await expect(other.row(f.held), "CONTROL: a non-competing admin carries it").toContainText("From the template");
-      await expect(other.row(f.held).locator('input[type="checkbox"]')).toBeChecked();
-      await expect(other.form.locator("#comp-ch-count")).toContainText("0 ticked (plus 2 from the template)");
+      const ev2 = await create(p2, f.bystander);
+      await expect.poll(() => originsHeldBy(ev2.id), { timeout: 10000, message: "CONTROL: a non-competing admin carries both" }).toEqual([f.held.id, f.free.id].sort());
     } finally { await ctx2.close(); }
   });
 });

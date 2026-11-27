@@ -17,7 +17,7 @@ const { registerPost } = require("./helpers");
 const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, PORT_BASE, gradingHashFor } = require("./helpers");
 const {
   login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin,
-  clickTab, openKebab, findSeededTaskRow, viewComp, showEveryoneInWorkspace, focusOwnLiveComp, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, openAnalyticsTab, openCompCreateForm, narrowChallengesTable, narrowPeopleTable } = require("./ui-admin-helpers");
+  clickTab, openKebab, openAddToEventsFor, findSeededTaskRow, viewComp, showEveryoneInWorkspace, focusOwnLiveComp, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, openAnalyticsTab, openCompCreateForm, narrowChallengesTable, narrowPeopleTable } = require("./ui-admin-helpers");
 
 // Route every page.goto() + page.request.* to THIS worker's server.
 test.use({ baseURL: BASE });
@@ -470,10 +470,9 @@ test.describe("Admin — Tasks", () => {
   test("assign dialog — filtered, save disabled, shows Assigned", async ({ page }) => {
     await adminLogin(page);
     await clickTab(page, "Challenges");
-    // Open kebab for easy1 — clicking kebab spawns a #kebab-portal with the menu contents.
+    // Stage B — the bank's one door into events: tick it, then Add to events.
     const row = await findSeededTaskRow(page, "Challenge easy1");
-    await openKebab(page, row);
-    await page.locator("#kebab-portal button:has-text('Assign to Events')").first().click();
+    await openAddToEventsFor(page, row.first());
     const overlay = page.locator("#assign-task-overlay");
     await expect(overlay).toBeVisible({ timeout: 5000 });
     await expect(overlay.locator("text=Test Ended")).not.toBeVisible();
@@ -485,8 +484,7 @@ test.describe("Admin — Tasks", () => {
     await adminLogin(page);
     await clickTab(page, "Challenges");
     const row = await findSeededTaskRow(page, "Challenge easy1");
-    await openKebab(page, row);
-    await page.locator("#kebab-portal button:has-text('Assign to Events')").first().click();
+    await openAddToEventsFor(page, row.first());
     const saveBtn = page.locator("#assign-task-save-btn");
     await expect(saveBtn).toBeDisabled({ timeout: 5000 });
     await page.locator("#assign-task-comp-list input[type='checkbox']").first().click();

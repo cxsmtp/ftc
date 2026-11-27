@@ -1232,7 +1232,7 @@
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "challenges-selection-bar|assign-challenges-to-comp-btn"
+          "grep": "challenges-selection-bar|challenge-selection-bar-assign-btn"
         },
         "behaviour": {
           "path": "public/js/features/challenges-admin.js",
@@ -2045,7 +2045,7 @@
       "route": "/",
       "visual_anchor": "#assign-task-overlay",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab tasks ; waitFor #admin-task-body tr ; fill #task-search Challenge easy1 ; click #admin-task-body tr:has-text('Challenge easy1') .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=task-assign-to-comps] ; waitFor #assign-task-comp-list label",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab tasks ; waitFor #admin-task-body tr ; fill #task-search Challenge easy1 ; click #admin-task-body tr:has-text('Challenge easy1') input[data-change-action=challenge-select-toggle] ; click #challenge-selection-bar-assign-btn ; waitFor #assign-task-comp-list label",
       "files": {
         "markup": null,
         "behaviour": {
@@ -2057,7 +2057,7 @@
           "grep": "#assign-task-comp-list"
         }
       },
-      "note": "Challenge library → a row's ⋯ → Assign to Events, opened on the seeded 'Challenge easy1' (assigned to Test Live and Test Upcoming); nothing is saved. Its card is inline-styled in challenges-admin.js."
+      "note": "Question bank → tick one question → Add to events on the selection bar (the bank's one door into events), opened on the seeded 'Challenge easy1' (assigned to Test Live and Test Upcoming); nothing is saved. Its card is inline-styled in challenges-admin.js."
     },
     {
       "screen": "attempt-grant-dialog",

@@ -53,17 +53,17 @@ test.describe("a qualifying challenge on the organiser's screens", () => {
     } finally { await api.dispose(); }
   });
 
-  test("the create form's Challenges section leaves it out, and its tag out of the chips", async ({ page }) => {
+  // Stage B (owner ruling, 27 Nov 2026) — the create form no longer lists
+  // questions at all (the event's one door is + Add from bank), so it cannot
+  // offer a qualifying one; the Question bank row is where both are read.
+  test("the create form lists no questions, and the Question bank lists both with only the ordinary one's topic", async ({ page }) => {
     await adminLogin(page);
     await openCompCreateForm(page, "tournament", { advanced: false });
     const form = page.locator("#comp-form-overlay");
-    // CONTROL: the tag both challenges carry is a chip, so the chips are drawn.
-    await expect(form.locator(`#comp-ch-tags [data-ch-tag="${SHARED}"]`)).toHaveCount(1, { timeout: 15000 });
-    await expect(form.locator(`#comp-ch-tags [data-ch-tag="${QTAG}"]`), "a qualifying tag is never a chip").toHaveCount(0);
-    await form.locator("#comp-ch-search").pressSequentially(STAMP, { delay: 20 });
-    const row = (title) => form.locator("#comp-ch-list .picker-row", { hasText: title });
-    await expect(row(T.plain), "CONTROL: the ordinary challenge is listed").toHaveCount(1);
-    await expect(row(T.qual), "the qualifying challenge is not: an event gets its own copies").toHaveCount(0);
+    await expect(form.locator("#comp-name"), "PRECONDITION: the form is open").toBeVisible();
+    await expect(form.locator("#comp-ch"), "no Challenges section").toHaveCount(0);
+    await expect(form, "the qualifying challenge is not offered").not.toContainText(T.qual);
+    await expect(form, "nor the ordinary one: the form picks none").not.toContainText(T.plain);
   });
 
   test("View as participant shows it as a Quick question, with no difficulty or points", async ({ page }) => {

@@ -19,7 +19,7 @@
 // A qualifying challenge is an ordinary challenge tagged `qualifying:<key>`
 // (lib/qualifying.js); an organiser's screen knows one only by that tag (a
 // participant gets the boolean `qualifying` instead). The Analytics filters, the
-// create form's Challenges section and its tag chips, and View as participant
+// template editor's picker, the workspace Overview and View as participant
 // all ask these two, so no screen can disagree about which challenge is one.
 
 /** A qualifying challenge's tag, `qualifying:<key>` (lib/qualifying.js). */

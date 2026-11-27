@@ -600,39 +600,57 @@ test.describe("v7.12.0 — bulk assign challenges to competitions (UI)", () => {
     await expect(page.locator("#challenges-selection-bar")).toBeHidden();
   });
 
-  test("v7.12.1: top 'Assign to Events' button appears on selection + assigns (no comp focused)", async ({ page }) => {
+  // Stage B (owner ruling, 27 Nov 2026) — ONE door into events from the bank (the
+  // selection bar's Add to events) and ONE into an event from inside it
+  // (+ Add from bank). The three tests below replace the top button's and the
+  // focused-event selection's: each door is pinned, and so is the absence of the
+  // ones the owner removed.
+  test("stage B: the bank's one door — one ticked question opens its own dialog, two the bulk picker; no top button", async ({ page }) => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     const saH = H(csrf);
     const mkTask = async (title) => (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
-    const t1title = uniq("TopBtn-A"), t2title = uniq("TopBtn-B");
+    const t1title = uniq("OneDoor-A"), t2title = uniq("OneDoor-B");
     const t1 = await mkTask(t1title), t2 = await mkTask(t2title);
-    const compName = uniq("TopBtn-Comp");
+    const compName = uniq("OneDoor-Comp");
     const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: compName, start_time: new Date(Date.now() + 3600_000).toISOString(), duration_minutes: 120 } })).json()).competition.id;
     await sa.dispose();
 
     await adminLogin(page);
     await clickTab(page, "Challenges");
-    await narrowChallengesTable(page, "TopBtn-");
-    const topBtn = page.locator("#assign-challenges-to-comp-btn");
-    await expect(topBtn, "top button hidden until a selection").toBeHidden();
-    await page.locator("#admin-task-body tr", { hasText: t1title }).locator("input[type=checkbox]").check();
-    await page.locator("#admin-task-body tr", { hasText: t2title }).locator("input[type=checkbox]").check();
-    await expect(topBtn).toBeVisible();
-    await expect(topBtn).toHaveText("Assign to Events"); // no comp focused → generic label
-    await topBtn.click();
+    await narrowChallengesTable(page, "OneDoor-");
+    await expect(page.locator("#assign-challenges-to-comp-btn"), "no top door").toHaveCount(0);
+    const r1 = page.locator("#admin-task-body tr", { hasText: t1title }), r2 = page.locator("#admin-task-body tr", { hasText: t2title });
+    await openKebab(page, r1.first());
+    await expect(page.locator('#kebab-portal [data-action="task-assign-to-comps"]'), "no per-row door").toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // One ticked: that question's own dialog.
+    await r1.locator("input[type=checkbox]").check();
+    const btn = page.locator("#challenge-selection-bar-assign-btn");
+    await expect(btn).toHaveText("Add to events");
+    await btn.click();
+    const single = page.locator("#assign-task-overlay");
+    await expect(single, "one question: its own dialog").toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#challenge-bulk-assign-overlay")).toHaveCount(0);
+    await single.locator("[data-action='overlay-close'], .btn.secondary").first().click();
+    await expect(single).toHaveCount(0, { timeout: 5000 });
+
+    // Two ticked: the bulk picker, and it assigns.
+    await r2.locator("input[type=checkbox]").check();
+    await expect(page.locator("#challenge-selection-count")).toHaveText("2 selected");
+    await btn.click();
     const overlay = page.locator("#challenge-bulk-assign-overlay");
-    await expect(overlay).toBeVisible();
+    await expect(overlay, "two questions: the bulk picker").toBeVisible();
     await overlay.locator(".picker-row", { hasText: compName }).locator("input[type=checkbox]").check();
     await overlay.locator("[data-action='challenge-bulk-assign-execute']").click();
-    await expect(topBtn, "selection cleared → top button hidden again").toBeHidden({ timeout: 8000 });
+    await expect(page.locator("#challenges-selection-bar"), "selection cleared").toBeHidden({ timeout: 8000 });
     const Database = require("better-sqlite3");
     const db = new Database(TEST_DB_PATH, { readonly: true });
-    // Each landed as the event's OWN copy of it (lib/event-copies.js).
     let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=? AND t.owner_competition_id=ct.competition_id AND t.copied_from_task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
     expect(count).toBe(2);
   });
 
-  test("v7.12.1: a challenge already in the FOCUSED competition carries no checkbox", async ({ page }) => {
+  test("stage B: inside an event no row carries a box; + Add from bank is the one door, and the ⋯ menu has none", async ({ page }) => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     const saH = H(csrf);
     const mkTask = async (title) => (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
@@ -640,53 +658,41 @@ test.describe("v7.12.0 — bulk assign challenges to competitions (UI)", () => {
     const tIn = await mkTask(inTitle); await mkTask(outTitle);
     const compName = uniq("Focus-Comp");
     const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: compName, start_time: new Date(Date.now() + 3600_000).toISOString(), duration_minutes: 120 } })).json()).competition.id;
-    await sa.post(`/api/admin/tasks/${tIn}/competitions`, { headers: saH, data: { competitionIds: [compId] } }); // tIn is IN the comp
+    await sa.post(`/api/admin/tasks/${tIn}/competitions`, { headers: saH, data: { competitionIds: [compId] } });
     await sa.dispose();
 
     await adminLogin(page);
-    await clickTab(page, "Events"); // load the comp list into state so the focus banner resolves
-    await page.evaluate(({ id, name }) => window.setAdminCompetitionScope(id, name), { id: compId, name: compName });
+    // CONTROL: on the bank's own page the same row carries its box.
     await clickTab(page, "Challenges");
-    await narrowChallengesTable(page, "Focus-");
-    const inRow = page.locator("#admin-task-body tr", { hasText: inTitle });
-    const outRow = page.locator("#admin-task-body tr", { hasText: outTitle });
-    await expect(outRow.locator("input[type=checkbox]"), "a challenge NOT in the focused comp still has a checkbox").toBeVisible();
-    await expect(inRow.locator("input[type=checkbox]"), "a challenge already in the focused comp has NO checkbox").toHaveCount(0);
-  });
+    await narrowChallengesTable(page, outTitle);
+    await expect(page.locator("#admin-task-body tr", { hasText: outTitle }).locator("input[type=checkbox]"), "CONTROL: the bank row has a box").toBeVisible();
 
-  test("v7.12.2: '+ Add Challenges' and the bulk Assign button never show together (one button when focused)", async ({ page }) => {
-    const { api: sa, csrf } = await apiLogin("superadmin");
-    const saH = H(csrf);
-    const mkTask = async (title) => (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
-    const outTitle = uniq("Dup-Out");
-    await mkTask(outTitle);
-    const compName = uniq("Dup-Comp");
-    const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: compName, start_time: new Date(Date.now() + 3600_000).toISOString(), duration_minutes: 120 } })).json()).competition.id;
-    await sa.dispose();
-
-    await adminLogin(page);
     await clickTab(page, "Events");
     await page.evaluate(({ id, name }) => window.setAdminCompetitionScope(id, name), { id: compId, name: compName });
     await clickTab(page, "Challenges");
-    await narrowChallengesTable(page, "Dup-Out");
-    const addBtn = page.locator("#add-tasks-to-comp-btn");     // the picker button
-    const topBtn = page.locator("#assign-challenges-to-comp-btn"); // the bulk button
+    await narrowChallengesTable(page, "Focus-");
+    const outRow = page.locator("#admin-task-body tr", { hasText: outTitle });
+    await expect(outRow, "PRECONDITION: the bank question is listed in the event").toHaveCount(1);
+    await expect(page.locator("#admin-task-body input[type=checkbox]"), "no row carries a box inside an event").toHaveCount(0);
+    await expect(page.locator("#add-tasks-to-comp-btn"), "the one door").toBeVisible();
+    const menu = await page.evaluate((id) => window.wsMenuItemsHtml((window.adminCompetitionsData || []).find(c => c.id === id)), compId);
+    expect(menu, "the ⋯ menu offers no Add from bank").not.toContain("comp-assign-challenges");
+  });
 
-    // Focused + nothing selected → ONLY the picker button.
-    await expect(addBtn).toBeVisible();
-    await expect(topBtn).toBeHidden();
-
-    // Select a challenge → the picker button yields to the bulk "Assign to <comp>" (never both).
-    const cb = page.locator("#admin-task-body tr", { hasText: outTitle }).locator("input[type=checkbox]");
-    await cb.check();
-    await expect(topBtn).toBeVisible();
-    await expect(topBtn).toHaveText(`Assign to "${compName}"`);
-    await expect(addBtn, "no duplication — the picker button hides while a selection exists").toBeHidden();
-
-    // Clear the selection → the picker button returns.
-    await cb.uncheck();
-    await expect(addBtn).toBeVisible();
-    await expect(topBtn).toBeHidden();
+  test("stage B: the Overview checklist's Add from bank is the Questions section's own door", async ({ page }) => {
+    const { api: sa, csrf } = await apiLogin("superadmin");
+    const saH = H(csrf);
+    const compName = uniq("Empty-Comp");
+    await sa.post("/api/admin/competitions", { headers: saH, data: { name: compName, start_time: new Date(Date.now() + 3600_000).toISOString(), duration_minutes: 120 } });
+    await sa.dispose();
+    await adminLogin(page);
+    await viewComp(page, compName);
+    const door = page.locator('#ws-ov-ready [data-action="ws-add-from-bank"]');
+    await expect(door, "an event with no question offers it on its checklist").toBeVisible({ timeout: 15000 });
+    await expect(page.locator('#ws-ov-ready [data-action="comp-assign-challenges"]'), "never a second door").toHaveCount(0);
+    await door.click();
+    await expect(page.locator("#admin-tasks-tab"), "it opens the Questions section").toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#task-picker-overlay"), "…and that section's picker").toBeVisible({ timeout: 15000 });
   });
 });
 

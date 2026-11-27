@@ -46,7 +46,7 @@
 // event is asserted still live).
 const { test, expect } = require("./isolated-test");
 const { BASE, PARTICIPANT_PASS, apiLogin, gradingHashFor, zipOf } = require("./helpers");
-const { loginViaApi, clickTab, openKebab, findSeededTaskRow, textContrast, narrowPeopleTable } = require("./ui-admin-helpers");
+const { loginViaApi, clickTab, openKebab, openAddToEventsFor, findSeededTaskRow, textContrast, narrowPeopleTable } = require("./ui-admin-helpers");
 const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol } = require("./event-admin-helpers");
 
 test.use({ baseURL: BASE });
@@ -344,9 +344,13 @@ test.describe("v8.13.8 — small status text reads at AA in the light theme", ()
     await item.click();
   }
 
-  test("Assign to Events: the 'Assigned' tag on its row", async ({ page }) => {
+  test("Add to events: the 'Assigned' tag on its row", async ({ page }) => {
     await adminPanel(page);
-    await fromChallengeKebab(page, tAssign.title, "task-assign-to-comps");
+    // Stage B — the bank's one door into events (the selection bar's Add to events).
+    await clickTab(page, "Challenges");
+    const aRow = await findSeededTaskRow(page, tAssign.title);
+    await expect(aRow.first(), `the challenge "${tAssign.title}" is listed`).toBeVisible({ timeout: 15000 });
+    await openAddToEventsFor(page, aRow.first());
     const overlay = page.locator("#assign-task-overlay");
     await expect(overlay, "the Assign to Events dialog opened").toBeVisible({ timeout: 20000 });
     const rowOf = c => overlay.locator(`#assign-task-comp-list > label:has(input[value="${c.id}"])`);

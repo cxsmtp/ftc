@@ -515,7 +515,10 @@ test.describe("v8.7.0 — the event-admin tier in the browser", () => {
     await expect(portal.locator(".kebab-note"),
       "the missing items are EXPLAINED, not merely absent").toContainText(/created by someone else/i);
     // The row is not merely inert: what they CAN do with it is still offered.
-    await expect(portal.locator('[data-action="task-assign-to-comps"]'),
+    // Stage B — the bank's one door into events is the selection bar, so using it
+    // in their own events means the row carries its selection box.
+    await page.keyboard.press("Escape");
+    await expect(row.first().locator('input[data-change-action="challenge-select-toggle"]'),
       "they may still use it in their own events").toHaveCount(1);
   });
 
@@ -835,9 +838,14 @@ test.describe("v8.7.0 — the event-admin tier in the browser", () => {
     // Driven through the real controls: tick a challenge, open the bulk picker,
     // choose an event, execute. The private poster is not reachable from the page
     // and reaching for it would test a function rather than the flow.
-    const row = await findSeededTaskRow(page, ownTask.title);
-    await row.first().locator('input[type="checkbox"]').check();
-    await page.locator("#assign-challenges-to-comp-btn").click();
+    // Stage B — the bank's one door into events: the selection bar's Add to
+    // events, which opens the BULK picker for two or more ticked questions.
+    for (const t of [ownTask, othersTask]) {
+      const row = await findSeededTaskRow(page, t.title);
+      await row.first().locator('input[type="checkbox"]').check();
+    }
+    await expect(page.locator("#challenge-selection-count")).toHaveText("2 selected");
+    await page.locator("#challenge-selection-bar-assign-btn").click();
     const overlay = page.locator("#challenge-bulk-assign-overlay");
     await expect(overlay, "the bulk picker opened").toBeVisible({ timeout: 15000 });
     await overlay.locator("#challenge-bulk-comp-list input[type=\"checkbox\"]").first().check();
