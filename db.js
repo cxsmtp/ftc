@@ -3375,6 +3375,43 @@ try {
   }
 }
 
+// One shot: a Booth Event never creates Checkmarx One accounts (owner's
+// decision, 27 Nov 2026; lib/event-policy.js `cxoneProvisioning`). The gate
+// refuses them whatever the column holds, so this changes nothing a participant
+// meets: it makes the DATA say what the platform does, so a booth row's form,
+// History and export cannot read "accounts on". Every booth event with accounts
+// on is turned off, each recorded as an `edited` event by "system" naming the
+// change and why; every booth template whose settings ask for accounts has the
+// setting dropped (the kind decides it), as a template save would refuse it.
+// The marker is written even when nothing changed.
+{
+  const done = db.prepare("SELECT value FROM settings WHERE key='booth_cxone_off_at'").get();
+  if (!done) {
+    db.transaction(() => {
+      const at = new Date().toISOString();
+      const rows = db.prepare("SELECT id FROM competitions WHERE event_kind='booth' AND cxone_disabled=0").all();
+      const ev = db.prepare("INSERT INTO competition_events (id, competition_id, event_type, changed_by, changed_at, details) VALUES (?,?,?,?,?,?)");
+      const off = db.prepare("UPDATE competitions SET cxone_disabled=1 WHERE id=?");
+      for (const r of rows) {
+        off.run(r.id);
+        ev.run(crypto.randomUUID(), r.id, "edited", "system", at,
+          JSON.stringify({ changes: { cxone_disabled: { from: false, to: true } }, reason: "booth_never_creates_cxone_accounts" }));
+      }
+      const tpls = db.prepare("SELECT id, settings FROM event_templates WHERE event_kind='booth'").all();
+      const upd = db.prepare("UPDATE event_templates SET settings=? WHERE id=?");
+      for (const t of tpls) {
+        let st = null;
+        try { st = JSON.parse(t.settings); } catch (e) { swallowed("db:booth-cxone-template", e); }
+        if (st && typeof st === "object" && st.cxone_disabled === false) {
+          delete st.cxone_disabled;
+          upd.run(JSON.stringify(st), t.id);
+        }
+      }
+      db.prepare("INSERT INTO settings (key, value) VALUES ('booth_cxone_off_at', ?) ON CONFLICT(key) DO NOTHING").run(at);
+    })();
+  }
+}
+
 // One shot: a PLATFORM-WIDE permission (lib/rbac.js PLATFORM_WIDE_PERMISSIONS)
 // is held only by a role of scope `all`. A grant stored on another custom role
 // before that rule grants nothing (`_readRoleDef` drops it); this removes the

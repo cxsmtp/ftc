@@ -253,8 +253,11 @@ From here you can:
   dialog has a **CxOne Integration** section where you can:
   - tick **"Don't create CxOne accounts for this event"** to skip CxOne
     (Checkmarx One) account provisioning for that event entirely. Where
-    it starts depends on the event type — already ticked for a Booth Event and a
-    Program, unticked for a Competition — and you can toggle it any time.
+    it starts depends on the event type — already ticked for a Program,
+    unticked for a Competition — and you can toggle it any time. A **Booth
+    Event never creates Checkmarx One accounts** (its walk-ups do not use the
+    product), so its form has no CxOne section at all, and changing an event
+    to a Booth Event turns its accounts off.
     Ticking it also stops any account still being set up for this event at
     that moment — as does removing that participant from the event — while
     accounts already created in Checkmarx One are not removed; and
@@ -1023,7 +1026,7 @@ Here is the whole matrix, so you know what to expect before you click:
 | **Trusted network IPs** | ● | ● | — |
 | **Sign-up form** (what a new participant is asked for) | ● | ● | ● |
 | **Late entries** | ● | — | — |
-| **CxOne integration** | ● | ● | ● |
+| **CxOne integration** | — | ● | ● |
 
 Why the gaps are where they are:
 

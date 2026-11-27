@@ -1326,8 +1326,12 @@ their own value, or to no integration if neither is set.
 The **Don't create CxOne accounts for this event** checkbox (top of the
 CxOne section) is **pre-set from the event type**: it arrives clear on a
 Competition — every participant added gets a CxOne account provisioned — and
-already ticked on a Booth Event and a Program, neither of which normally wants a
-Checkmarx One account minted for every attendee. The create dialog says which way
+already ticked on a Program, which does not normally want a Checkmarx One
+account minted for every attendee. A **Booth Event never creates Checkmarx One
+accounts** whatever is asked: its form has no CxOne section, the platform refuses
+accounts or a key override for one, and changing an event to a Booth Event turns
+its accounts off (recorded in its History). Booth Events that had accounts on
+were turned off once when this rule arrived, each recorded in its History. The create dialog says which way
 it has been pre-set for the type you chose. Tick it when an event
 shouldn't touch CxOne at all (a dry run, an external event, a practice
 round): no accounts are created for its participants through any path

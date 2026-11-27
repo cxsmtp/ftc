@@ -62,12 +62,17 @@ test.describe("Template editor — a setting left out takes the kind's seed", ()
     for (const key of SEEDED) await expect(ed.locator(`#tpl-ed-${key}`), `a Booth Event's ${key} seed is on`).toBeChecked();
     await expect(ed.locator("#tpl-ed-sum"), "the summary says what the event will do").toContainText("No Checkmarx One accounts");
     await expect(ed.locator("#tpl-ed-sum")).toContainText("Join link and QR code");
+    // A Booth Event never creates Checkmarx One accounts (owner's decision, 27 Nov
+    // 2026): the box is held ticked, disabled, with the reason.
+    await expect(ed.locator("#tpl-ed-cxone_disabled"), "held, not offered").toBeDisabled();
+    await expect(ed.locator('[data-why="cxone_disabled"]')).toContainText("never creates Checkmarx One accounts");
     // "Allow instant join" was retired (operator ruling, 14 Nov 2026).
     await expect(ed.locator("#tpl-ed-self_enroll_allow_instant"), "the retired switch is not offered").toHaveCount(0);
     await expect(ed.locator("#tpl-ed-sum"), "nor named in the summary").not.toContainText(/instant/i);
     // A different kind, a different seed: nothing touched follows the kind.
     await ed.locator("#tpl-ed-kind").selectOption("tournament");
     await expect(ed.locator("#tpl-ed-cxone_disabled"), "a Competition's opt-out seed is off").not.toBeChecked();
+    await expect(ed.locator("#tpl-ed-cxone_disabled"), "…and it is the organiser's to change").toBeEnabled();
     await expect(ed.locator("#tpl-ed-self_enroll_enabled"), "…and its join link").not.toBeChecked();
     await ed.locator("#tpl-ed-kind").selectOption("booth");
     await expect(ed.locator("#tpl-ed-cxone_disabled")).toBeChecked();
@@ -92,12 +97,16 @@ test.describe("Template editor — a setting left out takes the kind's seed", ()
     const name = uniq("Stated");
     await adminLogin(page);
     await openTemplates(page);
-    const ed = await newTemplateEditor(page, name, "booth");
+    // A Program's opt-out seed is ON and a Competition's OFF, so leaving and
+    // coming back to a Program shows a stated OFF was kept, not re-seeded. (A
+    // Booth Event holds it on: it never creates accounts.)
+    const ed = await newTemplateEditor(page, name, "program");
+    await expect(ed.locator("#tpl-ed-cxone_disabled"), "PRECONDITION: a Program's seed is on").toBeChecked();
     await ed.locator("#tpl-ed-cxone_disabled").uncheck();
+    await ed.locator("#tpl-ed-kind").selectOption("tournament");
+    await expect(ed.locator("#tpl-ed-cxone_disabled")).not.toBeChecked();
     await ed.locator("#tpl-ed-kind").selectOption("program");
     await expect(ed.locator("#tpl-ed-cxone_disabled"), "a stated choice is not re-seeded (a Program's seed is on)").not.toBeChecked();
-    await ed.locator("#tpl-ed-kind").selectOption("booth");
-    await expect(ed.locator("#tpl-ed-cxone_disabled")).not.toBeChecked();
     await expect(ed.locator("#tpl-ed-sum")).toContainText("Checkmarx One accounts on enrolment");
     const posted = page.waitForRequest((r) => r.url().endsWith("/api/admin/event-templates") && r.method() === "POST");
     await ed.locator('button[type="submit"]').click();

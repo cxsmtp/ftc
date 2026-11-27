@@ -426,7 +426,11 @@ const _DEFAULT_POLICY = { sessions: "many", schedule: "window", ranking_enabled:
   // event has always had, and the tap layout (public/js/features/choice-tap.js)
   // appears only where the server SAYS "tap". The reader tests `=== "tap"`, so an
   // unknown value lands here too.
-  choice_layout: "standard" };
+  choice_layout: "standard",
+  // "allowed" is what every kind did before the key existed, so a payload that
+  // predates it keeps the event form's Checkmarx One section (the server refuses
+  // a Booth Event's accounts either way).
+  cxone_provisioning: "allowed" };
 // v8.12.0 — STAFF CAN COMPETE, and the one predicate the participant surfaces
 // read. A staff-tagged user is a SPECTATOR of an event unless they hold a row on
 // it and its "Staff can compete" switch is on — the server puts that answer on

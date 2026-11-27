@@ -203,6 +203,11 @@ const _GROUP_BOARD_REFUSED =
 // at create there is no row yet, so the caller passes an `{event_kind}` stand-in.
 const _presenceRefused = (row) =>
   `Recording time on platform is not available for ${eventKindPhrase(row)} — its window is too short for the measurement to mean anything.`;
+// Checkmarx One accounts on a kind that never creates them (a Booth Event; owner's
+// decision, 27 Nov 2026), refused by create, the PUT, the key override and the
+// template doors in one sentence.
+const _cxoneRefused = (row) =>
+  `${eventKindPhrase(row).replace(/^./, (c) => c.toUpperCase())} never creates Checkmarx One accounts: its walk-ups do not use the product. Leave Checkmarx One accounts off.`;
 const _timeBasisRefused = (row) =>
   `Ranking a score tie on time spent is not available for ${eventKindPhrase(row)}, because it cannot record time on platform. Leave the tie-break on elapsed time.`;
 
@@ -687,7 +692,13 @@ app.post("/api/admin/competitions", requireAdmin, csrfProtection, (req, res) => 
   const groupLbEnabled = group_leaderboard_enabled ? 1 : 0;
   // v7.13.0 — CxOne account-creation opt-out; default OFF (accounts ARE created).
   // v8.1.0 (PR 30) — that default is now the KIND's, per the note above.
-  const cxoneDisabled = (cxone_disabled === undefined ? _kindPol.cxoneDisabledDefault : (cxone_disabled ? 1 : 0));
+  // A kind that never creates accounts (a Booth Event) refuses them ON, by name,
+  // and stores them off whatever the default says (the gate asks the kind too).
+  if (cxone_disabled === false && _kindPol.cxoneProvisioning !== "allowed") {
+    return res.status(400).json({ error: _cxoneRefused({ event_kind: kind }), code: "cxone_provisioning_forbidden" });
+  }
+  const cxoneDisabled = _kindPol.cxoneProvisioning !== "allowed" ? 1
+    : (cxone_disabled === undefined ? _kindPol.cxoneDisabledDefault : (cxone_disabled ? 1 : 0));
   // ── v8.4.0 — the sign-up matrix and the LinkedIn sign-up door ───────────────
   //
   // REFUSED for a kind that does not configure them, rather than stored and
@@ -1100,6 +1111,12 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   if (_presenceChanged && measure_presence && _polPut.measurePresence === "forbidden") {
     return res.status(400).json({ error: _presenceRefused(comp), code: "measure_presence_forbidden" });
   }
+  // Checkmarx One accounts ON for a kind that never creates them, against the
+  // kind this save produces. An explicit `false` only: the form sends nothing
+  // for such a kind (it shows no section), and `true` is what is stored.
+  if (cxone_disabled === false && _polPut.cxoneProvisioning !== "allowed") {
+    return res.status(400).json({ error: _cxoneRefused(_targetComp), code: "cxone_provisioning_forbidden" });
+  }
   if (_timeBasisChanged && time_basis === "presence" && _polPut.measurePresence === "forbidden") {
     return res.status(400).json({ error: _timeBasisRefused(comp), code: "time_basis_forbidden" });
   }
@@ -1366,8 +1383,11 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   // admin-made one — a stored setting that changes with no record is the class
   // this codebase repeatedly treats as a defect.
   //
-  // What is deliberately NOT touched: `cxone_disabled`, `self_enroll_enabled`
-  // and `leaderboard_mode`. No policy FORBIDS any of
+  // `cxone_disabled` is forced ON (accounts off) for a kind that never creates
+  // Checkmarx One accounts (a Booth Event), as the other prohibitions are.
+  //
+  // What is deliberately NOT touched: `self_enroll_enabled` and
+  // `leaderboard_mode`. No policy FORBIDS either of
   // them for any kind — they only have per-kind CREATE defaults — and a default
   // seeds a create, it does not overwrite a choice an operator has already made.
   // `leaderboard_mode` is additionally inert on a sessionless kind, so resetting
@@ -1398,6 +1418,7 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
     if (!CONFIGURABLE_KINDS.has(_targetKind) && comp.registration_field_policy && !_regFieldsChanged) {
       regFieldsCol = null; _regFieldsChanged = true; _regFieldsForcedClear = true;
     }
+    if (_polPut.cxoneProvisioning !== "allowed" && !comp.cxone_disabled && cxoneDisabledCol === null) cxoneDisabledCol = 1;
     if (_polPut.trustedNetworks === "never" && comp.trusted_network_ips && !trustedIpsChanged) {
       trustedIpsCol = null; trustedIpsChanged = true; trustedIpsForcedClear = true;
     }
@@ -2821,6 +2842,11 @@ app.put("/api/admin/competitions/:id/cxone", requireAdmin, csrfProtection, (req,
   { const _cmp = _competitorRefused(req, res, comp.id); if (_cmp) return _cmp; }
   const denied = competitionDenied(req, comp.id);
   if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
+  // A kind that never creates accounts has no key to override (its form shows
+  // no Checkmarx One section). Removing one (DELETE below) stays open.
+  if (eventPolicy(comp).cxoneProvisioning !== "allowed") {
+    return res.status(400).json({ error: _cxoneRefused(comp), code: "cxone_provisioning_forbidden" });
+  }
   const { cxone_api_key, cxone_group_name } = req.body;
   // batch 5 — typeof guards before the .trim() calls inside the txn (a non-string
   // api key / group name would 500).
@@ -3273,6 +3299,13 @@ function _bpResolve(settings, kind, mode, { autoEnd } = {}) {
   if (!r && s.time_basis === "presence" && pol.measurePresence === "forbidden") r = deny("time_basis", "time_basis_forbidden", _timeBasisRefused({ event_kind: kind }), "elapsed");
   if (!r && s.registration_fields !== undefined && !CONFIGURABLE_KINDS.has(kind)) r = deny("registration_fields", "registration_fields_forbidden", _regFieldsRefused(kind));
   if (!r && s.late_entry_enabled !== undefined && pol.lateEntry !== "allowed") r = deny("late_entry_enabled", "late_entry_forbidden", lateEntryForbiddenMessage({ event_kind: kind }));
+  // Accounts ON for a kind that never creates them: refused for a template; for
+  // a clone changing kind, turned off and named `cxone_provisioning` (apart
+  // from the own-key reason, which names `cxone_disabled`).
+  if (!r && s.cxone_disabled === false && pol.cxoneProvisioning !== "allowed") {
+    if (mode === "refuse") r = { error: _cxoneRefused({ event_kind: kind }), code: "cxone_provisioning_forbidden" };
+    else { s.cxone_disabled = true; forced.push("cxone_provisioning"); }
+  }
   if (r) return r;
   const b = (v, seed) => (v === undefined ? (seed ? 1 : 0) : (v ? 1 : 0));
   const defaults = registrationFieldDefaultsForKind(kind);
@@ -3290,7 +3323,7 @@ function _bpResolve(settings, kind, mode, { autoEnd } = {}) {
       reveal_answers_on_end: b(s.reveal_answers_on_end, 0),
       self_enroll_enabled: b(s.self_enroll_enabled, pol.selfEnrollDefault),
       group_leaderboard_enabled: b(s.group_leaderboard_enabled, 0),
-      cxone_disabled: b(s.cxone_disabled, pol.cxoneDisabledDefault),
+      cxone_disabled: pol.cxoneProvisioning !== "allowed" ? 1 : b(s.cxone_disabled, pol.cxoneDisabledDefault),
       measure_presence: b(s.measure_presence, 0),
       time_basis: s.time_basis === "presence" ? "presence" : "elapsed",
       attempt_cap: s.attempt_cap === undefined ? null : s.attempt_cap,
