@@ -71,8 +71,8 @@ four groups:
   sections (Overview, Participants, Challenges, Rankings and the rest);
 - **Actions** — what you can do from here: **New event**, **New challenge**,
   **Invite people**, **Sign up at the desk**, **New template** and the exports,
-  and inside an event the doors of its **⋯** menu (Clone,
-  Export everything, Join-link settings, Edit settings, History, …). Only what
+  and inside an event its **Invite** choices and the doors of its **⋯** menu
+  (Clone, Export everything, Join-link settings, Edit settings, History, …). Only what
   your role may use is listed. The irreversible doors — **End now**, **Close
   late entries now**, **Delete** — stay in the **⋯** menu, behind their confirm;
 - **Events** — any event by name, which opens its workspace;
@@ -237,12 +237,13 @@ it instead, and click again to reverse.
 From here you can:
 - Create an event and its sessions.
 - Edit an event's name, start time, and duration.
-- **Mark an event as a test / dry run** — tick **"Mark as test / dry run"**
-  near the bottom of the event create/edit dialog.
-  These are left out of Analytics by default and cannot mint achievement badges
-  — use them for rehearsals and test runs. They are flagged with a yellow edge
-  and a **test/dry run** badge wherever they appear. This is backed by the
-  built-in **test/dry run** tag, so you can also add or remove it directly.
+- **Mark an event as a dry run** — tick **Dry run** under **Advanced settings**
+  on the event form. These are left out of Analytics by default and cannot mint
+  achievement badges — use them for rehearsals and test runs. They are flagged
+  with a yellow edge and a **test/dry run** badge wherever they appear. The box
+  *is* the built-in **test/dry run** tag: ticking it adds the tag, and removing
+  the tag anywhere (the × on the Events list) unticks it, so you can also add or
+  remove it directly.
 - **Tag events** — tags show as searchable badges (the **test/dry run**
   tag above is the built-in one).
 - **Let staff compete** — tick **Staff can compete** on the event form and
@@ -253,8 +254,11 @@ From here you can:
   dialog has a **CxOne Integration** section where you can:
   - tick **"Don't create CxOne accounts for this event"** to skip CxOne
     (Checkmarx One) account provisioning for that event entirely. Where
-    it starts depends on the event type — already ticked for a Booth Event and a
-    Program, unticked for a Competition — and you can toggle it any time.
+    it starts depends on the event type — already ticked for a Program,
+    unticked for a Competition — and you can toggle it any time. A **Booth
+    Event never creates Checkmarx One accounts** (its walk-ups do not use the
+    product), so its form has no CxOne section at all, and changing an event
+    to a Booth Event turns its accounts off.
     Ticking it also stops any account still being set up for this event at
     that moment — as does removing that participant from the event — while
     accounts already created in Checkmarx One are not removed; and
@@ -307,26 +311,15 @@ From here you can:
   of handing you an empty file. A ZIP that leaves out a place still waiting for
   its certificate says how many are missing and why, and a certificate revoked
   while the file is being prepared is left out, and the message says so.
-- The three-dot menu carries the rest of a row's actions: **Edit**, **History**,
-  **Organisers** (see [Making somebody an event
-  admin](#making-somebody-an-event-admin)), **Email Delivery** (see [Email
-  delivery](#email-delivery)), **Export Activity (CSV)** (see [Export challenge
-  activity](#export-challenge-activity)), **Assign Challenges**, **Manage
-  Participants** (opens this event's workspace on its Participants section, with
-  everyone listed, ready to invite or remove people), **Join Link** (see [Self-enrollment
-  links](#self-enrollment-links)), **Close late entries now** (see [Closing late
-  entries early](#closing-late-entries-early)), **Start Now** (see [Starting an
-  event early](#starting-an-event-early)) and **End Now**. Which of them appear
-  depends on where the event is in its life: Assign Challenges only until it
-  ends, Manage Participants and Join Link until it ends too — except on a Booth
-  Event still taking late entries, where both stay until late entry closes (see
-  [Late entries](#late-entries)) — Close late entries now only on such an event,
-  Export Activity only once it is live or ended, Start Now only on an upcoming
-  single-session event, End Now only while it is live, and Edit only until the
-  end time has passed (after that, only a superadmin). **Delete** is there too,
-  for a superadmin. And if you are enrolled in the event yourself, on an event
-  that lets staff compete, the menu withholds everything that would change it —
-  see [The competitor lock](#the-competitor-lock).
+- The three-dot menu holds **Delete event** (a superadmin, or a role given it),
+  for tidying the list without opening each event. Everything else you do to an
+  event — editing it, its history, email delivery, the activity export, adding
+  challenges, its participants, the join link, starting, ending and closing late
+  entries — is in the event's workspace (**Open**): see [The event
+  workspace](#the-event-workspace). A row with nothing to offer you has no ⋮.
+  If you are enrolled in the event yourself, on an event that lets staff
+  compete, the menu says so instead of offering Delete — see [The competitor
+  lock](#the-competitor-lock).
 
 ### Email delivery
 
@@ -592,13 +585,18 @@ at the top as you scroll.
   With the link off the pill reads **Join link off** and opens the settings.
 
   ![The join pill's panel: the QR with the event code in its centre, Copy link and Full-screen QR](../screenshots/admin/68-join-qr-popover.png)
-- **Invite** — the one primary button (see [Inviting
-  participants](#inviting-participants)). **Approve** joins it while somebody in
-  the event is waiting for approval.
-- **⋯** — every other door for the event, in one place: **Clone**, **Export everything** (a ZIP), **Export activity (CSV)** (once it is
-  live or ended), **Sign up at the desk**, **Save as template** (administrators),
-  **Join-link settings**, **Edit settings**, **History**, **Organisers**, **Email
-  delivery** and **Start now** (an upcoming single-session event). The
+- **Invite** — the one primary button, and the one place to add people to the
+  event: it opens a menu with **Email invitation** (the **Invite Participants**
+  dialog, this event ticked — see [Inviting participants](#inviting-participants))
+  and **Sign up at the desk** (see [At the desk](#at-the-desk)). It is offered
+  while the event takes new members. **Approve** joins it while somebody in the
+  event is waiting for approval.
+- **⋯** — every other door for the event, in one place: **Clone**, **Export
+  everything** (a ZIP), **Export activity (CSV)** (once it is live or ended),
+  **Save as template** (administrators), **Join-link settings**, **Edit
+  settings**, **History**, **Email delivery** and **Start now** (an upcoming
+  single-session event). Who runs the event is the Overview's **Organisers**
+  card. The
   irreversible ones come last, after a divider, each behind its own confirmation:
   **Close late entries now** (a finished Booth Event still taking late entries —
   see [Closing late entries early](#closing-late-entries-early)), **End now**
@@ -700,8 +698,8 @@ the note *You are competing in this event — you can view it, not change it* (s
 
 **The sidebar is for the pages about every event**: **Events**, **New event**,
 **Question bank**, **Live rankings**, **Analytics** and **Audit** under
-*Manage*; **People** (participants and event organisers; admin accounts with
-**Show admin accounts**) and **Teams** under *Participants*;
+*Manage*; **People** (participants and event organisers; admin accounts are on
+**Roles & permissions**) and **Groups** under *Participants*;
 **Roles & permissions** and **Settings** under *Admin*. Opening one of those leaves the
 event's workspace, so they always show everything you may see.
 
@@ -966,12 +964,18 @@ Nothing is pre-selected: one click chooses the type **and** opens the form.
 The form opens with the essentials: **Event type**, **Event name**, **When it
 runs** (start, timezone, and a duration or a deadline; the end is shown beneath)
 and **How it plays** (reveal answers at the end, attempts per challenge). The
-settings most events never change are folded into **Advanced settings**: team
-leaderboard, staff can compete, time on platform, test / dry run, the sign-up
-form, late entries, the venue network, the qualifying questions and Checkmarx
-One. Folded or not, its heading line says whether Checkmarx One accounts will
-be created (**Checkmarx One accounts: on** or **off**, following the box and the
-type you picked), and the **Create** confirmation says it again. Every setting
+type is the one you picked on the New event page, shown as a chip: the form
+does not ask again. **Change type** opens the choice under it (with the
+confirmations described below), and is not offered once the type can no longer
+change. The settings most events never change are folded into **Advanced
+settings**, on an edit as on a create: team leaderboard, staff can compete,
+time on platform, dry run, the sign-up form, late entries, the venue network,
+the qualifying questions and Checkmarx One. Folded or not, its heading line says
+whether Checkmarx One accounts will be created (**Checkmarx One accounts: on**
+or **off**, following the box and the type you picked), and the **Create**
+confirmation says it again. A **Booth Event never creates Checkmarx One
+accounts** — its walk-ups never use the product — so its form has no Checkmarx
+One section at all. Every setting
 that is not obvious has a **?** beside it that explains it.
 **Create event** makes it. The form picks no questions: a blank event gets them
 afterwards from its **Questions** section (**+ Add from bank**), and an event made
@@ -1011,11 +1015,11 @@ Here is the whole matrix, so you know what to expect before you click:
 | **Start each participant's clock** | ● | ● | — |
 | **Staff can compete** | ● | ● | ● |
 | **Attempt limit per challenge** | ● | ● | ● |
-| **Mark as test / dry run** | ● | ● | ● |
+| **Dry run** | ● | ● | ● |
 | **Trusted network IPs** | ● | ● | — |
 | **Sign-up form** (what a new participant is asked for) | ● | ● | ● |
 | **Late entries** | ● | — | — |
-| **CxOne integration** | ● | ● | ● |
+| **CxOne integration** | — | ● | ● |
 
 Why the gaps are where they are:
 
@@ -1208,7 +1212,7 @@ privileged account: with such an event open a regular admin is not offered
 the **Invite** dialog is skipped with *"N admin account(s) skipped — only a
 superadmin can enrol an admin"*. A bound group is the one route that does not
 ask: its live sync enrols every member it holds, admin accounts included. The
-Teams page and the participant row's group chips guard that route — both refuse
+Groups page and the participant row's group chips guard that route — both refuse
 to put an admin account into a group for anyone but a superadmin — and the
 **Invite** dialog's **Add to Groups** picker skips the address with *"N admin
 account(s) not added to the selected group(s) — only a superadmin can put an
@@ -1328,19 +1332,20 @@ change to it. Superadmins are bound too — the [Superadmin
 guide](superadmin.md#the-competitor-lock-binds-you-too) says what that costs
 them.
 
-On the **Events** tab the row tells you so: its three-dot menu opens with the
-note *You are competing in this event — you can view it, not change it*, and
-withholds **Edit**, **Assign Challenges**, **Manage Participants**, **Close late
-entries now**, **Start Now**, **End Now** and **Delete**, along with the tag
-controls on the row.
-What stays is everything that only *looks*: **History**,
-**Organisers**, **Email Delivery**, **Export Activity (CSV)** once the event is
-live or ended, as on any event, and **Join Link**, which opens **read-only**:
+In the event's workspace the **⋯** menu opens with the note *You are competing
+in this event — you can view it, not change it*, and withholds **Edit
+settings**, **Add challenges**, **Clone**, **Close late entries now**, **Start
+now**, **End now** and **Delete event**; the header offers no **Invite**. On the
+**Events** tab the row's menu holds the same note instead of **Delete event**,
+and the row's tag controls are withheld too.
+What stays is everything that only *looks*: **History**, **Email delivery**,
+**Export activity (CSV)** once the event is live or ended, as on any event, and
+**Join-link settings**, which opens **read-only**:
 the link, the QR code and the short event code are there to copy and print (an organiser competing in their own event still needs them on the
 signage), while its toggle is disabled and **Regenerate link** is
 withheld, with a note saying why. Ask another organiser to change those.
 
-![An event's row menu for an admin who is competing in it — the competing note at the top, and only the viewing actions left](../screenshots/admin/61-competitor-locked-event.png)
+![An event's ⋯ menu for an admin who is competing in it — the competing note at the top, and only the viewing actions left](../screenshots/admin/61-competitor-locked-event.png)
 
 On the **Challenges** tab, every challenge in that event carries the same note
 — *You are competing in "…", which holds this challenge — you can view it, not
@@ -1593,7 +1598,8 @@ The join link is not the only way in while the window is open: you can add
 people yourself, and every way of doing it offers the event — **Invite to …**
 on a participant's row with the event open, the selection bar's
 **Assign to "…"**, the bulk **Assign to Events** picker, the **Invite** dialog,
-**At the desk**, and binding a group to it from the group's **Events** button.
+the desk sign-up (the workspace's **Invite** menu), and binding a group to it
+from the group's **Events** button.
 Wherever the event is listed it carries a **Late entry open** badge, and each
 route tells you before anything is saved that the person joins as a **late
 entrant** — ranked in the separate Late entrants section and able to play until
@@ -2022,7 +2028,7 @@ page words these downloads the same way.
 
 ### Export challenge activity
 
-**⋮ → Export Activity (CSV)** downloads a spreadsheet of how every participant
+**Export activity (CSV)**, in the event's **⋯** menu, downloads a spreadsheet of how every participant
 got on with every challenge in that event. It appears for **live and
 ended** events only — nothing has happened yet in one that has not
 started.
@@ -2136,9 +2142,8 @@ one-to-many: a single secret link (and QR code) that lets people add
 *themselves* to one event — ideal for an in-person event where you put
 a QR code on a screen and let the room scan it.
 
-Open it from the event's **⋮** menu on the Events list → **Join Link**, or, in
-the event's workspace, from **Join-link settings** (in the **⋯** menu and at the
-foot of the join pill's panel). The join pill itself shows the code and the QR
+Open it in the event's workspace, from **Join-link settings** (in the **⋯** menu
+and at the foot of the join pill's panel). The join pill itself shows the code and the QR
 for your signage — see [The event workspace](#the-event-workspace):
 
 ![Self-enrollment link dialog](../screenshots/admin/33-self-enroll-dialog.png)
@@ -2159,8 +2164,8 @@ form, and what the sign-up form behind the link asks for.
   without that code joining them to your event, even if you have switched the
   link back on by then. While the link is on they can still join through it,
   like anyone who opens it. Once the event
-  has ended the link, the QR and the code stop working and the **Join Link**
-  item leaves the ⋮ menu — except on a Booth Event still taking
+  has ended the link, the QR and the code stop working and the **Join-link
+  settings** item leaves the ⋯ menu — except on a Booth Event still taking
   [late entries](#late-entries). There the item stays, and — while **Enable
   self-enrollment** is on — the link, the QR and the code keep working until the
   late-entry deadline, or until somebody closes late entries early, because your
@@ -3123,7 +3128,8 @@ are **multi-select** — combine them (e.g. Pending + Denied to triage everyone
 awaiting a decision).
 
 The toolbar holds **Invite** (the one primary button), **At the desk** (see [At
-the desk](#at-the-desk)), one **Export ▾** menu (**Export CSV**, **Export JSON**
+the desk](#at-the-desk)) — inside an event's workspace neither: the header's
+**Invite** holds both — one **Export ▾** menu (**Export CSV**, **Export JSON**
 and, for a superadmin or a custom role given the import permission, **Import
 JSON**) and **Columns**. The table shows six
 columns by default — **Participant**, **Company**, **Status**, **Score**, **Last
@@ -3483,7 +3489,8 @@ that their account becomes an event admin, which signs them out everywhere and
 takes them off every leaderboard. A role that may add organisers but not search
 people is told so and offered **Remove** only. Administrators are not offered — they already run every event.
 Each organiser on the card has **Remove**, which asks first. You can also choose
-**Make event admin** on the participant's row with the event open. Their role changes to **Event admin** and their row badges the
+**Make event admin** on the participant's row with the event open. The card is
+the one place that lists who runs the event. Their role changes to **Event admin** and their row badges the
 events they organise, in the same colours the Events column beside it uses.
 
 **Only current events are badged** — live, upcoming, and any still inside a late
@@ -3495,10 +3502,6 @@ role is still theirs either way, and their full history is in the participant's
 own History dialog.
 
 Clicking a badge opens that event, exactly as it does in the Events column.
-
-You can also see an event's organisers from the event's own row menu, under
-**Organisers**; adding and removing them is done on the Overview's Organisers card
-or from the participant's row.
 
 Granting and revoking are **admin and superadmin only** — an event admin cannot
 make another one, which is what stops the role spreading on its own.
@@ -3759,9 +3762,9 @@ audit log.
 
 ---
 
-## Teams
+## Groups
 
-**Teams** (groups) are named, reusable collections of participants. A participant can
+**Groups** are named, reusable collections of participants. A participant can
 be in many groups, and a group can hold many participants. Use them to
 organise people — by company, cohort, region, or any label that helps you run
 events — and to act on everyone in a group at once.
@@ -3809,11 +3812,11 @@ check, so sort out any overlap before you tick it.
 
 ### Managing groups
 
-The **Teams** page lists every group with its member count and how many
+The **Groups** page lists every group with its member count and how many
 events it's bound to. Search by name, sort by any column, and page
 through the list — a mature instance accumulates a lot of groups.
 
-![Teams page](../screenshots/admin/28-groups.png)
+![Groups page](../screenshots/admin/28-groups.png)
 
 From here you can:
 
@@ -3937,7 +3940,8 @@ challenge. Any status or difficulty filters you had set, and any column filters,
 are cleared first, and the Participants list widens to whoever it would otherwise
 leave out — inside an event, everyone on the platform (an organiser's own test
 answers come from someone who is not one of its participants); elsewhere, admin
-accounts (**Show admin accounts** is ticked) — so what you clicked is always what
+accounts, for that one visit (a note above the table says so; the next time you
+open People it lists participants again) — so what you clicked is always what
 you land on. Inside an
 event you stay in it: the person or challenge opens in the event's own
 **Participants** or **Challenges** section. This works on hint rows as well as
@@ -4089,7 +4093,7 @@ Two things deliberately do *not* follow it:
 already filtered to them — the quickest route from "this person is stuck at rank
 40" to their profile, history or an impersonation session. Any status filter you
 had set is cleared first, so the person you clicked is always the row you land
-on. On the **Group Rankings** board a group name takes you to the **Teams** page
+on. On the **Group Rankings** board a group name takes you to the **Groups** page
 the same way, and a solo participant to **Participants**.
 
 ### Export a leaderboard to CSV
@@ -4187,11 +4191,12 @@ The filter bar has three cards — **Scope**, **Challenges**, and
   specific Event, or a Session. In Global mode you can also filter by
   event tags (default: exclude `test/dry run`).
 
-  **If you have an event open, Analytics opens on it.** Entering the
-  tab while an event's workspace is open selects that event here
-  too, and if you have a session open it narrows to that session — so you
-  are not asked to find today's event again in a list of every event you
-  have ever run. **With no event open, Analytics asks before it measures.** The first
+  **Inside an event, Analytics is that event.** The event's own
+  **Analytics** section measures that event only: its Scope card names the
+  event, with no Global/Event switch and no event picker, and offers **Whole
+  event** or one of its sessions where it has any (a session you had open is
+  chosen). The **Analytics** page in the sidebar is the one that compares
+  events, with the switch below. **With no event open, Analytics asks before it measures.** The first
   time you open the tab it shows a short *Choose what to measure* card with two
   buttons — **Pick an event** and **Show platform-wide** — and runs no query at
   all until you press one: no donut, no stat cards, and the per-challenge table
@@ -4570,7 +4575,8 @@ and participants sign in with an emailed code. Once a person has chosen, a role
 change leaves their choice alone.
 
 **People** lists participants and the organisers of events; admin and
-superadmin accounts appear there only with **Show admin accounts** ticked.
+superadmin accounts are on **Roles & permissions** (a link to one from a board
+still shows it in People, saying so).
 The sidebar is grouped **Manage** (Events, New event and templates, Challenge
 library, Live rankings, Analytics, Audit), **Participants** (People, Groups) and
 **Admin** (Roles & permissions, Settings). Submissions and the request logs are inside
@@ -4623,7 +4629,8 @@ A few destructive operations and platform-wide overrides are reserved for
 Two shortcuts for running an event in person, when "check your email" is the
 answer that loses the visitor.
 
-- **At the desk** (Participants tab) — creates an account and shows a sign-in
+- **At the desk** (the People toolbar; inside an event, **Invite → Sign up at
+  the desk** in its header) — creates an account and shows a sign-in
   code straight away. No email is sent at any point, so it works even when mail
   is being greylisted or delayed. A work email is still required. If the
   address already has an account, nothing is created and the message says what
@@ -4638,18 +4645,17 @@ answer that loses the visitor.
   entries](#late-entries) can be the open event: the address prompt and the code
   dialog both say the new account joins it as a late entrant, until its
   late-entry deadline. A finished event that is not taking late entries cannot —
-  the shortcut says so before it asks for an address, so open another event, or
-  leave the event. While the open event is one you are competing in, the
-  shortcut is refused with that reason — leave the event to create somebody with
-  no event, or ask another organiser (see [The competitor
+  its header offers no **Invite** — so open another event, or leave the event.
+  Nor can an event you are competing in, for the same reason — leave the event
+  to create somebody with no event, or ask another organiser (see [The competitor
   lock](#the-competitor-lock)). The account is checked once more just before it
   is created: if your administrator access ended, or you started competing in
   that event, in the meantime, nothing is created and no code is shown. While
   **Require admin approval for new accounts** is on, a role that cannot approve
   accounts cannot use it, as an account made at the desk could not sign in: the
-  button says why when you hover over or press it, and so does the event's **⋯**
-  menu in place of **Sign up at the desk** — use **Invite** instead, or ask an
-  administrator. A
+  button says why when you hover over or press it, and so does the event's
+  **Invite** menu in place of **Sign up at the desk** — use **Email invitation**
+  instead, or ask an administrator. A
   colleague moving you to another administrator role, or you signing in
   somewhere else, at that moment ends it the same way — you are told *Your
   session ended before this finished, so nothing was saved*; try again. The open event

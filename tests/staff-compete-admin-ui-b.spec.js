@@ -15,6 +15,7 @@ const {
   H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin,
   loginViaApi, formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
 } = F;
+const { inviteDoor } = require("./ui-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -483,14 +484,19 @@ test.describe("v8.12.0 — the Participants pane and a staff-tagged row", () => 
     await expect(row.locator("td.cb-cell input[type=checkbox]"), "no checkbox for a target the assign door will skip").toHaveCount(0);
   });
 
-  test("the INVITE DIALOG disables the event the actor competes in as 'You compete here' and does NOT pre-tick it though it is the focused event — an event they do not compete in is live (CONTROL)", async ({ page }) => {
+  test("the INVITE DIALOG disables the event the actor competes in as 'You compete here' — and that event's workspace offers no Invite at all; an event they do not compete in is live (CONTROL)", async ({ page }) => {
     // Round 3: the invitation route refuses the whole request for any named
-    // event the actor competes in (403 by name), and the dialog PRE-TICKS the
-    // focused event — so without the gate it opened with the one box the server
-    // was certain to refuse already ticked.
+    // event the actor competes in (403 by name). Inside that event's workspace
+    // the one people door is the header's Invite (owner's decision, 27 Nov
+    // 2026), withheld from a competitor, and its Participants section shows no
+    // Invite button either; the People page's dialog lists the event disabled.
     await adminPanel(page, competitor.email);
     await focus(page, competeLive.name);
+    await expect(page.locator("#ws-quick .ws-invite-btn"), "no Invite in the event they compete in").toHaveCount(0);
     await clickTab(page, "Participants");
+    await expect(page.locator("#invite-participants-btn"), "…nor in its Participants section").toBeHidden();
+    await page.locator("button.admin-nav-item[data-tab-id='admin-participants-tab']").first().click();
+    await expect(page.locator("#admin-workspace"), "PRECONDITION: the People page, no event open").toBeHidden();
     await page.locator("#invite-participants-btn").click();
     const overlay = page.locator("#invite-overlay");
     await expect(overlay, "the invite dialog opened").toBeVisible({ timeout: 15000 });
@@ -498,7 +504,7 @@ test.describe("v8.12.0 — the Participants pane and a staff-tagged row", () => 
     await expect(mine, "the event they compete in is listed — disabled, not hidden").toBeVisible();
     await expect(mine).toHaveClass(/is-disabled/);
     await expect(mine.locator("input.invite-comp-cb")).toBeDisabled();
-    await expect(mine.locator("input.invite-comp-cb"), "…and NOT pre-ticked, focused or not").not.toBeChecked();
+    await expect(mine.locator("input.invite-comp-cb"), "…and NOT ticked").not.toBeChecked();
     await expect(mine.locator(".picker-row-flag"), "…WITH its reason").toContainText("You compete here");
     await expect(mine).toHaveAttribute("title", /You are competing in this event/);
     const other = overlay.locator(`label.picker-row:has-text("${plainLive.name}")`).first();
@@ -520,8 +526,7 @@ test.describe("v8.12.0 — the Participants pane and a staff-tagged row", () => 
     // focused event for everybody.
     await adminLogin(page);
     await focus(page, competeLive.name);
-    await clickTab(page, "Participants");
-    await page.locator("#invite-participants-btn").click();
+    await inviteDoor(page, "email");
     const overlay = page.locator("#invite-overlay");
     await expect(overlay).toBeVisible({ timeout: 15000 });
     const mine = overlay.locator(`label.picker-row:has-text("${competeLive.name}")`).first();
@@ -530,18 +535,21 @@ test.describe("v8.12.0 — the Participants pane and a staff-tagged row", () => 
     await expect(mine).not.toHaveClass(/is-disabled/);
   });
 
-  test("the DESK SHORTCUT refuses a competitor with the focused event named, before any address is asked for — and nothing leaves the browser", async ({ page }) => {
+  test("the DESK SHORTCUT is not offered to a competitor in their event, and refuses with the event named before any address is asked for — nothing leaves the browser", async ({ page }) => {
     // Round 3: the desk shortcut enrols into the FOCUSED event, a competitor
-    // door. The button is static markup, so the reason is spoken on the click.
+    // door. The workspace's Invite (which holds it) is withheld from them, as is
+    // the section's desk button; reached any other way, the reason is spoken.
     await adminPanel(page, competitor.email);
     await focus(page, competeLive.name);
+    await expect(page.locator("#ws-quick .ws-invite-btn"), "no Invite, and with it no desk sign-up").toHaveCount(0);
     await clickTab(page, "Participants");
+    await expect(page.locator("#desk-invite-btn"), "no desk button in its Participants section").toBeHidden();
     /** @type {string[]} */ const posts = [];
     await page.route("**/api/admin/participants/desk-invite", async (route, req) => {
       if (req.method() === "POST") posts.push(req.postData() || "");
       await route.continue();
     });
-    await page.locator("#desk-invite-btn").click();
+    await page.evaluate(() => window.deskInvite());
     const toast = page.locator("#toast-stack");
     await expect(toast, "refused WITH the reason").toContainText(/You are competing in/, { timeout: 10000 });
     await expect(toast).toContainText(competeLive.name);
@@ -552,8 +560,7 @@ test.describe("v8.12.0 — the Participants pane and a staff-tagged row", () => 
   test("CONTROL — the built-in's desk shortcut opens the address prompt on the same focused event", async ({ page }) => {
     await adminLogin(page);
     await focus(page, competeLive.name);
-    await clickTab(page, "Participants");
-    await page.locator("#desk-invite-btn").click();
+    await inviteDoor(page, "desk");
     await expect(page.locator("#prompt-input"), "the prompt opens for an actor who competes nowhere").toBeVisible({ timeout: 10000 });
     await expect(page.locator("h3", { hasText: /Add someone at the desk/ })).toBeVisible();
     // `#toast-stack` exists only once a toast has been shown, so the absence is

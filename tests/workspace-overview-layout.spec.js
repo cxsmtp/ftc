@@ -199,7 +199,7 @@ test("upcoming: the Ready to start? checklist, each open item with its fix; no b
   await expect(page.locator("#ws-ov-chart"), "the chart is not on the face").toBeHidden();
   await expect(page.locator('#ws-kpis .ws-kpi-hero .eyebrow')).toContainText("Starts in");
   await todo.locator('[data-action="ws-point"]').click();
-  await expect(page.locator('#ws-quick [data-action="ws-invite"]'), "Show me focuses Invite").toBeFocused();
+  await expect(page.locator('#ws-quick .ws-invite-btn'), "Show me focuses Invite").toBeFocused();
 });
 
 test("live program (unranked): progress and solve rates on the face; no board, no Answers figure", async ({ page }) => {

@@ -99,6 +99,10 @@ export const S = {
   adminSelectedCompetitionName: null,
   // Workspace Participants: false = the event's own people, true = everyone (to add).
   pWsShowEveryone: false,
+  // People lists admin accounts only after a link to one (admin-crossnav.js
+  // widenPeopleToAdmins), until People is next entered.
+  pIncludeAdmins: false,
+  _pWidenOnce: false,
   // The platform's "Require admin approval for new accounts" switch, from
   // /api/admin/me. Approval UI (badges, Approve actions) is shown only while on.
   requireAccountApproval: false,

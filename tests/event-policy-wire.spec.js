@@ -79,10 +79,14 @@ const TAG = `pw${Date.now().toString(36)}`;
 //
 // `clock_start` ("allowed" | "never", owner decision, 27 Nov 2026) joins them with
 // the control it governs: the event form's "Start each participant's clock".
+// `cxone_provisioning` joins them with the control it governs (the event form's
+// Checkmarx One section): "forbidden" for a Booth Event, which never creates
+// Checkmarx One accounts (owner's decision, 27 Nov 2026), "allowed" otherwise.
+// Not `cxone_accounts`: the participant leak scanner's pattern matches "count".
 const POLICY_KEYS = ["sessions", "schedule", "ranking_enabled", "certificate",
   "registration_fields", "registration_fields_configurable",
   "reveal_answers", "group_leaderboard", "measure_presence", "trusted_networks",
-  "late_entry", "choice_layout", "clock_start"].sort();
+  "late_entry", "choice_layout", "clock_start", "cxone_provisioning"].sort();
 // The six configurable fields and the three legal states, imported rather than
 // retyped: a hand-written copy here would agree on the day it was written.
 const { REGISTRATION_FIELD_KEYS, FIELD_STATES } = require("../lib/registration-fields");
@@ -111,6 +115,8 @@ function expectPolicy(obj, where, kind) {
   // The discriminating assertion. Every "policy is present" check above is equally
   // satisfied by a constant object, so each attach point must also prove it resolved
   // THIS event's kind rather than a default.
+  expect(obj.policy.cxone_provisioning, `${where}: Checkmarx One accounts follow the kind`)
+    .toBe(kind === "booth" ? "forbidden" : "allowed");
   if (kind === "program") {
     expect(obj.policy.ranking_enabled, `${where}: a Program is not ranked`).toBe(false);
     expect(obj.policy.schedule, `${where}: a Program runs to a deadline`).toBe("deadline");

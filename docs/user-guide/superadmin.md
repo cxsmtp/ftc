@@ -129,11 +129,13 @@ not see it.
 
 ## Role promotion
 
-Role changes are made on **Roles & permissions** (above). The participant row's
-three-dot menu in People still offers **Promote to Admin** or
-**Promote to Superadmin** for a participant, and demoting uses the same menu.
+Role changes are made on **Roles & permissions** (above), and only there: a
+participant's row in People offers **Change role on Roles & permissions**, which
+opens that page searched to the person. An admin account is changed with its
+row's **Change role**; a participant is given an admin role with **Add user** and
+their address (the account is kept and gets the role).
 
-![Role promotion confirm](../screenshots/superadmin/01-role-promotion.png)
+![A People row menu linking to Roles & permissions](../screenshots/superadmin/01-role-promotion.png)
 
 A role change immediately signs the target out everywhere — they sign in
 again for the new role to take effect. That reaches work already in progress
@@ -154,7 +156,7 @@ one. Moved to event admin or participant, they sign in with an emailed code.
 
 There is a fourth role, **Event admin**: an organiser scoped to specific events.
 It is granted per event from the participant's row (**Make event admin**) or from
-the event's **Organisers** list, and any admin can do that — see the
+the **Organisers** card on the event's Overview, and any admin can do that — see the
 [Admin guide](admin.md) for what the role can and cannot do.
 
 Two parts of it are yours alone:
@@ -336,7 +338,7 @@ yours to know about:
   account, so a regular admin is not offered **Invite to …** on that row, and
   the selection bar and the **Invite** dialog skip it with *only a superadmin
   can enrol an admin*. A bound group is the exception that needs no skip: its
-  live sync enrols every member it holds — the Teams page and the **Invite**
+  live sync enrols every member it holds — the Groups page and the **Invite**
   dialog put an admin account into a group only for a superadmin. Any organiser
   may enrol themselves. The same rule reaches **Grant Attempts**: on such an
   event an enrolled admin or superadmin can run out of attempts like anyone
@@ -1233,7 +1235,7 @@ Settings is two panes: the list on the left, grouped under **People**,
   folder into the app, read-only. Any other deployment shows "not visible" unless
   its operator does the same (`BACKUP_DIR`).
 
-The pages the sidebar opens (People, Teams, Roles & permissions, Audit and the
+The pages the sidebar opens (People, Groups, Roles & permissions, Audit and the
 guides) are not repeated in Settings. The running version is at the foot of the
 sidebar (its short form while the sidebar is collapsed).
 
@@ -1384,8 +1386,12 @@ their own value, or to no integration if neither is set.
 The **Don't create CxOne accounts for this event** checkbox (top of the
 CxOne section) is **pre-set from the event type**: it arrives clear on a
 Competition — every participant added gets a CxOne account provisioned — and
-already ticked on a Booth Event and a Program, neither of which normally wants a
-Checkmarx One account minted for every attendee. The create dialog says which way
+already ticked on a Program, which does not normally want a Checkmarx One
+account minted for every attendee. A **Booth Event never creates Checkmarx One
+accounts** whatever is asked: its form has no CxOne section, the platform refuses
+accounts or a key override for one, and changing an event to a Booth Event turns
+its accounts off (recorded in its History). Booth Events that had accounts on
+were turned off once when this rule arrived, each recorded in its History. The create dialog says which way
 it has been pre-set for the type you chose. Tick it when an event
 shouldn't touch CxOne at all (a dry run, an external event, a practice
 round): no accounts are created for its participants through any path

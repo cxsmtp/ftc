@@ -245,8 +245,7 @@ test.describe("disabled fields on real screens", () => {
     await page.goto("/");
     await page.locator("#admin-page").waitFor({ state: "visible", timeout: 30000 });
     await clickTab(page, "Participants");
-    const inc = page.locator("#p-include-admins");
-    if (await inc.isVisible().catch(() => false) && !(await inc.isChecked())) await inc.check();
+    await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
     await expect.poll(() => page.evaluate((ids) => ids.every((id) => (window.S?.adminParticipantsData || []).some((p) => p.id === id)), [F.target.id, F.plain.id]),
       { timeout: 20000, message: "both accounts are in the People model" }).toBe(true);
 

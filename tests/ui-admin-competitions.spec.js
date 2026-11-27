@@ -17,7 +17,7 @@ const { registerPost } = require("./helpers");
 const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, PORT_BASE, gradingHashFor } = require("./helpers");
 const {
   login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin,
-  clickTab, openKebab, openAddToEventsFor, findSeededTaskRow, viewComp, showEveryoneInWorkspace, focusOwnLiveComp, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, openAnalyticsTab, openCompCreateForm, narrowChallengesTable, narrowPeopleTable } = require("./ui-admin-helpers");
+  clickTab, openKebab, openAddToEventsFor, findSeededTaskRow, viewComp, showEveryoneInWorkspace, focusOwnLiveComp, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, openAnalyticsTab, openCompCreateForm, narrowChallengesTable, narrowPeopleTable, openRowEventEdit } = require("./ui-admin-helpers");
 
 // Route every page.goto() + page.request.* to THIS worker's server.
 test.use({ baseURL: BASE });
@@ -862,9 +862,7 @@ test.describe("v7.8.1 — internal-competition checkbox", () => {
       return (list.find(c => c.name === name)?.tags) || [];
     };
     const openEdit = async () => {
-      await liveRow.locator(".kebab-btn").click();
-      await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-      await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+      await openRowEventEdit(page, liveRow);
       await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     };
     const saveThroughConfirm = async () => {
@@ -912,8 +910,7 @@ test.describe("v7.8.1 — internal-competition checkbox", () => {
     const openEdit = async () => {
       // The HARDENED opener (v7.21.25): the kebab is a toggle, so a single click
       // can land on a menu that never opens, and an empty portal is not "open".
-      await openKebab(page, row);
-      await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+      await openRowEventEdit(page, row);
       await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     };
     const save = async () => {
@@ -988,8 +985,7 @@ test.describe("v7.8.1 — internal-competition checkbox", () => {
     await filterComps(page, name);
     const row = page.locator(`#admin-comp-body tr:has-text(${JSON.stringify(name)})`).first();
     await expect(row).toBeVisible({ timeout: 15000 });
-    await openKebab(page, row);
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, row);
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     // v7.13.2 — the whole per-competition CxOne section is admin-level: a regular admin
     // sees the opt-out checkbox AND the credential override fields + Save button.

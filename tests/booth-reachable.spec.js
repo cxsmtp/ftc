@@ -331,15 +331,23 @@ test.describe("v8.1.0 — a Booth Event only holds answerable challenges", () =>
   test("an EXPLICIT value always beats the kind default, in both directions", async () => {
     // `? 1 : 0` cannot express this — it collapses "absent" and "false" — so this
     // is what separates a real default from a hard-coded override.
+    // EXCEPT Checkmarx One accounts on a Booth Event, which the kind FORBIDS
+    // (owner's decision, 27 Nov 2026): explicitly asking for them is refused by
+    // name, never stored (tests/booth-cxone-forbidden.api.spec.js holds the rest).
     const { api, csrf } = await sa();
-    const boothOff = await makeEvent(api, csrf, "booth", { self_enroll_enabled: false, cxone_disabled: false });
+    const boothOff = await makeEvent(api, csrf, "booth", { self_enroll_enabled: false });
     const compOn = await makeEvent(api, csrf, "tournament", { self_enroll_enabled: true, cxone_disabled: true });
     const bo = await compRow(api, boothOff.id);
     const co = await compRow(api, compOn.id);
     expect(bo.self_enroll_enabled, "explicit false on a booth").toBeFalsy();
-    expect(bo.cxone_disabled, "explicit false on a booth").toBeFalsy();
+    expect(bo.cxone_disabled, "a booth's accounts stay off").toBeTruthy();
     expect(co.self_enroll_enabled, "explicit true on a competition").toBeTruthy();
     expect(co.cxone_disabled, "explicit true on a competition").toBeTruthy();
+    const refused = await api.post("/api/admin/competitions", { headers: H(csrf), data: {
+      name: `${uniq()} booth cx`, event_kind: "booth", start_time: new Date(Date.now() - 3600e3).toISOString(),
+      timezone: "UTC", duration_minutes: 600, cxone_disabled: false } });
+    expect(refused.status(), "accounts on, on a booth: refused").toBe(400);
+    expect((await refused.json()).code).toBe("cxone_provisioning_forbidden");
   });
 
   // ── the property all six sites exist to make true ──

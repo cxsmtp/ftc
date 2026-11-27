@@ -190,7 +190,7 @@ test.describe("command palette", () => {
     const opts = await options(page, "");
     expect(labels(opts, "Go to"), "POSITIVE: the participant's pages").toEqual(expect.arrayContaining(["Events", "Profile", "Appearance"]));
     const all = opts.map((o) => o.label);
-    for (const gone of ["Question bank", "People", "Settings", "Roles & permissions", "Templates", "Teams", "Live rankings", "New event", "New question", "Invite people", "Sign up at the desk", "Switch to Participant View", "Switch to Admin View"]) {
+    for (const gone of ["Question bank", "People", "Settings", "Roles & permissions", "Templates", "Groups", "Teams", "Live rankings", "New event", "New question", "Invite people", "Sign up at the desk", "Switch to Participant View", "Switch to Admin View"]) {
       expect(all, `${gone} is not a participant's`).not.toContain(gone);
     }
     for (const q of ["library", "settings", "new event", "invite"]) {
@@ -348,6 +348,10 @@ test.describe("command palette — inside an event, a participant's jumps, and t
       expect((await offered(page, sec, "Go to")).filter((o) => o.hint === here).map((o) => o.label), `the workspace's ${sec} section`).toContain(sec);
     }
     expect((await offered(page, "invite", "Actions")).find((o) => o.label === "Invite people"), "Invite, to this event").toMatchObject({ hint: `To ${X.live.name}` });
+    // The header Invite's second choice (the desk sign-up moved there from the ⋯
+    // menu), and no Organisers door (the Overview's card is the one place).
+    expect((await offered(page, "desk", "Actions")).find((o) => o.label === "Sign up at the desk"), "the desk sign-up, in this event").toMatchObject({ hint: here });
+    expect((await offered(page, "organisers", "Actions")).map((o) => o.label), "no Organisers door").not.toContain("Organisers");
     for (const door of ["Edit settings", "History", "Clone"]) {
       expect((await offered(page, door, "Actions")).filter((o) => o.hint === here).map((o) => o.label), `the ⋯ menu's ${door}`).toContain(door);
     }
@@ -369,13 +373,13 @@ test.describe("command palette — inside an event, a participant's jumps, and t
     await page.setViewportSize({ width: 1440, height: 900 });
     await signInSuperadmin(page);
     await openWorkspace(page, X.ended);
-    await expect(page.locator('#ws-quick [data-action="ws-invite"]'), "PRECONDITION: the header offers no Invite on an ended event").toHaveCount(0);
+    await expect(page.locator('#ws-quick .ws-invite-btn'), "PRECONDITION: the header offers no Invite on an ended event").toHaveCount(0);
     await openPalette(page);
     expect((await offered(page, "history", "Actions")).map((o) => o.label), "POSITIVE: the ended event's own doors are offered").toContain("History");
     expect((await offered(page, "invite", "Actions")).map((o) => o.label), "no Invite to an event that takes no new members").not.toContain("Invite people");
     await page.keyboard.press("Escape");
     await openWorkspace(page, X.live);
-    await expect(page.locator('#ws-quick [data-action="ws-invite"]'), "CONTROL: a live event's header offers Invite").toHaveCount(1);
+    await expect(page.locator('#ws-quick .ws-invite-btn'), "CONTROL: a live event's header offers Invite").toHaveCount(1);
     await openPalette(page);
     expect((await offered(page, "invite", "Actions")).map((o) => o.label), "CONTROL: and so does the palette").toContain("Invite people");
     // Each event's status, by the one table the Events list uses.

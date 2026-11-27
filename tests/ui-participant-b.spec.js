@@ -12,7 +12,7 @@ const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, TEST_DB_P
 // place and is imported rather than becoming a fourth copy. ui-admin-helpers
 // requires only `expect`, never ./isolated-test (v7.21.35), so importing it here
 // cannot disturb the per-file isolation hook.
-const { filterComps, fillBreakGlass, submitLogin } = require("./ui-admin-helpers");
+const { filterComps, fillBreakGlass, submitLogin, openRowEventMenu } = require("./ui-admin-helpers");
 
 // v8.7.5 — resolve an admin tab by its `data-tab-id`, never by its visible
 // label: the sidebar's Events tab keeps the id `admin-competitions-tab` (ids are
@@ -360,8 +360,9 @@ test.describe("History dialog", () => {
     await filterComps(page, compName);
     const row = page.locator(`#admin-comp-body tr:has-text('${compName}')`).first();
     await expect(row).toBeVisible({ timeout: 5000 });
-    await openKebab(page, row);
-    await page.locator("#kebab-portal button:has-text('History')").first().click();
+    // The event's History is its workspace ⋯ menu's (the row keeps only Delete event).
+    await openRowEventMenu(page, row);
+    await page.locator('#kebab-portal [data-action="comp-history"]').click();
     await expect(page.locator("#hist-overlay")).toBeVisible({ timeout: 5000 });
   }
 

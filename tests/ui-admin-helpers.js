@@ -734,7 +734,9 @@ async function openKebab(page, row) {
     }
     await btn.click({ timeout: 3000 });
     await expect(portal).toBeVisible({ timeout: 2000 });
-    expect(await portal.locator("[data-action], button, a").count(),
+    // A menu holding only its reason (a competitor's Events row: the note, no
+    // door) is populated too.
+    expect(await portal.locator("[data-action], button, a, .kebab-note").count(),
       "the portal is open but empty — toggleKebab never populated it").toBeGreaterThan(0);
   }).toPass({ timeout: 20000, intervals: [200, 400, 800] });
 }
@@ -1041,6 +1043,143 @@ async function openCompCreateForm(page, kind = "tournament", opts = {}) {
   if (opts.advanced !== false) await openCompAdvanced(page);
 }
 
+/**
+ * Is the kebab portal open on the menu of the trigger `sel` matches? Asked in
+ * the page: the portal does not exist until a first menu opens, and a locator
+ * would wait for it (an action timeout) instead of answering no. A portal open
+ * on ANOTHER trigger's menu (the header has two) answers no, so the caller
+ * presses its own trigger.
+ */
+async function _menuOpenFrom(page, sel) {
+  return page.evaluate((s) => {
+    const p = document.getElementById("kebab-portal");
+    return !!(p && p.classList.contains("open") && p._srcBtn && p._srcBtn.isConnected && p._srcBtn.matches(s));
+  }, sel).catch(() => false);
+}
+
+/**
+ * An event's doors are its WORKSPACE's (owner's decision, 27 Nov 2026: the
+ * Events-row menu keeps only Delete event). Open the named event's workspace
+ * from the Events list and its header ⋯ menu; returns the open portal.
+ */
+async function openEventMenu(page, name) {
+  await clickTab(page, "Events");
+  await viewComp(page, name);
+  const portal = page.locator("#kebab-portal");
+  await expect(async () => {
+    if (!(await _menuOpenFrom(page, "#ws-quick .ws-more-btn"))) {
+      await page.locator("#ws-quick .ws-more-btn").click({ timeout: 3000 });
+    }
+    await expect.poll(() => _menuOpenFrom(page, "#ws-quick .ws-more-btn"), { timeout: 2000 }).toBe(true);
+  }).toPass({ timeout: 15000 });
+  return portal;
+}
+
+/** From an Events-list row (a locator), open that event's workspace and its ⋯
+ *  menu; returns the open portal. */
+async function openRowEventMenu(page, row) {
+  // A second door in one test: the workspace the first opened is still showing
+  // (the list row is behind it), so its menu is the event's.
+  const inWs = await page.locator("#admin-workspace:not([hidden]) #ws-record").isVisible().catch(() => false);
+  if (!(inWs && !(await row.first().isVisible().catch(() => false)))) {
+    await row.first().locator('[data-action="comp-open"]').first().click();
+  }
+  await page.locator("#ws-record").waitFor({ state: "visible", timeout: 15000 });
+  const portal = page.locator("#kebab-portal");
+  await expect(async () => {
+    if (!(await _menuOpenFrom(page, "#ws-quick .ws-more-btn"))) {
+      await page.locator("#ws-quick .ws-more-btn").click({ timeout: 3000 });
+    }
+    await expect.poll(() => _menuOpenFrom(page, "#ws-quick .ws-more-btn"), { timeout: 2000 }).toBe(true);
+  }).toPass({ timeout: 15000 });
+  return portal;
+}
+
+/** From an Events-list row, its Edit settings, Advanced open (see openEventEdit). */
+async function openRowEventEdit(page, row, { advanced = true } = {}) {
+  const portal = await openRowEventMenu(page, row);
+  await portal.locator('[data-action="comp-edit"]').click();
+  await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 10000 });
+  if (advanced) await openCompAdvanced(page);
+}
+
+/** The workspace header's Invite menu (an email invitation, a desk sign-up). */
+async function openInviteMenu(page) {
+  const portal = page.locator("#kebab-portal");
+  await expect(async () => {
+    if (!(await _menuOpenFrom(page, "#ws-quick .ws-invite-btn"))) {
+      await page.locator("#ws-quick .ws-invite-btn").click({ timeout: 3000 });
+    }
+    await expect(portal.locator('[data-action="ws-invite"]')).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15000 });
+  return portal;
+}
+
+/**
+ * Press the door that adds people: inside an event's workspace the header's
+ * Invite menu holds both (owner's decision, 27 Nov 2026: one control; the
+ * Participants section shows neither button there), elsewhere the People
+ * toolbar's Invite or At the desk. `which` is "email" or "desk".
+ */
+async function inviteDoor(page, which) {
+  const inWs = await page.locator("#admin-workspace:not([hidden]) #ws-record").isVisible().catch(() => false);
+  if (inWs) {
+    const portal = await openInviteMenu(page);
+    await portal.locator(`[data-action="${which === "desk" ? "desk-invite" : "ws-invite"}"]`).click();
+  } else {
+    await page.locator(which === "desk" ? "#desk-invite-btn" : "#invite-participants-btn").click();
+  }
+}
+
+/**
+ * Open the named event's edit form from its workspace (⋯ → Edit settings), with
+ * Advanced open: the form folds Advanced on an edit too (owner's decision, 27 Nov
+ * 2026), and a spec reaching a setting in it opens it as a person would.
+ */
+async function openEventEdit(page, name, { advanced = true } = {}) {
+  const portal = await openEventMenu(page, name);
+  const edit = portal.locator('[data-action="comp-edit"]');
+  await expect(edit, `Edit settings is offered on "${name}"`).toHaveCount(1);
+  await edit.click();
+  await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 15000 });
+  await page.locator("#comp-name").waitFor({ state: "visible", timeout: 15000 });
+  if (advanced) await openCompAdvanced(page);
+}
+
+/**
+ * People lists participants and organisers; admin accounts live on Roles &
+ * permissions (owner's decision, 27 Nov 2026: no "Show admin accounts"). The
+ * one way People lists them is a link to one (admin-crossnav.js
+ * `widenPeopleToAdmins`), until People is next entered: this takes that path,
+ * entering People with the list widened, for a spec acting on an admin row.
+ */
+async function peopleWithAdminAccounts(page) {
+  await page.waitForFunction(() => typeof window.widenPeopleToAdmins === "function");
+  // Inside a workspace the event's roster already lists every role (kind=all),
+  // and a role scoped to its events reads only its events' people: nothing to widen.
+  if (await page.evaluate(() => !!window.adminSelectedCompetitionId || !!window.isEventAdmin)) return;
+  // Already widened and on People: going in again would reload the list, which
+  // drops a selection the caller is building row by row.
+  if (await page.locator("#admin-participants-tab").isVisible() && await page.locator("#p-admins-note").isVisible()) return;
+  const reload = page.waitForResponse((r) => r.url().includes("/api/admin/participants?") && r.url().includes("kind=all"));
+  await page.evaluate(() => window.widenPeopleToAdmins());
+  await page.locator("button.admin-nav-item[data-tab-id='admin-participants-tab']").first().evaluate((el) => el.click());
+  await reload;
+  await expect(page.locator("#p-admins-note"), "the list says it shows admin accounts").toBeVisible();
+}
+
+/**
+ * Pick a type on the event form. The form names the type chosen on the New
+ * event page as a chip (owner's decision, 27 Nov 2026); "Change type" opens
+ * the choice, whose pick goes through the form's confirms as before.
+ */
+async function pickFormKind(page, kind) {
+  const box = page.locator("#comp-form-overlay #comp-kind-seg-box");
+  if (await box.isHidden()) await page.locator("#comp-form-overlay .comp-kind-change").click();
+  await expect(box, "Change type opened the choice").toBeVisible();
+  await page.locator(`#comp-form-overlay label.kind-seg-opt:has(input[value="${kind}"])`).click();
+}
+
 // Open the create/edit form's Advanced section (a <details>), if it is closed.
 async function openCompAdvanced(page) {
   const adv = page.locator("#comp-advanced");
@@ -1170,4 +1309,5 @@ module.exports = {
   signUpViaUi,
   textContrast, rowMarking,
   focusOwnLiveComp, openCompCreateForm, openCompAdvanced,
+  openEventMenu, openInviteMenu, openEventEdit, peopleWithAdminAccounts, pickFormKind, inviteDoor, openRowEventMenu, openRowEventEdit,
   awaitCompModel, expectSpaBooted, login, fillBreakGlass, submitLogin, loginViaApi, openAnalyticsTab, saLoginRetry, filterComps, rerenderedAfter, narrowGroupsTable, adminLogin, participantLogin, clickTab, openKebab, findSeededTaskRow, openAddToEventsFor, viewComp, showEveryoneInWorkspace, showAllParticipantColumns, showAllTableColumns, openSettingsSection, CHALLENGE_ALL_COLUMNS, EVENT_ALL_COLUMNS, openFilterPanels, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS };

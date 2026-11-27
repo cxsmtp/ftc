@@ -106,8 +106,9 @@ function _go(tabId, searchId, value, resetChips, widen) {
  * itself — inside a workspace the list narrows to the event's members (an
  * admin's own test answers come from someone who is not one), and the
  * cross-event People list leaves admin accounts out (a competing admin is on
- * the board). An admin filtering on "pending" who clicks an approved
- * participant would otherwise land on an empty table with nothing saying why.
+ * the board; admin accounts live on Roles & permissions). An admin filtering on
+ * "pending" who clicks an approved participant would otherwise land on an empty
+ * table with nothing saying why.
  * A navigation that promises to show someone has to actually show them.
  */
 export function adminShowParticipant(nickname) {
@@ -121,16 +122,19 @@ export function adminShowParticipant(nickname) {
     },
     () => {
       if (S.adminSelectedCompetitionId) S.pWsShowEveryone = true;
-      // Outside a workspace People leaves admin accounts out: "Show admin
-      // accounts" is ticked, for an event admin too (their list then holds the
-      // admin accounts enrolled in their events — a competing admin on their
-      // board — and the box shows while it is ticked, so they can take it off).
-      else {
-        S.pIncludeAdmins = true;
-        const cb = document.getElementById("p-include-admins");
-        if (cb) cb.checked = true;
-      }
+      // Outside a workspace People leaves admin accounts out (they live on Roles
+      // & permissions): this one entry lists them too, for an event admin as
+      // well (their list then holds the admin accounts enrolled in their events
+      // — a competing admin on their board), and the list says so above the
+      // table until People is next entered.
+      else widenPeopleToAdmins();
     });
+}
+
+/** The next entry to People lists admin accounts too (and says so). The one
+ *  way to show one there: a link to a person who holds an admin role. */
+export function widenPeopleToAdmins() {
+  S._pWidenOnce = true;
 }
 
 /** Show one challenge in the Challenges pane. Three chip groups and the

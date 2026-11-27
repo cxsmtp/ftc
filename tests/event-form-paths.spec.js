@@ -24,7 +24,7 @@
 // Every fixture is the test's own and is written through the API before the
 // browser signs in (the built-in superadmin holds one session).
 const { test, expect } = require("./isolated-test");
-const { adminLogin, openCompCreateForm, openCompAdvanced, viewComp, clickTab } = require("./ui-admin-helpers");
+const { adminLogin, openCompCreateForm, openCompAdvanced, viewComp, clickTab, pickFormKind } = require("./ui-admin-helpers");
 const { apiLogin, BASE, TEST_DB_PATH, PARTICIPANT_PASS } = require("./helpers");
 const { H, makeTask, makeParticipant } = require("./event-admin-helpers");
 const Database = require("better-sqlite3");
@@ -369,7 +369,7 @@ test.describe("An event create whose answer is lost after it landed", () => {
 
     // The form re-renders for the new type (the attempt cap typed differs from
     // the form as opened, so it asks first); it is still the same create.
-    await page.locator('#comp-form-overlay label.kind-seg-opt:has(input[value="booth"])').click();
+    await pickFormKind(page, "booth");
     await expect(page.locator("#modal-overlay.open #modal-title")).toHaveText(/^Change type to /, { timeout: 10000 });
     await page.locator("#modal-confirm-btn").click();
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("booth");

@@ -4128,6 +4128,17 @@ h1[tabindex="-1"],h2[tabindex="-1"],.page[tabindex="-1"],.admin-tab-pane[tabinde
 .kind-seg-opt input:disabled + span{cursor:not-allowed;color:var(--muted)}
 .kind-seg-opt input:disabled:checked + span{color:var(--text-2);outline:1px dashed var(--border-strong)}
 @media (pointer:coarse),(max-width:768px){.kind-seg-opt span{min-height:44px}}
+/* The form names the type chosen on the New event page; Change type opens the
+   choice under it (competitions-admin.js compKindChangeToggle). */
+.comp-kind-current{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-1) 0}
+.comp-kind-current .kind-chip{margin-left:0}
+.comp-kind-current .link-btn{min-height:44px;display:inline-flex;align-items:center;align-self:auto;font-size:var(--fs-14)}
+.kind-seg[hidden]{display:none}
+/* People: the one note saying admin accounts are listed (a link to one). */
+.p-admins-note{margin:0 0 var(--s-3);padding:var(--s-2) var(--s-3);border:1px solid var(--border);border-radius:var(--r-m);background:var(--surface-2);color:var(--text-2);font-size:var(--fs-13);line-height:1.45}
+.p-admins-note[hidden]{display:none}
+/* Analytics inside a workspace: the event it measures, named, not picked. */
+.analytics-ws-event{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-2) 0 0;font-weight:var(--fw-semibold);color:var(--text)}
 .comp-kind-blurb{margin:6px 0 2px;font-size:var(--fs-13);color:var(--muted);line-height:1.45}
 .comp-form-from{margin:0 0 12px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface-2);font-size:var(--fs-13);color:var(--text-2)}
 .comp-form-from svg{vertical-align:-2px}
@@ -5844,9 +5855,12 @@ body.mcf #qa-playbar{display:none!important}
    On every width: Log out and the footer go while a challenge is open, and so
    do the header's countdown and day chip wherever the play bar draws its ring —
    the ring is then the one clock. A Program's bar draws none (its deadline is
-   weeks out), so its header countdown stays. On a phone the whole header steps
-   aside (the block above). */
+   weeks out), so its header countdown stays. The header's score pill goes too
+   wherever the play bar shows the score, so the page says it once (owner's
+   decision, 27 Nov 2026). On a phone the whole header steps aside (the block
+   above). */
 @supports selector(:has(*)){
+  body:has(#task-detail-page.active #qa-stats .qa-score:not([hidden])):not(.mcf) #header-score,
   body:has(#task-detail-page.active):not(.mcf) #app-footer,
   body:has(#task-detail-page.active #qa-stats .qa-gauge):not(.mcf) #header-timer,
   body:has(#task-detail-page.active #qa-stats .qa-gauge):not(.mcf) #header-day,

@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").showAl
 const { BASE, PARTICIPANT_PASS } = require("./helpers");
 const {
   adminLogin, loginViaApi, clickTab, openKebab, viewComp, filterComps, awaitCompModel, showEveryoneInWorkspace,
-  narrowGroupsTable, AxeBuilder, AXE_GATED_IMPACTS, narrowPeopleTable } = require("./ui-admin-helpers");
+  narrowGroupsTable, AxeBuilder, AXE_GATED_IMPACTS, narrowPeopleTable, openEventMenu, inviteDoor } = require("./ui-admin-helpers");
 const {
   H, uniq, MIN, sa, makeParticipant, liveBooth, enrol, expireEvent, rawSetAssignedAt,
   participantCtx, submit, rawBackdate, rawGetComp, rawUpdateComp, outliveCompCache,
@@ -508,7 +508,7 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
   test("U5 — the invitation dialog pre-ticks the focused late-entry event and says what that means", async ({ page }) => {
     await adminLogin(page);
     await focusParticipants(page, OPEN.name);
-    await page.locator("#invite-participants-btn").click();
+    await inviteDoor(page, "email");
     const overlay = page.locator("#invite-overlay");
     await expect(overlay).toBeVisible({ timeout: 15000 });
     const open = overlay.locator("label.picker-row", { hasText: OPEN.name });
@@ -549,7 +549,7 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
     await adminLogin(page);
     await focusParticipants(page, OPEN.name);
     await awaitCompModel(page);
-    await page.locator("#desk-invite-btn").click();
+    await inviteDoor(page, "desk");
     const input = page.locator("#prompt-input");
     await expect(input).toBeVisible({ timeout: 10000 });
     await expect(page.locator("label", { hasText: "as a late entrant" }), "the prompt says so before asking").toBeVisible();
@@ -565,7 +565,10 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
     expect((u.competitions || []).find((c) => c.id === OPEN.id)?.late_entrant, "…as a late entrant of OPEN").toBe(true);
   });
 
-  test("U7 CONTROL — the desk shortcut on a CLOSED event refuses with the reason, before asking for an address", async ({ page }) => {
+  // The workspace's people doors are its header's Invite menu (owner's decision,
+  // 27 Nov 2026), offered only while the event takes new members: a CLOSED
+  // event offers no Invite at all, and its Participants section neither button.
+  test("U7 CONTROL — a CLOSED event offers no way to add someone: no Invite, no desk button, nothing sent", async ({ page }) => {
     await adminLogin(page);
     await focusParticipants(page, CLOSED.name);
     await awaitCompModel(page);
@@ -574,7 +577,11 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
       if (req.method() === "POST") posts.push(req.postData() || "");
       await route.continue();
     });
-    await page.locator("#desk-invite-btn").click();
+    await expect(page.locator("#ws-quick .ws-invite-btn"), "a closed event offers no Invite").toHaveCount(0);
+    await expect(page.locator("#desk-invite-btn"), "…and no desk button in its Participants section").toBeHidden();
+    await expect(page.locator("#invite-participants-btn"), "…nor an Invite one").toBeHidden();
+    // The desk's own refusal still stands behind any other way in.
+    await page.evaluate(() => window.deskInvite());
     await expect(page.locator("#toast-stack"), "refused WITH the reason").toContainText("not taking late entries", { timeout: 10000 });
     await expect(page.locator("#toast-stack")).toContainText(CLOSED.name);
     await expect(page.locator("#prompt-input"), "no address prompt opens").toHaveCount(0);
@@ -583,11 +590,12 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
 
   // ── The Events surfaces: kebab, scope banner, switcher ─────────────────────
 
-  test("U9 — the Events row menu offers Manage Participants and Join Link during the window, and never Assign Challenges", async ({ page }) => {
+  // The event's doors are its workspace's (the Events-row menu keeps only Delete
+  // event; owner's decision, 27 Nov 2026): Invite and its Participants section
+  // stand for the roster, the ⋯ menu for the join link and the close.
+  test("U9 — the event's workspace offers Invite, the Join Link and the close during the window, and never Add challenges", async ({ page }) => {
     await adminLogin(page);
-    await openKebab(page, await eventRow(page, OPEN.name));
-    const portal = page.locator("#kebab-portal");
-    await expect(portal.locator('[data-action="comp-manage-participants"]')).toHaveCount(1);
+    let portal = await openEventMenu(page, OPEN.name);
     await expect(portal.locator('[data-action="comp-self-enroll"]'), "the join link still works, so it is still offered").toHaveCount(1);
     await expect(portal.locator('[data-action="comp-assign-challenges"]'),
       "a finished event's challenge list is frozen whatever the window says").toHaveCount(0);
@@ -595,16 +603,18 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
     // arms in this file use OPEN's open window.
     await expect(portal.locator('[data-action="comp-close-late-entries"]'),
       "Close late entries now is offered while the window is open").toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#ws-quick .ws-invite-btn"), "the roster is open, so Invite is offered").toHaveCount(1);
 
-    await openKebab(page, await eventRow(page, CLOSED.name));
-    await expect(portal.locator('[data-action="comp-manage-participants"]'), "CONTROL: a closed event offers none of them").toHaveCount(0);
-    await expect(portal.locator('[data-action="comp-self-enroll"]')).toHaveCount(0);
+    portal = await openEventMenu(page, CLOSED.name);
+    await expect(portal.locator('[data-action="comp-self-enroll"]'), "CONTROL: a closed event offers none of them").toHaveCount(0);
     await expect(portal.locator('[data-action="comp-assign-challenges"]')).toHaveCount(0);
     await expect(portal.locator('[data-action="comp-close-late-entries"]'), "…nor a close, with no window left to close").toHaveCount(0);
     await page.keyboard.press("Escape");
+    await expect(page.locator("#ws-quick .ws-invite-btn"), "…nor Invite").toHaveCount(0);
 
-    await openKebab(page, await eventRow(page, OPEN.name));
-    await portal.locator('[data-action="comp-manage-participants"]').click();
+    await focus(page, OPEN.name);
+    await page.locator('#ws-tabs [data-section="admin-participants-tab"]').click();
     await expect(page.locator("#admin-participants-tab")).toBeVisible({ timeout: 15000 });
     await expect(page.locator("#admin-scope-banner")).toContainText(OPEN.name);
   });
@@ -641,6 +651,9 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
       await page.waitForFunction((cid) => (window.S?.adminCompetitionsData || []).some((c) => c.id === cid), id, { timeout: 20000 });
       await page.evaluate((cid) => window.editCompetition(cid), id);
       await expect(page.locator("#comp-form-overlay")).toBeVisible({ timeout: 15000 });
+      // Late entries sit under Advanced settings, folded on an edit too (owner's
+      // decision, 27 Nov 2026).
+      await require("./ui-admin-helpers").openCompAdvanced(page);
     };
     const closeForm = async () => {
       await page.locator('[data-action="overlay-close"][data-overlay-id="comp-form-overlay"]').first().click();
@@ -758,8 +771,7 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
 
   test("the Join Link dialog during the window: the link keeps working, and a regular admin is told why its settings are locked", async ({ page }) => {
     await adminPanelAs(page, R.email);
-    await openKebab(page, await eventRow(page, OPEN.name));
-    await page.locator('#kebab-portal [data-action="comp-self-enroll"]').click();
+    await (await openEventMenu(page, OPEN.name)).locator('[data-action="comp-self-enroll"]').click();
     const ov = page.locator("#self-enroll-overlay");
     await expect(ov).toBeVisible({ timeout: 15000 });
     await expect(ov.locator("#self-enroll-late-note"), "the dialog says the link still works").toContainText("late entries");
@@ -772,8 +784,7 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
 
   test("CONTROL — the superadmin's Join Link dialog on the same event keeps its settings live", async ({ page }) => {
     await adminLogin(page);
-    await openKebab(page, await eventRow(page, OPEN.name));
-    await page.locator('#kebab-portal [data-action="comp-self-enroll"]').click();
+    await (await openEventMenu(page, OPEN.name)).locator('[data-action="comp-self-enroll"]').click();
     const ov = page.locator("#self-enroll-overlay");
     await expect(ov).toBeVisible({ timeout: 15000 });
     await expect(ov.locator("#self-enroll-late-note")).toBeVisible();
@@ -788,8 +799,7 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
   // above are the CONTROL that the claim is still made where it is true.
   test("a DISABLED link on an event taking late entries: the Join Link dialog does not say it works, and says what would", async ({ page }) => {
     await adminPanelAs(page, R.email);
-    await openKebab(page, await eventRow(page, OPENOFF.name));
-    await page.locator('#kebab-portal [data-action="comp-self-enroll"]').click();
+    await (await openEventMenu(page, OPENOFF.name)).locator('[data-action="comp-self-enroll"]').click();
     const ov = page.locator("#self-enroll-overlay");
     await expect(ov).toBeVisible({ timeout: 15000 });
     await expect(ov.locator("#self-enroll-enabled"), "PRECONDITION: the link is off").not.toBeChecked();
@@ -808,8 +818,7 @@ test.describe("v8.12.6 — the admin doors offer a late-entry event, and say wha
 
   test("…and a superadmin who switches the link ON in the dialog is told it now works; switching it OFF takes the claim back", async ({ page }) => {
     await adminLogin(page);
-    await openKebab(page, await eventRow(page, OPENTOG.name));
-    await page.locator('#kebab-portal [data-action="comp-self-enroll"]').click();
+    await (await openEventMenu(page, OPENTOG.name)).locator('[data-action="comp-self-enroll"]').click();
     const ov = page.locator("#self-enroll-overlay");
     await expect(ov).toBeVisible({ timeout: 15000 });
     const note = ov.locator("#self-enroll-late-note");

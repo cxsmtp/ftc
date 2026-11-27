@@ -14,7 +14,7 @@
 const { test, expect } = require("./isolated-test");
 const { registerPost } = require("./helpers");
 const { getSuperadminPass, BASE, codeLogin } = require("./helpers");
-const { openAnalyticsTab, openCompCreateForm, narrowGroupsTable, narrowEventsTable } = require("./ui-admin-helpers"); // v8.1.0 — one analytics entry point; v8.2.0 — one create entry point; v9.2.4 — one way into the Groups search
+const { openAnalyticsTab, openCompCreateForm, narrowGroupsTable, narrowEventsTable, openRowEventEdit } = require("./ui-admin-helpers"); // v8.1.0 — one analytics entry point; v8.2.0 — one create entry point; v9.2.4 — one way into the Groups search
 
 test.use({ baseURL: BASE });
 
@@ -1207,9 +1207,7 @@ test.describe("v7.21.1 (A6) — CxOne fields survive a competition CREATE for a 
       await narrowEventsTable(page, name);
       const row = page.locator(`#admin-comp-body tr:has-text(${JSON.stringify(name)})`);
       await expect(row).toBeVisible({ timeout: 10000 });
-      await row.locator(".kebab-btn").click();
-      await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 5000 });
-      await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+      await openRowEventEdit(page, row);
       await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 10000 });
       await page.locator("#comp-cxone-group").fill("a6-edit-path-group");
       await page.locator("[data-action='comp-save-cxone']").click();

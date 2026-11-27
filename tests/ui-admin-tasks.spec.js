@@ -15,9 +15,7 @@ test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").openFi
 test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").showAllParticipantColumns(page); });
 const { registerPost } = require("./helpers");
 const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, PORT_BASE, gradingHashFor } = require("./helpers");
-const {
-  login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin,
-  clickTab, openKebab, findSeededTaskRow, viewComp, narrowGroupsTable, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, narrowChallengesTable, narrowPeopleTable, narrowEventsTable } = require("./ui-admin-helpers");
+const { login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin, clickTab, openKebab, findSeededTaskRow, viewComp, narrowGroupsTable, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, narrowChallengesTable, narrowPeopleTable, narrowEventsTable, openRowEventEdit, openRowEventMenu } = require("./ui-admin-helpers");
 
 // Route every page.goto() + page.request.* to THIS worker's server.
 test.use({ baseURL: BASE });
@@ -135,22 +133,27 @@ test.describe("Admin — Competitions", () => {
     await expect(page.locator("text=Viewing").first()).toBeVisible({ timeout: 3000 });
   });
 
-  test("Assign Challenges available in kebab for live, absent for ended", async ({ page }) => {
+  // The event's doors are its workspace ⋯ menu's (owner's decision, 27 Nov
+  // 2026: the Events-row menu keeps only Delete event).
+  test("Add challenges is in the event's menu while live, absent once ended; neither row menu offers it", async ({ page }) => {
     await adminLogin(page);
     await clickTab(page, "Events");
     await expect(page.locator(".status-badge.live").first()).toBeVisible({ timeout: 10000 });
     await filterComps(page, "Test Live");
     const liveRow = page.locator("#admin-comp-body tr:has-text('Test Live')");
-    // Assign Challenges is in the kebab menu and is marked as elevated (km-warning) for live competitions
-    await expect(liveRow.locator(".kebab-menu button.km-warning:has-text('Assign Challenges')")).toHaveCount(1);
-    // Edit on a live competition should also be elevated (warning)
-    await expect(liveRow.locator(".kebab-menu button.km-warning:has-text('Edit')")).toHaveCount(1);
+    await expect(liveRow.locator(".kebab-menu [data-action='comp-assign-challenges']"), "not on the row").toHaveCount(0);
+    let portal = await openRowEventMenu(page, liveRow);
+    await expect(portal.locator("[data-action='comp-assign-challenges']")).toHaveCount(1);
+    await expect(portal.locator("[data-action='comp-edit']")).toHaveCount(1);
+    await page.keyboard.press("Escape");
     // Show ended competitions — wait for the filter re-render, not a fixed delay.
+    await clickTab(page, "Events");
     await page.locator("#comp-status-filters button[data-status='all']").click();
     await filterComps(page, "Test Ended");
     const endedRow = page.locator("#admin-comp-body tr:has-text('Test Ended')");
     await expect(endedRow).toBeVisible({ timeout: 5000 });
-    await expect(endedRow.locator(".kebab-menu button:has-text('Assign Challenges')")).toHaveCount(0);
+    portal = await openRowEventMenu(page, endedRow);
+    await expect(portal.locator("[data-action='comp-assign-challenges']")).toHaveCount(0);
   });
 
   test("opening a second row's kebab while one is open keeps the new menu open (no flash-close)", async ({ page }) => {
@@ -172,7 +175,7 @@ test.describe("Admin — Competitions", () => {
     await page.keyboard.press("Escape");
   });
 
-  test("role promotion severity: km-warning for admin, km-danger for superadmin", async ({ page }) => {
+  test("the People row's role door is a link to Roles & permissions, never Promote/Demote", async ({ page }) => {
     // v7.21.35 — THIS TEST NOW OWNS ITS PARTICIPANT, and that is the actual fix.
     //
     // It flaked three times against the shared seeded `carol`. The v7.21.17 pass
@@ -249,25 +252,18 @@ test.describe("Admin — Competitions", () => {
       "which reads as a markup bug and is not one",
     ).toHaveCount(0, { timeout: 10000 });
 
-    // Promote to Admin → warning (elevated)
-    // Promote to Superadmin → danger (destructive escalation)
-    // Read BOTH labels in one pass so a failure reports what the kebab actually
-    // contained rather than a bare 0 — with the preconditions above already
-    // established, the label list is the only remaining unknown.
+    // Roles are changed on Roles & permissions only (owner's decision, 27 Nov
+    // 2026): the row's role door is ONE link there, and no Promote/Demote item
+    // (whose km-warning / km-danger severities were this test's subject).
+    // Read the labels in one pass so a failure reports what the kebab contained.
     const kebabLabels = async () =>
       (await carolRow.locator(".kebab-menu button").allInnerTexts()).map((t) => t.trim()).filter(Boolean);
     await expect
-      .poll(kebabLabels, {
-        timeout: 10000,
-        message: "Carol's kebab never rendered the participant-branch role buttons",
-      })
-      .toEqual(expect.arrayContaining([
-        expect.stringContaining("Promote to Admin"),
-        expect.stringContaining("Promote to Superadmin"),
-      ]));
-    // Severity classes are the actual subject of the test.
-    await expect(carolRow.locator(".kebab-menu button.km-warning:has-text('Promote to Admin')")).toHaveCount(1);
-    await expect(carolRow.locator(".kebab-menu button.km-danger:has-text('Promote to Superadmin')")).toHaveCount(1);
+      .poll(kebabLabels, { timeout: 10000, message: "the row never rendered its role link" })
+      .toEqual(expect.arrayContaining([expect.stringContaining("Change role on Roles & permissions")]));
+    const labels = await kebabLabels();
+    expect(labels.filter((l) => /Promote|Demote/.test(l)), "no Promote/Demote on the People row").toEqual([]);
+    await expect(carolRow.locator(".kebab-menu [data-action='participant-role']")).toHaveCount(0);
   });
 
   test("v6.16.0: reveal-answers checkbox toggles + persists + flows to /api/tasks/:id", async ({ page }) => {
@@ -289,9 +285,7 @@ test.describe("Admin — Competitions", () => {
     const liveRow = page.locator("#admin-comp-body tr:has-text('Test Live')");
     await expect(liveRow).toBeVisible({ timeout: 5000 });
     // Open edit modal.
-    await liveRow.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, liveRow);
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     // Default: checkbox unchecked for the seed comp.
     const cb = page.locator("#comp-reveal-answers");
@@ -306,9 +300,7 @@ test.describe("Admin — Competitions", () => {
     await page.locator("#modal-confirm-btn").click();
     await page.locator("#comp-form-overlay").waitFor({ state: "hidden", timeout: 5000 });
     // Re-open modal and confirm the box is now checked (PUT round-trip).
-    await liveRow.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, liveRow);
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     await expect(page.locator("#comp-reveal-answers")).toBeChecked();
     // Untick + Save (restore the seed default).
@@ -497,9 +489,7 @@ test.describe("audit v7.7.35 (T3) — modal dismissal contract", () => {
     await filterComps(page, "Test Live");
     const liveRow = page.locator("#admin-comp-body tr:has-text('Test Live')");
     await expect(liveRow).toBeVisible({ timeout: 5000 });
-    await liveRow.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, liveRow);
     const form = page.locator("#comp-form-overlay");
     await form.waitFor({ state: "visible", timeout: 5000 });
 

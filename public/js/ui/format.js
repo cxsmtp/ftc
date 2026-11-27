@@ -429,7 +429,11 @@ const _DEFAULT_POLICY = { sessions: "many", schedule: "window", ranking_enabled:
   choice_layout: "standard",
   // "never" is the restrictive value: a stale payload hides the clock-start choice
   // rather than offer one the save refuses (`clock_start_forbidden`).
-  clock_start: "never" };
+  clock_start: "never",
+  // "allowed" is what every kind did before the key existed, so a payload that
+  // predates it keeps the event form's Checkmarx One section (the server refuses
+  // a Booth Event's accounts either way).
+  cxone_provisioning: "allowed" };
 // v8.12.0 — STAFF CAN COMPETE, and the one predicate the participant surfaces
 // read. A staff-tagged user is a SPECTATOR of an event unless they hold a row on
 // it and its "Staff can compete" switch is on — the server puts that answer on

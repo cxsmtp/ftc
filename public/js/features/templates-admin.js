@@ -517,6 +517,9 @@ function _forbidReason(key, kind) {
     registration_fields: () => (p.registration_fields_configurable === true ? '' : `${label} always asks the short sign-up form.`),
     leaderboard_mode: () => (p.sessions === 'many' ? '' : `${label} runs in one sitting, so there is one board.`),
     clock_start: () => (p.clock_start === 'allowed' ? '' : `${label} has no ranking, so each person's time starts when they enter.`),
+    // The one option a kind forbids by keeping it ON: "Do not create Checkmarx
+    // One accounts" stays ticked where accounts are never created.
+    cxone_disabled: () => (p.cxone_provisioning === 'allowed' ? '' : `${label} never creates Checkmarx One accounts.`),
   };
   // An unknown key has no refusal (never an exception).
   return Object.prototype.hasOwnProperty.call(reasons, key) ? reasons[key]() : '';
@@ -788,13 +791,29 @@ function _syncEditor(ov, state) {
   const k = _kindOf(kind);
   const p = policyOrDefault(k && k.policy);
   // Policy-forbidden options: disabled, with the reason beside them.
-  for (const key of ['reveal_answers_on_end', 'group_leaderboard_enabled', 'measure_presence', 'late_entry_enabled', 'registration_fields', 'time_basis', 'leaderboard_mode', 'clock_start']) {
+  for (const key of ['reveal_answers_on_end', 'group_leaderboard_enabled', 'measure_presence', 'late_entry_enabled', 'registration_fields', 'time_basis', 'leaderboard_mode', 'clock_start', 'cxone_disabled']) {
     let why = _forbidReason(key, kind);
     if (!why && key === 'time_basis' && !ov.querySelector('#tpl-ed-measure_presence').checked) why = 'Turn on Record time on the platform first.';
     const box = ov.querySelector(`[data-opt="${key}"]`);
     if (box) {
       box.classList.toggle('is-disabled', !!why);
-      for (const inp of box.querySelectorAll('input,select')) inp.disabled = !!why;
+      for (const inp of box.querySelectorAll('input,select')) {
+        inp.disabled = !!why;
+        // Forbidding accounts holds "Do not create" ticked (never sent: the kind
+        // decides it); the organiser's own tick comes back with a type that
+        // allows accounts.
+        if (key === 'cxone_disabled') {
+          if (why) {
+            if (inp.dataset.held !== '1') { inp.dataset.prev = inp.checked ? '1' : '0'; inp.dataset.held = '1'; }
+            inp.checked = true;
+          } else if (inp.dataset.held === '1') {
+            // A seed the organiser never stated was re-seeded for the new type
+            // already (the kind select's own listener runs first).
+            if (state.explicit.has(key)) inp.checked = inp.dataset.prev === '1';
+            delete inp.dataset.held; delete inp.dataset.prev;
+          }
+        }
+      }
     }
     const note = ov.querySelector(`[data-why="${key}"]`);
     if (note) { note.textContent = why; note.hidden = !why; }
@@ -824,7 +843,7 @@ function _syncEditor(ov, state) {
     v.settings.measure_presence ? `Time on the platform recorded${v.settings.time_basis === 'presence' ? ' and used for ties' : ''}` : null,
     p.clock_start === 'allowed' ? (ov.querySelector('#tpl-ed-clock_start')?.value === 'entry' ? 'Each clock starts on entry' : "Each clock starts at the person's first challenge") : null,
     v.settings.staff_compete ? 'Staff compete' : null,
-    on('cxone_disabled') ? 'No Checkmarx One accounts' : 'Checkmarx One accounts on enrolment',
+    (on('cxone_disabled') || _forbidReason('cxone_disabled', kind)) ? 'No Checkmarx One accounts' : 'Checkmarx One accounts on enrolment',
     `${state.tasks.length} challenge${state.tasks.length === 1 ? '' : 's'}`,
   ].filter(Boolean);
   setSafeHtml(ov.querySelector('#tpl-ed-sum'), facts.map(f => `<li>${ICO.check}<span>${esc(f)}</span></li>`).join(''));

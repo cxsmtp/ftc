@@ -478,9 +478,7 @@ async function startNowConfirm(page, ev, via) {
       await expect(more, "the workspace header's ⋯").toBeVisible({ timeout: 10000 });
       await more.click();
     } else {
-      await clickTab(page, "Events");
-      await filterComps(page, ev.name);
-      await openKebab(page, page.locator("#admin-comp-body tr").filter({ has: page.locator(`td.ev-name-cell[data-comp-id="${ev.id}"]`) }));
+      throw new Error(`unknown door ${via}`);
     }
     const item = page.locator('#kebab-portal.open [data-action="comp-start-now"]');
     await expect(item, `${via}: the menu offers Start now`).toBeVisible({ timeout: 5000 });
@@ -496,10 +494,12 @@ async function startNowConfirm(page, ev, via) {
 }
 
 for (const width of WIDTHS) {
-  test(`organiser: Start now on the upcoming open-ended Program says "Deadline (preserved): ${WORDS}" through both doors, beside a dated control, at ${width} px`, async ({ page }) => {
+  // Start now is the workspace ⋯ menu's (the Events-row menu keeps only Delete
+  // event; owner's decision, 27 Nov 2026), so there is one door to read.
+  test(`organiser: Start now on the upcoming open-ended Program says "Deadline (preserved): ${WORDS}" through its door, beside a dated control, at ${width} px`, async ({ page }) => {
     await page.setViewportSize(viewport(width));
     await adminLogin(page);
-    for (const via of ["workspace", "row"]) {
+    for (const via of ["workspace"]) {
       const open = await startNowConfirm(page, fx.soon, via);
       expect(open.line, `${via}: the kept deadline is the words: ${open.body}`).toBe(WORDS);
       expect(open.body, `${via}: no placeholder date in the confirm`).not.toMatch(fx.placeholderRe);
@@ -594,9 +594,9 @@ test("organiser: the Events list, the Start now confirm and the workspace follow
   }
 
   // The Start now confirm.
-  const soon = await startNowConfirm(page, fx.soon, "row");
+  const soon = await startNowConfirm(page, fx.soon, "workspace");
   expect(soon.line, `soon (arrives false): its stored deadline: ${soon.body}`).toBe(await fmt(page, fx.soon.deadline_at, "long"));
-  const soonDated = await startNowConfirm(page, fx.soonDated, "row");
+  const soonDated = await startNowConfirm(page, fx.soonDated, "workspace");
   expect(soonDated.line, `soonDated (arrives true): the words: ${soonDated.body}`).toBe(WORDS);
   expect([...soon.sent, ...soonDated.sent], "cancelled, nothing was sent").toEqual([]);
 

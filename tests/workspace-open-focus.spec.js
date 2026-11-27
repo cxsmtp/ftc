@@ -84,7 +84,7 @@ function headerGeometry(page) {
       vh: window.innerHeight, vw: document.documentElement.clientWidth, scrollY: Math.round(window.scrollY),
       headerBottom: Math.round(document.getElementById("app-header").getBoundingClientRect().bottom),
       active: a ? (a.id || `${a.tagName.toLowerCase()}.${[...a.classList].join(".")}`) : null,
-      title: box("#ws-title"), invite: box('#ws-quick [data-action="ws-invite"]'), more: box("#ws-quick .ws-more-btn"),
+      title: box("#ws-title"), invite: box('#ws-quick .ws-invite-btn'), more: box("#ws-quick .ws-more-btn"),
       ownHeading: box(`#${ov} h2`),
     };
   }, OVERVIEW);
@@ -187,9 +187,9 @@ test.describe("workspace route focus on a short screen", () => {
     await expectHeaderInView(page, F.a, "the first event");
     // CONTROL (the place already shown is not announced again): the same
     // event's Overview rendered again leaves focus where the person put it.
-    await page.locator('#ws-quick [data-action="ws-invite"]').focus();
+    await page.locator('#ws-quick .ws-invite-btn').focus();
     await page.evaluate(({ id, n, tab }) => window.openEventWorkspace(id, n, { tab }), { id: F.a.id, n: F.a.name, tab: OVERVIEW });
-    await expect(page.locator('#ws-quick [data-action="ws-invite"]'), "showing the same Overview again moves no focus").toBeFocused();
+    await expect(page.locator('#ws-quick .ws-invite-btn'), "showing the same Overview again moves no focus").toBeFocused();
     // Another event, from the command palette.
     await openPalette(page);
     await page.locator("#cp-input").fill(F.b.name);

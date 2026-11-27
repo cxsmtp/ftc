@@ -48,6 +48,9 @@
 //   ledgerAt: a call key as above — snapshot the ledger AT that call, i.e. what a
 //     process that died there would leave committed (output `ledgerAtFire`).
 //   removeFrom / disableOn: the event those two act on (default "c-1").
+//   eventKind: the participant's event's kind (default the column's, a
+//     Competition); "booth" plants a Booth Event, whose kind forbids accounts
+//     whatever its `cxone_disabled` (0 here) holds
 //   deleteBefore / deleteCompBefore / removeMembershipBefore / disableBefore:
 //     act before the job starts.
 //
@@ -317,6 +320,7 @@ const plantEvent = (id, name, key = KEY, enrol = true, grp = group) => {
   if (enrol) db.prepare("INSERT INTO competition_users (competition_id,user_id) VALUES (?,?)").run(id, UID);
 };
 if (!S.globalOnly) plantEvent(CID, "F2 event");
+if (S.eventKind) db.prepare("UPDATE competitions SET event_kind=?, cxone_disabled=0 WHERE id=?").run(S.eventKind, CID);
 if (S.secondEvent) plantEvent(CID2, "F2 other event");
 // Events the participant is NOT in, carrying another realm's key.
 // v8.13.1 — `group` names that event's own group ("" for none, i.e. it grants

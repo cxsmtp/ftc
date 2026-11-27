@@ -26,7 +26,7 @@ const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, 
 const {
   loginViaApi, login: formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
   textContrast, rowMarking,
-  showEveryoneInWorkspace, narrowPeopleTable } = require("./ui-admin-helpers");
+  showEveryoneInWorkspace, narrowPeopleTable, openEventMenu, openEventEdit } = require("./ui-admin-helpers");
 
 const iso = ms => new Date(Date.now() + ms).toISOString();
 
@@ -390,15 +390,11 @@ async function eventRow(page, name) {
   return row;
 }
 
-/** Open the EDIT form of a named event through the row kebab. */
+/** Open the EDIT form of a named event from its workspace (⋯ → Edit settings),
+ *  Advanced open (the event's doors are its workspace's; the row menu keeps
+ *  only Delete event). */
 async function openEdit(page, name) {
-  const row = await eventRow(page, name);
-  await openKebab(page, row);
-  const edit = page.locator('#kebab-portal [data-action="comp-edit"]');
-  await expect(edit, `Edit is offered on "${name}"`).toHaveCount(1);
-  await edit.click();
-  await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 15000 });
-  await page.locator("#comp-name").waitFor({ state: "visible", timeout: 15000 });
+  await openEventEdit(page, name);
 }
 
 /** Press Save on the edit form and accept the "Update …" confirmation. */
@@ -435,15 +431,10 @@ async function participantRow(page, email) {
   // NON-members (the Invite rows), so list everyone, as the old focus did. A
   // no-op outside a workspace and once pressed.
   await showEveryoneInWorkspace(page);
-  // RBAC — People lists admin accounts only with "Show admin accounts" ticked
-  // (the box exists outside a workspace, for global admins); these fixtures
-  // include admin rows.
-  const inc = page.locator("#p-include-admins");
-  if (await inc.isVisible().catch(() => false) && !(await inc.isChecked())) {
-    const reload = page.waitForResponse((r) => r.url().includes("/api/admin/participants?") && r.url().includes("kind=all"));
-    await inc.check();
-    await reload;
-  }
+  // RBAC — People lists admin accounts only after a link to one (they live on
+  // Roles & permissions; outside a workspace, for global admins); these
+  // fixtures include admin rows.
+  await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
   await narrowPeopleTable(page, email);
   const row = page.locator(`#admin-participants-body tr:has-text("${email}")`).first();
   await expect(row, `the participants table narrowed to ${email}`).toBeVisible({ timeout: 15000 });
@@ -578,5 +569,5 @@ module.exports = {
   adminPanel, eventRow, openEdit, saveEdit, challengeRow, participantRow, closeKebab, focus,
   expectInactiveRow, toDarkTheme,
   H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin,
-  loginViaApi, formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
+  loginViaApi, formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm, openEventMenu,
 };

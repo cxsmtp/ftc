@@ -1,41 +1,49 @@
 // @ts-check
 //
-// THE TWO EVENT MENUS AGREE ON THE DOORS THEY SHARE.
+// THE TWO EVENT MENUS AGREE ON THE DOORS THEY SHARE, AND SHARE ONLY DELETE.
 //
 // An event has two menus built by two functions: the Events-list row kebab
 // (`compMenuItemsHtml`, features/competitions-admin.js) and the workspace
-// header's ⋯ menu (`wsMenuItemsHtml`, features/event-workspace.js). Their door
-// SETS differ on purpose (each workspace action has one place: Clone, Export
-// everything, Sign up at the desk and Save as template live only in the header;
-// Manage Participants only on the row). Every door they BOTH offer must answer
-// the same for the same event and the same viewer, or one surface offers a door
-// the other withholds and the route refuses one of them.
+// header's ⋯ menu (`wsMenuItemsHtml`, features/event-workspace.js). Every event
+// is run from its workspace, so the row menu keeps only what the LIST needs
+// (owner's decision, 27 Nov 2026: "remove only true duplication"): Delete event.
+// Every other door (Edit settings, History, Email delivery, Export activity,
+// Join-link settings, Start now, End now, Close late entries now) is the
+// workspace's alone, and Organisers is in neither (the Overview's Organisers
+// card is the one place). Neither menu puts bank questions into an event
+// (Stage B, owner ruling, 27 Nov 2026: the event's one door is its Questions
+// section's + Add from bank).
 //
-// Each builder re-states its predicates, so this is the lock that keeps them
-// in step: a matrix of event states and viewers, both builders run in the
-// browser on the same fake row, the shared doors compared by value. The matrix
-// is anti-vacuous: every shared door is offered in some state and withheld in
-// another, by both builders.
+// Each builder re-states its predicates, so this is the lock that keeps them in
+// step: a matrix of event states and viewers, both builders run in the browser
+// on the same fake row. It asserts (1) the row menu offers NO door beyond
+// Delete event, in any state; (2) Delete answers the same in both menus, by
+// value, with the same label; (3) neither menu offers Organisers, and the
+// workspace menu still offers the doors the row gave up (anti-vacuity: each is
+// offered somewhere, so a builder that offers nothing cannot pass).
 const { test, expect } = require("./isolated-test");
 const { adminLogin } = require("./ui-admin-helpers");
 const { BASE } = require("./helpers");
 
 test.use({ baseURL: BASE });
 
-const SHARED = [
-  "comp-edit", "comp-history", "comp-organisers", "comp-delivery", "comp-export-activity",
-  "comp-self-enroll", "comp-start-now", "comp-end-now", "comp-delete",
-  "comp-close-late-entries",
+const SHARED = ["comp-delete"];
+// The doors the row menu gave up: the workspace keeps every one.
+const WORKSPACE_ONLY = [
+  "comp-edit", "comp-history", "comp-delivery", "comp-export-activity", "comp-self-enroll",
+  "comp-start-now", "comp-end-now", "comp-close-late-entries",
 ];
 
-test("the Events-row menu and the workspace ⋯ menu offer the same shared doors in every state", async ({ page }) => {
+test("the Events-row menu offers only Delete event, as the workspace ⋯ menu does, in every state", async ({ page }) => {
   await adminLogin(page);
   await page.goto("/");
   await expect(page.locator("#admin-page")).toBeVisible({ timeout: 20000 });
   await page.waitForFunction(() => typeof window.compMenuItemsHtml === "function" && typeof window.wsMenuItemsHtml === "function");
 
   const out = await page.evaluate((shared) => {
-    const acts = (html) => [...String(html).matchAll(/data-action="([^"]+)"/g)].map(m => m[1]).filter(a => shared.includes(a)).sort();
+    const all = (html) => [...String(html).matchAll(/data-action="([^"]+)"/g)].map(m => m[1]).sort();
+    const acts = (html) => all(html).filter(a => shared.includes(a));
+    const label = (html, act) => { const m = String(html).match(new RegExp(`data-action="${act}"[^>]*>(?:<svg[\\s\\S]*?</svg>)?\\s*([^<]+)<`)); return m ? m[1].trim() : null; };
     const H = 3600e3, now = Date.now();
     const rows = [];
     const saved = { sa: window.isSuperAdmin, ea: window.isEventAdmin };
@@ -54,8 +62,10 @@ test("the Events-row menu and the workspace ⋯ menu offer the same shared doors
                       effective_end: new Date(now + (futureEnd ? H : -H)).toISOString(),
                       start_time: new Date(now - H).toISOString(), duration_minutes: 60, tags: [],
                     };
+                    const rowHtml = window.compMenuItemsHtml(c), wsHtml = window.wsMenuItemsHtml(c);
                     rows.push({ key: JSON.stringify({ status, sessions: timeslots.length, competing, late, canClose, futureEnd, sa, ea }),
-                      row: acts(window.compMenuItemsHtml(c)), ws: acts(window.wsMenuItemsHtml(c)) });
+                      row: acts(rowHtml), ws: acts(wsHtml), rowAll: all(rowHtml), wsAll: all(wsHtml),
+                      rowDelLabel: label(rowHtml, "comp-delete"), wsDelLabel: label(wsHtml, "comp-delete") });
                   }
                 }
               }
@@ -68,28 +78,27 @@ test("the Events-row menu and the workspace ⋯ menu offer the same shared doors
   }, SHARED);
 
   expect(out.length, "PRECONDITION: the matrix ran").toBeGreaterThan(100);
+  // (1) The row menu holds nothing but Delete event, in every state.
+  const extra = out.filter(r => r.rowAll.some(a => a !== "comp-delete"));
+  expect(extra.map(r => `${r.key}: ${r.rowAll.join(",")}`), "the row menu offers only Delete event").toEqual([]);
+  // (2) Delete answers the same in both menus, with the same words.
   const mismatched = out.filter(r => JSON.stringify(r.row) !== JSON.stringify(r.ws));
-  expect(mismatched.map(r => `${r.key}\n  row: ${r.row.join(",")}\n  ws:  ${r.ws.join(",")}`), "the shared doors agree").toEqual([]);
-  // Stage B (owner ruling, 27 Nov 2026) — ONE door puts bank questions into an
-  // event: its Questions section's + Add from bank. The ⋯ menu never offers one,
-  // in any state, to any viewer (the Events row's Assign Challenges belongs to
-  // another change and is out of this pair's shared set).
-  const wsAssign = await page.evaluate(() => {
-    const H = 3600e3, now = Date.now(), seen = [];
-    for (const status of ["upcoming", "live"]) for (const competing of [false, true]) {
-      const c = { id: "parity2", name: "Parity", event_kind: "tournament", status, timeslots: [], competing, tags: [],
-        effective_end: new Date(now + H).toISOString(), start_time: new Date(now - H).toISOString(), duration_minutes: 120 };
-      seen.push({ ws: /data-action="comp-assign-challenges"/.test(window.wsMenuItemsHtml(c)), row: /data-action="comp-assign-challenges"/.test(window.compMenuItemsHtml(c)) });
-    }
-    return seen;
-  });
-  expect(wsAssign.some(x => x.row), "CONTROL: the matrix reaches states where a menu could offer it").toBe(true);
-  expect(wsAssign.filter(x => x.ws), "the workspace ⋯ menu never offers Add from bank").toEqual([]);
-  // ANTI-VACUITY: every shared door is offered somewhere and withheld somewhere.
-  for (const door of SHARED) {
-    expect(out.some(r => r.row.includes(door)), `${door} is offered in some state`).toBe(true);
-    if (!["comp-history", "comp-organisers", "comp-delivery"].includes(door)) {
-      expect(out.some(r => !r.row.includes(door)), `${door} is withheld in some state`).toBe(true);
-    }
+  expect(mismatched.map(r => `${r.key}\n  row: ${r.row.join(",")}\n  ws:  ${r.ws.join(",")}`), "Delete agrees").toEqual([]);
+  const labelled = out.filter(r => r.row.includes("comp-delete"));
+  expect(labelled.length, "PRECONDITION: Delete is offered somewhere").toBeGreaterThan(0);
+  for (const r of labelled) expect(r.rowDelLabel, `${r.key}: the same label`).toBe(r.wsDelLabel);
+  expect(labelled[0].rowDelLabel).toBe("Delete event");
+  expect(out.some(r => !r.row.includes("comp-delete")), "Delete is withheld in some state (a competitor)").toBe(true);
+  // (3) Organisers is in neither menu (the Overview's card is the one place),
+  // and the workspace keeps every door the row gave up.
+  expect(out.filter(r => r.rowAll.includes("comp-organisers") || r.wsAll.includes("comp-organisers")).length, "no Organisers item").toBe(0);
+  for (const door of WORKSPACE_ONLY) {
+    expect(out.some(r => r.wsAll.includes(door)), `${door} is still offered by the workspace menu`).toBe(true);
   }
+  // (4) Stage B (owner ruling, 27 Nov 2026) — ONE door puts bank questions into
+  // an event: its Questions section's + Add from bank. Neither menu offers one,
+  // in any state, to any viewer (CONTROL: the same scan finds the workspace
+  // menu's Edit settings in those states, so the pattern can match).
+  expect(out.filter(r => r.rowAll.includes("comp-assign-challenges") || r.wsAll.includes("comp-assign-challenges")).map(r => r.key), "no menu offers Add from bank").toEqual([]);
+  expect(out.some(r => r.wsAll.includes("comp-edit")), "CONTROL: the scan reads the workspace menu's doors").toBe(true);
 });

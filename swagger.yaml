@@ -4757,9 +4757,11 @@ paths:
         Per kind — `booth`: no `deadline_at` (`deadline_not_accepted`), no sessions
         (`POST .../timeslots` → `sessions_forbidden`), `measure_presence` and
         `time_basis:"presence"` refused (`measure_presence_forbidden` /
-        `time_basis_forbidden`); `cxone_disabled` and `self_enroll_enabled` default
-        to 1; `clock_start` defaults to `first_open`. `tournament`: everything applies
-        (`clock_start` defaults to `first_open`): everything applies; `trusted_network_ips` is accepted
+        `time_basis_forbidden`); `self_enroll_enabled` defaults to 1, and Checkmarx
+        One accounts are never created (`cxone_disabled` is stored 1; sending
+        `false` is 400 `cxone_provisioning_forbidden`); `clock_start` defaults to
+        `first_open`. `tournament`: everything applies (`clock_start` defaults to
+        `first_open`); `trusted_network_ips` is accepted
         while the event has a single session. `program`: `deadline_at` is REQUIRED
         and `duration_minutes` is derived from it, no sessions,
         `reveal_answers_on_end` and `group_leaderboard_enabled` refused
@@ -5170,7 +5172,7 @@ paths:
                     stored value back is never a change. `undefined` ⇒ no change.
                 cxone_disabled:
                   type: boolean
-                  description: "opt OUT of CxOne account creation for this event. When true, no CxOne accounts are provisioned for its participants — and a provisioning job already under way for it is abandoned at its next check (before it creates the account, or before it grants the event's group); anything it had already created is not removed. `undefined` ⇒ no change."
+                  description: "opt OUT of CxOne account creation for this event. When true, no CxOne accounts are provisioned for its participants — and a provisioning job already under way for it is abandoned at its next check (before it creates the account, or before it grants the event's group); anything it had already created is not removed. `undefined` ⇒ no change. A Booth Event (policy `cxone_provisioning: forbidden`) never creates accounts: `false` is 400 `cxone_provisioning_forbidden`, and a kind change to a Booth Event stores 1 (recorded in `edited`)."
                 trusted_network_ips:
                   type: string
                   nullable: true
@@ -12141,7 +12143,7 @@ paths:
         created plus the groups bound to one of their events (an organiser with no
         events sees only their own). Each row also carries THE ANSWER to what this
         caller may do with it — `can_write`, `can_bind`, `can_delete` and, when it
-        applies, `competing` — so the Teams page and the pickers can withhold a
+        applies, `competing` — so the Groups page and the pickers can withhold a
         control with its reason instead of offering one the server refuses.
       responses:
         default: { $ref: '#/components/responses/UnexpectedError' }
@@ -14475,7 +14477,7 @@ paths:
                   cxone_tenant: { type: string }
                   cxone_base_url: { type: string }
                   cxone_group_name: { type: string }
-        "400": { description: Invalid API key }
+        "400": { description: "Invalid API key, or `cxone_provisioning_forbidden`: a Booth Event never creates Checkmarx One accounts, so it takes no key override." }
         "404": { description: Competition not found }
         "403":
           description: >-
@@ -18881,6 +18883,15 @@ components:
             address. Three states, not two: an Event qualifies only while it
             has no sessions, and a Program never does, because it can run for years
             and the bypass is deliberately time-bounded.
+        cxone_provisioning:
+          type: string
+          enum: [allowed, forbidden]
+          description: >
+            Whether this kind may create Checkmarx One accounts for its
+            participants. `forbidden` for a Booth Event: its form has no Checkmarx
+            One section, create, PUT, templates and the per-event key override
+            refuse turning accounts on (400 `cxone_provisioning_forbidden`), and the
+            provisioning gate never creates one whatever the stored column says.
         late_entry:
           type: string
           enum: [allowed, never]
@@ -19421,7 +19432,7 @@ components:
               reason: { type: string, enum: [ended_before_start, starts_before_event] }
         forced_settings:
           type: array
-          description: "Settings not carried to the new event as the source had them: forbidden by its kind (`sessions` included), never copied (`trusted_network_ips`, `cxone_group_name`), a pinned `late_entry_deadline_at` that does not fit the new end, or `cxone_disabled` when the source creates Checkmarx One accounts with its own key and the copy's accounts were turned off."
+          description: "Settings not carried to the new event as the source had them: forbidden by its kind (`sessions` included), never copied (`trusted_network_ips`, `cxone_group_name`), a pinned `late_entry_deadline_at` that does not fit the new end, `cxone_disabled` when the source creates Checkmarx One accounts with its own key and the copy's accounts were turned off, or `cxone_provisioning` when the new kind (a Booth Event) never creates them."
           items: { type: string }
         granted_organiser: { type: boolean, description: "True when an event admin was made the new event's organiser." }
         qualifying_questions: { $ref: '#/components/schemas/SafeInteger' }

@@ -20,7 +20,7 @@
 //   • the remembered section survives a reload;
 //   • the list is grouped under PEOPLE, RECORDS and SYSTEM captions (not
 //     buttons), and holds sections only: the pages the sidebar opens (People,
-//     Teams, Roles & permissions, Audit, the guides) are not repeated in it
+//     Groups, Roles & permissions, Audit, the guides) are not repeated in it
 //     (owner decision, 27 Nov 2026), and a section a role has no card for is not
 //     listed (CONTROL: a role with settings.view alone);
 //   • the platform name is under Branding, the event team report domains under

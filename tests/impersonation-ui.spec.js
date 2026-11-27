@@ -50,14 +50,9 @@ async function findParticipantRow(page, email) {
   await btn.waitFor({ state: "attached" });
   await btn.evaluate((el) => el.click());
   await page.locator("#admin-participants-tab").waitFor({ state: "visible", timeout: 5000 });
-  // RBAC — People lists admin accounts only with "Show admin accounts" ticked;
-  // the privileged-row arm below needs one.
-  const inc = page.locator("#p-include-admins");
-  if (await inc.isVisible().catch(() => false) && !(await inc.isChecked())) {
-    const reload = page.waitForResponse((r) => r.url().includes("/api/admin/participants?") && r.url().includes("kind=all"));
-    await inc.check();
-    await reload;
-  }
+  // RBAC — People lists admin accounts only after a link to one (they live on
+  // Roles & permissions); the privileged-row arm below needs one.
+  await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
   await narrowPeopleTable(page, email);
   // v8.1.0 — POLL for the filter to settle rather than taking the first visible
   // match. The search is DEBOUNCED, so `.fill()` returns while the table still

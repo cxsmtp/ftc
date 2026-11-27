@@ -18,7 +18,7 @@
 const { test, expect } = require("./isolated-test");
 const { registerPost } = require("./helpers");
 const { freshCtx, getSuperadminPass, BASE, TEST_DB_PATH, codeLogin } = require("./helpers");
-const { adminLogin } = require("./ui-admin-helpers");
+const { adminLogin, pickFormKind } = require("./ui-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -303,7 +303,7 @@ test.describe("v8.3.0 — changing an event's type before it starts", () => {
     await expect(page.locator("#comp-dur-box")).toBeVisible();
     await expect(page.locator("#comp-deadline-box")).toHaveCount(0);
 
-    await page.click('#comp-form-overlay label.kind-seg-opt:has(input[value="program"])');
+    await pickFormKind(page, "program");
     await page.locator("#modal-overlay.open").waitFor({ state: "visible", timeout: 10000 });
     // Until confirmed, the field still shows the stored type.
     await expect(page.locator('#comp-form-overlay input[name="comp-kind-seg"][value="tournament"]')).toBeChecked();
@@ -350,7 +350,7 @@ test.describe("v8.3.0 — changing an event's type before it starts", () => {
       { timeout: 20000, message: "the event must be in the admin model before its form is opened" }).toBe(true);
     await page.evaluate((id) => window.openCompetitionForm(id), comp.id);
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 10000 });
-    await page.click('#comp-form-overlay label.kind-seg-opt:has(input[value="program"])');
+    await pickFormKind(page, "program");
     await expect(page.locator("#modal-overlay.open #modal-title")).toHaveText("Change type to Program?", { timeout: 10000 });
     await page.click("#modal-confirm-btn");
     await page.locator("#comp-deadline-box").waitFor({ state: "visible", timeout: 10000 });
@@ -392,7 +392,7 @@ test.describe("v8.3.0 — changing an event's type before it starts", () => {
       await expect.poll(() => page.evaluate((x) => (window.S?.adminCompetitionsData || []).some(c => c.id === x), id), { timeout: 20000 }).toBe(true);
       await page.evaluate((x) => window.openCompetitionForm(x), id);
       await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 10000 });
-      await page.click('#comp-form-overlay label.kind-seg-opt:has(input[value="tournament"])');
+      await pickFormKind(page, "tournament");
       const modal = page.locator("#modal-overlay.open");
       await expect(modal.locator("#modal-title")).toHaveText("Change type to Competition?", { timeout: 10000 });
       const text = await modal.locator("#modal-body").innerText();
@@ -428,6 +428,8 @@ test.describe("v8.3.0 — changing an event's type before it starts", () => {
 
     const radios = page.locator('#comp-form-overlay input[name="comp-kind-seg"]');
     await expect(radios).toHaveCount(3);
+    await expect(page.locator("#comp-form-overlay .comp-kind-change"), "no Change type where the type is locked").toHaveCount(0);
+    await expect(page.locator("#comp-form-overlay .comp-kind-current .kind-chip"), "the type is still named").toHaveText("Competition");
     for (let i = 0; i < 3; i++) await expect(radios.nth(i), "a started event's type cannot be changed").toBeDisabled();
     // v7.14.2 — the affordance and its explanation move together. A control that
     // simply goes inert reads as a broken feature; this one says why.
