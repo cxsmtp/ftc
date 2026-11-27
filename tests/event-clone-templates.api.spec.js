@@ -237,9 +237,13 @@ test.describe("v8.15.0 — Event templates", () => {
     const list = (await r.json()).templates;
     const built = list.filter(t => t.is_builtin);
     expect(built.map(t => [t.name, t.event_kind]).sort()).toEqual([
-      ["Booth quick-spin", "booth"], ["Learning Program (30 days)", "program"], ["Tournament (2 h)", "tournament"],
+      ["Booth day (8 hours)", "booth"], ["Competition (several sessions)", "tournament"], ["Learning program (30 days)", "program"],
     ]);
     for (const t of built) expect(t.task_ids, `${t.name} carries no challenges`).toEqual([]);
+    // The booth's recommended setup runs a full conference day with its join link open.
+    expect(built.find(t => t.event_kind === "booth").settings).toEqual({ duration_minutes: 480, self_enroll_enabled: true });
+    expect(built.find(t => t.event_kind === "tournament").settings).toEqual({ duration_minutes: 120 });
+    expect(built.find(t => t.event_kind === "program").settings).toEqual({ duration_minutes: 43200 });
   });
 
   test("the built-ins are seeded once: a deleted one does not come back at the next boot", () => {
@@ -256,7 +260,7 @@ test.describe("v8.15.0 — Event templates", () => {
       try {
         expect(db.prepare("SELECT COUNT(*) n FROM event_templates WHERE is_builtin=1").get().n).toBe(3);
         expect(db.prepare("SELECT value FROM settings WHERE key='event_templates_seeded_at'").get(), "the marker is armed").toBeTruthy();
-        db.prepare("DELETE FROM event_templates WHERE name='Tournament (2 h)'").run();
+        db.prepare("DELETE FROM event_templates WHERE builtin_key='tournament-2h'").run();
       } finally { db.close(); }
       const second = run();
       expect(second.status, second.stderr).toBe(0);

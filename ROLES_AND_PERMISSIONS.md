@@ -111,10 +111,10 @@ non-grantable gives nothing and was removed at boot).
 | `users.manage` | Add platform users and change roles |  |  | ✓ | superadmin only |
 | `roles.manage` | Create, edit and delete custom roles |  |  | ✓ | superadmin only |
 
-### 1b. Custom roles and Users & roles
+### 1b. Custom roles and Roles & permissions
 
 A superadmin (or a custom role holding `roles.manage`) creates CUSTOM roles on
-**Users & roles** (`routes/users.js`; `roles` / `role_permissions` tables). A
+**Roles & permissions** (`routes/users.js`; `roles` / `role_permissions` tables). A
 custom role has a label, a description, a scope mode — `granted` (acts on the
 events its holders have `competition_admins` rows for, bound by every §4
 predicate exactly as an event admin) or `all` (unscoped) — fixed at creation,
@@ -183,7 +183,7 @@ and deleting, locking or recalculating a challenge or purging its feedback
 (`taskScoringEditDenied`). The scoped-handler scanner in
 `tests/functional-core-b.api.spec.js` holds every such route to a row predicate
 (lock: `tests/rbac-scoped-role-reach.api.spec.js`).
-Users & roles also marks a RIVAL (`rival_in`, as the People rows do) and
+Roles & permissions also marks a RIVAL (`rival_in`, as the People rows do) and
 withholds **Change role** on that row with the reason: the role change is a rival
 door (§9.8).
 
@@ -296,7 +296,7 @@ drift directions are safe:
 | `requireAdmin` | `lib/middleware.js` | `admin`, `superadmin`, `event_admin` — and every custom role: any role whose class (`lib/rbac.js` `roleClass`) is not `none`. An unknown role key is `none` and refused. |
 | `requireGlobalAdmin` | `lib/middleware.js` | `admin`, `superadmin` — **not** `event_admin`. One of the two independent gates on the grant/revoke pair (§8). A custom role passes only by holding, live, the route's permission, and a role scoped to its events then meets the handler's §4 predicate (§1). |
 | `requireSuperAdmin` | `lib/middleware.js` | `superadmin` only — or a custom role holding, live, the route's permission (only a superadmin can grant one); a role scoped to its events then meets the handler's §4 predicate (§1) |
-| `requirePermission(perm)` | `lib/middleware.js` | any role holding `perm`, read live (the Users & roles routes); never through an impersonation seat |
+| `requirePermission(perm)` | `lib/middleware.js` | any role holding `perm`, read live (the Roles & permissions routes); never through an impersonation seat |
 | `eventAdminGuard` | `lib/rbac.js` `permissionGuard` (exported under its historical name by `lib/event-admin.js`), mounted globally in `server.js` | see §3 |
 
 Every one of them **re-reads the user row per request**, so a demotion, a block or
@@ -609,6 +609,7 @@ route's own tier guard.
 | `PUT /api/admin/platform-look` | superadmin |  |
 | `GET /api/admin/settings/events` | **forbidden** | Platform settings apply to every event, so they are not available to event admins. |
 | `GET /api/admin/submissions` | **scoped** |  |
+| `GET /api/admin/system-health` | **forbidden** | The platform's health covers every event, so it is not available to event admins. |
 | `GET /api/admin/tags` | **scoped** |  |
 | `GET /api/admin/task-tags` | **scoped** |  |
 | `GET /api/admin/tasks` | **scoped** |  |

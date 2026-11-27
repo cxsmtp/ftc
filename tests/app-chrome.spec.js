@@ -610,7 +610,7 @@ test.describe("lane chrome — one door per setting for the org default look", (
       await adminLogin(page);
       await page.locator("#admin-page").waitFor({ state: "visible", timeout: 20000 });
       await page.locator('.admin-nav-item[data-tab-id="admin-settings-tab"]').click();
-      await openSettingsSection(page, "look");
+      await openSettingsSection(page, "branding");
       const card = page.locator("#platform-look-card");
       await expect(card.locator("#pl-look")).toHaveValue("");
       // The house default is named as it is: Ambient, following the device.

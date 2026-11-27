@@ -1699,9 +1699,9 @@
       "screen": "settings-platform",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=platform]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=general]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings platform ; waitFor #platform-name-card",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings general ; waitFor #platform-name-card",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1716,15 +1716,15 @@
           "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|row)\\b"
         }
       },
-      "note": "Settings → Platform: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings platform` step."
+      "note": "Settings → General (platform name card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step."
     },
     {
       "screen": "settings-look",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=look]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=branding]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings look ; waitFor #pl-look",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings branding ; waitFor #pl-look",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1739,15 +1739,15 @@
           "grep": "\\.pl-grid|\\.settings-help-inline|#admin-settings-tab \\.settings-(card|heading|help|actions)\\b"
         }
       },
-      "note": "Settings → Look & appearance: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings look` step. The platform look card (superadmin)."
+      "note": "Settings → Branding (platform look card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings branding` step. The platform look card (superadmin)."
     },
     {
       "screen": "settings-accounts",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=accounts]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=signin]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings accounts ; waitFor #settings-require-approval",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings signin ; waitFor #settings-require-approval",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1762,7 +1762,7 @@
           "grep": "#admin-settings-tab \\.settings-(card|card-head|help|row-check|row)\\b"
         }
       },
-      "note": "Settings → Sign-in & accounts: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings accounts` step."
+      "note": "Settings → Sign-in (new accounts card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings signin` step."
     },
     {
       "screen": "settings-email",
@@ -1794,9 +1794,9 @@
       "screen": "settings-certificates",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=certificates]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=branding]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings certificates ; waitFor #cert-config-body [data-cw-open] ; click #cert-config-body [data-cw-open] ; waitFor #cw-img",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings branding ; waitFor #cert-config-body [data-cw-open] ; click #cert-config-body [data-cw-open] ; waitFor #cw-img",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1811,15 +1811,15 @@
           "grep": "\\.cw-|\\.cert-wiz"
         }
       },
-      "note": "Settings → Certificates design: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings certificates` step. The card opens the platform certificate designer on demand (the server renders a full-size preview); the capture opens it and waits for the preview image."
+      "note": "Settings → Branding (certificate design card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings branding` step. The card opens the platform certificate designer on demand (the server renders a full-size preview); the capture opens it and waits for the preview image."
     },
     {
       "screen": "settings-cxone",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=cxone]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=general]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings cxone ; waitFor #cxone-card",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings general ; waitFor #cxone-card",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1834,15 +1834,15 @@
           "grep": "#admin-settings-tab \\.settings-(card|row|status|hint|actions)\\b|\\.cxone-wd"
         }
       },
-      "note": "Settings → Checkmarx One: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings cxone` step. The global default Checkmarx One integration (no key on a test server). The removals card beside it stays hidden while nothing is listed, which on a test server is always (see cxone-withdrawal-banner)."
+      "note": "Settings → General (Checkmarx One integration card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step. The global default Checkmarx One integration (no key on a test server). The removals card beside it stays hidden while nothing is listed, which on a test server is always (see cxone-withdrawal-banner)."
     },
     {
       "screen": "settings-data",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=data]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=general]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings data ; waitFor #retention-body .settings-facts",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings general ; waitFor #retention-body .settings-facts",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1857,15 +1857,15 @@
           "grep": "#admin-settings-tab \\.settings-(card|facts|hint)\\b"
         }
       },
-      "note": "Settings → Data & retention: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings data` step."
+      "note": "Settings → General (event history retention card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step."
     },
     {
       "screen": "settings-alerts",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=alerts]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=general]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings alerts ; waitFor #alerts-body .list-count",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings general ; waitFor #alerts-body .list-count",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1880,15 +1880,15 @@
           "grep": "#admin-settings-tab \\.settings-(card|alert-row|help)\\b"
         }
       },
-      "note": "Settings → Alerts: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings alerts` step. Shows 'No open alerts', its resting state: an open alert also opens its dialog over the page (the alerts poll), and dismissing that dialog takes the alert off this list for the admin who dismissed it."
+      "note": "Settings → General (blocked-address alerts card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step. Shows 'No open alerts', its resting state: an open alert also opens its dialog over the page (the alerts poll), and dismissing that dialog takes the alert off this list for the admin who dismissed it."
     },
     {
       "screen": "settings-breakglass",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=breakglass]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=signin]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings breakglass ; waitFor #settings-breakglass-username",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings signin ; waitFor #settings-breakglass-username",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1903,7 +1903,76 @@
           "grep": "#admin-settings-tab \\.settings-(card|card-head|help|row|hint)\\b"
         }
       },
-      "note": "Settings → Break-glass: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings breakglass` step. Listed only in the break-glass session itself, which is how the harness signs in."
+      "note": "Settings → Sign-in (break-glass account card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings signin` step. Listed only in the break-glass session itself, which is how the harness signs in."
+    },
+    {
+      "screen": "settings-updates",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=updates]",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings updates ; waitFor #settings-updates-version",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "updates-card|settings-updates-(version|actions)"
+        },
+        "behaviour": {
+          "path": "public/js/features/settings-admin.js",
+          "grep": "function loadUpdatesCard\\b|settings-updates-"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|facts|actions)\\b"
+        }
+      },
+      "note": "Settings → Updates: the running version and What's new. Reads no route."
+    },
+    {
+      "screen": "settings-health",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=health]",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings health ; waitFor #system-health-body .settings-facts",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "system-health-(card|body)"
+        },
+        "behaviour": {
+          "path": "public/js/features/settings-admin.js",
+          "grep": "function loadSystemHealthCard\\b|system-health-"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|facts|actions)\\b"
+        }
+      },
+      "note": "Settings → Backups & health: GET /api/admin/system-health, the start-up checks and the server's own figures."
+    },
+    {
+      "screen": "settings-about",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=about]",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings about ; waitFor #settings-about-version",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "about-card|settings-about-(version|started)"
+        },
+        "behaviour": {
+          "path": "public/js/features/settings-admin.js",
+          "grep": "function loadAboutCard\\b|settings-about-"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|facts|actions)\\b"
+        }
+      },
+      "note": "Settings → About: the version and the typefaces certificates use. Reads no route."
     },
     {
       "screen": "analytics-scope-picker",

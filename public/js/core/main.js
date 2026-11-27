@@ -867,9 +867,12 @@ function boot() {
   registerAction('cxone-withdrawal-override',  (e, el) => retryCxoneWithdrawal(el.dataset.id, true));
   registerAction('cxone-withdrawal-dismiss',   (e, el) => dismissCxoneWithdrawal(el.dataset.id));
   // The Settings two-pane shell: the section list, its phone picker, and the
-  // Email / Data & retention / Alerts sections' own controls.
+  // sections' own controls (Email, retention, alerts, link items, health).
   registerAction('settings-section',           (e, el) => _ns22.selectSettingsSection(el.dataset.section, { focus: true }));
-  registerChange('settings-section-pick',      (e, el) => _ns22.selectSettingsSection(el.value));
+  registerChange('settings-section-pick',      (e, el) => _ns22.settingsPick(el.value));
+  registerAction('settings-link',              (e, el) => _ns22.openSettingsLink(el.dataset.settingsLink));
+  registerAction('settings-open-cxone-audit',  () => _ns22.openCxoneAudit());
+  registerAction('settings-health-retry',      () => _ns22.loadSystemHealthCard());
   registerAction('send-test-email',            () => _ns22.sendTestEmail());
   registerAction('settings-retention-reload',  () => _ns22.loadRetentionCard());   // one caller, no poll
   registerAction('settings-alerts-reload',     () => _ns22.loadAlertsCard());      // one caller, no poll
@@ -1802,7 +1805,7 @@ function boot() {
   registerAction("open-profile-menu",      () => _ns28.openProfileMenu());
   registerAction("nav-locked",             () => _ns28.navLockedPressed());
   registerAction("open-builtin-account",   () => {
-    _ns22.selectSettingsSection('breakglass');   // shown as soon as its card loads
+    _ns22.selectSettingsSection('signin');   // Sign-in holds the break-glass card, shown as soon as it loads
     _ns28.adminTab(document.querySelector('.admin-nav-item[data-tab-id="admin-settings-tab"]'), 'admin-settings-tab');
   });
   registerAction("open-appearance",        () => _ns60.openAppearancePage());

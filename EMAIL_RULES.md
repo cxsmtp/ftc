@@ -24,7 +24,7 @@ Every account has up to two email slots:
 
 **Printable-ASCII only (v7.7.12).** `isValidEmailFormat` (`lib/util.js`) — the
 single shared validator every email write path calls (register, `PUT /api/me`,
-admin edit, import, Users & roles → Add user (`POST /api/admin/users`), and **`POST /api/admin/participants/desk-invite`** — the v8.1.0 at-desk shortcut,
+admin edit, import, Roles & permissions → Add user (`POST /api/admin/users`), and **`POST /api/admin/participants/desk-invite`** — the v8.1.0 at-desk shortcut,
 which creates a `users` row with an email and is the entry most easily forgotten
 in a list like this; both the primary and secondary slots) — **rejects any address containing a
 non-printable-ASCII character** (`/^[\x20-\x7E]+$/`). A Unicode address is
@@ -86,7 +86,7 @@ as a secondary by name (§3 *Secondary email*).
 - `POST /api/admin/import/participants` (overwrite re-validates the secondary)
 - `POST /api/admin/participants/desk-invite` — **twice**: a pre-check, and an
   in-transaction re-check, because two desks can process one queue (v8.1.7)
-- `POST /api/admin/users` (Users & roles → Add user), inside its write
+- `POST /api/admin/users` (Roles & permissions → Add user), inside its write
   transaction; an address held as a secondary is refused as `email_is_secondary`
   (§3)
 - `POST /confirm-email` re-checks **at confirm time** (see §3)
@@ -206,7 +206,7 @@ any address no account holds. So:
   enrolled and nothing is mailed. An invitation stored for it could never be
   redeemed (sign-up refuses a taken address), and enrolling the secondary's holder
   would hand the event to whoever claimed the address.
-- **Users & roles → Add user (`POST /api/admin/users`) refuses it** with 409
+- **Roles & permissions → Add user (`POST /api/admin/users`) refuses it** with 409
   `email_is_secondary` and no account id, so the client offers no "give that
   account the role": that would hand an admin role to whoever claimed the address.
 
@@ -297,7 +297,7 @@ address through:
 3. the **participant import**, which does not enforce the rule at all —
    `isFreeEmail` runs *after* the INSERT on the create branch purely to stamp
    that same audit flag, and not at all on an overwrite;
-4. **Users & roles → Add user** (`POST /api/admin/users`), which creates an
+4. **Roles & permissions → Add user** (`POST /api/admin/users`), which creates an
    account with an admin role (any role but participant) for any valid address,
    stores no secondary, and records `bypassed_free_email_rule: true` on its
    `user_added` when the address is a personal one (operator ruling, 24 Nov

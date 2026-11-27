@@ -30,7 +30,7 @@ new** and **Sign out** (the [Admin guide](admin.md#your-account-menu) describes 
 **Search** beside it (or **Ctrl+K**, **⌘K** on a Mac) finds a page, an action,
 one of your events or a heading of this guide by typing a few letters (the
 [Admin guide](admin.md#search) describes it). It lists only what you may use:
-no **Settings**, **Users & roles**, **New template** or platform exports, and
+no **Settings**, **Roles & permissions**, **New template** or platform exports, and
 only the events you organise. **New event** is there as the page where you start
 an event from a template, not as an action that opens a blank one.
 
@@ -67,7 +67,7 @@ Three things a full administrator has are simply absent for you:
 - **Raw logs**, the second view of the **Audit** page: the server's logs
   cover the whole platform (see [The Audit page](#the-audit-page)).
 - **Settings** — platform settings apply to every event on it.
-- **Users & roles** — who runs the platform and what each role may do.
+- **Roles & permissions** — who runs the platform and what each role may do.
 
 You will also not find **+ New Event**: a blank event is an administrator's to
 create. You can still start one yourself, and become its organiser: **New event**
@@ -227,7 +227,7 @@ If you compete in an event you do not organise, its roster and group doors
 answer with the platform's ordinary scope refusals first: assigning people in
 bulk, inviting them, granting attempts, and changing or deleting a group bound
 to it all tell you the event is not yours to organise — the group controls by
-naming the event, as the [Groups](#groups) section describes — rather than that
+naming the event, as the [Teams](#teams) section describes — rather than that
 you are competing in it. A challenge held by that event is different: wherever
 the event sits, changing the challenge refuses you with the competitor reason,
 naming the event, and its row on your Challenges tab carries the competing note
@@ -622,14 +622,14 @@ event you ticked skipped it, it stays waiting, its address stays in the box,
 and the summary says an administrator approves it. An organiser's or an
 administrator's account waiting for approval is never approved by your
 invitation. An administrator's account is likewise left out of any group you
-ticked — the **Invite** dialog, like the Groups tab, puts one into a group only
+ticked — the **Invite** dialog, like the Teams page, puts one into a group only
 for a superadmin — and the summary counts that separately. An address that is
 somebody's secondary email is refused and listed with the reason (that address
 never signs anyone in), so invite the person by the address they sign in with.
 
 ---
 
-## Groups
+## Teams
 
 You can create groups, and you see groups you created plus any group bound to one
 of your events.

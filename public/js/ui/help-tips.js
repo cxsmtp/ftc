@@ -43,9 +43,12 @@ export const HELP_TIPS = {
   "appearance.look": "A look changes colours and shapes, never what anything does.",
   "appearance.ambient": "The colour of the lines and accents on the Ambient look. Every colour keeps text readable.",
   "appearance.tips": "Opens every \"?\" note on every page at once, for people who prefer to read everything.",
-  "appearance.org": "The look every browser gets until its viewer picks one, outside events that set their own; Apply to everyone now also replaces earlier picks. Locked for participants, it beats their pick and an event's unlocked look, and only an event that locks its own look wins inside that event (Settings, Look & appearance).",
+  "appearance.org": "The look every browser gets until its viewer picks one, outside events that set their own; Apply to everyone now also replaces earlier picks. Locked for participants, it beats their pick and an event's unlocked look, and only an event that locks its own look wins inside that event (Settings, Branding).",
   // New event page and the one create form
-  "newevent.blank": "Starts an empty event of that type. You add challenges and invite people from its workspace after you create it.",
+  "newevent.types": {
+    default: "Recommended setup opens the form filled in the way most events of that type run; Start blank opens it empty. Either way you add challenges and invite people from the event's workspace after you create it.",
+    event_admin: "Recommended setup starts an event of that type set up the way most of them run: give it a name and a start. You add challenges and invite people from the event's workspace afterwards.",
+  },
   "templates.deleted": "Deleted templates wait here so one press of Restore brings them back. After the restore window they are removed for good.",
   "event.kind": "The type decides how the event runs: a short walk-up stand, a timed ranked contest, or a self-paced program to a deadline. The sentence under the choice describes the selected type. The form shows only the settings that type can use, and you can change the type until the event starts.",
   "event.name": "What participants and organisers see in lists, emails and on certificates. Each event needs its own name. It cannot be changed after the event ends.",
@@ -107,7 +110,7 @@ export const HELP_TIPS = {
     // An organiser's People list holds only the people of the events they run.
     event_admin: "Lists the people of your other events too, not only this event's, so you can add someone with Add to event.",
   },
-  "people.admins": "People normally lists participants and organisers. Tick this to list administrator accounts too; they are managed on Users & roles.",
+  "people.admins": "People normally lists participants and organisers. Tick this to list administrator accounts too; they are managed on Roles & permissions.",
   "people.desk": "Creates the account and shows a one-time sign-in code on your screen, for someone standing with you who cannot reach their email.",
   "people.columns": "Choose which columns the table shows. The choice is kept in this browser only.",
   "people.status": "Unconfirmed: has not confirmed their email. Pending: waiting for approval. Denied: refused. Confirmed: can take part. Blocked: stopped by an organiser. Locked: too many wrong codes, for a short while.",
@@ -119,7 +122,7 @@ export const HELP_TIPS = {
     default: "Export downloads the challenges listed as a JSON file. A superadmin can import such a file to add or update challenges.",
     superadmin: "Export downloads the challenges listed as a JSON file; Import adds or updates challenges from one, and shows conflicts before anything changes.",
   },
-  "groups.list": "A group is a reusable list of people. Bind it to an event and its members join that event, and leave it when they leave the group.",
+  "groups.list": "A team (group) is a reusable list of people. Bind it to an event and its members join that event, and leave it when they leave the group.",
   "activity.list": "Every answer and hint, newest first. Δ pts is what each one changed the score by: a wrong answer costs points, and a hint costs a share of the challenge's points.",
   "rankings.board": "Ranked by score, with ties broken by time to solve. Benchmark accounts are listed apart and not ranked. Export CSV saves every column, whatever is hidden on screen.",
   "analytics.scope": {

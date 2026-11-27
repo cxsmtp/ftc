@@ -33,7 +33,10 @@ const dbGet = (sql, ...a) => { const db = new Database(TEST_DB_PATH, { readonly:
 async function openTemplates(page) {
   await page.locator('button.admin-nav-item[data-tab-id="admin-templates-tab"]').click();
   await expect(page.locator("#admin-templates-tab")).toBeVisible({ timeout: 15000 });
-  await expect(page.locator("#tpl-list .tpl-row").first()).toBeVisible({ timeout: 15000 });
+  // Settled: the type cards are drawn and the list has answered (a row, or the
+  // empty sentence: the built-ins are on the cards, never listed twice).
+  await expect(page.locator("#tpl-kind-cards .tpl-kind").first()).toBeVisible({ timeout: 15000 });
+  await expect(page.locator("#tpl-list .tpl-row, #tpl-list-empty").first()).toBeVisible({ timeout: 15000 });
 }
 // Writes through the BROWSER's own session (a second superadmin sign-in would end it).
 async function browserApi(page, method, url, data) {
@@ -113,9 +116,9 @@ test.describe("Template editor — a setting left out takes the kind's seed", ()
     // its shipped definition in the finally (a failed assertion must not leave
     // it edited for the rest of the file).
     try {
-      const row = page.locator("#tpl-list .tpl-row").filter({ has: page.locator("button.card-open", { hasText: builtin.name }) });
-      await row.locator(".tpl-row-more").click();
-      await page.locator('#kebab-portal [data-action="tpl-edit"]').click();
+      // A built-in is its type's recommended setup: edited from that card's menu.
+      await page.locator('#tpl-kind-cards .tpl-kind[data-kind="booth"] .tpl-kind-more').click();
+      await page.locator(`#kebab-portal [data-action="tpl-edit"][data-tpl-id="${builtin.id}"]`).click();
       const ed = page.locator("#tpl-editor");
       await expect(ed.locator("#tpl-ed-name")).toHaveValue(builtin.name, { timeout: 10000 });
       await expect(ed.locator("#tpl-ed-cxone_disabled"), "the kind's seed is shown").toBeChecked();
@@ -233,30 +236,43 @@ test.describe("Template editor — a save whose answer is lost", () => {
 });
 
 test.describe("The New event page", () => {
-  test("a blank starter is a card whose control is its title button, never a button holding a list", async ({ page }) => {
+  // A type card holds two starts, so the card itself is no button and no
+  // click target (which start would a press on its picture mean?): its
+  // controls are the two buttons in its foot, each named from its own words.
+  test("a type card is no button: its controls are Recommended setup and Start blank, never a button holding a list", async ({ page }) => {
     await adminLogin(page);
     await openTemplates(page);
     const cards = page.locator("#tpl-kind-cards .tpl-kind");
-    await expect(cards, "PRECONDITION: three starters").toHaveCount(3);
+    await expect(cards, "PRECONDITION: three type cards").toHaveCount(3);
     for (let i = 0; i < 3; i++) {
       const card = cards.nth(i);
       expect(await card.evaluate(el => el.tagName), "the card is not a button").toBe("DIV");
-      const btn = card.locator("button.card-open");
-      await expect(btn).toHaveCount(1);
-      const label = (await btn.textContent()).trim();
-      expect(await btn.getAttribute("aria-label"), "the name opens with the words the button shows").toMatch(new RegExp(`^${label}\\b`));
+      expect(await card.getAttribute("data-action"), "nor a click target").toBeNull();
+      const btns = card.locator(".tpl-kind-actions button");
+      await expect(btns).toHaveText(["Recommended setup", "Start blank"]);
+      for (let j = 0; j < 2; j++) {
+        const label = (await btns.nth(j).textContent()).trim();
+        expect(await btns.nth(j).getAttribute("aria-label"), "the name opens with the words the button shows").toMatch(new RegExp(`^${label}\\b`));
+      }
       await expect(card.locator(".tpl-kind-bullets li"), "CONTROL: the three lines are still on the card").toHaveCount(3);
     }
     await expect(page.locator("#tpl-kind-cards button ul"), "no list inside a button").toHaveCount(0);
-    // The keyboard path: the title button starts it.
-    await page.locator('#tpl-kind-cards .tpl-kind[data-kind="program"] button.card-open').focus();
+    // A press on the card's picture starts nothing.
+    await page.locator('#tpl-kind-cards .tpl-kind[data-kind="booth"] .tpl-kind-art').click();
+    await page.waitForTimeout(300);
+    expect(await page.locator("#comp-form-overlay").count(), "the picture is no door").toBe(0);
+    // The keyboard path: Start blank opens the form on its type.
+    await page.locator('#tpl-kind-cards .tpl-kind[data-kind="program"] button[data-action="new-event-start"]').focus();
     await page.keyboard.press("Enter");
     await expect(page.locator("#comp-form-overlay")).toBeVisible({ timeout: 10000 });
     await expect(page.locator('#comp-form-overlay input[name="comp-kind-seg"][value="program"]')).toBeChecked();
+    await expect(page.locator("#comp-form-from"), "a blank start names no template").toHaveCount(0);
     await page.locator('#comp-form-overlay [data-action="overlay-close"]').click();
-    // The pointer path: anywhere on the card still starts it.
-    await page.locator('#tpl-kind-cards .tpl-kind[data-kind="booth"] .tpl-kind-art').click();
+    await expect(page.locator("#comp-form-overlay")).toHaveCount(0, { timeout: 10000 });
+    // ...and Recommended setup opens it seeded from the type's built-in.
+    await page.locator('#tpl-kind-cards .tpl-kind[data-kind="booth"] button[data-action="tpl-pick"]').click();
     await expect(page.locator('#comp-form-overlay input[name="comp-kind-seg"][value="booth"]')).toBeChecked({ timeout: 10000 });
+    await expect(page.locator("#comp-form-from")).toContainText("Booth day (8 hours)");
   });
 
   test("a template row, live or recently deleted, is never captioned with its stored kind value", async ({ page }) => {

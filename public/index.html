@@ -528,7 +528,7 @@
              in its own WORKSPACE (header, KPIs, its own Participants, Challenges,
              Rankings, Certificates and Settings), opened from the Events list.
              The other items are the cross-event pages a global admin keeps
-             (People, the Challenge library, Groups, Logs, Analytics, Settings).
+             (People, the Challenge library, Teams, Logs, Analytics, Settings).
              Every item is still found by `data-tab-id`, never by label.
              RBAC — three groups (Manage, Participants, Admin). ui/nav.js hides
              each item the role's permissions do not open (ADMIN_NAV_PERMISSIONS)
@@ -547,11 +547,11 @@
         <p class="admin-nav-section" aria-hidden="true" data-nav-group="participants">Participants</p>
         <ul class="admin-nav-list" role="list" data-nav-group="participants">
           <li><button id="participants-tab-btn" class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-participants-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">People</span><span id="pending-badge"></span></button></li>
-          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-groups-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Groups</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-groups-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Teams</span></button></li>
         </ul>
         <p class="admin-nav-section" aria-hidden="true" data-nav-group="admin">Admin</p>
         <ul class="admin-nav-list" role="list" data-nav-group="admin">
-          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-users-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Users &amp; roles</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-users-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Roles &amp; permissions</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-settings-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Settings</span></button></li>
         </ul>
       </nav>
@@ -680,23 +680,25 @@
       </div>
 
       <!-- NEW EVENT: the one place every event starts (features/templates-admin.js).
-           A blank starter per kind, or a template; both open the one create form
-           (the kind is a field there). Templates are managed here too, with a
-           Recently deleted list that restores one in a click. An event admin
-           gets templates only, through the quick-start panel (a sheet on phones). -->
+           One card per event type, each offering its recommended setup (the
+           kind's built-in template) and Start blank; both open the one create
+           form (the kind is a field there). Below, the templates organisers
+           made, managed here too, with a Recently deleted list that restores one
+           in a click. An event admin gets the recommended setups and templates
+           only, through the quick-start panel (a sheet on phones). -->
       <div id="admin-templates-tab" class="admin-tab-pane" style="display:none">
         <div class="ev-home-head">
           <div class="ev-home-titles">
             <p class="eyebrow ink">Create</p>
             <h2 class="admin-pane-title ev-home-title">New event</h2>
-            <p class="ev-home-lede">Start blank or from a template. Either way you get one form with everything in it, and you can change any of it later.</p>
+            <p class="ev-home-lede">Pick the type of event. Start from its recommended setup or blank; either way you get one form with everything in it, and you can change any of it later.</p>
           </div>
         </div>
         <div class="tpl-layout">
           <div class="tpl-main">
-            <div class="tpl-list-head" id="tpl-blank-head"><h3 class="tpl-list-title">Start blank</h3><span data-help="newevent.blank" data-help-label="Start blank"></span></div>
-            <div id="tpl-kind-cards" class="tpl-kinds" role="group" aria-label="Start a blank event"></div>
-            <div class="tpl-list-head"><h3 class="tpl-list-title">Start from a template</h3><span data-help="templates.list" data-help-label="Templates"></span><span id="tpl-list-count" class="list-count" role="status" aria-live="polite"></span><span class="p-toolbar-gap" aria-hidden="true"></span><button type="button" class="btn sm secondary" id="tpl-new-btn" data-action="tpl-new" hidden>+ New template</button></div>
+            <div class="tpl-list-head" id="tpl-blank-head"><h3 class="tpl-list-title">Choose a type</h3><span data-help="newevent.types" data-help-label="Event types"></span></div>
+            <div id="tpl-kind-cards" class="tpl-kinds" role="group" aria-label="Event types"></div>
+            <div class="tpl-list-head"><h3 class="tpl-list-title">Your templates</h3><span data-help="templates.list" data-help-label="Templates"></span><span id="tpl-list-count" class="list-count" role="status" aria-live="polite"></span><span class="p-toolbar-gap" aria-hidden="true"></span><button type="button" class="btn sm secondary" id="tpl-new-btn" data-action="tpl-new" hidden>+ New template</button></div>
             <div id="tpl-list" class="tpl-list"></div>
             <section id="tpl-deleted" class="tpl-deleted" aria-label="Recently deleted templates" hidden></section>
           </div>
@@ -1087,12 +1089,12 @@
       <!-- Groups tab -->
       <div id="admin-groups-tab" style="display:none">
         <div class="admin-toolbar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-          <h2 style="margin:0">Participant Groups</h2>
-          <span data-help="groups.list" data-help-label="Groups"></span>
+          <h2 style="margin:0">Teams</h2>
+          <span data-help="groups.list" data-help-label="Teams"></span>
           <span style="flex:1"></span>
           <button class="btn sm" data-action="group-create">New Group</button>
         </div>
-        <p class="settings-help" style="margin:0 0 12px">Groups organise participants for bulk operations. Binding a group to an event keeps that event's membership in sync as the group changes.</p>
+        <p class="settings-help" style="margin:0 0 12px">Teams (groups) organise participants for bulk operations. Binding a group to an event keeps that event's membership in sync as the group changes.</p>
         <!--
           v7.17.2 — the search box, the table shell and the pagination bar are
           STATIC, and only #groups-tbody is re-rendered. That is what lets the
@@ -1271,7 +1273,11 @@
              on the left (a <select> on phones), the chosen section on the right.
              The list is BUILT FROM THE MARKUP: every .settings-section below is
              listed, in order, while it holds a card that is not display:none, so
-             a card added to a section renders with no list edit. A
+             a card added to a section renders with no list edit. Each names its
+             group (data-settings-group: people, records, system), captioned in
+             the list. A .settings-link is a list item that opens another page
+             (data-settings-tab, only while that page is offered to the role) or
+             runs an action (data-settings-action); it holds no card. A
              .settings-card dropped straight into .settings-bento (outside any
              section) is adopted into the section its data-settings-section
              names, else Platform. The chosen section is remembered per browser
@@ -1281,7 +1287,7 @@
           <nav class="settings-nav" aria-label="Settings sections">
             <label class="settings-pick-label" for="settings-section-pick">Section</label>
             <select id="settings-section-pick" class="settings-section-pick" data-change-action="settings-section-pick" autocomplete="off"></select>
-            <ul id="settings-section-list" class="settings-section-list"></ul>
+            <div id="settings-section-list" class="settings-section-list"></div>
           </nav>
           <div class="settings-bento">
             <!-- v8.3.33 — the pane's own failure state. Every other admin pane
@@ -1290,7 +1296,56 @@
                  sits above every section, so it shows whichever is chosen. -->
             <div id="settings-load-failure" class="card settings-card" style="display:none"></div>
 
-            <div class="settings-section" data-settings-section="platform" data-settings-label="Platform">
+            <div class="settings-link" data-settings-link="people" data-settings-group="people" data-settings-label="People" data-settings-tab="admin-participants-tab" hidden></div>
+            <div class="settings-link" data-settings-link="teams" data-settings-group="people" data-settings-label="Teams" data-settings-tab="admin-groups-tab" hidden></div>
+            <div class="settings-link" data-settings-link="roles" data-settings-group="people" data-settings-label="Roles &amp; permissions" data-settings-tab="admin-users-tab" hidden></div>
+            <div class="settings-section" data-settings-section="signin" data-settings-group="people" data-settings-label="Sign-in">
+              <div class="card settings-card" id="account-approval-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">New accounts</h3><span data-help="settings.approval" data-help-label="New accounts"></span></div>
+                <p class="settings-help">A new account is made once its owner confirms the address with an emailed code. Hold new accounts for approval, or let them play straight away.</p>
+                <div class="settings-row settings-row-check">
+                  <label class="checkbox-row">
+                    <input type="checkbox" id="settings-require-approval" data-change-action="save-require-approval"/>
+                    <span>Require admin approval for new accounts</span>
+                  </label>
+                </div>
+              </div>
+              <!-- The break-glass account's own card: rendered only in that
+                   session (the server refuses every other one, user-backed
+                   superadmins too). -->
+              <div class="card settings-card" id="breakglass-account-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Break-glass account</h3><span data-help="settings.breakglass" data-help-label="Break-glass account"></span></div>
+                <p class="settings-help">The one account that signs in with a password instead of an emailed code.</p>
+                <div class="settings-row">
+                  <label for="settings-breakglass-username">Username</label>
+                  <input type="text" id="settings-breakglass-username" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="settings-breakglass-hint"/>
+                  <button class="btn" data-action="save-breakglass-username">Save username</button>
+                  <p class="settings-hint" id="settings-breakglass-hint">3 to 64 characters, no spaces and no @. It may not be any account's email address.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-link" data-settings-link="audit" data-settings-group="records" data-settings-label="Audit log" data-settings-tab="admin-audit-tab" hidden></div>
+            <div class="settings-section" data-settings-section="cxone-audit" data-settings-group="records" data-settings-label="CxOne API audit">
+              <!-- The Checkmarx One record: the Audit page narrowed to its
+                   activity (audit.view, the Audit page's own read). -->
+              <div class="card settings-card" id="cxone-audit-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Checkmarx One activity</h3><span data-help="settings.cxone-audit" data-help-label="Checkmarx One activity"></span></div>
+                <p class="settings-help">Every Checkmarx One account the platform set up, linked or removed, and every change to its settings, is recorded in the Audit log.</p>
+                <div class="settings-actions"><button class="btn secondary" data-action="settings-open-cxone-audit">Open Checkmarx One activity in the Audit log</button></div>
+              </div>
+              <!-- v8.12.7 — Checkmarx One account removals. Superadmin-only, and
+                   hidden too while Checkmarx One is not in use and nothing is
+                   listed. The heading is focusable (-1) so the header banner's
+                   "Review removals" can land on it. -->
+              <div class="card settings-card cxone-wd-card" id="cxone-withdrawals-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading" id="cxone-withdrawals-heading" tabindex="-1">Checkmarx One account removals</h3><span data-help="settings.cxone-removals" data-help-label="Account removals"></span></div>
+                <p class="settings-help">Accounts the platform created for deleted participants that it could not remove, or will not remove without your say-so.</p>
+                <div id="cxone-withdrawals-body"></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="general" data-settings-group="system" data-settings-label="General">
               <div class="card settings-card" id="platform-name-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">Platform name</h3><span data-help="settings.platform-name" data-help-label="Platform name"></span></div>
                 <!-- v7.26.0 — the card says what the name reaches; maxlength
@@ -1302,28 +1357,50 @@
                   <button class="btn" data-action="save-platform-name">Save Name</button>
                 </div>
               </div>
-            </div>
-
-            <div class="settings-section" data-settings-section="look" data-settings-label="Look &amp; appearance">
-              <!-- THE PLATFORM LOOK (superadmin): filled by features/look-admin.js
-                   renderPlatformLookCard from GET /api/admin/settings. -->
-              <div class="card settings-card" id="platform-look-card" style="display:none"></div>
-            </div>
-
-            <div class="settings-section" data-settings-section="accounts" data-settings-label="Sign-in &amp; accounts">
-              <div class="card settings-card" id="account-approval-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">New accounts</h3><span data-help="settings.approval" data-help-label="New accounts"></span></div>
-                <p class="settings-help">A new account is made once its owner confirms the address with an emailed code. Hold new accounts for approval, or let them play straight away.</p>
-                <div class="settings-row settings-row-check">
-                  <label class="checkbox-row">
-                    <input type="checkbox" id="settings-require-approval" data-change-action="save-require-approval"/>
-                    <span>Require admin approval for new accounts</span>
-                  </label>
+              <div class="card settings-card" id="cxone-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Global Default CheckmarxOne Integration</h3><span data-help="settings.cxone" data-help-label="Checkmarx One integration"></span></div>
+                <p class="settings-help">Used by every event without its own Checkmarx One settings.</p>
+                <div id="cxone-status" class="settings-status"></div>
+                <div class="settings-row">
+                  <label for="cxone-api-key">API Key</label>
+                  <input type="password" id="cxone-api-key" placeholder="Paste API key" autocomplete="off" data-block-clipboard="1" aria-describedby="cxone-api-key-hint"/>
+                  <span data-help="settings.cxone-key" data-help-label="API key"></span>
+                  <p class="settings-hint" id="cxone-api-key-hint">Tenant and URLs are derived automatically from the key.</p>
                 </div>
+                <div class="settings-row">
+                  <label for="cxone-group-name">Read-Only Group Name</label>
+                  <input type="text" id="cxone-group-name" placeholder="e.g. VisibleToAll"/>
+                  <span data-help="settings.cxone-group" data-help-label="Read-only group"></span>
+                </div>
+                <div class="settings-actions">
+                  <button class="btn" data-action="save-cxone-settings">Save Integration</button>
+                  <button class="btn danger sm" id="cxone-remove-btn" style="display:none" data-action="remove-cxone-settings">Remove</button>
+                </div>
+              </div>
+              <div class="card settings-card" id="retention-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Event history retention</h3><span data-help="settings.retention" data-help-label="Event history retention"></span></div>
+                <div id="retention-body"></div>
+              </div>
+              <div class="card settings-card" id="alerts-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Blocked-address alerts</h3><span data-help="settings.alerts" data-help-label="Blocked-address alerts"></span></div>
+                <div id="alerts-body"></div>
               </div>
             </div>
 
-            <div class="settings-section" data-settings-section="email" data-settings-label="Email">
+            <div class="settings-section" data-settings-section="branding" data-settings-group="system" data-settings-label="Branding">
+              <!-- THE PLATFORM LOOK: filled by features/look-admin.js
+                   renderPlatformLookCard from GET /api/admin/settings. -->
+              <div class="card settings-card" id="platform-look-card" style="display:none"></div>
+              <!-- The platform certificate design. Events inherit it and may
+                   override it from their workspace's Certificates tab. -->
+              <div class="card settings-card cert-wiz-card" id="cert-config-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Certificate design</h3><span data-help="settings.certificates" data-help-label="Certificate design"></span></div>
+                <p class="settings-help">The wording, colours and parts of every certificate the platform issues.</p>
+                <div id="cert-config-body"></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="email" data-settings-group="system" data-settings-label="Email (SMTP)">
               <div class="card settings-card" id="email-test-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">Outbound email</h3><span data-help="settings.test-email" data-help-label="Outbound email"></span></div>
                 <p class="settings-help" id="email-relay-status" role="status">Checking the mail relay…</p>
@@ -1351,75 +1428,33 @@
               </div>
             </div>
 
-            <div class="settings-section" data-settings-section="certificates" data-settings-label="Certificates design">
-              <!-- The platform certificate design. Events inherit it and may
-                   override it from their workspace's Certificates tab. -->
-              <div class="card settings-card cert-wiz-card" id="cert-config-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Certificate design</h3><span data-help="settings.certificates" data-help-label="Certificate design"></span></div>
-                <p class="settings-help">The wording, colours and parts of every certificate the platform issues.</p>
-                <div id="cert-config-body"></div>
+            <div class="settings-section" data-settings-section="updates" data-settings-group="system" data-settings-label="Updates">
+              <!-- Updates (features/settings-admin.js loadUpdatesCard): what is
+                   running and where What's new is. Reads no route. -->
+              <div class="card settings-card" id="updates-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Updates</h3><span data-help="settings.updates" data-help-label="Updates"></span></div>
+                <p class="settings-help">Running version <strong id="settings-updates-version">—</strong>.</p>
+                <p class="settings-help">Updates are not installed from this page. A server set up with the Podman installer checks daily for a new signed release image and restarts on it; any other deployment updates however its operator set it up (see the operator guide). This page cannot check what will be installed next.</p>
+                <div class="settings-actions" id="settings-updates-actions" hidden><button class="btn secondary" data-action="release-notes-open">What's new</button></div>
               </div>
             </div>
 
-            <div class="settings-section" data-settings-section="cxone" data-settings-label="Checkmarx One">
-              <div class="card settings-card" id="cxone-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Global Default CheckmarxOne Integration</h3><span data-help="settings.cxone" data-help-label="Checkmarx One integration"></span></div>
-                <p class="settings-help">Used by every event without its own Checkmarx One settings.</p>
-                <div id="cxone-status" class="settings-status"></div>
-                <div class="settings-row">
-                  <label for="cxone-api-key">API Key</label>
-                  <input type="password" id="cxone-api-key" placeholder="Paste API key" autocomplete="off" data-block-clipboard="1" aria-describedby="cxone-api-key-hint"/>
-                  <span data-help="settings.cxone-key" data-help-label="API key"></span>
-                  <p class="settings-hint" id="cxone-api-key-hint">Tenant and URLs are derived automatically from the key.</p>
-                </div>
-                <div class="settings-row">
-                  <label for="cxone-group-name">Read-Only Group Name</label>
-                  <input type="text" id="cxone-group-name" placeholder="e.g. VisibleToAll"/>
-                  <span data-help="settings.cxone-group" data-help-label="Read-only group"></span>
-                </div>
-                <div class="settings-actions">
-                  <button class="btn" data-action="save-cxone-settings">Save Integration</button>
-                  <button class="btn danger sm" id="cxone-remove-btn" style="display:none" data-action="remove-cxone-settings">Remove</button>
-                </div>
-              </div>
-              <!-- v8.12.7 — Checkmarx One account removals. Superadmin-only, and
-                   hidden too while Checkmarx One is not in use and nothing is
-                   listed. The heading is focusable (-1) so the header banner's
-                   "Review removals" can land on it. -->
-              <div class="card settings-card cxone-wd-card" id="cxone-withdrawals-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading" id="cxone-withdrawals-heading" tabindex="-1">Checkmarx One account removals</h3><span data-help="settings.cxone-removals" data-help-label="Account removals"></span></div>
-                <p class="settings-help">Accounts the platform created for deleted participants that it could not remove, or will not remove without your say-so.</p>
-                <div id="cxone-withdrawals-body"></div>
+            <div class="settings-section" data-settings-section="health" data-settings-group="system" data-settings-label="Backups &amp; health">
+              <!-- Backups & health (loadSystemHealthCard, GET /api/admin/system-health). -->
+              <div class="card settings-card" id="system-health-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Platform health</h3><span data-help="settings.health" data-help-label="Platform health"></span></div>
+                <div id="system-health-body" role="status"></div>
+                <p class="settings-help">A server set up with the Podman installer tries to back up its database before each start, into its backup folder (a failed backup does not stop the start). Any other deployment has whatever backups its operator set up (see the operator guide). This page cannot list backups; the server's operator restores them.</p>
               </div>
             </div>
 
-            <div class="settings-section" data-settings-section="data" data-settings-label="Data &amp; retention">
-              <div class="card settings-card" id="retention-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Event history retention</h3><span data-help="settings.retention" data-help-label="Event history retention"></span></div>
-                <div id="retention-body"></div>
-              </div>
-            </div>
-
-            <div class="settings-section" data-settings-section="alerts" data-settings-label="Alerts">
-              <div class="card settings-card" id="alerts-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Blocked-address alerts</h3><span data-help="settings.alerts" data-help-label="Blocked-address alerts"></span></div>
-                <div id="alerts-body"></div>
-              </div>
-            </div>
-
-            <div class="settings-section" data-settings-section="breakglass" data-settings-label="Break-glass">
-              <!-- The break-glass account's own card: rendered only in that
-                   session (the server refuses every other one, user-backed
-                   superadmins too), so the section is listed only then. -->
-              <div class="card settings-card" id="breakglass-account-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Break-glass account</h3><span data-help="settings.breakglass" data-help-label="Break-glass account"></span></div>
-                <p class="settings-help">The one account that signs in with a password instead of an emailed code.</p>
-                <div class="settings-row">
-                  <label for="settings-breakglass-username">Username</label>
-                  <input type="text" id="settings-breakglass-username" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="settings-breakglass-hint"/>
-                  <button class="btn" data-action="save-breakglass-username">Save username</button>
-                  <p class="settings-hint" id="settings-breakglass-hint">3 to 64 characters, no spaces and no @. It may not be any account's email address.</p>
-                </div>
+            <div class="settings-link" data-settings-link="help" data-settings-group="system" data-settings-label="Get help" data-settings-action="help-open" hidden></div>
+            <div class="settings-section" data-settings-section="about" data-settings-group="system" data-settings-label="About">
+              <!-- About (loadAboutCard): reads no route. -->
+              <div class="card settings-card" id="about-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">About</h3><span data-help="settings.about" data-help-label="About"></span></div>
+                <p class="settings-help">Version <strong id="settings-about-version">—</strong><span id="settings-about-started" hidden></span></p>
+                <p class="settings-help">Certificates are set in the open-source Inter and Noto typefaces, under the SIL Open Font License 1.1.</p>
               </div>
             </div>
           </div>
@@ -1431,7 +1466,7 @@
            that run the platform and the roles they hold. The body is rendered. -->
       <div id="admin-users-tab" class="admin-tab-pane" style="display:none">
         <div class="ua-head">
-          <div class="help-label-row"><h2 class="admin-pane-title" tabindex="-1">Users &amp; roles</h2><span data-help="users.pane" data-help-label="Users and roles"></span></div>
+          <div class="help-label-row"><h2 class="admin-pane-title" tabindex="-1">Roles &amp; permissions</h2><span data-help="users.pane" data-help-label="Roles and permissions"></span></div>
           <p class="t-small">The people who run events and the platform, and what each role may do. Participants are under People.</p>
         </div>
         <div id="ua-body"></div>

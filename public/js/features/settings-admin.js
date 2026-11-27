@@ -15,7 +15,10 @@ import { loadPlatformCertificateCard } from "./certificate-wizard.js"; // the pl
 import { refreshAdminBanners, _showIpBanAlert } from "./admin-alerts.js"; // v8.12.7 — repaint the removals banner after an action; the Alerts section re-opens an open alert
 import { registerHelpTips } from "../ui/help-tips.js"; // the Settings rows' "?" texts
 import { renderPlatformLookCard } from "./look-admin.js"; // the platform look card (superadmin)
-import { adminCan, settingsCardOffered } from "../ui/nav.js"; // RBAC — the one permission predicate; each Settings card's own (read inside functions only)
+import { adminCan, settingsCardOffered, adminPageOffered } from "../ui/nav.js"; // RBAC — the one permission predicate; each Settings card's own; the link items' pages (read inside functions only)
+import { openHelpDrawer } from "./help-drawer.js"; // Settings → Get help
+import { releaseNotesVisible } from "./release-notes.js"; // Settings → Updates: What's new, where it is offered
+import { openAuditNarrowed } from "./audit-admin.js"; // Settings → CxOne API audit
 
 export function applyPlatformName(name){
   S.currentPlatformName=name;
@@ -780,7 +783,7 @@ export async function loadAdminSettings(){
 // card loaders' own show/hide decides what is offered and a card another module
 // adds to a section needs no list edit. A card dropped straight into
 // `.settings-bento` is adopted into the section its `data-settings-section`
-// names, else Platform. The CHOSEN section is a preference (remembered per
+// names, else General. The CHOSEN section is a preference (remembered per
 // browser): while it has nothing to show the first listed one is shown, and it
 // comes back the moment its card appears (the break-glass card loads late).
 
@@ -789,7 +792,7 @@ export async function loadAdminSettings(){
 // each loaded by its own loader. Every one is gated by SETTINGS_CARD_PERMISSIONS
 // (ui/nav.js). Hoisted: function bodies read them at call time.
 const _SETTINGS_READ_CARDS=['platform-name-card','account-approval-card','cxone-card'];
-const _OWN_ROUTE_CARDS=['email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card'];
+const _OWN_ROUTE_CARDS=['email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card','system-health-card','cxone-audit-card','updates-card','about-card'];
 function _loadOwnRouteCards(){
   for(const id of _OWN_ROUTE_CARDS){
     const el=document.getElementById(id);
@@ -800,10 +803,75 @@ function _loadOwnRouteCards(){
   if(settingsCardOffered('unsubscribe-card')){ document.getElementById('unsubscribe-card').style.display=''; loadUnsubscribeList(); }
   if(settingsCardOffered('retention-card')){ document.getElementById('retention-card').style.display=''; loadRetentionCard(); }
   if(settingsCardOffered('alerts-card')){ document.getElementById('alerts-card').style.display=''; loadAlertsCard(); }
+  if(settingsCardOffered('system-health-card')){ document.getElementById('system-health-card').style.display=''; loadSystemHealthCard(); }
+  if(settingsCardOffered('cxone-audit-card'))document.getElementById('cxone-audit-card').style.display='';
+  loadUpdatesCard();        // read no route: shown to everyone who opens Settings
+  loadAboutCard();
   loadCxoneWithdrawals();   // shows itself only while Checkmarx One is in use or a removal is listed
 }
+
+// ─── Updates, Backups & health, About ────────────────────────────────────────
+function _runningVersion(){
+  const t=(document.getElementById('platform-version')?.textContent||'').trim();
+  return t.replace(/^v\.?\s*/i,'')||'unknown';
+}
+/** Updates: the running version, and What's new where it is offered. */
+export function loadUpdatesCard(){
+  const card=document.getElementById('updates-card');
+  if(!card)return;
+  const v=document.getElementById('settings-updates-version');
+  if(v)v.textContent=_runningVersion();
+  const acts=document.getElementById('settings-updates-actions');
+  if(acts)acts.hidden=!releaseNotesVisible();
+  card.style.display='';
+}
+/** About: the version, and for a superadmin when this server process started. */
+export function loadAboutCard(){
+  const card=document.getElementById('about-card');
+  if(!card)return;
+  const v=document.getElementById('settings-about-version');
+  if(v)v.textContent=_runningVersion();
+  const st=document.getElementById('settings-about-started');
+  if(st){
+    const at=S.isSuperAdmin?_sessionMon.serverStartedAt:null;
+    st.hidden=!at;
+    st.textContent=at?` · server started ${fmtDt(at,'long')}`:'';
+  }
+  card.style.display='';
+}
+let _healthSeq=0;
+// The mail relay is null until its first probe (never under test); the boot's
+// database checks run before the server listens, so they are always booleans.
+const _yesNo=(ok,yes,no)=>ok===true?yes:ok===false?no:'Not checked yet';
+/** Backups & health: GET /api/admin/system-health (settings.view). */
+export async function loadSystemHealthCard(){
+  const body=document.getElementById('system-health-body');
+  if(!body)return;
+  const seq=++_healthSeq;
+  const d=await fetchJsonObject('/api/admin/system-health');
+  if(seq!==_healthSeq)return;
+  if(!d){ renderLoadFailure('system-health-body',{noun:'platform health',retryAction:'settings-health-retry'}); return; }
+  const gib=(n)=>typeof n==='number'?`${n} GiB free`:'Could not be read';
+  const up=Number(d.uptime_seconds)||0;
+  const upText=up>=86400?`${Math.floor(up/86400)} d ${Math.floor(up%86400/3600)} h`:up>=3600?`${Math.floor(up/3600)} h ${Math.floor(up%3600/60)} min`:`${Math.floor(up/60)} min`;
+  const rows=[
+    ['Database check',d.database_integrity_ok===true?'Passed at start-up':'Failed at start-up — restore from a backup'],
+    ['Database tables',d.database_schema_ok===true?'Complete':'Incomplete — see the server log'],
+    ['Maintenance mode',d.maintenance===true?'On':'Off'],
+    ['Mail relay',_yesNo(d.smtp_healthy,'Answering','Not answering')],
+    ['Running for',upText],
+    ['Version',String(d.version||'')],
+    ['Data volume',gib(d.data_free_gib)],
+    ['Uploads volume',gib(d.uploads_free_gib)],
+    ['Event history kept',`${Number(d.event_retention_days)||0} days`],
+  ];
+  if('database_size_mib' in d)rows.push(['Database size',typeof d.database_size_mib==='number'?`${d.database_size_mib} MiB`:'Could not be read']);
+  if(d.node_version)rows.push(['Node.js',String(d.node_version)]);
+  if(d.started_at)rows.push(['Server started',fmtDt(d.started_at,'long')]);
+  setSafeHtml(body,`<dl class="settings-facts">${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`);
+}
 const _SECTION_KEY='ha:settings-section';
-const _DEFAULT_SECTION='platform';
+const _DEFAULT_SECTION='general';
 let _settingsPref=null;
 let _settingsObserver=null;
 
@@ -816,7 +884,7 @@ function _readSectionPref(){
 
 function _cardShown(card){ return card.style.display!=='none'; }
 
-/** Move any card sitting outside a section into its named section (else Platform). */
+/** Move any card sitting outside a section into its named section (else General). */
 function _adoptOrphanCards(){
   const bento=document.querySelector('#admin-settings-tab .settings-bento');
   if(!bento)return;
@@ -834,9 +902,40 @@ export function settingsSections(){
   return [...document.querySelectorAll('#admin-settings-tab .settings-section[data-settings-section]')].map(sec=>({
     key:sec.getAttribute('data-settings-section'),
     label:sec.getAttribute('data-settings-label')||sec.getAttribute('data-settings-section'),
+    group:sec.getAttribute('data-settings-group')||'system',
     el:sec,
     available:[...sec.querySelectorAll('.settings-card')].some(_cardShown),
   }));
+}
+
+// The list's group captions (each item's `data-settings-group`), in the order
+// the markup first names them.
+const _GROUP_LABELS={people:'People',records:'Records',system:'System'};
+
+// A LINK item opens another admin page (`data-settings-tab`), offered only while
+// that page is (adminPageOffered: its sidebar item as the nav builder left it),
+// or runs an action (`data-settings-action`, e.g. Get help). It holds no card.
+function _linkAvailable(el){
+  const tab=el.getAttribute('data-settings-tab');
+  if(tab)return adminPageOffered(tab);
+  return !!el.getAttribute('data-settings-action');
+}
+
+/** Every list item, sections and links, in markup order. */
+function _navItems(){
+  const sections=new Map(settingsSections().map(s=>[s.el,s]));
+  return [...document.querySelectorAll('#admin-settings-tab .settings-bento > .settings-section[data-settings-section], #admin-settings-tab .settings-bento > .settings-link[data-settings-link]')].map(el=>{
+    if(sections.has(el))return {kind:'section',...sections.get(el)};
+    return {kind:'link',key:el.getAttribute('data-settings-link'),label:el.getAttribute('data-settings-label')||el.getAttribute('data-settings-link'),
+      group:el.getAttribute('data-settings-group')||'system',el,available:_linkAvailable(el)};
+  });
+}
+
+function _itemHtml(it){
+  if(it.kind==='section')return `<li data-settings-item="${esc(it.key)}"><button type="button" class="settings-nav-item" data-action="settings-section" data-section="${esc(it.key)}">${esc(it.label)}</button></li>`;
+  // A link says where it goes, after its words (WCAG 2.5.3: the name opens with them).
+  const goes=it.el.getAttribute('data-settings-tab')?' — opens that page':' — opens the help';
+  return `<li data-settings-item="link:${esc(it.key)}"><button type="button" class="settings-nav-item settings-nav-link" data-action="settings-link" data-settings-link="${esc(it.key)}">${esc(it.label)}<span class="sr-only">${goes}</span><span class="settings-nav-link-ic" aria-hidden="true">${ICO.chevronRight}</span></button></li>`;
 }
 
 /** Repaint the list, the phone picker and which section shows. Idempotent. */
@@ -845,7 +944,8 @@ export function syncSettingsNav(){
   const pick=document.getElementById('settings-section-pick');
   if(!list||!pick)return;
   _adoptOrphanCards();
-  const all=settingsSections();
+  const items=_navItems();
+  const all=items.filter(i=>i.kind==='section');
   const avail=all.filter(s=>s.available);
   const pref=_readSectionPref();
   const shown=(avail.find(s=>s.key===pref)||avail[0]||null);
@@ -854,30 +954,87 @@ export function syncSettingsNav(){
     const hide=s.key!==shownKey;
     if(s.el.hidden!==hide)s.el.hidden=hide;
   }
-  // The list holds one item per section in the MARKUP, built only when that set
-  // changes; availability only toggles each item's `hidden`. Rebuilding on every
-  // card show/hide replaced the buttons while the loaders were still landing, so
-  // a press arriving in that window hit a detached button and did nothing.
-  const allSig=all.map(s=>`${s.key}:${s.label}`).join('|');
+  // The list holds one item per section or link in the MARKUP, grouped under
+  // its caption, built only when that set changes; availability only toggles
+  // each item's `hidden` (and a group's, when none of its items is listed).
+  // Rebuilding on every card show/hide replaced the buttons while the loaders
+  // were still landing, so a press arriving in that window hit a detached
+  // button and did nothing.
+  const groups=[];
+  for(const it of items){
+    let g=groups.find(x=>x.key===it.group);
+    if(!g){ g={key:it.group,label:_GROUP_LABELS[it.group]||it.group,items:[]}; groups.push(g); }
+    g.items.push(it);
+  }
+  const allSig=items.map(i=>`${i.kind}:${i.group}:${i.key}:${i.label}`).join('|');
   if(list.dataset.sig!==allSig){
     list.dataset.sig=allSig;
-    setSafeHtml(list,all.map(s=>`<li data-settings-item="${esc(s.key)}"><button type="button" class="settings-nav-item" data-action="settings-section" data-section="${esc(s.key)}">${esc(s.label)}</button></li>`).join(''));
+    setSafeHtml(list,groups.map(g=>{
+      const cid=`settings-group-${g.key}`;
+      return `<div class="settings-nav-group" data-settings-group="${esc(g.key)}"><h3 class="settings-nav-caption" id="${esc(cid)}">${esc(g.label)}</h3><ul class="settings-nav-items" aria-labelledby="${esc(cid)}">${g.items.map(_itemHtml).join('')}</ul></div>`;
+    }).join(''));
   }
   for(const li of list.querySelectorAll('li[data-settings-item]')){
-    const hide=!avail.some(s=>s.key===li.dataset.settingsItem);
+    const k=li.dataset.settingsItem;
+    const it=k.startsWith('link:')?items.find(i=>i.kind==='link'&&`link:${i.key}`===k):items.find(i=>i.kind==='section'&&i.key===k);
+    const hide=!(it&&it.available);
     if(li.hidden!==hide)li.hidden=hide;
   }
-  const availSig=avail.map(s=>s.key).join('|');
+  for(const grp of list.querySelectorAll('.settings-nav-group')){
+    const hide=!grp.querySelector('li[data-settings-item]:not([hidden])');
+    if(grp.hidden!==hide)grp.hidden=hide;
+  }
+  // The phone picker: the same groups as <optgroup>s; a link option runs its
+  // link and the picker returns to the section on screen.
+  const availItems=items.filter(i=>i.available);
+  const availSig=availItems.map(i=>`${i.kind}:${i.group}:${i.key}`).join('|');
   if(pick.dataset.sig!==availSig){
     pick.dataset.sig=availSig;
-    setSafeHtml(pick,avail.map(s=>`<option value="${esc(s.key)}">${esc(s.label)}</option>`).join(''));
+    setSafeHtml(pick,groups.map(g=>{
+      const opts=g.items.filter(i=>i.available).map(i=>i.kind==='section'
+        ?`<option value="${esc(i.key)}">${esc(i.label)}</option>`
+        :`<option value="link:${esc(i.key)}">${esc(i.label)} (opens)</option>`).join('');
+      return opts?`<optgroup label="${esc(g.label)}">${opts}</optgroup>`:'';
+    }).join(''));
   }
-  for(const b of list.querySelectorAll('.settings-nav-item')){
+  for(const b of list.querySelectorAll('.settings-nav-item[data-section]')){
     const cur=b.dataset.section===shownKey;
     if(cur){ if(b.getAttribute('aria-current')!=='true')b.setAttribute('aria-current','true'); }
     else if(b.hasAttribute('aria-current'))b.removeAttribute('aria-current');
   }
   if(shownKey&&pick.value!==shownKey)pick.value=shownKey;
+}
+
+/** A link item: open its page through the sidebar's own door, or run its action. */
+export function openSettingsLink(key){
+  const el=document.querySelector(`#admin-settings-tab .settings-link[data-settings-link="${CSS.escape(String(key||''))}"]`);
+  if(!el||!_linkAvailable(el))return;
+  const tab=el.getAttribute('data-settings-tab');
+  if(tab){
+    const btn=document.querySelector(`#admin-sidebar .admin-nav-item[data-tab-id="${CSS.escape(tab)}"]`);
+    if(btn)btn.click();
+    return;
+  }
+  const action=el.getAttribute('data-settings-action');
+  if(action==='help-open')openHelpDrawer();
+}
+
+/** The phone picker's change: a section, or a link (which leaves the picker on the section shown). */
+export function settingsPick(value){
+  if(typeof value!=='string')return;
+  if(value.startsWith('link:')){
+    const pick=document.getElementById('settings-section-pick');
+    const shown=settingsSections().find(s=>!s.el.hidden);
+    if(pick&&shown)pick.value=shown.key;
+    openSettingsLink(value.slice(5));
+    return;
+  }
+  selectSettingsSection(value);
+}
+
+/** CxOne API audit: the Audit page narrowed to Checkmarx One activity. */
+export function openCxoneAudit(){
+  openAuditNarrowed('Checkmarx One');
 }
 
 /** Choose a section (a list press, the phone picker, or a deep link). */
@@ -937,6 +1094,10 @@ export const SETTINGS_HELP_TIPS={
   'settings.cxone-removals':'When a participant is deleted, the platform removes the Checkmarx One accounts it created for them. Anything it could not remove, or will not remove without your say-so, is listed with what to do.',
   'settings.retention':'Audit and activity history older than this is deleted by a daily sweep. Submissions, scores and certificates are not affected.',
   'settings.alerts':'When a blocked address could be a busy shared network such as a venue, every superadmin is emailed and an alert opens here until the block lapses or someone dismisses it. An unmistakable scanner is blocked without an alert; every block is recorded in Audit.',
+  'settings.cxone-audit':'Opens the Audit log searching for Checkmarx One activity: accounts set up, linked and removed, and changes to the integration.',
+  'settings.updates':'On a server set up with the Podman installer, new signed releases are checked for daily and installed with a restart; otherwise updates are whatever the deployment’s operator set up. What’s new lists what each version changed.',
+  'settings.health':'What the server found at its last start and sees now. Superadmins also see the database size and the server’s Node.js version.',
+  'settings.about':'The running version and the typefaces the certificates use.',
   'settings.breakglass':'The boot-generated password is in the data folder. Changing the username keeps you signed in; the new one is needed from the next sign-in, and the old one then signs nobody in.',
 };
 
@@ -969,7 +1130,7 @@ export async function sendTestEmail(){
   showToast(d.error?`The test email was not sent: ${d.error}`:`The test email was not sent (${r.status}).`,'error');
 }
 
-// ─── Data & retention (read-only) ─────────────────────────────────────────────
+// ─── Event history retention (read-only) ─────────────────────────────────────────────
 let _retSeq=0;
 export async function loadRetentionCard(){
   const body=document.getElementById('retention-body');
@@ -1275,7 +1436,7 @@ function _wdFocusIfPending(){
   const card=document.getElementById('cxone-withdrawals-card');
   // The card's section must be the one on screen before its heading can take
   // focus (focus on a hidden element is a silent no-op).
-  if(h&&card&&card.style.display!=='none'){ selectSettingsSection('cxone'); h.focus(); }
+  if(h&&card&&card.style.display!=='none'){ selectSettingsSection('cxone-audit'); h.focus(); }
 }
 
 // The header banner's "Review removals". It routes through the Settings nav item
@@ -1288,7 +1449,7 @@ export function openCxoneWithdrawalsReview(){
   // The click dispatches synchronously (dispatcher → adminTab → the synchronous
   // prefix of loadAdminSettings, which reads this), so the flag is scoped to
   // this one entry and cannot survive it — not even if the handler throws.
-  selectSettingsSection('cxone');   // the removals card's section, before the pane opens
+  selectSettingsSection('cxone-audit');   // the removals card's section, before the pane opens
   _wdReviewEntry=true;
   try{ btn.click(); }finally{ _wdReviewEntry=false; }
 }

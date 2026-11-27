@@ -86,7 +86,7 @@ function _render() {
   const body = document.getElementById("ua-body");
   if (!body) return;
   const tab = (v, label) => `<button type="button" class="ua-switch-btn" role="tab" data-action="ua-view" data-view="${v}" aria-selected="${_st.view === v}">${esc(label)}</button>`;
-  setSafeHtml(body, `<div class="ua-switch" role="tablist" aria-label="Users and roles">${tab("users", `Users (${_st.users.length})`)}${tab("roles", `Roles (${_st.roles.length})`)}</div>
+  setSafeHtml(body, `<div class="ua-switch" role="tablist" aria-label="Roles and permissions">${tab("users", `Users (${_st.users.length})`)}${tab("roles", `Roles (${_st.roles.length})`)}</div>
     <div id="ua-view-users" ${_st.view === "users" ? "" : "hidden"}>${_usersToolbarHtml()}<div id="ua-users-list"></div></div>
     <div id="ua-view-roles" ${_st.view === "roles" ? "" : "hidden"}><div id="ua-roles-list"></div></div>`);
   const q = document.getElementById("ua-search");

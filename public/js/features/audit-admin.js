@@ -29,6 +29,7 @@ import { downloadCsv } from "../ui/csv.js";
 import { overlayDismiss } from "../ui/modal.js";
 import { registerHelpTips } from "../ui/help-tips.js";
 import { adminTab, adminCan } from "../ui/nav.js";
+import { clearColumnFilters } from "../ui/table-columns.js"; // openAuditNarrowed: no heading filter may hide the narrowed rows
 import { compareCompsForPicker } from "./competitions-admin.js"; // the shared order of every admin event picker
 
 export const AUDIT_TYPE_LABELS = Object.freeze({
@@ -628,6 +629,26 @@ export function auditClearFilters() {
   loadAdminAudit(1);
 }
 
+
+/** Open the Audit page narrowed to one search (Settings → CxOne API audit):
+ *  every other filter cleared, the text in the search box, so the trail lists
+ *  the records whose activity wording matches it (the search sends the matching
+ *  activity keys too). The page's own loader reads the box. */
+export function openAuditNarrowed(q) {
+  _st.types.clear();
+  document.querySelectorAll("#audit-type-filters [data-type]").forEach(b => { b.classList.remove("active"); b.setAttribute("aria-pressed", "false"); });
+  for (const id of ["audit-actor", "audit-event", "audit-outcome", "audit-from", "audit-to"]) {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  }
+  const box = document.getElementById("audit-search");
+  if (box) box.value = String(q || "");
+  const clear = document.getElementById("audit-search-clear");
+  if (clear) clear.classList.toggle("hidden", !(box && box.value));
+  clearColumnFilters("audit");
+  const item = _auditNavItem();
+  if (item) adminTab(item, "admin-audit-tab");
+}
 
 // THE AUDIT PAGE'S TWO VIEWS. The trail is this pane; Raw logs is the Logs pane
 // (features/settings-admin.js: the log files, paged, page 1 refreshing live and

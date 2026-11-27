@@ -269,7 +269,7 @@ test.describe("the platform look", () => {
       await require("./ui-admin-helpers").adminLogin(page);
       await page.locator("#admin-page").waitFor({ state: "visible", timeout: 20000 });
       await page.locator('.admin-nav-item[data-tab-id="admin-settings-tab"]').click();
-      await require("./ui-admin-helpers").openSettingsSection(page, "look");   // Settings is two panes
+      await require("./ui-admin-helpers").openSettingsSection(page, "branding");   // Settings is two panes
       const card = page.locator("#platform-look-card");
       await expect(card).toBeVisible();
       await card.locator("#pl-look").selectOption("signature");

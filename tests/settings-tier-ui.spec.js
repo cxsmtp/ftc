@@ -123,7 +123,7 @@ test.describe("the Settings tab: offered to a regular admin, its superadmin-only
     // every account signs in with an emailed code is false.
     await adminLogin(page);
     await page.locator("[data-action='admin-tab'][data-tab-id='admin-settings-tab']").first().click();
-    await openSettingsSection(page, "accounts");
+    await openSettingsSection(page, "signin");
     const help = page.locator("#account-approval-card .settings-help");
     await expect(help).toBeVisible();
     await expect(help).toHaveText("A new account is made once its owner confirms the address with an emailed code. Hold new accounts for approval, or let them play straight away.");
