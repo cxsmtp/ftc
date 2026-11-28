@@ -109,7 +109,7 @@ const COMPETITION_FIELD_SCHEMA = {
   // `int` rather than a hand-rolled parse so the strict-whole-number rule is the
   // validator's, not a fourth copy of it. NULL/absent means uncapped; the min of 1
   // is why zero is refused rather than stored — see lib/attempts.js.
-  attempt_cap: { type: "int", min: ATTEMPT_CAP_MIN, max: ATTEMPT_CAP_MAX, label: "Attempts per challenge" },
+  attempt_cap: { type: "int", min: ATTEMPT_CAP_MIN, max: ATTEMPT_CAP_MAX, label: "Attempts per question" },
   // v8.1.0 (PR 30) — the SELF-ENROLMENT ceiling: how many people may add
   // themselves through the join link. NULL/absent means unlimited, which is what
   // every event has had until now, so an omitted field cannot change behaviour.
@@ -199,7 +199,7 @@ const COMPETITION_FIELD_SCHEMA = {
 // meet the underlying need, so the refusal is not a dead end.
 const _REVEAL_REFUSED =
   "This event type does not reveal answers when it ends — a published answer key would let anyone " +
-  "complete it after the deadline is extended. Participants still see the explanation on any challenge " +
+  "complete it after the deadline is extended. Participants still see the explanation on any question " +
   "they have solved.";
 const _GROUP_BOARD_REFUSED =
   "This event type has no leaderboard, so there is no team board to enable.";
@@ -211,7 +211,7 @@ const _GROUP_BOARD_REFUSED =
 const _presenceRefused = (row) =>
   `Recording time on platform is not available for ${eventKindPhrase(row)} — its window is too short for the measurement to mean anything.`;
 const _clockStartRefused = (row) =>
-  `Starting each participant's clock at their first challenge is not available for ${eventKindPhrase(row)}: it has no ranking for a clock to decide. Leave it on "When they enter the event".`;
+  `Starting each participant's clock at their first question is not available for ${eventKindPhrase(row)}: it has no ranking for a clock to decide. Leave it on "When they enter the event".`;
 const _CLOCK_START_LOCKED = "When each participant's clock starts cannot be changed once the event has started — solve times already measured would no longer compare with the rest.";
 // Checkmarx One accounts on a kind that never creates them (a Booth Event; owner's
 // decision, 27 Nov 2026), refused by create, the PUT, the key override and the
@@ -1230,7 +1230,7 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
       const _unsealed = staffCompeteUnsealedAssigned(db, comp.id);
       if (_unsealed.length) {
         return res.status(400).json({
-          error: `“${comp.name}” holds ${_unsealed.length === 1 ? "a challenge whose answer is not sealed" : `${_unsealed.length} challenges whose answers are not sealed`}, and an event where staff compete only admits sealed ones. Take ${_unsealed.length === 1 ? "it" : "them"} out of the event first, or leave the switch off.`,
+          error: `“${comp.name}” holds ${_unsealed.length === 1 ? "a question whose answer is not sealed" : `${_unsealed.length} questions whose answers are not sealed`}, and an event where staff compete only admits sealed ones. Take ${_unsealed.length === 1 ? "it" : "them"} out of the event first, or leave the switch off.`,
           code: STAFF_COMPETE_CODES.UNSEALED_ASSIGNED,
           challenges: _unsealed,
         });
@@ -1242,7 +1242,7 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
       const _authors = staffCompeteEnrolledAuthors(db, comp.id);
       if (_authors.length) {
         return res.status(400).json({
-          error: `${_authors.length === 1 ? `${_authors[0].nickname} is enrolled in “${comp.name}” and wrote` : `${_authors.length} people enrolled in “${comp.name}” wrote`} ${_authors.length === 1 && _authors[0].tasks.length === 1 ? "a challenge it holds" : "challenges it holds"}, so they cannot compete in it — a challenge's answer is known to its author. Remove ${_authors.length === 1 ? "that person" : "them"} from the event or take ${_authors.length === 1 && _authors[0].tasks.length === 1 ? "the challenge" : "their challenges"} out first, or leave the switch off.`,
+          error: `${_authors.length === 1 ? `${_authors[0].nickname} is enrolled in “${comp.name}” and wrote` : `${_authors.length} people enrolled in “${comp.name}” wrote`} ${_authors.length === 1 && _authors[0].tasks.length === 1 ? "a question it holds" : "questions it holds"}, so they cannot compete in it — a question's answer is known to its author. Remove ${_authors.length === 1 ? "that person" : "them"} from the event or take ${_authors.length === 1 && _authors[0].tasks.length === 1 ? "the question" : "their questions"} out first, or leave the switch off.`,
           code: STAFF_COMPETE_CODES.AUTHOR_ENROLLED,
           participants: _authors,
         });
@@ -3503,10 +3503,10 @@ function _bpTaskSkip(req, task, compStub, tags) {
 function _bpValidateTemplateTasks(req, raw, kind, settings) {
   if (raw === undefined || raw === null) return { ids: [] };
   if (!Array.isArray(raw) || raw.some(x => typeof x !== "string")) {
-    return { error: "task_ids must be an array of challenge ids.", code: "template_tasks_invalid" };
+    return { error: "task_ids must be an array of question ids.", code: "template_tasks_invalid" };
   }
   const ids = [...new Set(raw.map(x => x.trim()).filter(Boolean))];
-  if (ids.length > TEMPLATE_MAX_TASKS) return { error: `A template holds at most ${TEMPLATE_MAX_TASKS} challenges.`, code: "template_tasks_invalid" };
+  if (ids.length > TEMPLATE_MAX_TASKS) return { error: `A template holds at most ${TEMPLATE_MAX_TASKS} questions.`, code: "template_tasks_invalid" };
   if (!ids.length) return { ids };
   const rows = db.prepare(`SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed FROM tasks WHERE id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(ids));
   const byId = new Map(rows.map(t => [t.id, t]));
@@ -3519,7 +3519,7 @@ function _bpValidateTemplateTasks(req, raw, kind, settings) {
       return {
         error: skip.reason === "qualifying"
           ? `“${t.title}” is a qualifying question, which belongs to its own event. Remove it: an event made from this template gets its own through Add the qualifying questions.`
-          : skip.message || (skip.reason === "missing" ? `No challenge has the id ${id.slice(0, 64)}.` : `“${t.title}” cannot be part of this template (${skip.reason}).`),
+          : skip.message || (skip.reason === "missing" ? `No question has the id ${id.slice(0, 64)}.` : `“${t.title}” cannot be part of this template (${skip.reason}).`),
         code: "template_task_" + skip.reason, task_id: id.slice(0, 64),
         // A competitor's refusal is a 403, as every competitor refusal is.
         ...(skip.reason === "competing" ? { status: 403 } : {}),

@@ -271,7 +271,7 @@ test.describe("v7.24.0 — Export CSV from the analytics table", () => {
     // the file said "Total Events" while the screen said "Total", and the header
     // is the contract with the human reading the file (v7.15.8).
     expect(csv[0]).toEqual([
-      "Challenge ID", "Title", "Difficulty", "Tags", "Total Activity",
+      "Question ID", "Title", "Difficulty", "Tags", "Total Activity",
       "Solved", "Incorrect", "Hints Revealed", "Navigated Away",
       "Unique Attempters", "Solve Rate (%)",
     ]);
@@ -344,13 +344,13 @@ test.describe("v7.24.0 — Export CSV from the analytics table", () => {
     await page.locator(".tcol-pop input[data-tcol-input]").pressSequentially("Needle", { delay: 20 });
     // Needle 3, 13 and 23: the last is on the second page of the unfiltered table.
     await expect(page.locator("#analytics-table-body tr")).toHaveCount(3, { timeout: 5000 });
-    await expect(page.locator("#analytics-table-meta")).toHaveText("3 of 30 challenges match");
+    await expect(page.locator("#analytics-table-meta")).toHaveText("3 of 30 questions match");
     await expect(page.locator(".tcol-bar[data-tcols-for='analytics'] .tcol-note")).toHaveText("Filtered by Title");
     await page.keyboard.press("Escape");
 
     const { rows: csv } = await exportCsv(page);
     expect(csv[0], "every column, hidden ones included").toEqual([
-      "Challenge ID", "Title", "Difficulty", "Tags", "Total Activity",
+      "Question ID", "Title", "Difficulty", "Tags", "Total Activity",
       "Solved", "Incorrect", "Hints Revealed", "Navigated Away",
       "Unique Attempters", "Solve Rate (%)",
     ]);
@@ -472,7 +472,7 @@ test.describe("v7.24.0 — Export CSV from the analytics table", () => {
     await openAnalytics(page, [row({ id: "z1", num: "1.01", title: "Only one" })]);
 
     await page.locator("#analytics-search").fill("zzz-no-such-challenge");
-    await expect(page.locator("#analytics-table-body")).toContainText(/No challenges match/i);
+    await expect(page.locator("#analytics-table-body")).toContainText(/No questions match/i);
 
     let downloaded = false;
     page.on("download", () => { downloaded = true; });
@@ -566,7 +566,7 @@ test.describe("v7.27.0 — Unique Attempters is a table column", () => {
     await openAnalytics(page, ORDER_ROWS);
     const cols = await page.locator("#analytics-table thead th").count();
     await page.locator("#analytics-search").fill("zzz-no-such-challenge");
-    await expect(page.locator("#analytics-table-body")).toContainText(/No challenges match/i);
+    await expect(page.locator("#analytics-table-body")).toContainText(/No questions match/i);
     expect(await page.locator("#analytics-table-body tr td").first().getAttribute("colspan")).toBe(String(cols));
   });
 });

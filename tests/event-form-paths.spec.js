@@ -98,7 +98,7 @@ test.describe("A template create whose settings save is refused", () => {
 
     // The refusal keeps its list, says the event exists, and how to finish it.
     const modal = page.locator("#modal-overlay.open");
-    await expect(modal.locator("#modal-title"), "a refusal list keeps its modal").toHaveText("Seal these challenges first", { timeout: 15000 });
+    await expect(modal.locator("#modal-title"), "a refusal list keeps its modal").toHaveText("Seal these questions first", { timeout: 15000 });
     await expect(modal).toContainText(inTpl.title);
     await expect(modal).toContainText("was created from the template, but these settings were not saved");
     await expect(modal).toContainText("Finish creating");
@@ -541,7 +541,7 @@ test.describe("Staff compete and the built-in qualifying questions", () => {
     let spawned = 0;
     page.on("request", (r) => { if (r.method() === "POST" && /\/spawn$/.test(new URL(r.url()).pathname)) spawned++; });
     await form.locator('[data-action="comp-save"]').click();
-    await expect(page.locator("#toast-stack"), "the pair is refused by name").toContainText("holds sealed challenges only", { timeout: 10000 });
+    await expect(page.locator("#toast-stack"), "the pair is refused by name").toContainText("holds sealed questions only", { timeout: 10000 });
     await expect(page.locator("#modal-overlay.open"), "no confirmation: nothing would be made").toHaveCount(0);
     expect(spawned, "the template was not spawned").toBe(0);
     expect(eventsNamed(evName)).toEqual([]);

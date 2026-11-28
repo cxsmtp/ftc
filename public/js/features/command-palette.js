@@ -227,7 +227,7 @@ function _actionItems() {
         // that may read people has (`participants.view`), from the People page
         // it opens first (_exportPeopleOnTheirPage).
         if (adminCan("participants.view") && _tabOffered("admin-participants-tab")) act("act:export-people", "Export people (CSV)", _exportPeopleOnTheirPage, "Export");
-        act("act:export-challenges", "Export challenges", () => _dispatch("export-tasks"), "Export");
+        act("act:export-challenges", "Export questions", () => _dispatch("export-tasks"), "Export");
       }
     }
   }

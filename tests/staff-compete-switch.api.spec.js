@@ -1009,7 +1009,7 @@ test.describe("v8.12.0 — the three content refusals", () => {
     expect(serialised, "the outsider is not named (by value)").not.toContain(outsider.nickname);
     expect(serialised, "…nor is their challenge").not.toContain(theirs.title);
     expect(b.error, "the sentence names the person").toContain(author.nickname);
-    expect(b.error, "…and names the remedy").toMatch(/Remove that person from the event or take their challenges out first/);
+    expect(b.error, "…and names the remedy").toMatch(/Remove that person from the event or take their questions out first/);
     expect((await listRow(eventA.id)).staff_compete, "nothing written").toBe(0);
     expect(await eventsOf(eventA.id, "edited"), "no edit recorded").toEqual([]);
 
@@ -1031,7 +1031,7 @@ test.describe("v8.12.0 — the three content refusals", () => {
     const b3 = await expectSwitchRefused(await putSwitch(eventC.id, { staff_compete: true }), staffCompete.CODES.AUTHOR_ENROLLED, "ON with the same author enrolled elsewhere");
     expect(b3.participants.map(p => p.id), "the same person, on the other event").toEqual([author.id]);
     expect(b3.participants[0].tasks, "the singular shape: one challenge held there").toEqual([{ id: eventCopyOf(mineB.id, eventC.id), title: mineB.title }]);
-    expect(b3.error, "the singular remedy sentence").toMatch(/Remove that person from the event or take the challenge out first/);
+    expect(b3.error, "the singular remedy sentence").toMatch(/Remove that person from the event or take the question out first/);
     const rm = await sa.delete(`/api/admin/competitions/${eventC.id}/users/${author.id}`, { headers: H(saCsrf) });
     expect(rm.ok(), `remove the author: ${rm.status()} ${await rm.text()}`).toBeTruthy();
     expect((await rm.json()).removed, "the removal really happened").toBe(true);

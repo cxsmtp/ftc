@@ -177,7 +177,7 @@ test.describe("v8.13.3 — an internal error in the assignment transaction is a 
     const ended = await makeCompetition(sa, saCsrf, "ended", {
       start_time: new Date(Date.now() - 2 * 3_600_000).toISOString(), duration_minutes: 30,
     });
-    const endedMsg = `Cannot modify challenge assignments for competition "${ended.name}" — a session has already ended.`;
+    const endedMsg = `Cannot modify question assignments for competition "${ended.name}" — a session has already ended.`;
     await expectNamed400(await postAssign(SA, T.id, [ended.id]), endedMsg, "POST into an ended event");
     await expectNamed400(await putDesired(SA, T.id, [ended.id], []), endedMsg, "PUT into an ended event");
 
@@ -315,7 +315,7 @@ test.describe("v8.13.3 — competitionIds / expectedAssignments must be arrays o
     const T = await makeTask(sa, saCsrf, "cap");
     // The POST twin adds exactly what it lists, so its LIST is the change.
     const over = Array(BULK_ADMIN_MAX + 1).fill(C.id);
-    await expectNamed400(await postAssign(SA, T.id, over), `Cannot assign a challenge to more than ${BULK_ADMIN_MAX} events in a single request.`, "POST over the cap");
+    await expectNamed400(await postAssign(SA, T.id, over), `Cannot assign a question to more than ${BULK_ADMIN_MAX} events in a single request.`, "POST over the cap");
     expect(heldCount(T.id)).toBe(0);
     // The PUT is a DESIRED-STATE door, so its bound is on the CHANGE (the
     // pre-release review): more than BULK_ADMIN_MAX DISTINCT new ids is refused
@@ -325,7 +325,7 @@ test.describe("v8.13.3 — competitionIds / expectedAssignments must be arrays o
     await expectNamed400(await putDesired(SA, T.id, ghosts, []), changeMsg, "PUT adding more than the cap");
     // …and an expected set far beyond what the challenge holds cannot be what
     // the dialog was shown.
-    await expectNamed400(await putDesired(SA, T.id, [C.id], ghosts), "expectedAssignments lists far more events than this challenge is assigned to.", "PUT expectedAssignments far beyond the state");
+    await expectNamed400(await putDesired(SA, T.id, [C.id], ghosts), "expectedAssignments lists far more events than this question is assigned to.", "PUT expectedAssignments far beyond the state");
     expect(heldCount(T.id)).toBe(0);
     // …while REPEATS are one id, on both doors: the list's length is not the cap.
     const okPost = await postAssign(SA, T.id, Array(BULK_ADMIN_MAX).fill(C.id));

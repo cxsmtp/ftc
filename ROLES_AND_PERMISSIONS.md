@@ -67,11 +67,11 @@ non-grantable gives nothing and was removed at boot).
 | `events.delete` | Delete events |  |  | ✓ | superadmin only |
 | `templates.view` | See event templates | ✓ | ✓ | ✓ | yes |
 | `templates.manage` | Create, edit and delete event templates |  | ✓ | ✓ | yes |
-| `challenges.view` | See challenges, versions, attachments and feedback | ✓ | ✓ | ✓ | yes |
-| `challenges.edit` | Create and edit challenges | ✓ | ✓ | ✓ | yes |
-| `challenges.assign` | Assign challenges to events | ✓ | ✓ | ✓ | yes |
-| `challenges.delete` | Delete challenges and feedback |  |  | ✓ | superadmin only |
-| `challenges.lock` | Lock challenges and recalculate scores |  |  | ✓ | superadmin only |
+| `challenges.view` | See questions, versions, attachments and feedback | ✓ | ✓ | ✓ | yes |
+| `challenges.edit` | Create and edit questions | ✓ | ✓ | ✓ | yes |
+| `challenges.assign` | Add questions to events | ✓ | ✓ | ✓ | yes |
+| `challenges.delete` | Delete questions and feedback |  |  | ✓ | superadmin only |
+| `challenges.lock` | Lock questions and recalculate scores |  |  | ✓ | superadmin only |
 | `challenges.sealed_reveal` | Reveal a sealed answer |  |  | ✓ | no |
 | `participants.view` | See participants and their history | ✓ | ✓ | ✓ | yes |
 | `participants.edit` | Edit participant profiles, tags and group membership | ✓ | ✓ | ✓ | yes |
@@ -93,10 +93,10 @@ non-grantable gives nothing and was removed at boot).
 | `analytics.view` | See analytics | ✓ | ✓ | ✓ | yes |
 | `audit.view` | See the audit trail (each kind of row also needs the permission that guards it elsewhere: see §1b) | ✓ | ✓ | ✓ | yes |
 | `audit.raw_logs` | See the raw request and application logs |  | ✓ | ✓ | yes |
-| `export.data` | Export event, participant and challenge data | ✓ | ✓ | ✓ | yes |
+| `export.data` | Export event, participant and question data | ✓ | ✓ | ✓ | yes |
 | `export.platform` | Export every event on the platform |  | ✓ | ✓ | yes |
 | `export.settings` | Export platform settings |  |  | ✓ | superadmin only |
-| `data.import` | Import challenges and participants |  |  | ✓ | superadmin only |
+| `data.import` | Import questions and participants |  |  | ✓ | superadmin only |
 | `settings.view` | See platform settings |  | ✓ | ✓ | yes |
 | `settings.edit` | Change platform settings |  |  | ✓ | superadmin only |
 | `ops.alerts` | See and acknowledge operational alerts |  | ✓ | ✓ | yes |

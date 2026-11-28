@@ -47,7 +47,7 @@ export async function impersonateParticipant(userId, nickname, role) {
   const viewPick = isOrganiser
     ? `<fieldset class="imp-view-pick" role="radiogroup" aria-label="Which of their views to open">
          <legend>Open</legend>
-         <label class="checkbox-row"><input type="radio" name="imp-view" value="admin" checked> <span><strong>Their Event Admin Panel</strong> — the events, challenges and participants they organise, as they see them</span></label>
+         <label class="checkbox-row"><input type="radio" name="imp-view" value="admin" checked> <span><strong>Their Event Admin Panel</strong> — the events, questions and participants they organise, as they see them</span></label>
          <label class="checkbox-row"><input type="radio" name="imp-view" value="participant"> <span><strong>Their participant view</strong> — the events they are enrolled in as a player</span></label>
        </fieldset>`
     : "";

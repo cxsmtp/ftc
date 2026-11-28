@@ -853,7 +853,7 @@ test.describe("v8.7.0 — the event-admin tier in the browser", () => {
 
     const toast = page.locator("#toast-stack");
     await expect(toast, "the out-of-scope skips are named").toContainText(/2 event\(s\) you do not organise/i, { timeout: 15000 });
-    await expect(toast, "…and the ones they cannot use").toContainText(/1 challenge\(s\) you cannot use/i);
+    await expect(toast, "…and the ones they cannot use").toContainText(/1 question\(s\) you cannot use/i);
     await expect(toast, "…and the server's own reason, which rode the response for exactly this")
       .toContainText(/booth event cannot hold a file-answer challenge/i);
     // v8.12.0 — the two staff-compete seal skips joined the ledger.

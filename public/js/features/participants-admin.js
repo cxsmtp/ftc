@@ -1625,7 +1625,7 @@ export async function grantEventAdmin(userId,compId,compName,nickname){
   const ok=await showModal({
     title:'Make event admin',
     message:`<strong>${esc(nickname||_pLabel(userId))}</strong> will be able to organise `
-      +`<strong>${esc(compName)}</strong> — its challenges, its participants, its rankings — `
+      +`<strong>${esc(compName)}</strong> — its questions, its participants, its rankings — `
       +`with the same powers you have on that event.<br><br>`
       +`They will see nothing outside the events they are given. They cannot create a blank event `
       +`(only from a template, or by cloning one of their own), change roles, or reach Logs and Settings.<br><br>`
@@ -2519,7 +2519,7 @@ export async function submitInvitations(){
   if(d.skippedStaff)msg.push(`${d.skippedStaff} staff enrolment(s) skipped — staff can only be added to events that let staff compete`);
   if(d.skippedPrivileged)msg.push(`${d.skippedPrivileged} admin account(s) skipped — only a superadmin can enrol an admin`);
   if(d.skippedPrivilegedGroups)msg.push(`${d.skippedPrivilegedGroups} admin account(s) not added to the selected group(s) — only a superadmin can put an admin into a group`);
-  if(d.skippedAuthors)msg.push(`${d.skippedAuthors} skipped because they created a challenge in the event`);
+  if(d.skippedAuthors)msg.push(`${d.skippedAuthors} skipped because they created a question in the event`);
   if(d.skippedBlocked)msg.push(`${d.skippedBlocked} blocked account(s) not enrolled`);
   if(d.skippedUnapproved)msg.push(`${d.skippedUnapproved} unapproved account(s) not enrolled`);
   // v8.12.6 — the late-entry window refuses a NEW row for anybody who took part
@@ -2621,7 +2621,7 @@ function _assignSkipNote(d){
   if(d.skippedPrivileged)parts.push(`${d.skippedPrivileged} admin account(s) skipped — only a superadmin can enrol an admin`);
   if(d.skippedBlocked)parts.push(`${d.skippedBlocked} blocked account(s) skipped`);
   if(d.skippedUnapproved)parts.push(`${d.skippedUnapproved} unapproved account(s) skipped`);
-  if(Array.isArray(d.skippedAuthors)&&d.skippedAuthors.length)parts.push(`${d.skippedAuthors.length} skipped because they created a challenge in the event`);
+  if(Array.isArray(d.skippedAuthors)&&d.skippedAuthors.length)parts.push(`${d.skippedAuthors.length} skipped because they created a question in the event`);
   // v8.12.6 — through a late-entry window the route skips anybody who took part
   // in the event before it ended (a new row would move them onto the late-entrant
   // list and let them play on past the end of an event whose results are final).
@@ -2654,8 +2654,8 @@ function _showSkippedAuthorsModal(d){
   if(!rows.length)return;
   const list=rows.map(r=>`<li><strong>${esc(r.nickname||r.userId)}</strong> — ${esc(r.competitionName||'')}: ${(r.tasks||[]).map(t=>`“${esc(t.title)}”`).join(', ')}</li>`).join('');
   showModal({
-    title:'Not enrolled — they wrote a challenge in this event',
-    message:`A challenge's answer is known to the person who created it, so its author cannot compete in an event it is assigned to. These were skipped:<ul style="margin:8px 0 0 18px">${list}</ul>Take the challenge out of the event, or leave them off the board.`,
+    title:'Not enrolled — they wrote a question in this event',
+    message:`A question's answer is known to the person who created it, so its author cannot compete in an event it is assigned to. These were skipped:<ul style="margin:8px 0 0 18px">${list}</ul>Take the question out of the event, or leave them off the board.`,
     confirmText:'OK',cancelText:null
   });
 }
@@ -2724,7 +2724,7 @@ export function _getAssignRevivalHints(comp){
     // the auto-end predicate is solved-OR-exhausted. This is the WORST-placed of
     // the five copies of that claim, because it is shown at the exact moment an
     // admin is following the remedy the other four name.
-    `<strong style="color:var(--yellow)">Revival warning:</strong> This event was auto-ended (every participant had finished every challenge — solved it, or run out of attempts). Adding new participants will make the following <strong>live</strong> again:` +
+    `<strong style="color:var(--yellow)">Revival warning:</strong> This event was auto-ended (every participant had finished every question — solved it, or run out of attempts). Adding new participants will make the following <strong>live</strong> again:` +
     `<ul style="margin:6px 0 0">${revivable.map(n=>'<li>'+esc(n)+'</li>').join('')}</ul>` +
     (certNote?`<p style="margin:8px 0 0">${esc(certNote)}</p>`:'') +
     `</div>`;

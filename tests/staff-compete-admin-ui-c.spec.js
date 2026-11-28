@@ -109,8 +109,8 @@ test.describe("v8.12.0 — the assign ledger is rendered", () => {
   test("an AUTHOR assigned to the compete event holding their challenge gets the 'they wrote a challenge' modal, naming both", async ({ page }) => {
     await adminLogin(page);
     await bulkAssign(page, [author.id], [author.email], competeLive.name);
-    await expect(page.locator("#toast-stack")).toContainText(/1 skipped because they created a challenge in the event/, { timeout: 15000 });
-    await expect(page.locator("#modal-title")).toHaveText(/Not enrolled — they wrote a challenge in this event/, { timeout: 15000 });
+    await expect(page.locator("#toast-stack")).toContainText(/1 skipped because they created a question in the event/, { timeout: 15000 });
+    await expect(page.locator("#modal-title")).toHaveText(/Not enrolled — they wrote a question in this event/, { timeout: 15000 });
     await expect(page.locator("#modal-body"), "the person is named").toContainText(author.nickname);
     await expect(page.locator("#modal-body"), "…and the challenge").toContainText(sealedHinted.title);
     await expect(page.locator("#modal-body"), "…and the event").toContainText(competeLive.name);
@@ -192,12 +192,12 @@ test.describe("v8.12.0 — the challenge-side bulk picker, Remove from Event, an
     await expect(mine.locator(".picker-row-flag"), "the competitor reason").toContainText("You compete here");
     const sealedOnly = overlay.locator(`#challenge-bulk-comp-list label.picker-row:has-text("${gOn.name}")`);
     await expect(sealedOnly.locator("input"), "a compete event they do not compete in is OFFERED…").toBeEnabled();
-    await expect(sealedOnly.locator(".picker-row-flag"), "…with a reminder that unsealed challenges will be skipped there").toContainText("Sealed challenges only");
+    await expect(sealedOnly.locator(".picker-row-flag"), "…with a reminder that unsealed challenges will be skipped there").toContainText("Sealed questions only");
     const plain = overlay.locator(`#challenge-bulk-comp-list label.picker-row:has-text("${plainLive.name}")`);
     await expect(plain.locator("input"), "CONTROL: a plain event is offered with no flag").toBeEnabled();
     await expect(plain.locator(".picker-row-flag")).toHaveCount(0);
     // v8.13.7 — the disabled row is MARKED (dashed, muted, full strength), the live one is not.
-    await expectInactiveRow(mine, plain, { site: "Challenges' bulk Assign Challenges to Events picker (challenge-bulk-comp-list), 'You compete here' row" });
+    await expectInactiveRow(mine, plain, { site: "Challenges' bulk Assign Questions to Events picker (challenge-bulk-comp-list), 'You compete here' row" });
     await overlay.locator('[data-action="overlay-close"]').first().click();
     await expect(overlay).toBeHidden();
   });
@@ -430,7 +430,7 @@ test.describe("v8.12.0 — the invite dialog renders the skip ledger", () => {
     const toast = page.locator("#toast-stack");
     await expect(toast, "the staff skips are named").toContainText(/2 staff enrolment\(s\) skipped — staff can only be added to events that let staff compete/, { timeout: 15000 });
     await expect(toast, "…the peer-admin skips").toContainText(/1 admin account\(s\) skipped — only a superadmin can enrol an admin/);
-    await expect(toast, "…the author skips").toContainText(/3 skipped because they created a challenge in the event/);
+    await expect(toast, "…the author skips").toContainText(/3 skipped because they created a question in the event/);
     await expect(toast, "…the blocked skips").toContainText(/1 blocked account\(s\) not enrolled/);
     await expect(toast, "…and the unapproved skips").toContainText(/1 unapproved account\(s\) not enrolled/);
     await expect(overlay, "nothing was left to fix, so the dialog closed").toBeHidden({ timeout: 10000 });

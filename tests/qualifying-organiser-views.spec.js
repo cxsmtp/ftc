@@ -409,13 +409,13 @@ test.describe("an event asks each qualifying question once, through a draft or a
 test("the challenge import's summary names each qualifying skip and what to change", async ({ page }) => {
   await adminLogin(page);
   const note = (d) => page.evaluate((x) => window._importDropNote(x), d);
-  expect(await note({ qualifying_key_held_skipped: 1 })).toContain("1 challenge was not overwritten because the file would make it a qualifying question on a topic an event holding it already asks (an event asks each one once)");
-  expect(await note({ qualifying_key_held_skipped: 2 })).toContain("2 challenges were not overwritten because the file would make them qualifying questions on a topic an event holding them already asks");
+  expect(await note({ qualifying_key_held_skipped: 1 })).toContain("1 question was not overwritten because the file would make it a qualifying question on a topic an event holding it already asks (an event asks each one once)");
+  expect(await note({ qualifying_key_held_skipped: 2 })).toContain("2 questions were not overwritten because the file would make them qualifying questions on a topic an event holding them already asks");
   expect(await note({ qualifying_options_fixed_skipped: 1 })).toContain("1 qualifying question was not overwritten because people have answered it and the file moves or removes options (reword an option where it stands, or add one at the end)");
   expect(await note({ qualifying_options_fixed_skipped: 3 })).toContain("3 qualifying questions were not overwritten because people have answered them");
-  expect(await note({ qualifying_copy_skipped: 1 })).toContain("1 challenge was not overwritten because its row could mean more than one challenge: several share the title (each event's own copy of a qualifying question) or several rows of the file overwrite it (edit the question in its event, or choose Add New)");
-  expect(await note({ qualifying_copy_skipped: 2 })).toContain("2 challenges were not overwritten because their rows could mean more than one challenge");
-  expect(await note({ qualifying_tag_invalid_skipped: 1 })).toContain("1 challenge was not imported because its qualifying tag is not qualifying:<key>");
-  expect(await note({ qualifying_tag_invalid_skipped: 2 })).toContain("2 challenges were not imported because their qualifying tag is not qualifying:<key>");
+  expect(await note({ qualifying_copy_skipped: 1 })).toContain("1 question was not overwritten because its row could mean more than one question: several share the title (each event's own copy of a qualifying question) or several rows of the file overwrite it (edit the question in its event, or choose Add New)");
+  expect(await note({ qualifying_copy_skipped: 2 })).toContain("2 questions were not overwritten because their rows could mean more than one question");
+  expect(await note({ qualifying_tag_invalid_skipped: 1 })).toContain("1 question was not imported because its qualifying tag is not qualifying:<key>");
+  expect(await note({ qualifying_tag_invalid_skipped: 2 })).toContain("2 questions were not imported because their qualifying tag is not qualifying:<key>");
   expect(await note({ qualifying_key_held_skipped: 0, qualifying_options_fixed_skipped: 0, qualifying_copy_skipped: 0, qualifying_tag_invalid_skipped: 0 }), "CONTROL: nothing skipped, nothing said").toBe("");
 });

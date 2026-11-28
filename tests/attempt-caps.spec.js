@@ -510,7 +510,7 @@ test.describe("v8.1.0 — attempt caps", () => {
     expect(arm, "the arm reads the field the server emits")
       .toMatch(/d\.exhausted_participants/);
     expect(arm, "…and still renders the ordinary sentence when nobody was exhausted")
-      .toMatch(/all participants solved all challenges/);
+      .toMatch(/all participants solved all questions/);
     expect(arm, "…and a different one when somebody was")
       .toMatch(/ran out of attempts/);
   });

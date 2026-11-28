@@ -1647,15 +1647,15 @@ function boot() {
     setSafeHtml(ov, `
       <div class="picker-modal picker-modal-wide">
         <div class="picker-modal-head">
-          <h3>Pick challenges</h3>
-          <input type="search" placeholder="Search by title, difficulty or tag…" aria-label="Search challenges by title, difficulty or tag" id="analytics-task-search" class="filter-select" style="max-width:240px"/>
+          <h3>Pick questions</h3>
+          <input type="search" placeholder="Search by title, difficulty or tag…" aria-label="Search questions by title, difficulty or tag" id="analytics-task-search" class="filter-select" style="max-width:240px"/>
           <div style="display:flex;gap:8px">
             ${_analyticsState.taskIds.length ? `<button type="button" class="btn sm secondary" data-action="analytics-clear-tasks-and-close">Clear (${_analyticsState.taskIds.length})</button>` : ''}
             <button type="button" class="btn sm" data-action="analytics-close-picker">Done</button>
           </div>
         </div>
         <div class="picker-grid picker-grid-narrow" id="analytics-task-grid">
-          ${cards || '<p style="color:var(--muted)">No challenges exist yet.</p>'}
+          ${cards || '<p style="color:var(--muted)">No questions exist yet.</p>'}
         </div>
       </div>`);
     document.body.appendChild(ov);
@@ -1666,8 +1666,8 @@ function boot() {
     // that the card renders right there were both unsearchable, and it reported
     // no count and showed nothing at all when a query matched none.
     wirePickerFilter(ov, 'analytics-task-search', '#analytics-task-grid .picker-card', {
-      emptyText: 'No challenges match that search.',
-      noun: 'challenge',
+      emptyText: 'No questions match that search.',
+      noun: 'question',
     });
     document.getElementById('analytics-task-search')?.focus();
   });

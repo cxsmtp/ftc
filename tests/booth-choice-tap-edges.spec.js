@@ -559,7 +559,7 @@ test.describe("v8.13.0 — the booth tap view at its edges", () => {
     await expect(rows).toHaveCount(20);
     await expect(add, "the 21st is refused before it is offered").toBeDisabled();
     await expect(page.locator("#tf-choices-cap-note")).toBeVisible();
-    await expect(page.locator("#tf-choices-cap-note")).toHaveText("That is the most a challenge can have: 20 choices.");
+    await expect(page.locator("#tf-choices-cap-note")).toHaveText("That is the most a question can have: 20 choices.");
     await page.locator("#tf-choices-list [data-action='task-choice-remove']").last().click();
     await expect(rows).toHaveCount(19);
     await expect(add).toBeEnabled();

@@ -534,7 +534,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     await signIn(page, U.tplMgr);
     const ed = await openEditor(page);
     await expect(ed.locator("#tpl-ed-task-unseen"), "the editor says why no challenge can be added")
-      .toHaveText("Your role cannot view the challenge library, so it cannot add challenges here. The template keeps the challenges listed above unless you remove them.");
+      .toHaveText("Your role cannot view the question library, so it cannot add questions here. The template keeps the questions listed above unless you remove them.");
     await expect(ed.locator("#tpl-ed-tasks .tpl-ed-task-title"), "the template's own challenge is listed").toHaveText([tplTask.title]);
     await expect(ed.locator("#tpl-ed-task-search"), "no picker").toHaveCount(0);
     await expect(ed.locator('[data-tpl-task][data-op="remove"]'), "Remove needs no library read, so it stays").toHaveCount(1);

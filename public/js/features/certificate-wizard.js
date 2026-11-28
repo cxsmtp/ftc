@@ -620,7 +620,7 @@ export async function renderIssuedCertificates(box, { compId, readOnly = false }
   const showCode = adminCan('certificates.lookup');
   const head = `<div class="ic-head"><div><p class="eyebrow gold">Issued</p><h3 class="ic-title">${list.length} certificate${list.length === 1 ? '' : 's'}</h3></div>
     <p class="ic-note">${d.emailEnabled ? 'Holders are emailed their certificate.' : 'Certificate emails are off for this event.'}${pend ? ` ${pend} send${pend === 1 ? ' is' : 's are'} queued.` : ''}</p></div>`;
-  if (!list.length) { setSafeHtml(box, `${head}<p class="ws-empty">None yet. Certificates are issued when the event ends (for a Program, when someone finishes every challenge).</p>`); return; }
+  if (!list.length) { setSafeHtml(box, `${head}<p class="ws-empty">None yet. Certificates are issued when the event ends (for a Program, when someone finishes every question with 60% or more).</p>`); return; }
   // Buttons name their row by its place in the list (`data-i`): a holder can
   // have a revoked row beside a live one, so the user id alone is ambiguous.
   const rows = list.map((c, i) => {

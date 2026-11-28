@@ -83,11 +83,11 @@ test.describe("v8.12.0 — the Assign Challenges picker on a switch-on event", (
 
     await sRow.locator("input").check();
     await page.locator("#task-picker-save").click();
-    await expect(page.locator("#modal-title"), "the picker confirms what it is about to add").toHaveText(/Apply challenge changes/, { timeout: 10000 });
+    await expect(page.locator("#modal-title"), "the picker confirms what it is about to add").toHaveText(/Apply question changes/, { timeout: 10000 });
     await expect(page.locator("#modal-body")).toContainText(gSealed.title);
     await page.locator("#modal-confirm-btn").click();
     await expect(page.locator("#toast-stack"), "the add is reported").toContainText(/1 added/, { timeout: 15000 });
-    await expect(page.locator("#modal-title"), "and nothing was refused").not.toHaveText(/Some challenges were not added/);
+    await expect(page.locator("#modal-title"), "and nothing was refused").not.toHaveText(/Some questions were not added/);
 
     await expect.poll(async () => ((await taskRow(gSealed.id)).competitions || []).map(c => c.id),
       { message: "the sealed challenge really is in the event", timeout: 10000 }).toContain(gOn.id);
@@ -159,8 +159,8 @@ test.describe("v8.12.0 — the per-challenge Assign to Events dialog", () => {
     await expect(save, "a changed tick enables Save").toBeEnabled();
     await save.click();
     await expect(page.locator("#assign-task-overlay"), "the dialog closed on success").toBeHidden({ timeout: 15000 });
-    await expect(page.locator("#toast-stack")).toContainText(/Challenge assignments updated/, { timeout: 15000 });
-    await expect(page.locator("#modal-title")).not.toHaveText(/Some challenges were not added/);
+    await expect(page.locator("#toast-stack")).toContainText(/Question assignments updated/, { timeout: 15000 });
+    await expect(page.locator("#modal-title")).not.toHaveText(/Some questions were not added/);
     await expect.poll(async () => ((await taskRow(hSealed.id)).competitions || []).map(c => c.id),
       { message: "the sealed challenge really is in the switch-on event", timeout: 10000 }).toContain(hUpOn.id);
   });
@@ -174,7 +174,7 @@ test.describe("v8.12.0 — the per-challenge Assign to Events dialog", () => {
     await expect(r.locator("input"), "the row is offered — the client cannot see who wrote it").toBeEnabled();
     await r.locator("input").check();
     await page.locator("#assign-task-save-btn").click();
-    await expect(page.locator("#modal-title")).toHaveText(/Some challenges were not added/, { timeout: 15000 });
+    await expect(page.locator("#modal-title")).toHaveText(/Some questions were not added/, { timeout: 15000 });
     await expect(page.locator("#modal-body")).toContainText(hSealed2.title);
     await expect(page.locator("#modal-body")).toContainText(hAuthorOn.name);
     await expect(page.locator("#modal-body")).toContainText(/its author is competing in the event/);
@@ -227,8 +227,8 @@ test.describe("v8.12.0 — the per-challenge Assign to Events dialog", () => {
     await expect(save).toBeEnabled();
     await save.click();
     await expect(page.locator("#assign-task-overlay"), "the dialog closed on success").toBeHidden({ timeout: 15000 });
-    await expect(page.locator("#toast-stack")).toContainText(/Challenge assignments updated/, { timeout: 15000 });
-    await expect(page.locator("#modal-title")).not.toHaveText(/Some challenges were not added/);
+    await expect(page.locator("#toast-stack")).toContainText(/Question assignments updated/, { timeout: 15000 });
+    await expect(page.locator("#modal-title")).not.toHaveText(/Some questions were not added/);
     await expect.poll(async () => ((await taskRow(sealedHinted.bankId)).competitions || []).map(c => c.id).sort(),
       { message: "the challenge is in BOTH the compete event and the added one", timeout: 10000 })
       .toEqual(expect.arrayContaining([competeLive.id, hUpOff.id]));

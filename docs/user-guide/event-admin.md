@@ -96,7 +96,7 @@ walk-ups.
 **Click an event's name (or Open) to run it from its workspace**: a two-line
 header (name, type, live status, dates, sessions and organisers, the join pill
 with its QR code and short code, **Invite** and the **⋯** menu), the live
-figures led by the countdown, and its own sections — Overview, Participants, Challenges, Rankings, Activity,
+figures led by the countdown, and its own sections — Overview, Participants, Questions, Rankings, Activity,
 Analytics, Certificates, Team & reports and Settings. Everything below is done from there; **←
 Events** takes you back.
 The administrator guide describes the workspace in full ([The event
@@ -149,18 +149,18 @@ current the badges simply go, and your role stays:
 ![The event-admin role on a participant row](../screenshots/event-admin/04-role-badge.png)
 
 An administrator can also view the platform *as you* — your participant view, or
-this panel exactly as you see it, events, challenges and participants included.
+this panel exactly as you see it, events, questions and participants included.
 An admin can only look; a superadmin can act, and anything they change is
 recorded as theirs, made through your panel, never as your own act. Both the
 start and the end of such a session land on your **History**, naming who it
 was. One thing stays yours whoever is looking: a [sealed
 answer](#sealing-an-answer) you wrote is not shown through your panel — with one
 exception, a superadmin who reveals it, and that reveal is recorded on the
-challenge's History, naming them and the view they were in.
+question's History, naming them and the view they were in.
 
 ### Who else organises this event
 
-The **Organisers** card of the event's Overview (under **Show challenges,
+The **Organisers** card of the event's Overview (under **Show questions,
 activity and organisers**) lists everybody who administers it — useful when you
 share a stand with a colleague. You cannot add or
 remove an organiser yourself (the card says so where an administrator sees
@@ -173,8 +173,8 @@ Every event has a **Staff can compete** switch on its edit form, off by default,
 and on your own events it is yours to set like any other setting — only until the
 event starts, though: once it has started the switch is locked, so decide before
 the doors open. Turning it on is refused, naming what stands in the way, if the
-event holds a challenge whose answer is not sealed, or a challenge written by
-somebody already enrolled in it — take the challenge out of the event, or remove
+event holds a question whose answer is not sealed, or a question written by
+somebody already enrolled in it — take the question out of the event, or remove
 the person, and turn it on again. The [Admin guide](admin.md) describes the
 switch in full. This is what it means for *you*.
 
@@ -194,21 +194,21 @@ takes you to the admin panel and enrols you in nothing:
 choose **Switch to Participant View** in your account menu and open the link again, or type the event's
 printed code into the box on your event list.
 
-**And while you are enrolled, you cannot change that event or its challenges.**
+**And while you are enrolled, you cannot change that event or its questions.**
 This is the same lock every tier meets — administrators and superadmins included
 — and it covers every change to the event: its settings, schedule and sessions,
 its tags, its join link, ending it, who is in it — which includes a group bound
 to it, whose members you cannot change and which you cannot delete while you
-compete there — and every challenge assigned to it. The event's **⋯** menu says
+compete there — and every question assigned to it. The event's **⋯** menu says
 so — **You are competing in this event — you can view it, not change it** — and
 keeps only the items that read rather than write: History, Email delivery,
 Export activity once the event is live or has finished (as on any event), and
 Join-link settings, which opens read-only — the link, the QR code and the
 short code are there to copy, while the toggle and Regenerate are withheld with
 a note saying why. On the Participants tab, with that event open, only your own row
-offers **Remove**, and in every dialog that assigns people or challenges to
-events the event is greyed out, edged with a dashed line, as *You compete here*. On the Challenges tab a
-challenge held by that event carries the same note; **Edit** is not offered on
+offers **Remove**, and in every dialog that assigns people or questions to
+events the event is greyed out, edged with a dashed line, as *You compete here*. On the Questions tab a
+question held by that event carries the same note; **Edit** is not offered on
 its row, **View** shows it as your fellow competitors see it with the hint
 withheld — a participant pays 30% of the points to see one, and so would you —
 and its History offers no Restore. The one change you can still make, while the
@@ -217,7 +217,7 @@ participant list, which lifts the lock at once. Once the event has finished
 nobody can be taken out of it — except a late entrant (somebody who joined after
 it ended and had not started playing before then), while late entries are still
 open, so if that is how you joined you can still remove yourself then —
-so the lock on it and on its challenges stays:
+so the lock on it and on its questions stays:
 another organiser makes any change still needed there — and once its end time
 has passed, that is a superadmin, since an event past its end is theirs alone
 to edit or tag.
@@ -227,9 +227,9 @@ answer with the platform's ordinary scope refusals first: assigning people in
 bulk, inviting them, granting attempts, and changing or deleting a group bound
 to it all tell you the event is not yours to organise — the group controls by
 naming the event, as the [Groups](#groups) section describes — rather than that
-you are competing in it. A challenge held by that event is different: wherever
-the event sits, changing the challenge refuses you with the competitor reason,
-naming the event, and its row on your Challenges tab carries the competing note
+you are competing in it. A question held by that event is different: wherever
+the event sits, changing the question refuses you with the competitor reason,
+naming the event, and its row on your Questions tab carries the competing note
 just as it would for an event of yours. Your own removal from such an event is
 refused on neither ground while it has not finished, but the event is not in
 your Events tab, so there is no row to press **Remove** on: ask one of its
@@ -237,17 +237,17 @@ organisers to take you out — unless you
 joined it through its link and it has not started, in which case **Leave this
 event** on the waiting screen still works.
 
-Two things follow from the sealing such an event insists on. Every challenge in
+Two things follow from the sealing such an event insists on. Every question in
 it is sealed, so a competing organiser cannot read an answer off the admin
-screen. And an event where staff compete never holds a challenge whose author
-competes in it — so a challenge you created cannot be assigned to such an event
+screen. And an event where staff compete never holds a question whose author
+competes in it — so a question you created cannot be assigned to such an event
 while you are enrolled in it, and you cannot be enrolled in one while it holds
 one of yours. Where the refusal is one you meet yourself it names the
-challenge: assigning the challenge lists it, along with everything else refused
+question: assigning the question lists it, along with everything else refused
 in the same request, and the join link names it too; whoever assigns you to the
-event is shown your name and the challenge. An invitation to your address is
+event is shown your name and the question. An invitation to your address is
 reported to whoever sent it only as one person skipped for having written a
-challenge in the event, and a group binding leaves you out without saying so.
+question in the event, and a group binding leaves you out without saying so.
 
 **In an ordinary event you are an organiser.** You can still be enrolled in an
 event where staff do not compete — to try it as an attendee, or because a group
@@ -265,7 +265,7 @@ though, it is yours to make only while you are not competing in it.
 
 ---
 
-## Challenges
+## Questions
 
 The **Question bank** is shared by every organiser, while **a question added to
 an event lives in that event**. Adding a bank question to your event (**+ Add
@@ -288,50 +288,50 @@ tags.
 
 ### What you can see
 
-Three kinds of challenge, and nothing else:
+Three kinds of question, and nothing else:
 
-1. **Challenges you created.** Yours to edit, publish, hide and share.
-2. **Challenges used by one of your events** — including ones an administrator
+1. **Questions you created.** Yours to edit, publish, hide and share.
+2. **Questions used by one of your events** — including ones an administrator
    or a fellow organiser added. You can see them and read them, so you know what
    your participants are being asked, but you cannot change them.
 3. **Questions shared with all organisers.** A shared pool anybody organising an
    event can pick from.
 
-**If a shared-pool challenge looks missing, it is probably further down the
+**If a shared-pool question looks missing, it is probably further down the
 list.** Opening an event does not hide anything — the tab always shows you
 everything the three rules above give you. What opening it does is move that
-event's own challenges to the top and grey out the rest, so on an event holding a
-screenful of its own challenges the whole shared pool sits below them, on the
+event's own questions to the top and grey out the rest, so on an event holding a
+screenful of its own questions the whole shared pool sits below them, on the
 next page. Leave the event with **Events** (the back arrow at the top of its
 workspace), or use the search box, and it comes back into view.
 
-**A challenge from the shared pool is badged `Shared`** in the Status column,
-beside Published or Draft. That is the quickest way to tell a challenge you can
+**A question from the shared pool is badged `Shared`** in the Status column,
+beside Published or Draft. That is the quickest way to tell a question you can
 see because it is shared from one you can see because an event of yours holds
 it.
 
-**A challenge whose answer has been sealed is badged `Sealed`** in that same
+**A question whose answer has been sealed is badged `Sealed`** in that same
 column. Its author chose to keep the correct answer, the explanation and the hint
-to themselves, so on somebody else's sealed challenge those three are the only
-parts of it hidden from you — the rest of the challenge reads as normal. There is
+to themselves, so on somebody else's sealed question those three are the only
+parts of it hidden from you — the rest of the question reads as normal. There is
 more on this below, from both sides: sealing your own, and meeting somebody
 else's.
 
-**You cannot change a challenge you did not create**, sharing included, so on
+**You cannot change a question you did not create**, sharing included, so on
 those rows Edit is not offered and the menu says why. You can still use the
-challenge in your own events — that is what the shared pool is for.
+question in your own events — that is what the shared pool is for.
 
-**The Events column on a challenge row shows only your own events.** If a
-challenge is also in an event somebody else runs, you see a `+1 elsewhere` chip
-instead of that event's name — enough to know the challenge is in use, without
+**The Events column on a question row shows only your own events.** If a
+question is also in an event somebody else runs, you see a `+1 elsewhere` chip
+instead of that event's name — enough to know the question is in use, without
 naming an event that is not yours. The chip is not clickable, because there is
 nothing there you could open.
 
-That also means the events column can be a chip and nothing else, on a challenge
+That also means the events column can be a chip and nothing else, on a question
 you created that another organiser has taken into their event. It is not unused;
 it is in use somewhere you cannot see.
 
-**And you are still warned before editing one.** If a challenge is live in an
+**And you are still warned before editing one.** If a question is live in an
 event you do not organise, saving an edit asks you to confirm first and says so —
 "in live event(s): 1 event you do not organise" — because your change reaches
 those participants immediately even though the event is not named.
@@ -343,27 +343,27 @@ organisers**; turning the switch on shares it and removes the look-alike.
 
 ### What you can do
 
-- **Create** a challenge — freely, as many as you like. It is yours.
-- **Edit / publish / unpublish / hide / share** — only challenges you created
+- **Create** a question — freely, as many as you like. It is yours.
+- **Edit / publish / unpublish / hide / share** — only questions you created
   (and your events' own questions).
-- **Assign** any challenge you can see to any event you organise.
-- **Remove from an event** — only challenges *you* added to that event. If a
+- **Assign** any question you can see to any event you organise.
+- **Remove from an event** — only questions *you* added to that event. If a
   colleague or an administrator put it there, ask them to take it out. In the
   **Add from bank** dialog those rows are ticked, greyed out and outlined with
   dashes, and hovering
   one says who can remove it; the row menu leaves the option off entirely.
 
-A challenge you did not create offers no Edit, Publish or Hide, and says why.
+A question you did not create offers no Edit, Publish or Hide, and says why.
 If its form is reached some other way, it opens read-only, with no Save button
 and its formatting buttons switched off under a line saying you can only edit
-challenges you created:
+questions you created:
 
-![A challenge created by somebody else](../screenshots/event-admin/02-challenge-not-mine.png)
+![A question created by somebody else](../screenshots/event-admin/02-challenge-not-mine.png)
 
-Deleting a challenge outright is an administrator's action, exactly as it is for
+Deleting a question outright is an administrator's action, exactly as it is for
 a normal admin. Unpublish it or hide it instead — both are yours.
 
-### Sharing a challenge with other organisers
+### Sharing a question with other organisers
 
 Turn on **Shared with all organisers** in the **Topic and sharing** row of one
 of your own bank questions, and every event admin on the platform can see it and
@@ -374,50 +374,50 @@ question.
 
 ### Sealing an answer
 
-When you create a challenge the form offers **Seal the answer — only I, or a
+When you create a question the form offers **Seal the answer — only I, or a
 superadmin on the record, can see or change it**. Turn it on and the correct
 answer, the explanation and the hint become yours alone: not other organisers,
 not administrators. (A participant competing in an event that holds it can still
 buy its hint there, as they could any hint.) The one exception is a
 **superadmin**, and even for them it is not silent: they can
 reveal a sealed answer to themselves only by an explicit act that is recorded in
-the challenge's History and in the event log, naming them — so if it ever
+the question's History and in the event log, naming them — so if it ever
 happens, you will see who did it, and when. If they were looking through
 somebody else's view at the time, the History names that person too when they
 share one of your events, and otherwise says only that it was *an account
 outside your events* — not which kind of account, nor which view. If that
 account has since been deleted, it says so instead. This is the one restriction on
 {{platformName}} that binds *upwards* as well as sideways, which is what makes
-it worth having when you are writing a challenge for a room that includes the
+it worth having when you are writing a question for a room that includes the
 people who run the platform.
 
-What it covers is narrow, and deliberately so. The challenge itself stays entirely
+What it covers is narrow, and deliberately so. The question itself stays entirely
 visible — its title, description, difficulty, points, who solved it and every
 score. The **hint** is sealed with the answer: it is withheld
 from every other organiser's screens and exports exactly as the answer is. A
-participant who gives up 30% of the challenge's points for it during the event
+participant who gives up 30% of the question's points for it during the event
 still receives it — that is what a hint is for, and a seal does not take back
-something they bought. On a multiple-choice challenge the options still show,
+something they bought. On a multiple-choice question the options still show,
 because the options are the question; which of them are correct does not.
 
 Participants never see the answer either, and that includes the end of the event.
 If your event has **Reveal answers when the event ends** switched on, a sealed
-challenge shows **Answer not shown** with a line saying why, and contributes
+question shows **Answer not shown** with a line saying why, and contributes
 neither its explanation nor its hint to the reveal (a hint a participant paid for
 during the event stays theirs). Scores, solves and rankings are untouched.
 
-**You cannot seal an *Any answer (free response)* challenge.** There is no answer
+**You cannot seal an *Any answer (free response)* question.** There is no answer
 on one to seal — every response is accepted — and sealing would hide the responses
 from everyone but you, which is the opposite of why you asked the question. The
 form disables sealing when you choose that answer type, and takes that answer type
 away once you tick the seal.
 
-Sealing also makes you the only person who can **edit** that challenge or
+Sealing also makes you the only person who can **edit** that question or
 **restore an earlier version** of it — the answer is bound up in both. (A
 superadmin who has revealed the answer can do both as well, and the reveal is on
 the record.) It reaches further than the answer box, so know what you are taking
 on: on everybody else's screen the row loses **Publish**, **Hide** and **Edit**
-(and with it the sharing switch) as well, and their row menu says the challenge
+(and with it the sharing switch) as well, and their row menu says the question
 is not theirs to change. If a colleague was going to publish it for you, retitle
 it or share it with all organisers, that falls to you.
 
@@ -425,30 +425,30 @@ What other organisers and administrators keep is the *use* of it. They can still
 read the row, preview it as a participant, assign it to their own events, take
 back an assignment they made, grant attempts on it and open its History. A
 superadmin can still delete it outright, too — a seal protects the answer, not
-the challenge.
+the question.
 
-**You can only decide this while the challenge is being created.** There is no
+**You can only decide this while the question is being created.** There is no
 way to seal an answer afterwards, and the platform will tell you so if you try:
 by then it has been readable by administrators, and a setting cannot take that
-back. You can go the other way — open your own sealed challenge and tick
+back. You can go the other way — open your own sealed question and tick
 **Unseal this answer when I save** (a superadmin who has revealed the answer is
 offered the same tick) — but that is just as final, and it is
-refused while the challenge is in an event where staff compete, whatever stage
-that event is at, finished included: such an event admits sealed challenges
+refused while the question is in an event where staff compete, whatever stage
+that event is at, finished included: such an event admits sealed questions
 only, and a finished one can be reopened. The editor withholds the tick while an
-event of yours holds the challenge, and says why, naming the event or events;
+event of yours holds the question, and says why, naming the event or events;
 where its only such events are ones you do not organise, the tick is offered
 and the save is refused instead, and the refusal says how many events you do
 not organise stand in the way. While none of those events has finished — nor
-any session of one — take the challenge out of them first (where somebody else
+any session of one — take the question out of them first (where somebody else
 assigned it, ask them to) or leave the answer sealed; once one has finished, or
-one of its sessions has, its challenge list can no longer be changed, so the
-answer stays sealed for as long as the challenge stays assigned — you still
-read and edit the challenge as its author (see [When staff
+one of its sessions has, its question list can no longer be changed, so the
+answer stays sealed for as long as the question stays assigned — you still
+read and edit the question as its author (see [When staff
 compete](#when-staff-compete)). Once unsealed the answer is readable by everyone
-who can see the challenge, and it cannot be sealed again.
+who can see the question, and it cannot be sealed again.
 
-Two more things before you rely on it. A sealed challenge **cannot be carried to
+Two more things before you rely on it. A sealed question **cannot be carried to
 another platform**: an import has no way of knowing who its author should be
 there, so those rows are refused, and you would create it fresh and seal it
 again at the other end. And this is a control over {{platformName}}'s own
@@ -457,18 +457,18 @@ the server's database or its backups can still read the answer.
 
 ### One thing that will surprise you
 
-If a challenge you created is held by an event you do not organise (that
+If a question you created is held by an event you do not organise (that
 event's own copy, written by you, or a qualifying question it shares), you
 can still fix its title, description, hint and explanation — but not its
-**answer (on a Text challenge that is every accepted answer, so adding or
+**answer (on a Text question that is every accepted answer, so adding or
 removing one counts), answer type, difficulty, choices, attempt limit or
-published state**, nor make it a qualifying question or an ordinary challenge
-again (its `qualifying:` tag). An **Any answer** challenge has no hint to fix — it never
+published state**, nor make it a qualifying question or an ordinary question
+again (its `qualifying:` tag). An **Any answer** question has no hint to fix — it never
 carries one.
 Those decide how somebody else's event scores, so changing them from here would
 re-grade an event you have no part in.
 
-You will see this rather than be refused after the fact. Opening such a challenge
+You will see this rather than be refused after the fact. Opening such a question
 for editing leaves the title and the text fields alone and locks the scoring
 fields (a dashed outline), with a line above them saying why. **Publish** and **Hide** are not
 offered on it at all, and the row menu explains their absence. In its version
@@ -477,25 +477,25 @@ rewrites the answer and difficulty along with everything else, so it counts as a
 scoring change even though it looks like an undo.
 
 **A sealed answer is that same rule taken to its limit.** On somebody else's
-sealed challenge you can read the title and the description, assign it to your
+sealed question you can read the title and the description, assign it to your
 own events and watch people solve it — but the correct answer, the explanation
 and the hint are shown to you nowhere: not in the list, not in **View as
 Participant** (which says the hint is withheld rather than leaving a blank), not
-in the challenge's version **History** (including the versions saved before it
+in the question's version **History** (including the versions saved before it
 was sealed), and not after the event even if the event reveals answers. There is
 no **Edit** on the row, and an administrator cannot lift that for you either — a
 seal binds them too. So if you need the answer, or need something in the
-challenge changed, ask whoever created it — or a superadmin, who can reveal the
-answer to themselves and then edit the challenge, the reveal being written into
+question changed, ask whoever created it — or a superadmin, who can reveal the
+answer to themselves and then edit the question, the reveal being written into
 its History with their name. The `Sealed` badge in the Status column is how to
 spot one before you go looking.
 
 ### Attempt limits you cannot see
 
-**Grant Attempts** speaks only for the events you organise. If a challenge is
+**Grant Attempts** speaks only for the events you organise. If a question is
 capped by an event somebody else runs, this dialog will tell you that no event
 *you organise* limits attempts on it — which is not the same as saying nobody
-does. Ask an administrator if a participant is stuck on a challenge whose limit
+does. Ask an administrator if a participant is stuck on a question whose limit
 you cannot find.
 
 ---
@@ -524,16 +524,16 @@ that:
 - **Export CSV** covers exactly what the list shows — every page of it, in its
   order, after your search, the status filters and the column filters (and, with
   **Show people from your other events** ticked, those people too) — and, with one of your
-  events open, adds one **Response:** column per **Any answer** challenge in
+  events open, adds one **Response:** column per **Any answer** question in
   that event, holding each participant's response exactly as they typed it
   (blank for anyone who has not answered). That is how you read the free-text
   responses for an event you organise. If those responses cannot be loaded the
   export is cancelled with a message rather than saved without them. An **Any
-  answer** challenge that somebody else has sealed gets no column at all: on that
-  kind of challenge the responses *are* the answer, so they belong to its author,
+  answer** question that somebody else has sealed gets no column at all: on that
+  kind of question the responses *are* the answer, so they belong to its author,
   and a column of empty cells under its title would read as nobody having
   responded — which is worse than its absence. Ask the author for those. Your own
-  sealed challenges are not affected: you are the author, so their columns are
+  sealed questions are not affected: you are the author, so their columns are
   there as usual.
 
 For those people you have the ordinary administrator's row actions: approve,
@@ -622,7 +622,7 @@ The summary after an invitation counts anyone who was left out and says why:
 somebody tagged **staff** invited to an event where staff do not compete (they
 can enter it without being enrolled), an existing administrator's account
 invited to an event where staff *do* compete (only a superadmin can enrol an
-administrator as a competitor), the author of a challenge assigned to that
+administrator as a competitor), the author of a question assigned to that
 event, anyone blocked or still awaiting approval, and — on a late-entry event —
 anybody who took part in it before it ended, who cannot come back as a late
 entrant. Each of those is counted as skipped, not reported as already in the
@@ -678,11 +678,11 @@ All three start from your events.
 
 - **Submissions** — an event's **Activity** section lists that event's; the
   **Audit** page lists those of all your events. An answer submitted to a
-  **sealed** challenge somebody else
+  **sealed** question somebody else
   created reads `sealed` rather than showing what the participant typed, and the
   search box cannot match it either — otherwise searching would be a way of
   working the answer out. Who submitted, when, and whether they were right are all
-  still there, and on your own sealed challenges you read the answers as usual.
+  still there, and on your own sealed questions you read the answers as usual.
 - **Rankings** — an event's **Rankings** section shows that event (or the
   session you picked); **Live rankings** in the sidebar shows the live events
   you organise. A **Program** has no leaderboard: its Rankings section lists each
@@ -690,10 +690,10 @@ All three start from your events.
   Satisfactory; under 60% no certificate, and the learner may try again; the
   [Admin guide](admin.md#program-grades) explains how a grade is worked out).
   On a Booth Event or Competition set to **Start each
-  participant's clock: When they open their first challenge** (the default for
+  participant's clock: When they open their first question** (the default for
   new ones, chosen on the event form's Advanced section before it starts),
   each person's time to solve runs from their first open of a scoring
-  challenge, so somebody who has entered but opened nothing is not on the board
+  question, so somebody who has entered but opened nothing is not on the board
   yet. The administrator guide's *Start each participant's clock* has the rest.
 - **Analytics** — pick one of your events or sessions. There is no
   platform-wide option: it would aggregate events that are not yours. Inside an
@@ -722,12 +722,12 @@ its activity already says it failed).
 - **Full event export** — a ZIP of CSV files with everything about one of your
   events (participants, answers, hints, time, rankings, certificates, ratings;
   for a Program, each learner's grades).
-  Answers to a sealed challenge somebody else wrote stay withheld.
+  Answers to a sealed question somebody else wrote stay withheld.
 - **Person export** — a participant's profile, memberships, answers, history
   and invitations, covering **only your events**: anything from somebody else's
   events is left out, and so are your event team's lead records.
 - **Clone event** — copy one of your events into a new, upcoming one (settings,
-  tags, challenges, sessions; never people, answers, the join link, the event
+  tags, questions, sessions; never people, answers, the join link, the event
   team and its lead targets, the event's look or its own certificate design). You
   become the organiser of the copy. Starting an event from a template works the
   same way, and both need at least one event of your own: if every event you
@@ -736,14 +736,14 @@ its activity already says it failed).
   clone dialog says so.
 - **Templates** — you can see the event templates and create an event from one,
   and you become its organiser. Only an administrator can create, change or
-  delete a template, or save an event as one. A challenge you cannot see is left
+  delete a template, or save an event as one. A question you cannot see is left
   out of the event you create and counted, never named: its id and title are
   hidden from you in the template and in the message that confirms the event. A
-  challenge held by an event you compete in is left out of an event you create
+  question held by an event you compete in is left out of an event you create
   from a template or by cloning, and the message names it with that reason.
   The quick spin offers **Add the qualifying questions**, ticked for a Booth
   Event, except on a template where staff compete: such an event holds sealed
-  challenges only, and a qualifying question can never be sealed. A start
+  questions only, and a qualifying question can never be sealed. A start
   inside the hour the clocks skip when they go forward is refused.
 
 They are all in the event's workspace: **⋯ → Export everything** and **⋯ →
@@ -751,7 +751,7 @@ Clone**, and **New event** in the sidebar (pick a template, then **Create
 event** in its quick spin). The person export is an API route (see the API
 reference). While you compete in an event, **Export everything** and **Clone**
 are refused to you there; **Export Activity** stays, with the other reads (a
-fellow competitor's person export among them: that event's challenges are all
+fellow competitor's person export among them: that event's questions are all
 sealed, so their answers stay withheld), and its Overview keeps only the live
 figures off the page (**Joined** and its certificate counts are still shown).
 
@@ -768,7 +768,7 @@ its reports: its targets are then shown, not offered. Each SDR's email lists eve
 lead's address and attaches a file of their own leads. Only a team member whose
 address is an account able to open the event (you, say) gets each email's button;
 the others are told the next step in words they can act on without it (to load
-the attached file into the CRM, for instance, or to ask you to edit a challenge).
+the attached file into the CRM, for instance, or to ask you to edit a question).
 A lead's other events, where they were first seen and who invited them there,
 are named only where the reader may open those events: your report and your
 download name only your own events (an earlier event of somebody else's reads

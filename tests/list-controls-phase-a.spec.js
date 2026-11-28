@@ -84,7 +84,7 @@ test.describe("Analytics per-challenge table: search + pagination (v7.20.7)", ()
 
     // A miss says so rather than showing a blank table.
     await page.locator("#analytics-search").fill("zzz-no-such-challenge");
-    await expect(page.locator("#analytics-table-body")).toContainText(/No challenges match/i);
+    await expect(page.locator("#analytics-table-body")).toContainText(/No questions match/i);
   });
 });
 

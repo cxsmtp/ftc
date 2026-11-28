@@ -189,7 +189,7 @@ export async function closeLateEntriesNow(compId){
   const ok=await showModal({
     title:'Close late entries now',
     message:`Stop taking late entries for <strong>${esc(comp.name)}</strong> now${dl?`, instead of at <strong>${esc(dl)}</strong>`:''}?<br><br>`
-      +`From this moment its join link, QR code and short code stop admitting anyone, organisers can no longer add or remove people, and late entrants can no longer answer challenges or reveal hints. `
+      +`From this moment its join link, QR code and short code stop admitting anyone, organisers can no longer add or remove people, and late entrants can no longer answer questions or reveal hints. `
       +`The late-entrant leaderboard becomes final, so its top three can collect a placing certificate — unless they already collected a participation certificate during the window. `
       +`Emails already sent still name the old deadline, and invitations or sign-ups not yet completed no longer let anyone take part. `
       +`Only a superadmin can reopen it.`,
@@ -1084,7 +1084,7 @@ export async function compKindSelect(el){
     const label=eventKindLabel(kind)||eventCollectiveSingular();
     const ok=await showModal({
       title:`Change type to ${label}?`,
-      message:`The name, the start, the template and the ticked challenges are kept. <strong>Every other setting you changed</strong> (duration or deadline, sessions, attempts, Advanced settings) goes back to the defaults for ${esc(label)}.`,
+      message:`The name, the start, the template and the ticked questions are kept. <strong>Every other setting you changed</strong> (duration or deadline, sessions, attempts, Advanced settings) goes back to the defaults for ${esc(label)}.`,
       confirmText:'Change type',
     });
     if(!ok||!document.body.contains(ov))return;
@@ -1587,8 +1587,8 @@ export function openCompetitionForm(editId,opts){
         is), and event admins &mdash; are never on an event&rsquo;s leaderboard. When on, a staff member
         <strong>enrolled</strong> in this event competes like any other participant &mdash; on the board,
         in the all-solved rule, eligible for a certificate &mdash; and <strong>cannot edit this event or
-        any challenge assigned to it</strong> while enrolled, whatever their admin tier. Only
-        <strong>sealed</strong> challenges can be assigned (a competing admin would otherwise read the
+        any question assigned to it</strong> while enrolled, whatever their admin tier. Only
+        <strong>sealed</strong> questions can be assigned (a competing admin would otherwise read the
         answer key off the admin screen), never one whose author competes here, and anyone tagged
         <strong>staff</strong> can only be added to an event with this switch on.
       </p>
@@ -1685,7 +1685,7 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
   setSafeHtml(overlay, `<div class="card comp-form-card" role="dialog" aria-modal="true" aria-labelledby="comp-form-title">
     <h3 class="modal-title" id="comp-form-title">${esc(title)}</h3>
     ${tpl?`<p class="comp-form-from" id="comp-form-from">${ICO.copy} Starting from the template <strong>${esc(tpl.name)}</strong>${
-      tpl.task_count?` &middot; its ${tpl.task_count} challenge${tpl.task_count===1?'':'s'} and join-link settings come with it`:' &middot; its join-link settings come with it'
+      tpl.task_count?` &middot; its ${tpl.task_count} question${tpl.task_count===1?'':'s'} and join-link settings come with it`:' &middot; its join-link settings come with it'
     }. Change anything below.</p>`:''}
     <input type="hidden" id="comp-edit-id" value="${esc(editId||'')}"/>
     ${lockName?'<p class="comp-form-lock-note">This event has ended. Name and start time cannot be changed.</p>'
@@ -1782,13 +1782,13 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
          limit, and it is a plain number input for the same reason the challenge
          one is: uncapped is the normal answer and must be the easiest to leave. -->
     <div class="form-group" style="margin-top:12px">
-      <label for="comp-attempt-cap">Attempt limit per challenge</label><span data-help="event.attempts" data-help-label="Attempt limit"></span>
+      <label for="comp-attempt-cap">Attempt limit per question</label><span data-help="event.attempts" data-help-label="Attempt limit"></span>
       <input id="comp-attempt-cap" type="number" min="1" max="1000" step="1" inputmode="numeric"
              placeholder="No limit" value="${(Number.isInteger(src?.attempt_cap)&&src.attempt_cap>0)?src.attempt_cap:''}"
              aria-describedby="comp-attempt-cap-hint"/>
       <p class="comp-form-reveal-hint" id="comp-attempt-cap-hint">
-        Submissions each participant may make on each challenge in this event. Leave blank
-        for no limit. A challenge with its own limit overrides this one. Once a participant
+        Submissions each participant may make on each question in this event. Leave blank
+        for no limit. A question with its own limit overrides this one. Once a participant
         runs out, an admin can grant them more.
       </p>
     </div>
@@ -1862,12 +1862,12 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
     ${showClockStart?`<div class="form-group" style="margin-top:12px">
       <div class="help-label-row"><label for="comp-clock-start">Start each participant&rsquo;s clock</label><span data-help="event.clock" data-help-label="Clock start"></span></div>
       <select id="comp-clock-start" ${_csLocked?'disabled':''} aria-describedby="comp-clock-start-hint">
-        <option value="first_open" ${_clockStartInit==='first_open'?'selected':''}>When they open their first challenge</option>
+        <option value="first_open" ${_clockStartInit==='first_open'?'selected':''}>When they open their first question</option>
         <option value="entry" ${_clockStartInit==='entry'?'selected':''}>When they enter the event</option>
       </select>
       <p class="comp-form-reveal-hint" id="comp-clock-start-hint">
-        Time to solve breaks score ties. With <strong>When they open their first challenge</strong>,
-        each participant&rsquo;s time starts when they first open a scoring challenge (or answer or
+        Time to solve breaks score ties. With <strong>When they open their first question</strong>,
+        each participant&rsquo;s time starts when they first open a scoring question (or answer or
         ask for a hint, if that comes first), so arriving late or reading the list is not counted.
         Quick questions do not start it. Until it starts, a participant is not on the leaderboard.
       </p>
@@ -2921,8 +2921,8 @@ export function showStaffCompeteRefusalModal(d,extra=''){
   if(d.code==='staff_compete_unsealed_challenges'){
     const rows=Array.isArray(d.challenges)?d.challenges:[];
     showModal({
-      title:'Seal these challenges first',
-      message:`${esc(d.error||'')}${extra?` ${esc(extra)}`:''}<ul style="margin:8px 0 0 18px">${rows.map(t=>`<li>${esc(t.title)}</li>`).join('')}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">A sealed challenge's answer is hidden from every admin but its author. Seal a new copy of each one, or take it out of the event, then turn the switch on.</p>`,
+      title:'Seal these questions first',
+      message:`${esc(d.error||'')}${extra?` ${esc(extra)}`:''}<ul style="margin:8px 0 0 18px">${rows.map(t=>`<li>${esc(t.title)}</li>`).join('')}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">A sealed question's answer is hidden from every admin but its author. Seal a new copy of each one, or take it out of the event, then turn the switch on.</p>`,
       confirmText:'OK',cancelText:null,
     });
     return true;
@@ -2931,7 +2931,7 @@ export function showStaffCompeteRefusalModal(d,extra=''){
     const rows=Array.isArray(d.participants)?d.participants:[];
     showModal({
       title:'Remove these authors first',
-      message:`${esc(d.error||'')}${extra?` ${esc(extra)}`:''}<ul style="margin:8px 0 0 18px">${rows.map(u=>`<li><strong>${esc(u.nickname||u.id)}</strong> — ${(u.tasks||[]).map(t=>`“${esc(t.title)}”`).join(', ')}</li>`).join('')}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">A challenge's answer is known to whoever wrote it, so its author cannot compete in an event that holds it. Remove them from the event (Manage Participants) or take their challenges out of it, then turn the switch on.</p>`,
+      message:`${esc(d.error||'')}${extra?` ${esc(extra)}`:''}<ul style="margin:8px 0 0 18px">${rows.map(u=>`<li><strong>${esc(u.nickname||u.id)}</strong> — ${(u.tasks||[]).map(t=>`“${esc(t.title)}”`).join(', ')}</li>`).join('')}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">A question's answer is known to whoever wrote it, so its author cannot compete in an event that holds it. Remove them from the event (Manage Participants) or take their questions out of it, then turn the switch on.</p>`,
       confirmText:'OK',cancelText:null,
     });
     return true;
@@ -3065,7 +3065,7 @@ export async function saveCompetition(){
   // never be sealed, so the qualifying questions cannot join it: said here,
   // before a template spawn makes the event, rather than by the PUT that follows.
   if(tpl&&!(_formOv&&_formOv._spawned)&&fd.add_qualifying&&fd.staff_compete){
-    showToast('An event where staff compete holds sealed challenges only, and a qualifying question can never be sealed, so such an event cannot ask qualifying questions. Untick one of the two.','error');
+    showToast('An event where staff compete holds sealed questions only, and a qualifying question can never be sealed, so such an event cannot ask qualifying questions. Untick one of the two.','error');
     return;
   }
   const body={name:fd.name};
@@ -3226,7 +3226,7 @@ export async function saveCompetition(){
             ?`, with ${esc(_noFixedDeadlineWords(newEnd,undefined,true))}`
             :` — its deadline is being moved to ${esc(fmtDt(newEnd,'long'))}`;
           if(comp.ended_manually){_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> was closed early and will become <strong>live</strong> again${reopens}.`);}
-          else if(comp.ended_at&&_autoEndKeepsEnded(comp)) revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended because every participant had already finished every challenge — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
+          else if(comp.ended_at&&_autoEndKeepsEnded(comp)) revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended because every participant had already finished every question — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
           else if(comp.ended_at){_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended before its deadline and will become <strong>live</strong> again${reopens}.`);}
           else{_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> ended when its deadline passed. ${noFixedDeadline?`Saving it with ${esc(_noFixedDeadlineWords(newEnd,undefined,true))}`:`Moving the deadline to ${esc(fmtDt(newEnd,'long'))}`} will make it <strong>live</strong> again.`);}
         }
@@ -3261,7 +3261,7 @@ export async function saveCompetition(){
             //                                  time-derived, so a later end makes it live again.
             if(comp.ended_manually){_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> was manually ended and will become <strong>live</strong> again.`);}
             else if(comp.ended_at&&!_autoEndKeepsEnded(comp)){_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended before its scheduled time and will become <strong>live</strong> again.`);}
-            else if(comp.ended_at) revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended because every participant had already finished every challenge — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
+            else if(comp.ended_at) revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended because every participant had already finished every question — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
             else{_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> ended automatically when its scheduled time elapsed. Saving a later end time will make it <strong>live</strong> again.`);}
           }
         }
@@ -3282,7 +3282,7 @@ export async function saveCompetition(){
             // The session gate reads its COMPETITION's two columns (routes/sessions.js).
             if(ts.ended_manually){_revives=true;revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> was manually ended and will become <strong>live</strong> again.`);}
             else if(ts.ended_at&&!_autoEndKeepsEnded(comp)){_revives=true;revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> auto-ended before its scheduled time and will become <strong>live</strong> again.`);}
-            else if(ts.ended_at) revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> auto-ended because every participant had already finished every challenge — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
+            else if(ts.ended_at) revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> auto-ended because every participant had already finished every question — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
             else{_revives=true;revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> ended automatically when its scheduled time elapsed. Saving a later end time will make it <strong>live</strong> again.`);}
           }
         }
@@ -3340,7 +3340,7 @@ export async function saveCompetition(){
       }
       summary+=`</ul>`;
     }
-    if(tpl)summary+=`<br><br>From the template <strong>${esc(tpl.name)}</strong>${tpl.task_count?`, with its ${tpl.task_count} challenge${tpl.task_count===1?'':'s'}`:''}.`;
+    if(tpl)summary+=`<br><br>From the template <strong>${esc(tpl.name)}</strong>${tpl.task_count?`, with its ${tpl.task_count} question${tpl.task_count===1?'':'s'}`:''}.`;
     // The opt-out sits in the folded Advanced section: the confirmation says
     // what it will do (ON creates an account for everyone who joins).
     if(fd.cxone_disabled!==undefined)summary+=`<br><br><span id="comp-confirm-cxone">${esc(_cxoneAccountsLine(fd.cxone_disabled))}${fd.cxone_disabled?'.':' — one is created for everyone who joins.'}</span>`;
@@ -3538,7 +3538,7 @@ export async function saveCompetition(){
       // A conflict is not this form's to fix: someone else changed the event
       // after it was made, and pressing again would only be refused again.
       if(r.status===409&&d.conflict){
-        showToast(`Created “${spawned.competition.name}” from the template, but these settings were not saved: the event was changed after it was created, by another admin or in another tab. Open it from the Events list to see what it holds now; the challenges you ticked and the Checkmarx One settings were not added either.`,'error');
+        showToast(`Created “${spawned.competition.name}” from the template, but these settings were not saved: the event was changed after it was created, by another admin or in another tab. Open it from the Events list to see what it holds now; the questions you ticked and the Checkmarx One settings were not added either.`,'error');
         loadAdminCompetitions({keepPage:true});
         return;
       }
@@ -3682,7 +3682,7 @@ export async function saveCompetition(){
       // short by the one that applies to an exhausted participant: Grant Attempts
       // (Challenges tab kebab) un-finishes them, which is what lets this very
       // save revive the event on the next attempt.
-      else if(_allSolved)_msg='Saved. The event stays ended — every participant had already finished every challenge (solved it, or run out of attempts). Add new participants, or grant an exhausted participant more attempts, to revive it.';
+      else if(_allSolved)_msg='Saved. The event stays ended — every participant had already finished every question (solved it, or run out of attempts). Add new participants, or grant an exhausted participant more attempts, to revive it.';
     }
     showToast(_msg);
   }
@@ -3701,7 +3701,7 @@ export async function saveCompetition(){
 
 export async function deleteCompetition(id){
   const comp=S.adminCompetitionsData.find(c=>c.id===id);
-  const ok=await showModal({title:'Delete Event',message:`Permanently delete <strong>${esc(comp?.name||'')}</strong>?<br><br>All associated submissions, assignments, and challenge links will be removed. This cannot be undone.`,confirmText:'Delete',confirmClass:'danger'});
+  const ok=await showModal({title:'Delete Event',message:`Permanently delete <strong>${esc(comp?.name||'')}</strong>?<br><br>All associated submissions, assignments, and question links will be removed. This cannot be undone.`,confirmText:'Delete',confirmClass:'danger'});
   if(!ok)return;
   const r=await fetch(`/api/admin/competitions/${id}`,{method:'DELETE',headers:csrfHeaders()});
   if(r.ok){

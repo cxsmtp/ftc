@@ -786,7 +786,7 @@ app.get("/api/admin/export/competition-activity", requireAdmin, exportLimiter, (
   const slots = getCompetitionTimeslots(compId);
   if (competitionStatus(comp, slots) === "upcoming") {
     return res.status(400).json({
-      error: "This event has not started yet, so there is no challenge activity to export.",
+      error: "This event has not started yet, so there is no question activity to export.",
       code: "competition_not_started",
     });
   }

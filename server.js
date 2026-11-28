@@ -382,7 +382,7 @@ function _importRowShapeError(rows, noun, fields) {
       if (v === undefined || v === null) continue;
       if (!_IMPORT_FIELD_SHAPES[kind](v, r)) {
         const want = kind === "flag" ? "true/false, 0/1 or a number"
-          : kind === "answer" ? "text (or a list of option ids on a choice challenge)"
+          : kind === "answer" ? "text (or a list of option ids on a choice question)"
           : "text";
         return `${noun} #${i + 1} has an invalid "${name}". The file is malformed — expected ${want}.`;
       }
@@ -6199,11 +6199,11 @@ require("./routes/export-import")(app);
 app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimiter, csrfProtection, _importJsonParser, async (req, res) => {
   const { data, resolutions } = req.body;
   if (!data || data.type !== "hackarena-tasks" || !Array.isArray(data.tasks))
-    return res.status(400).json({ error: "Invalid challenge export file" });
+    return res.status(400).json({ error: "Invalid question export file" });
   if (data.tasks.length > 10000)
-    return res.status(400).json({ error: `Too many challenges (${data.tasks.length}). Maximum is 10,000.` });
+    return res.status(400).json({ error: `Too many questions (${data.tasks.length}). Maximum is 10,000.` });
   {
-    const _shape = _importRowShapeError(data.tasks, "Challenge", {
+    const _shape = _importRowShapeError(data.tasks, "Question", {
       title: "str", description: "str", explanation: "str", hint: "str",
       status: "str", author_name: "str", author_linkedin: "str",
       attachment_url: "str", active: "flag", correct_answer: "answer",

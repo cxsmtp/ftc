@@ -16,7 +16,7 @@ import { showSkeletonRows, showLoading, hideLoading } from "../ui/loading.js";
 import { overlayDismiss, showModal } from "../ui/modal.js";
 import { createRichEditor, highlightCodeElement, renderRich } from "../ui/richtext.js";
 import { showToast } from "../ui/toast.js";
-import { taskMatchesQuery, isQualifyingTask, isQualifyingTag, bankTasks, workspaceTasks, pickerTasks } from "../ui/task-search.js"; // the one challenge search: title, difficulty, tags; the one qualifying test
+import { taskMatchesQuery, isQualifyingTask, isQualifyingTag, bankTasks, workspaceTasks, pickerTasks } from "../ui/task-search.js"; // the one question search: title, difficulty, tags; the one qualifying test
 import { addTasksToCompetition, runBoundedCollect } from "./task-assign.js"; // the one add-to-event path
 import { tipsAllOn } from "../ui/help-tips.js";
 import { _stopAllPolls, _announceSignout } from "./session-monitor.js";
@@ -376,14 +376,14 @@ export async function assignPickedTasks(compId,overlayIn){
   // in a toast. Headings render only for a non-empty side — a heading over an
   // empty list is the empty-shell shape v7.20.3 removed.
   const parts=[];
-  if(toAdd.length)parts.push(`<strong>Adding ${toAdd.length} challenge(s)</strong>${li(toAdd)}`);
-  if(toRemove.length)parts.push(`<strong>Removing ${toRemove.length} challenge(s)</strong>${li(toRemove)}`);
-  if(toRemove.length)parts.push(`<p style="margin:10px 0 0">Removing a challenge takes it off this event for everyone. Any points already scored on it are kept, but it stops counting toward the leaderboard and participants can no longer open it.</p>`);
+  if(toAdd.length)parts.push(`<strong>Adding ${toAdd.length} question(s)</strong>${li(toAdd)}`);
+  if(toRemove.length)parts.push(`<strong>Removing ${toRemove.length} question(s)</strong>${li(toRemove)}`);
+  if(toRemove.length)parts.push(`<p style="margin:10px 0 0">Removing a question takes it off this event for everyone. Any points already scored on it are kept, but it stops counting toward the leaderboard and participants can no longer open it.</p>`);
   if(isLive)parts.push(`<p style="margin:10px 0 0"><strong>${esc(comp.name)}</strong> is <strong>live</strong> — this takes effect immediately.</p>`);
   const ok=await showModal({
-    title:'Apply challenge changes?',
+    title:'Apply question changes?',
     message:parts.join(''),
-    confirmText:toRemove.length?'Apply Changes':'Add Challenges',
+    confirmText:toRemove.length?'Apply Changes':'Add Questions',
     confirmClass:toRemove.length?'danger':'',
     cancelText:'Cancel',
   });
@@ -484,8 +484,8 @@ export function showAssignmentRefusalModal(refused,total){
   const li=rows.map(r=>`<li><strong>${esc(r.title||r.task_id)}</strong> → ${esc(r.competition_name||r.competition_id)} — ${esc(reasonText(r))}</li>`).join('');
   const capped=(Number(total)||rows.length)>rows.length?`<li><em>…and ${(Number(total)||0)-rows.length} more</em></li>`:'';
   showModal({
-    title:'Some challenges were not added',
-    message:`An event where staff compete only admits challenges whose answer is <strong>sealed</strong>, and never one created by somebody competing in it — a competing admin could otherwise read the answer.<ul style="margin:8px 0 0 18px;max-height:220px;overflow:auto">${li}${capped}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">Seal a new copy of the challenge, choose a sealed one by another author, or turn off "Staff can compete" on the event.</p>`,
+    title:'Some questions were not added',
+    message:`An event where staff compete only admits questions whose answer is <strong>sealed</strong>, and never one created by somebody competing in it — a competing admin could otherwise read the answer.<ul style="margin:8px 0 0 18px;max-height:220px;overflow:auto">${li}${capped}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">Seal a new copy of the question, choose a sealed one by another author, or turn off "Staff can compete" on the event.</p>`,
     confirmText:'OK',cancelText:null,
   });
 }
@@ -564,9 +564,9 @@ export async function loadAdminTasks(){
     // PAGE RELOAD, which throws away every other pane's state to recover one.
     S.selectedChallenges.clear();
     renderLoadFailure('admin-task-body',{colspan:colspanFor('admin-task-body'),
-      noun:'challenges',retryAction:'retry-load-admin-tasks',
+      noun:'questions',retryAction:'retry-load-admin-tasks',
       resetModel:()=>{S.adminTasksData=[];}});
-    showToast('Could not load the challenge list. Please try again.','error');
+    showToast('Could not load the question list. Please try again.','error');
     return 'failed';
   }
   S.adminTasksData=_tasks;
@@ -743,7 +743,7 @@ export function renderAdminTasks(){
     // MEASURED purple pair (--accent2 on --accent-soft dark; --badge-purple-fg on
     // --purple-pill light, 7.47:1 / 6.57:1) rather than a fresh colour.
     const sharedBadge=(t.tags||[]).includes(PUBLIC_DOMAIN_TAG)
-      ?'<span class="badge shared-pool" title="In the shared pool — every event organiser on the platform can use this challenge in their own events.">Shared</span>'
+      ?'<span class="badge shared-pool" title="In the shared pool — every event organiser on the platform can use this question in their own events.">Shared</span>'
       :'';
     // v8.10.0 — the SEALED badge, in the same column and for the same reason
     // v8.8.4 put "Shared" there: an operator deciding whether it is safe to touch
@@ -762,8 +762,8 @@ export function renderAdminTasks(){
     // server's answer; the client never re-derives who is who.
     const sealedBadge=t.answer_sealed
       ?`<span class="badge sealed-answer" title="${t.can_see_answer===false
-          ?(t.can_reveal_answer?'Sealed answer and hint — only the person who created this challenge can see them. As a superadmin you can reveal them; the reveal is recorded in the challenge\'s history.':'Sealed answer and hint — only the person who created this challenge, or a superadmin who reveals them on the record, can see them or edit this challenge.')
-          :(t.answer_revealed?'Sealed answer and hint — revealed to you as a superadmin; the reveal is recorded in the challenge\'s history.':'Sealed answer and hint — you created this challenge, so only you (or a superadmin who reveals them on the record) can see them or edit it.')}">${ICO.lock} Sealed</span>`
+          ?(t.can_reveal_answer?'Sealed answer and hint — only the person who created this question can see them. As a superadmin you can reveal them; the reveal is recorded in the question\'s history.':'Sealed answer and hint — only the person who created this question, or a superadmin who reveals them on the record, can see them or edit this question.')
+          :(t.answer_revealed?'Sealed answer and hint — revealed to you as a superadmin; the reveal is recorded in the question\'s history.':'Sealed answer and hint — you created this question, so only you (or a superadmin who reveals them on the record) can see them or edit it.')}">${ICO.lock} Sealed</span>`
       :'';
 
     // Competition badges — highlight the selected competition, show task_number if assigned.
@@ -857,11 +857,11 @@ export function renderAdminTasks(){
     const _notMineNote=_mayEdit
       ? ''
       : (_competes
-          ? `<div class="kebab-note">${ICO.lock} You are competing in ${esc(_competingIn.map(c=>`“${c.name}”`).join(', '))}, which holds this challenge — you can view it, not change it</div>`
+          ? `<div class="kebab-note">${ICO.lock} You are competing in ${esc(_competingIn.map(c=>`“${c.name}”`).join(', '))}, which holds this question — you can view it, not change it</div>`
           : _sealBinds
           ? (t.can_reveal_answer
-              ? `<div class="kebab-note">Its answer is sealed — reveal it below to see the answer and hint${S.isEventAdmin?'':' and to change this challenge'}; the reveal is recorded</div>`
-              : `<div class="kebab-note">Its answer is sealed — only the person who created it, or a superadmin who reveals it on the record, can change this challenge</div>`)
+              ? `<div class="kebab-note">Its answer is sealed — reveal it below to see the answer and hint${S.isEventAdmin?'':' and to change this question'}; the reveal is recorded</div>`
+              : `<div class="kebab-note">Its answer is sealed — only the person who created it, or a superadmin who reveals it on the record, can change this question</div>`)
           : `<div class="kebab-note">Created by someone else — you can use it, not change it</div>`);
     // v8.8.5 — THE STRICT GATE HAD NO CLIENT CONSUMER. v8.7.0 computes
     // `can_edit_scoring` expressly so the client never offers a scoring control
@@ -880,7 +880,7 @@ export function renderAdminTasks(){
     const _permAssign=adminCan('challenges.assign');
     // Its own reason, not _notMineNote's: this actor may well OWN the challenge.
     const _scoringNote=(_mayEdit&&!_mayEditScoring)
-      ? `<div class="kebab-note">Another organiser's event is scoring on this challenge — only an administrator can publish or hide it</div>`
+      ? `<div class="kebab-note">Another organiser's event is scoring on this question — only an administrator can publish or hide it</div>`
       : '';
     if(isDraft){
       // v6.16.17 — Publish kebab gated on lock state. v6.16.14 added
@@ -984,7 +984,7 @@ export function renderAdminTasks(){
     const rowOpacity=dimContentOnly?'':contentOpacity;
     const cellDim=dimContentOnly?'row-deemphasised':'';
     return `<tr class="${rowOpacity}" style="${isDraft?'font-style:italic':''}">
-      <td class="cb-cell">${(isDraft||isInSelectedComp||!_canSelect)?'':`<input type="checkbox" value="${esc(t.id)}" ${S.selectedChallenges.has(t.id)?'checked':''} data-change-action="challenge-select-toggle" aria-label="Select challenge ${esc(t.title)}"/>`}</td>
+      <td class="cb-cell">${(isDraft||isInSelectedComp||!_canSelect)?'':`<input type="checkbox" value="${esc(t.id)}" ${S.selectedChallenges.has(t.id)?'checked':''} data-change-action="challenge-select-toggle" aria-label="Select question ${esc(t.title)}"/>`}</td>
       <td class="${cellDim}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.locked?`<span class="task-lock-icon" title="Locked">${ICO.lock}</span>`:''}${esc(t.title)}</td>
       <td class="${cellDim}"><span class="badge ${esc(t.difficulty)}">${esc(t.difficulty)}</span></td>
       <td class="${cellDim}">${esc(t.answer_type)}</td>
@@ -1087,7 +1087,7 @@ async function _postBulkAssignChallenges(competitionIds){
   if(!res)return;
   if(res.r.ok){
     const d=res.d;const sk=d.skipped||{};
-    let msg=`${d.assigned||0} challenge-to-competition assignment(s) added.`;
+    let msg=`${d.assigned||0} question-to-event assignment(s) added.`;
     const skipBits=[];
     if(sk.draft)skipBits.push(`${sk.draft} draft`);
     if(sk.locked)skipBits.push(`${sk.locked} locked`);
@@ -1101,7 +1101,7 @@ async function _postBulkAssignChallenges(competitionIds){
     // and the toast then read "0 assigned" with no reason — the v7.21.2
     // counter-with-no-consumer defect, on the surface that has to explain itself.
     if(sk.outOfScope)skipBits.push(`${sk.outOfScope} event(s) you do not organise`);
-    if(sk.notOwned)skipBits.push(`${sk.notOwned} challenge(s) you cannot use`);
+    if(sk.notOwned)skipBits.push(`${sk.notOwned} question(s) you cannot use`);
     if(sk.unfit)skipBits.push(`${sk.unfit} unfit for the event`);
     // v8.12.0 — the two staff-compete seal skips, per (challenge, event) like
     // `unfit`; the refused PAIRS ride `refused` and are listed in a modal below.
@@ -1120,11 +1120,11 @@ async function _postBulkAssignChallenges(competitionIds){
     if(Array.isArray(d.refused)&&d.refused.length)showAssignmentRefusalModal(d.refused,d.refused_total);
     S.selectedChallenges.clear();
     loadAdminTasks();loadAdminCompetitions();
-  }else{showToast(res.d.error||'Failed to assign challenges.','error');}
+  }else{showToast(res.d.error||'Failed to assign questions.','error');}
 }
 
 export async function openBulkAssignChallengesModal(){
-  if(!S.selectedChallenges.size){showToast('Select challenges first.');return;}
+  if(!S.selectedChallenges.size){showToast('Select questions first.');return;}
   // v8.3.20 — REFUSE rather than open an empty picker. The old form never
   // checked `r.ok`, so a 500's error BODY parsed into an object and the
   // `.filter` below threw "comps.filter is not a function": the dialog never
@@ -1138,8 +1138,8 @@ export async function openBulkAssignChallengesModal(){
   overlay.id='challenge-bulk-assign-overlay';
   overlay.className='picker-overlay';
   setSafeHtml(overlay, `<div class="picker-modal" role="dialog" aria-modal="true" aria-labelledby="challenge-bulk-assign-title">
-    <div class="picker-modal-head"><h3 id="challenge-bulk-assign-title">Assign Challenges to Events</h3></div>
-    <p class="picker-note">${S.selectedChallenges.size} challenge(s) selected. Choose the event(s) to assign them to (ended events are excluded):</p>
+    <div class="picker-modal-head"><h3 id="challenge-bulk-assign-title">Assign Questions to Events</h3></div>
+    <p class="picker-note">${S.selectedChallenges.size} question(s) selected. Choose the event(s) to assign them to (ended events are excluded):</p>
     ${nonEnded.length?`<div class="picker-rows" id="challenge-bulk-comp-list">
       ${nonEnded.map(c=>{
         const status=computeCompStatus(c);
@@ -1147,9 +1147,9 @@ export async function openBulkAssignChallengesModal(){
         // name), so it is not offered; an event where staff compete is offered
         // with a reminder that unsealed challenges will be skipped there.
         const competing=!!c.competing;
-        return`<label class="picker-row${competing?' is-disabled':''}"${competing?' title="You are competing in this event — you cannot change its challenges."':''}>
+        return`<label class="picker-row${competing?' is-disabled':''}"${competing?' title="You are competing in this event — you cannot change its questions."':''}>
           <input type="checkbox" value="${esc(c.id)}" class="picker-row-check" ${competing?'disabled':''}/>
-          <span class="picker-row-body"><strong>${esc(c.name)}</strong> <span class="status-badge ${status}">${status}</span>${(c.tags||[]).includes(DRY_RUN_TAG)?` <span class="badge draft" title="Test / dry run event">${DRY_RUN_TAG}</span>`:''}${competing?'<span class="picker-row-flag">You compete here</span>':(c.staff_compete?'<span class="picker-row-flag" style="color:var(--muted)">Sealed challenges only</span>':'')}
+          <span class="picker-row-body"><strong>${esc(c.name)}</strong> <span class="status-badge ${status}">${status}</span>${(c.tags||[]).includes(DRY_RUN_TAG)?` <span class="badge draft" title="Test / dry run event">${DRY_RUN_TAG}</span>`:''}${competing?'<span class="picker-row-flag">You compete here</span>':(c.staff_compete?'<span class="picker-row-flag" style="color:var(--muted)">Sealed questions only</span>':'')}
           <span class="bulk-assign-row-meta">${fmtDt(c.start_time,'long')}</span></span>
         </label>`;
       }).join('')}
@@ -1172,10 +1172,10 @@ export async function challengeBulkAssignExecute(){
 
 export async function publishTask(id){
   const t=S.adminTasksData.find(x=>x.id===id);
-  const ok=await showModal({title:'Publish Challenge',message:`Publishing <strong>${esc(t?.title||'')}</strong> is irreversible. The challenge will become available for assignment to events.<br><br>Continue?`,confirmText:'Publish',confirmClass:''});
+  const ok=await showModal({title:'Publish Question',message:`Publishing <strong>${esc(t?.title||'')}</strong> is irreversible. The question will become available for assignment to events.<br><br>Continue?`,confirmText:'Publish',confirmClass:''});
   if(!ok)return;
   const r=await fetch(`/api/admin/tasks/${id}/publish`,{method:'POST',headers:csrfHeaders()});
-  if(r.ok){showToast('Challenge published.','success');loadAdminTasks();}
+  if(r.ok){showToast('Question published.','success');loadAdminTasks();}
   else{const d=await r.json();showToast(d.error||'Failed.','error');}
 }
 
@@ -1201,7 +1201,7 @@ export function tfChoicesRender(){
              data-input-action="task-choice-text" data-idx="${i}"
              placeholder="Choice ${i+1}" aria-label="Choice ${i+1} text"/>
       <button type="button" class="btn sm danger choice-remove" data-action="task-choice-remove" data-idx="${i}"
-              aria-label="Remove choice ${i+1}"${rows.length<=2?' disabled title="A multiple-choice challenge needs at least two choices"':''}>Remove</button>
+              aria-label="Remove choice ${i+1}"${rows.length<=2?' disabled title="A multiple-choice question needs at least two choices"':''}>Remove</button>
     </div>`).join(''));
   const err=document.getElementById('tf-choices-err');
   if(err)err.textContent=tfChoicesError()||'';
@@ -1232,7 +1232,7 @@ function _tfSyncAddChoiceCap(n){
 export function tfChoicesError(){
   const rows=(S._tfChoices||[]).map(c=>({...c,text:(c.text||'').trim()}));
   if(rows.length<2)return 'Add at least two choices.';
-  if(rows.length>TF_MAX_CHOICES)return `A multiple-choice challenge can have at most ${TF_MAX_CHOICES} choices.`;
+  if(rows.length>TF_MAX_CHOICES)return `A multiple-choice question can have at most ${TF_MAX_CHOICES} choices.`;
   if(rows.some(c=>!c.text))return 'Every choice needs some text.';
   const seen=new Set();
   for(const c of rows){
@@ -1415,7 +1415,7 @@ function _tfSealSyncWithType(){
   if(anyOpt)anyOpt.disabled=!!sealed;
   if(note){
     note.hidden=!(isAny||sealed);
-    if(isAny)note.textContent='An "Any answer (free response)" challenge has no answer to seal — every response is accepted — so sealing is unavailable for it. Sealing would also hide the responses from everyone but you.';
+    if(isAny)note.textContent='An "Any answer (free response)" question has no answer to seal — every response is accepted — so sealing is unavailable for it. Sealing would also hide the responses from everyone but you.';
     else if(sealed)note.textContent='This answer is sealed, so "Any answer (free response)" is unavailable: that type has no answer to seal, and the responses would be hidden from everyone but you.';
   }
 }
@@ -1433,7 +1433,7 @@ export async function restoreTaskVersion(taskId,versionId,versionNum){
   // the open-sequence token in closeHistoryDialog would NOT have been the fix:
   // re-opening already bumps it, and the restore does not read it.
   const _histDialog=S._histState;
-  const ok=await showModal({title:'Restore Version',message:`Restore challenge to version #${versionNum}? This creates a new version with the restored data.`,confirmText:'Restore',confirmClass:''});
+  const ok=await showModal({title:'Restore Version',message:`Restore question to version #${versionNum}? This creates a new version with the restored data.`,confirmText:'Restore',confirmClass:''});
   if(!ok)return;
   // Keep the CSRF token fresh right before the POST. A long-lived history
   // dialog may have been open past a client-side refresh that invalidated
@@ -1456,7 +1456,7 @@ export async function restoreTaskVersion(taskId,versionId,versionNum){
     }else{
       await loadAdminTasks();
     }
-    showToast('Challenge restored.','success');
+    showToast('Question restored.','success');
   }
   else{const d=await r.json().catch(()=>({}));showToast(d.error||'Restore failed.','error');}
 }
@@ -1540,7 +1540,7 @@ export async function openAssignTaskToComps(taskId){
         const sealBlocked=!!c.staff_compete&&!task?.answer_sealed&&!isAssigned;
         const topicBlocked=!isAssigned&&topicHeldIn.has(c.id);
         const blocked=competing||sealBlocked||topicBlocked;
-        const why=competing?'You are competing in this event — you cannot change its challenges.':(sealBlocked?'Staff compete in this event, so it only admits challenges whose answer is sealed.':(topicBlocked?'This event already has a qualifying question on this topic, and an event asks each one once.':''));
+        const why=competing?'You are competing in this event — you cannot change its questions.':(sealBlocked?'Staff compete in this event, so it only admits questions whose answer is sealed.':(topicBlocked?'This event already has a qualifying question on this topic, and an event asks each one once.':''));
         const flag=competing?'<span class="picker-row-flag">You compete here</span>':(sealBlocked?'<span class="picker-row-flag">Sealed only</span>':(topicBlocked?'<span class="picker-row-flag">Topic already asked</span>':''));
         // v8.13.7 — marked inactive like every picker row (dashed edge, muted
         // text, at full strength — styles.css #assign-task-comp-list).
@@ -1591,7 +1591,7 @@ export async function saveTaskCompAssignments(taskId){
   const liveRemovals=Array.from(allBoxes).filter(cb=>!cb.checked&&cb.dataset.wasAssigned==='1'&&cb.dataset.compStatus==='live');
   if(liveRemovals.length>0){
     const names=liveRemovals.map(cb=>cb.dataset.compName).join(', ');
-    const ok=await showModal({title:'Remove from Live Event',message:`You are about to remove this challenge from <strong>${esc(names)}</strong>, which ${liveRemovals.length>1?'are':'is'} currently <strong>live</strong>. Participants may already be working on it.<br><br>Are you sure?`,confirmText:'Yes, Remove',confirmClass:'danger'});
+    const ok=await showModal({title:'Remove from Live Event',message:`You are about to remove this question from <strong>${esc(names)}</strong>, which ${liveRemovals.length>1?'are':'is'} currently <strong>live</strong>. Participants may already be working on it.<br><br>Are you sure?`,confirmText:'Yes, Remove',confirmClass:'danger'});
     if(!ok)return;
   }
   const r=await fetch(`/api/admin/tasks/${taskId}/competitions`,{method:'PUT',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({competitionIds,expectedAssignments})});
@@ -1601,7 +1601,7 @@ export async function saveTaskCompAssignments(taskId){
   // admin can close it and open "Assign to Events" for another challenge, and a
   // by-id removal then closed THAT one. Removing an already-detached element is a
   // no-op, which is the right answer when the admin closed it themselves.
-  if(r.ok){showToast('Challenge assignments updated.','success');overlay.remove();loadAdminTasks();}
+  if(r.ok){showToast('Question assignments updated.','success');overlay.remove();loadAdminTasks();}
   else{
     const d=await r.json().catch(()=>({}));
     if(d.conflict){showToast(d.error||'Conflict detected. Please reopen the dialog.','error');overlay.remove();loadAdminTasks();}
@@ -1615,7 +1615,7 @@ export async function saveTaskCompAssignments(taskId){
 export async function removeTaskFromComp(taskId,compId){
   const comp=S.adminCompetitionsData.find(c=>c.id===compId);
   const status=comp?computeCompStatus(comp):null;
-  if(status==='ended'){showToast('Cannot modify challenge assignments for ended events.','success');return;}
+  if(status==='ended'){showToast('Cannot modify question assignments for ended events.','success');return;}
   const isLive=status==='live';
   const msg=isLive
     ?`This event is <strong>currently live</strong>. Removing this task may affect participants who are working on it.<br><br>Are you sure you want to remove it?`
@@ -1623,7 +1623,7 @@ export async function removeTaskFromComp(taskId,compId){
   const ok=await showModal({title:isLive?'Remove from Live Event':'Remove Task',message:msg,confirmText:isLive?'Yes, Remove':'Remove',confirmClass:'danger'});
   if(!ok)return;
   const r=await fetch(`/api/admin/tasks/${taskId}/competitions/${compId}`,{method:'DELETE',headers:csrfHeaders()});
-  if(r.ok){showToast('Challenge removed from event.','success');loadAdminTasks();}
+  if(r.ok){showToast('Question removed from event.','success');loadAdminTasks();}
   else{const d=await r.json();showToast(d.error||'Failed.','error');}
 }
 
@@ -1653,11 +1653,11 @@ export async function openAttemptGrant(taskId){
   // ran before the await, so two opens in flight both appended.
   const seq=++_grantOpenSeq;
   const task=S.adminTasksData.find(t=>t.id===taskId);
-  if(!task){showToast('That challenge is no longer in the list. Refresh and try again.','error');return;}
+  if(!task){showToast('That question is no longer in the list. Refresh and try again.','error');return;}
   let allComps=null;
   try{const r=await fetch('/api/admin/competitions');if(r.ok&&seq===_grantOpenSeq)allComps=await r.json();}catch(e){console.warn('Grant attempts: could not load events',e);}
   if(seq!==_grantOpenSeq)return;   // superseded while in flight — re-checked after the parse too
-  if(!Array.isArray(allComps)){showToast('Could not load this challenge’s events. Please try again.','error');return;}
+  if(!Array.isArray(allComps)){showToast('Could not load this question’s events. Please try again.','error');return;}
   const byId=new Map(allComps.map(c=>[c.id,c]));
   // Mirror of the server's `??` chain. A mirror can only ever be OPTIMISTIC —
   // the POST re-resolves the cap and its 409 is surfaced below, which is what
@@ -1693,7 +1693,7 @@ export async function openAttemptGrant(taskId){
       ${competingHeld.length
         ?`<p class="picker-note">You are competing in ${competingHeld.map(n=>`<strong>${esc(n)}</strong>`).join(' and ')}, which ${competingHeld.length===1?'holds':'hold'} <strong>${esc(task.title)}</strong> with an attempt limit, so you cannot grant attempts on it — ask another organiser.</p>`
         :`<p class="picker-note">No event <em>you organise</em> holds <strong>${esc(task.title)}</strong> with an attempt limit, so there is nothing to grant here.</p>`}
-      <p class="picker-note">A limit is set by <em>Attempt limit</em> in the challenge editor, or by <em>Attempt limit per challenge</em> on the event. Both name the controls exactly as they appear. The limit itself can no longer be changed on an ended event, but attempts can still be granted on one.</p>
+      <p class="picker-note">A limit is set by <em>Attempt limit</em> in the question editor, or by <em>Attempt limit per question</em> on the event. Both name the controls exactly as they appear. The limit itself can no longer be changed on an ended event, but attempts can still be granted on one.</p>
       <div class="picker-modal-foot">
         <button class="btn secondary" data-action="overlay-close" data-overlay-id="attempt-grant-overlay">Close</button>
       </div>
@@ -1865,11 +1865,11 @@ async function _submitAttemptGrant(overlay,taskId,taskTitle,capped,read){
 export async function openAddTasksToCompetition(){
   if(!S.adminSelectedCompetitionId)return;
   const allTasks=await _loadAdminTaskList();
-  if(!allTasks){ showToast('Could not load the challenge list. Please try again.','error'); return; }
+  if(!allTasks){ showToast('Could not load the question list. Please try again.','error'); return; }
   // Find tasks already assigned to the selected competition
   const assignedIds=new Set(allTasks.filter(t=>(t.competitions||[]).some(c=>c.id===S.adminSelectedCompetitionId)).map(t=>t.id));
   const available=allTasks.filter(t=>t.status==='published'&&t.active&&!assignedIds.has(t.id));
-  if(!available.length){showToast('No more published challenges to add.','success');return;}
+  if(!available.length){showToast('No more published questions to add.','success');return;}
   openTaskPickerForCompetition(S.adminSelectedCompetitionId);
 }
 
@@ -1960,7 +1960,7 @@ export async function _renderTaskFormAttachments(){
     // what this challenge already has, so leaving it terminal is what makes the
     // wrong claim durable.
     list.removeAttribute('role');
-    setSafeHtml(list,'<div class="tf-attach-empty">Could not load this challenge\'s attachments. '
+    setSafeHtml(list,'<div class="tf-attach-empty">Could not load this question\'s attachments. '
       +'<button class="btn sm secondary" data-action="retry-load-attachments">Try again</button></div>');
     _tfAttachCountSync(null);
     return;
@@ -2019,7 +2019,7 @@ export async function _confirmLiveChallengeMutation(taskId,title,body){
   if(!parts.any)return true;
   return showModal({
     title,
-    message:`This challenge is currently in live event(s): ${_liveMutationPhrase(parts)}.<br><br>${body}<br><br>Continue?`,
+    message:`This question is currently in live event(s): ${_liveMutationPhrase(parts)}.<br><br>${body}<br><br>Continue?`,
     confirmText:'Continue',confirmClass:'danger',
   });
 }
@@ -2120,7 +2120,7 @@ export async function _renameSavedAttachment(taskId,aid,currentName){
   if(newName==null)return;
   const trimmed=newName.trim();
   if(!trimmed||trimmed===currentName)return;
-  if(!(await _confirmLiveChallengeMutation(taskId,'Rename Attachment on Live Challenge','Renaming changes what participants see on the download link immediately.')))return;
+  if(!(await _confirmLiveChallengeMutation(taskId,'Rename Attachment on Live Question','Renaming changes what participants see on the download link immediately.')))return;
   const r=await fetch(`/api/admin/tasks/${taskId}/attachments/${aid}`,{method:'PATCH',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({display_name:trimmed})});
   if(!r.ok){const d=await r.json().catch(()=>({}));showToast(d.error||'Rename failed.','error');return;}
   await _renderTaskFormAttachments();
@@ -2146,9 +2146,9 @@ export async function _deleteSavedAttachment(taskId,aid,name){
   // Post-v6.13.11 attachment mutations don't create snapshots on
   // their own, so the restore path is: revert the challenge to a
   // prior SAVED version that included the file. Docs updated to match.
-  const ok=await showModal({title:'Remove attachment',message:`Remove <strong>${esc(name)}</strong> from this challenge?<br><br>The file is kept on disk. To put it back, open <strong>History</strong> and restore a saved version that included it.`,confirmText:'Remove',confirmClass:'danger'});
+  const ok=await showModal({title:'Remove attachment',message:`Remove <strong>${esc(name)}</strong> from this question?<br><br>The file is kept on disk. To put it back, open <strong>History</strong> and restore a saved version that included it.`,confirmText:'Remove',confirmClass:'danger'});
   if(!ok)return;
-  if(!(await _confirmLiveChallengeMutation(taskId,'Remove Attachment from Live Challenge','Removing takes effect immediately. Participants currently on this challenge will no longer see the download link.')))return;
+  if(!(await _confirmLiveChallengeMutation(taskId,'Remove Attachment from Live Question','Removing takes effect immediately. Participants currently on this question will no longer see the download link.')))return;
   const r=await fetch(`/api/admin/tasks/${taskId}/attachments/${aid}`,{method:'DELETE',headers:csrfHeaders()});
   if(!r.ok){const d=await r.json().catch(()=>({}));showToast(d.error||'Remove failed.','error');return;}
   await _renderTaskFormAttachments();
@@ -2202,7 +2202,7 @@ export function closeTaskForm(){
 
 export async function viewTaskAsParticipant(taskId){
   const t=S.adminTasksData.find(x=>x.id===taskId);
-  if(!t){showToast('Challenge not found.');return;}
+  if(!t){showToast('Question not found.');return;}
   // adminTasksData from /api/admin/tasks doesn't carry attachments — fetch
   // them here so the preview mirrors what a participant would see. Admin
   // session authorises both the listing and the download links, so we use
@@ -2219,7 +2219,7 @@ export async function viewTaskAsParticipant(taskId){
       </div>
     </div>`:(attachmentsFailed?`<div class="task-preview-attachments">
       <div class="task-preview-attachments-label">${ICO.download}Downloads</div>
-      <div class="task-preview-attachments-list"><span style="color:var(--muted);font-size:var(--fs-13)">Could not load this challenge's attachments, so this preview may be missing some.</span></div>
+      <div class="task-preview-attachments-list"><span style="color:var(--muted);font-size:var(--fs-13)">Could not load this question's attachments, so this preview may be missing some.</span></div>
     </div>`:'');
   // v8.12.0 — a competitor's preview says the hint is WITHHELD rather than
   // rendering nothing: an absent hint block on a challenge that has one reads as
@@ -2232,10 +2232,10 @@ export async function viewTaskAsParticipant(taskId){
   const hintHtml=t.hint_withheld?`<div class="task-preview-hint">
       <div class="task-preview-hint-label">${ICO.lightbulb} Hint</div>
       <div class="task-preview-hint-body" style="color:var(--muted)">${_competesPrev
-        ?'Withheld — you are competing in an event that holds this challenge. Participants pay 30% of the points to reveal a hint, and so would you.'
+        ?'Withheld — you are competing in an event that holds this question. Participants pay 30% of the points to reveal a hint, and so would you.'
         :(t.can_reveal_answer
-          ?'Withheld — this challenge\'s answer is sealed, and its hint is sealed with it. Reveal the sealed answer from the row menu to see both; the reveal is recorded.'
-          :'Withheld — this challenge\'s answer is sealed, and its hint is sealed with it: only the person who created it, or a superadmin who reveals it on the record, can see them.')}</div>
+          ?'Withheld — this question\'s answer is sealed, and its hint is sealed with it. Reveal the sealed answer from the row menu to see both; the reveal is recorded.'
+          :'Withheld — this question\'s answer is sealed, and its hint is sealed with it: only the person who created it, or a superadmin who reveals it on the record, can see them.')}</div>
     </div>`:t.hint?`<div class="task-preview-hint">
       <div class="task-preview-hint-label">${ICO.lightbulb} Hint</div>
       <div class="task-preview-hint-body">${renderRich(t.hint)}</div>
@@ -2276,7 +2276,7 @@ export async function viewTaskAsParticipant(taskId){
       <span class="tpc-text">${esc(c.text)}</span>
       ${_mcCorrect.has(c.id)?'<span class="tpc-badge">correct</span>':''}
     </div>`).join('')}
-    ${_mcChoices.length?'':'<div class="settings-help" style="margin:0">This challenge has no choices — participants would see nothing to answer.</div>'}
+    ${_mcChoices.length?'':'<div class="settings-help" style="margin:0">This question has no choices — participants would see nothing to answer.</div>'}
   </div>`:_pickOneHtml(t);
 
   // v7.20.3 — for a choice task the options above already carry the answer
@@ -2288,8 +2288,8 @@ export async function viewTaskAsParticipant(taskId){
   // The box must not become an empty shell (v7.20.4), and an admin who clicked
   // "View as Participant" expecting the solution needs to be told why there is
   // none — the affordance and its explanation together (v7.14.2).
-  const sealedHtml=_sealHidden?`<div class="task-preview-solution"><h3>${ICO.solution} Solution</h3><p class="settings-help" style="margin:0">This challenge's answer is sealed. Only the person who created it — or a superadmin who reveals it, which is recorded in the challenge's history — can see the answer, the explanation or the hint. That is true here, in the challenge editor, in Submissions, in the version history and in the answers shown to participants after the event.${t.can_reveal_answer?' You can reveal it from the row menu.':''}</p></div>`:'';
-  const anyHtml=t.answer_type==='any'?`<div class="settings-help" style="margin:12px 0 0">Any non-empty answer is accepted exactly as typed. This challenge has no hint and no wrong-answer penalty.</div>`:'';
+  const sealedHtml=_sealHidden?`<div class="task-preview-solution"><h3>${ICO.solution} Solution</h3><p class="settings-help" style="margin:0">This question's answer is sealed. Only the person who created it — or a superadmin who reveals it, which is recorded in the question's history — can see the answer, the explanation or the hint. That is true here, in the question editor, in Submissions, in the version history and in the answers shown to participants after the event.${t.can_reveal_answer?' You can reveal it from the row menu.':''}</p></div>`:'';
+  const anyHtml=t.answer_type==='any'?`<div class="settings-help" style="margin:12px 0 0">Any non-empty answer is accepted exactly as typed. This question has no hint and no wrong-answer penalty.</div>`:'';
   let solutionHtml='';
   if(!_sealHidden&&(_showsAnswer||t.explanation)){
     solutionHtml='<div class="task-preview-solution">';
@@ -2375,14 +2375,14 @@ export function closeTaskPreview(){
 // competing); the seal's, the reveal `#tf-sealed-note` offers (`can_reveal_answer`,
 // and inside an organiser's panel what the reveal does not grant); otherwise the
 // server's own refusal.
-const _TF_RO_LOCKED_UNLOCK="Read-only: this challenge is locked. Unlock it from its row's ⋯ menu to edit it.";
-const _TF_RO_LOCKED="Read-only: this challenge is locked, and only a superadmin can unlock it.";
+const _TF_RO_LOCKED_UNLOCK="Read-only: this question is locked. Unlock it from its row's ⋯ menu to edit it.";
+const _TF_RO_LOCKED="Read-only: this question is locked, and only a superadmin can unlock it.";
 const _TF_RO_SEALED="Read-only: its answer is sealed, so only the person who created it can edit it.";
 const _TF_RO_SEALED_REVEAL="Read-only: its answer is sealed. Reveal it (recorded) to see and edit it.";
 const _TF_RO_SEALED_REVEAL_PANEL="Read-only: its answer is sealed. Revealing it shows it to you; editing still follows this organiser's rules.";
-const _TF_RO_COMPETING="Read-only: you are competing in an event that holds this challenge.";
-const _TF_RO_NOT_MINE="Read-only: you can only edit challenges you created.";
-const _TF_RO_LOCKED_NOT_MINE="Read-only: this challenge is locked, and you can only edit challenges you created.";
+const _TF_RO_COMPETING="Read-only: you are competing in an event that holds this question.";
+const _TF_RO_NOT_MINE="Read-only: you can only edit questions you created.";
+const _TF_RO_LOCKED_NOT_MINE="Read-only: this question is locked, and you can only edit questions you created.";
 const _tfCompetes=t=>Array.isArray(t.competing_in)&&t.competing_in.length>0;
 function _tfSealedReason(t){
   if(_tfCompetes(t))return _TF_RO_COMPETING;
@@ -2399,7 +2399,7 @@ export function _tfLockedReason(t){
 }
 /** The three rich bodies go read-only (with `reason`) or editable (null) together. */
 function _tfRichReadOnly(reason,also){for(const ed of [descEditor,explanationEditor,hintEditor])ed.setReadOnly(reason,{also});}
-const _TF_SEAL_PROXY_NOTE="A sealed answer belongs to the person who typed it, and you are creating this challenge through another organiser's panel — so it cannot be sealed from here. Exit impersonation and create it from your own account, or leave the answer unsealed.";
+const _TF_SEAL_PROXY_NOTE="A sealed answer belongs to the person who typed it, and you are creating this question through another organiser's panel — so it cannot be sealed from here. Exit impersonation and create it from your own account, or leave the answer unsealed.";
 function _tfSealSetCreateMode(){
   const g=document.getElementById('tf-seal-group'); if(g)g.style.display='';
   const proxy=!!S.impersonation;
@@ -2449,14 +2449,14 @@ function _tfSealSetEditMode(t){
     // named here can still be left (each entry carries the event's status).
     const _leavable=_competingIn.length&&_competingIn.every(c=>c.status!=='ended');
     note.textContent=_competingIn.length
-      ? `You are competing in ${_competingIn.map(c=>`“${c.name}”`).join(', ')}, which holds this challenge, so it is read-only for you: its answer, explanation and hint are withheld, and only another organiser can change it.${_leavable?' Remove yourself from the event to edit it again.':''}`
+      ? `You are competing in ${_competingIn.map(c=>`“${c.name}”`).join(', ')}, which holds this question, so it is read-only for you: its answer, explanation and hint are withheld, and only another organiser can change it.${_leavable?' Remove yourself from the event to edit it again.':''}`
       : S._tfAnswerVisible
       ? (t.answer_revealed
-          ? 'The answer to this challenge is sealed. You can see and change it — the answer, the explanation and the hint — because you revealed it as a superadmin, and that reveal is recorded in the challenge\'s history. Participants are never shown it, even when the event reveals answers.'
-          : 'The answer to this challenge is sealed: you can see and change it because you created it. Nobody else can — not other organisers, not administrators — except a superadmin who reveals it, which is recorded in the challenge\'s history. Participants are never shown it, even when the event reveals answers.')
+          ? 'The answer to this question is sealed. You can see and change it — the answer, the explanation and the hint — because you revealed it as a superadmin, and that reveal is recorded in the question\'s history. Participants are never shown it, even when the event reveals answers.'
+          : 'The answer to this question is sealed: you can see and change it because you created it. Nobody else can — not other organisers, not administrators — except a superadmin who reveals it, which is recorded in the question\'s history. Participants are never shown it, even when the event reveals answers.')
       : (t.can_reveal_answer
-          ? "This challenge's answer is sealed by the person who created it. The answer, the explanation and the hint are not shown to anyone else. As a superadmin you can reveal them and then edit this challenge; the reveal is recorded in the challenge's history, naming you."
-          : "This challenge's answer is sealed by the person who created it. The answer, the explanation and the hint are not shown to anyone else, and only they — or a superadmin who reveals them on the record — can edit this challenge.");
+          ? "This question's answer is sealed by the person who created it. The answer, the explanation and the hint are not shown to anyone else. As a superadmin you can reveal them and then edit this question; the reveal is recorded in the question's history, naming you."
+          : "This question's answer is sealed by the person who created it. The answer, the explanation and the hint are not shown to anyone else, and only they — or a superadmin who reveals them on the record — can edit this question.");
   }
   // v8.12.2 — THE REVEAL CONTROL, inside the editor beside the note. A real
   // `<button>` OUTSIDE the read-only sweep's selectors (`_tfSealApplyReadOnly`
@@ -2501,10 +2501,10 @@ function _tfSealSetEditMode(t){
       const _plural=(_sealHeld.length+_sealHeldAway)>1;
       const _leavable=!_sealHeldAway&&_sealHeld.every(c=>c.status!=='ended');
       const _allEnded=!_sealHeldAway&&_sealHeld.every(c=>c.status==='ended');
-      unNote.textContent=`The answer stays sealed while this challenge is in ${_names}, where staff compete — such an event only admits sealed challenges. `+(_leavable
+      unNote.textContent=`The answer stays sealed while this question is in ${_names}, where staff compete — such an event only admits sealed questions. `+(_leavable
         ?`Take it out of ${_plural?'those events':'that event'} first, or leave the answer sealed.`
         :_allEnded
-        ?`${_plural?'A finished event\u2019s':'The finished event\u2019s'} challenge list cannot be changed, so it stays sealed for as long as it stays assigned.`
+        ?`${_plural?'A finished event\u2019s':'The finished event\u2019s'} question list cannot be changed, so it stays sealed for as long as it stays assigned.`
         :`Only ${_sealHeldAway?'that event\u2019s organiser':'another organiser'} can take it out, so it stays sealed for as long as it stays assigned.`);
     }
   }
@@ -2556,9 +2556,9 @@ function _tfFormReadOnly(reason,also){
 
 /** The long explanations behind the editor's "?" tips (registered at boot). */
 export const CHALLENGE_EDITOR_TIPS={
-  "challenge.attempts":"Optional. Leave it blank for no limit. A number from 1 to 1000 caps how many answers each participant may submit on this challenge, and it overrides the event's own limit. Organisers can grant more attempts later.",
+  "challenge.attempts":"Optional. Leave it blank for no limit. A number from 1 to 1000 caps how many answers each participant may submit on this question, and it overrides the event's own limit. Organisers can grant more attempts later.",
   "challenge.choices":"Tick every choice that is correct. One correct choice shows participants radio buttons; two or more show checkboxes. The order is shuffled per participant. At a Booth Event on a phone, participants tap large lettered tiles instead: a short question with a few short choices fits one screen; with more than 6 choices, or any longer than 90 characters, the screen always scrolls.",
-  "challenge.attachments":"ZIP files only, at most 64 MB each and up to 10 per challenge. Uploads stay invisible to participants until you save; Cancel discards them. A link points participants at a download hosted elsewhere.",
+  "challenge.attachments":"ZIP files only, at most 64 MB each and up to 10 per question. Uploads stay invisible to participants until you save; Cancel discards them. A link points participants at a download hosted elsewhere.",
   "challenge.topic":"The topic this question is filed under in the Question bank. Participants see it on the question as its category. A question has one topic; manage the list with Topics on the Question bank page.",
   "challenge.shared":"On: every event organiser on the platform can find this bank question and use it in their own events, even though they did not create it. Off: only you, administrators and the events using it.",
 };
@@ -2807,7 +2807,7 @@ export async function editTask(id){
     // Don't leave the editor open with stale data + re-enabled inputs from the
     // previous edit — close the form and surface the gap.
     closeTaskForm?.();
-    showToast('That challenge is no longer available. The list has been refreshed.','error');
+    showToast('That question is no longer available. The list has been refreshed.','error');
     loadAdminTasks?.();
     return;
   }
@@ -2910,7 +2910,7 @@ export async function editTask(id){
     // Not on a form that is read-only as a whole (not theirs, sealed, a competitor's,
     // locked): it would say the rest can still be edited.
     _scNote.hidden=t.can_edit_scoring!==false||t.can_edit===false||!!t.locked;
-    _scNote.textContent="Another organiser's event is scoring on this challenge, so its difficulty, answer, options and attempt limit are fixed. You can still edit the title, description, explanation, hint and attachments.";
+    _scNote.textContent="Another organiser's event is scoring on this question, so its difficulty, answer, options and attempt limit are fixed. You can still edit the title, description, explanation, hint and attachments.";
   }
   // v8.10.0 — after the re-enable pass above, and before the lock branch below,
   // which layers on top for a challenge that is both sealed and locked.
@@ -2952,7 +2952,7 @@ export async function editTask(id){
   const _fbCompetes=Array.isArray(t.competing_in)&&t.competing_in.length>0;
   if(fb===null){
     fbSection.style.display='';
-    setSafeHtml(fbList, `<div style="color:var(--muted);font-size:var(--fs-14)">Could not load feedback for this challenge.</div>`);
+    setSafeHtml(fbList, `<div style="color:var(--muted);font-size:var(--fs-14)">Could not load feedback for this question.</div>`);
   } else if(fb.length){
     fbSection.style.display='';
     setSafeHtml(fbList, fb.map(f=>`<div style="display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid var(--border)">
@@ -3021,7 +3021,7 @@ export async function saveTask(status){
     // the warning on a shared challenge.
     const parts=_liveMutationParts(existing);
     if(parts.any){
-      const ok=await showModal({title:'Edit Live Challenge',message:`This challenge is currently in live event(s): ${_liveMutationPhrase(parts)}.<br><br>Changes take effect immediately and may affect participants already working on it.<br><br>Continue?`,confirmText:'Save Anyway',confirmClass:'danger'});
+      const ok=await showModal({title:'Edit Live Question',message:`This question is currently in live event(s): ${_liveMutationPhrase(parts)}.<br><br>Changes take effect immediately and may affect participants already working on it.<br><br>Continue?`,confirmText:'Save Anyway',confirmClass:'danger'});
       if(!ok)return;
     }
   }
@@ -3101,13 +3101,13 @@ export async function saveTask(status){
   if(!r.ok){
     const d=await r.json().catch(()=>({}));
     if(r.status===409&&d.conflict){
-      showToast(d.error||'This challenge was modified by another admin. Reload to see the latest values.','error');
+      showToast(d.error||'This question was modified by another admin. Reload to see the latest values.','error');
       // v8.14.5 — refresh the LIST (not the open form, which keeps the admin's
       // edits and its own token) so closing and reopening the editor starts from
       // the latest version, as the guide says.
       loadAdminTasks();
     }else{
-      showToast(d.error||'Failed to save challenge.','error');
+      showToast(d.error||'Failed to save question.','error');
     }
     return;
   }
@@ -3118,19 +3118,19 @@ export async function saveTask(status){
   const _savedId=id||_saved.id;
   const _orgFailed=_savedId?await _tfApplyOrgTags(_savedId):[];
   closeTaskForm();loadAdminTasks();
-  if(_orgFailed.length)showToast(`Challenge saved, but: ${_orgFailed[0]}`,'error');
-  else showToast('Challenge saved!','success');
+  if(_orgFailed.length)showToast(`Question saved, but: ${_orgFailed[0]}`,'error');
+  else showToast('Question saved!','success');
 }
 
 export async function deleteTask(id){
   const t=S.adminTasksData.find(x=>x.id===id);if(!t)return;
-  const ok1=await showModal({title:'Delete Challenge',message:`Are you sure you want to permanently delete <strong>${esc(t.title)}</strong>?<br><br>This action cannot be undone. Existing submissions and participant scores will be preserved.`,confirmText:'Delete',confirmClass:'danger'});
+  const ok1=await showModal({title:'Delete Question',message:`Are you sure you want to permanently delete <strong>${esc(t.title)}</strong>?<br><br>This action cannot be undone. Existing submissions and participant scores will be preserved.`,confirmText:'Delete',confirmClass:'danger'});
   if(!ok1)return;
   const ok2=await showModal({title:'Are You Absolutely Sure?',message:`<strong>${esc(t.title)}</strong> will be permanently removed from the system.<br><br>This cannot be reversed.`,confirmText:'Yes, Delete Permanently',confirmClass:'danger'});
   if(!ok2)return;
   const r=await fetch(`/api/admin/tasks/${id}`,{method:'DELETE',headers:csrfHeaders()});
-  if(r.ok){showToast('Challenge permanently deleted.','success');loadAdminTasks();}
-  else{const d=await r.json();showToast(d.error||'Failed to delete challenge.','error');}
+  if(r.ok){showToast('Question permanently deleted.','success');loadAdminTasks();}
+  else{const d=await r.json();showToast(d.error||'Failed to delete question.','error');}
 }
 
 // Stage B — SAVE TO BANK: copy this event's own question into the Question bank
@@ -3155,7 +3155,7 @@ export async function deleteFeedback(taskId,userId){
 }
 
 export async function deleteAllFeedback(taskId){
-  const ok=await showModal({title:'Delete All Feedback',message:'Delete all feedback for this challenge? This cannot be undone.',confirmText:'Delete All',confirmClass:'danger'});
+  const ok=await showModal({title:'Delete All Feedback',message:'Delete all feedback for this question? This cannot be undone.',confirmText:'Delete All',confirmClass:'danger'});
   if(!ok)return;
   const r=await fetch(`/api/admin/tasks/${taskId}/feedback`,{method:'DELETE',headers:csrfHeaders()});
   if(r.ok){showToast('All feedback deleted.','success');editTask(taskId);}
@@ -3164,7 +3164,7 @@ export async function deleteAllFeedback(taskId){
 
 export async function toggleTaskLock(id){
   const r=await fetch(`/api/admin/tasks/${id}/lock`,{method:'POST',headers:csrfHeaders()});
-  if(r.ok){const d=await r.json();showToast(d.locked?'Challenge locked.':'Challenge unlocked.');loadAdminTasks();}
+  if(r.ok){const d=await r.json();showToast(d.locked?'Question locked.':'Question unlocked.');loadAdminTasks();}
   else{const d=await r.json().catch(()=>({}));showToast(d.error||'Failed to toggle lock.','error');}
 }
 
@@ -3194,7 +3194,7 @@ export async function revealSealedAnswer(id){
     // history to administrators and the seat themselves, but to another organiser
     // only when they share an event with that organiser (`_revealSeatFor`); the
     // event log always carries it.
-    message:`Show yourself the sealed answer, explanation and hint of <strong>${esc(t?.title||'this challenge')}</strong>${seat}${S.isEventAdmin?'':', and be able to edit it'}, for the rest of this session.${S.isEventAdmin?' Editing it still follows this organiser\'s own rules: only a challenge they created can be edited from their view.':''}<br><br>This is <strong>recorded</strong>: the challenge's history and the event log will show that you revealed it, naming you${seat?' and whose view you were in — which administrators see, and other organisers only if they share an event with this organiser':''}. The person who created it can see that record.`,
+    message:`Show yourself the sealed answer, explanation and hint of <strong>${esc(t?.title||'this question')}</strong>${seat}${S.isEventAdmin?'':', and be able to edit it'}, for the rest of this session.${S.isEventAdmin?' Editing it still follows this organiser\'s own rules: only a question they created can be edited from their view.':''}<br><br>This is <strong>recorded</strong>: the question's history and the event log will show that you revealed it, naming you${seat?' and whose view you were in — which administrators see, and other organisers only if they share an event with this organiser':''}. The person who created it can see that record.`,
     confirmText:'Reveal and record',
     confirmClass:'warning',
     cancelText:'Cancel',
@@ -3203,8 +3203,8 @@ export async function revealSealedAnswer(id){
   const r=await fetch(`/api/admin/tasks/${id}/sealed-reveal`,{method:'POST',headers:csrfHeaders()});
   const d=await r.json().catch(()=>({}));
   if(!r.ok){showToast(d.error||'Could not reveal the sealed answer.','error');return;}
-  if(d.author)showToast('You created this challenge — its answer was already yours to see.');
-  else showToast(d.already?'Already revealed in this session.':'Sealed answer and hint revealed — recorded in the challenge\'s history.');
+  if(d.author)showToast('You created this question — its answer was already yours to see.');
+  else showToast(d.already?'Already revealed in this session.':'Sealed answer and hint revealed — recorded in the question\'s history.');
   // Only a load that LANDED may re-enter the editor: a failed one reset the model
   // to [] (editTask would close the form with a false "no longer available"), and
   // a superseded one left the pre-reveal row (the form would re-open read-only
@@ -3262,7 +3262,7 @@ export async function refreshAfterSessionRegenerate(){
 export async function recalculateTaskScores(id){
   const ok=await showModal({
     title:'Recalculate Scores',
-    message:'Re-grade this challenge\'s historical submissions against its current grading rule — the accepted answer(s), or for an Any answer challenge every non-empty answer — <strong>in events that are still open</strong>. Submissions in events whose session has ended are <strong>frozen and will not change</strong> (their final standings are locked). This can flip open submissions from <strong>correct → wrong</strong> (or vice versa), which may change the leaderboard rank of affected participants and their auto-end status.<br><br>Use this after fixing a typo in an accepted answer, adding one, or changing the answer type — while the event is still live. Cannot be undone (re-issue the same edit + recalculate to revert).',
+    message:'Re-grade this question\'s historical submissions against its current grading rule — the accepted answer(s), or for an Any answer question every non-empty answer — <strong>in events that are still open</strong>. Submissions in events whose session has ended are <strong>frozen and will not change</strong> (their final standings are locked). This can flip open submissions from <strong>correct → wrong</strong> (or vice versa), which may change the leaderboard rank of affected participants and their auto-end status.<br><br>Use this after fixing a typo in an accepted answer, adding one, or changing the answer type — while the event is still live. Cannot be undone (re-issue the same edit + recalculate to revert).',
     confirmText:'Recalculate',
     confirmClass:'warning',
     cancelText:'Cancel',
@@ -3282,7 +3282,7 @@ export async function recalculateTaskScores(id){
     if(d.code==='live_session_confirm'){
       const go=await showModal({
         title:'A session is LIVE right now',
-        message:`${esc(d.error||'')}<br><br>Participants in that session may see their score change mid-event, and a re-grade can leave somebody with no attempts left on this challenge — you would then need <strong>Grant Attempts</strong> to give them another try.`,
+        message:`${esc(d.error||'')}<br><br>Participants in that session may see their score change mid-event, and a re-grade can leave somebody with no attempts left on this question — you would then need <strong>Grant Attempts</strong> to give them another try.`,
         confirmText:'Recalculate anyway',
         confirmClass:'danger',
         cancelText:'Cancel',
@@ -3322,7 +3322,7 @@ export async function recalculateTaskScores(id){
     const _strandN=d.attempts_exhausted_after||0;
     const _shown=_who.slice(0,4).join(', ');
     const _strand=_strandN
-      ?` ${_strandN} participant${_strandN===1?'':'s'} now ${_strandN===1?'has':'have'} no attempts left and no correct answer${_shown?`: ${_shown}${_who.length>4?`, and ${_who.length-4} more`:''}`:''} — use “Grant Attempts” on this challenge to give them another try.`
+      ?` ${_strandN} participant${_strandN===1?'':'s'} now ${_strandN===1?'has':'have'} no attempts left and no correct answer${_shown?`: ${_shown}${_who.length>4?`, and ${_who.length-4} more`:''}`:''} — use “Grant Attempts” on this question to give them another try.`
       :'';
     if(d.total_submissions===0 && d.frozen_skipped){
       showToast(`Nothing re-graded: all ${d.frozen_skipped} submission${d.frozen_skipped===1?'':'s'} belong to events that have finished, whose final scores are frozen. Revive an event (extend its duration) to re-grade it.`,'info');
@@ -3341,15 +3341,15 @@ export async function toggleTaskVisibility(id){
   const t=S.adminTasksData.find(x=>x.id===id);if(!t)return;
   const hiding=!!t.active;
   const ok=await showModal(hiding
-    ?{title:'Hide Challenge',message:'This challenge will be hidden from participants. Existing submissions are preserved.<br><br>Hidden challenges do not count toward the total required for leaderboard "all solved" status.',confirmText:'Hide Challenge',confirmClass:'warning',cancelText:'Cancel'}
-    :{title:'Show Challenge',message:'This challenge will become visible to participants and will count toward the completion total.',confirmText:'Show Challenge',confirmClass:'',cancelText:'Cancel'});
+    ?{title:'Hide Question',message:'This question will be hidden from participants. Existing submissions are preserved.<br><br>Hidden questions do not count toward the total required for leaderboard "all solved" status.',confirmText:'Hide Question',confirmClass:'warning',cancelText:'Cancel'}
+    :{title:'Show Question',message:'This question will become visible to participants and will count toward the completion total.',confirmText:'Show Question',confirmClass:'',cancelText:'Cancel'});
   if(!ok)return;
   const r=await fetch(`/api/admin/tasks/${id}/visibility`,{method:'PATCH',headers:csrfHeaders()});
-  if(r.ok){showToast(hiding?'Challenge hidden from participants.':'Challenge is now visible to participants.');loadAdminTasks();}
+  if(r.ok){showToast(hiding?'Question hidden from participants.':'Question is now visible to participants.');loadAdminTasks();}
   else{const d=await r.json();showToast(d.error||'Failed to update visibility.','error');}
 }
 
-export const descEditor=createRichEditor(document.getElementById('tf-desc'),'Challenge description...',100);
+export const descEditor=createRichEditor(document.getElementById('tf-desc'),'Question description...',100);
 
 export const explanationEditor=createRichEditor(document.getElementById('tf-explanation'),'Explain how to arrive at the correct answer...',80);
 

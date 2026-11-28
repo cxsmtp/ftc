@@ -193,7 +193,7 @@ async function confirmReveal(page, taskId) {
   expect(res.status(), `the reveal POST answered ${res.status()}`).toBe(200);
   await expect.poll(() => page.evaluate(() => (window.__revealToasts || []).join(" | ")),
     { message: "the toast reports the reveal AND that it was recorded", timeout: 10_000 })
-    .toContain("Sealed answer and hint revealed — recorded in the challenge's history.");
+    .toContain("Sealed answer and hint revealed — recorded in the question's history.");
   return res;
 }
 
@@ -240,7 +240,7 @@ test.describe("v8.12.2 — the superadmin's recorded reveal in the admin UI", ()
     await expect(revealItem(page)).toHaveText(/Reveal sealed answer/);
     await expect(editItem(page), "…and withholds Edit until then (can_edit is false)").toHaveCount(0);
     await expect(portal(page).locator(".kebab-note"), "the note names the reveal as the remedy, and says it is recorded")
-      .toContainText("reveal it below to see the answer and hint and to change this challenge; the reveal is recorded");
+      .toContainText("reveal it below to see the answer and hint and to change this question; the reveal is recorded");
     await page.keyboard.press("Escape");
     await expect(portal(page)).toBeHidden();
 
@@ -307,9 +307,9 @@ test.describe("v8.12.2 — the superadmin's recorded reveal in the admin UI", ()
     await expect(page.locator("#tf-hint-group"), "the hint group is HIDDEN — the hint is sealed with the answer (v8.12.2)").toBeHidden();
     await expect(page.locator("#tf-reveal-row"), "the reveal control is offered in the editor").toBeVisible();
     await expect(page.locator("#tf-reveal-row button[data-action='task-reveal-sealed']")).toHaveText("Reveal sealed answer and hint");
-    await expect(page.locator("#tf-reveal-row"), "…beside the note that it is recorded").toContainText("recorded in this challenge's history and the event log, naming you");
+    await expect(page.locator("#tf-reveal-row"), "…beside the note that it is recorded").toContainText("recorded in this question's history and the event log, naming you");
     await expect(page.locator("#tf-sealed-note"), "and the sealed note names the superadmin's door")
-      .toContainText("As a superadmin you can reveal them and then edit this challenge; the reveal is recorded in the challenge's history, naming you.");
+      .toContainText("As a superadmin you can reveal them and then edit this question; the reveal is recorded in the question's history, naming you.");
     expect(await page.content(), "the sealed hint is nowhere in the page before the reveal").not.toContain(P.hint);
     expect(await page.content()).not.toContain(P.key);
     // The description's toolbar is switched off, its line naming the same door.
@@ -424,7 +424,7 @@ test.describe("v8.12.2 — the superadmin's recorded reveal in the admin UI", ()
     await expect(revealItem(page), "a regular admin is NOT offered the reveal").toHaveCount(0);
     await expect(editItem(page), "…nor Edit").toHaveCount(0);
     await expect(portal(page).locator(".kebab-note"), "and the note names the superadmin's door as the only other way in")
-      .toContainText("Its answer is sealed — only the person who created it, or a superadmin who reveals it on the record, can change this challenge");
+      .toContainText("Its answer is sealed — only the person who created it, or a superadmin who reveals it on the record, can change this question");
     // The preview: the hint is WITHHELD, with the SEAL as the reason.
     await portal(page).locator("button[data-action='task-view']").click();
     const overlay = page.locator("#task-preview-overlay");
@@ -749,7 +749,7 @@ test.describe("v8.12.2 final review — the editor after a failed load, and stag
     await page.locator("#tf-reveal-row button[data-action='task-reveal-sealed']").click();
     await confirmReveal(page, P.sealedId);
     await expect.poll(() => toasts(page), { message: "the loader reported the failed load", timeout: 10_000 })
-      .toContain("Could not load the challenge list");
+      .toContain("Could not load the question list");
     await expect(page.locator("#admin-task-form"), "the editor is still open").toBeVisible();
     await expect(page.locator("#edit-task-id")).toHaveValue(P.sealedId);
     await expect(page.locator("#tf-answer"), "…in the state it already had: sealed, read-only").toBeDisabled();

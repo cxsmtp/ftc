@@ -1121,12 +1121,12 @@ async function _loadProgramGrades(compId, mySeq){
 export function programGradesHtml(d){
   const pass=Number(d.passPercent)||60;
   const head=`<h4 class="rk-grades-title">Grades</h4>
-    <p class="rk-unranked-note">Points earned out of ${esc(String(d.maxPoints??0))}, after wrong-answer penalties and hints. A grade counts once the learner has finished every challenge; ${esc(String(pass))}% or more earns a certificate (90% Excellent, 80% Very good, 70% Good, 60% Satisfactory). Under it the learner is told to try again.</p>`;
+    <p class="rk-unranked-note">Points earned out of ${esc(String(d.maxPoints??0))}, after wrong-answer penalties and hints. A grade counts once the learner has finished every question (solved it or used every attempt); ${esc(String(pass))}% or more earns a certificate (90% Excellent, 80% Very good, 70% Good, 60% Satisfactory). Under it the learner is told to try again.</p>`;
   if(!d.rows.length)return head+'<p class="rk-unranked-note">Nobody has joined yet.</p>';
   const items=d.rows.map((r)=>{
     const who=[r.firstName,r.lastName].filter(Boolean).join(' ')||r.nickname||r.email||r.userId;
     const g=r.grade;
-    const grade=!g?'No challenges yet'
+    const grade=!g?'No questions yet'
       :(r.finished?`${esc(g.percent)} &middot; ${esc(g.label)}`:`${esc(g.percent)} so far &middot; not finished`);
     const extra=[
       r.attempt>1?`attempt ${esc(String(r.attempt))}`:'',
@@ -1304,7 +1304,7 @@ function _rkRenderTopCerts(compId, board, { reread = true } = {}) {
   const placesWord = unearned.length > 1 ? `${unearned.slice(0, -1).map(l => l.replace(' place', '')).join(', ')} and ${unearned[unearned.length - 1]}` : (unearned[0] || '');
   setSafeHtml(box, `<div class="rk-certs-head"><div><p class="eyebrow gold">Certificates</p><h3 id="rk-certs-title">Top three</h3></div>
       <p class="rk-certs-note">${ended ? 'Final placings.' : 'Provisional: the event is still running, so these can change.'} Previews use this event's certificate design; each finisher collects their own issued certificate, with its credential code, from their account.</p></div>
-    ${unearned.length ? `<p class="rk-certs-note rk-certs-zero">No medal certificate for ${esc(placesWord)}: a top-three place earns Gold, Silver or Bronze only with points above zero; ${unearned.length > 1 ? 'those finishers get' : 'that finisher gets'} a participation certificate if they attempted a challenge.</p>` : ''}
+    ${unearned.length ? `<p class="rk-certs-note rk-certs-zero">No medal certificate for ${esc(placesWord)}: a top-three place earns Gold, Silver or Bronze only with points above zero; ${unearned.length > 1 ? 'those finishers get' : 'that finisher gets'} a participation certificate if they attempted a question.</p>` : ''}
     ${top.length ? `<ol class="rk-certs-list">${top.map(r => {
       const [tier, label] = _RK_TIERS[r.rank];
       return `<li class="rk-cert" data-rank="${r.rank}">

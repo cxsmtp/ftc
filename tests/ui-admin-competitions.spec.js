@@ -1472,7 +1472,7 @@ test.describe("v7.20.9 (ext-audit F12) — analytics empty states", () => {
 
     await page.locator("#analytics-search").fill(`zzz-no-such-challenge-${stamp}`);
     const emptyCell = page.locator("#analytics-table-body tr td").first();
-    await expect(emptyCell).toContainText(/No challenges match/i, { timeout: 10000 });
+    await expect(emptyCell).toContainText(/No questions match/i, { timeout: 10000 });
 
     const cols = await page.locator("#analytics-table thead th").count();
     // Positive control on the fixture itself: if the table ever stops having 12

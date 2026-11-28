@@ -33,7 +33,7 @@ function _subChallengeCell(title){
   if(!v)return '—';
   if(!crossNavOffered('challenge'))return esc(v);     // RBAC — no Challenges page for this role: a plain name
   return `<button type="button" class="sub-link" data-action="submissions-open-challenge" data-title="${esc(v)}"
-    title="Show ${esc(v)} in Challenges" aria-label="${esc(v)} — show in the Challenges tab">${esc(v)}</button>`;
+    title="Find ${esc(v)} among the questions" aria-label="${esc(v)} — find it among the questions">${esc(v)}</button>`;
 }
 
 export function _subKbReset(){
@@ -249,7 +249,7 @@ export function onSubmissionsSearchInput(){
 // leak a cell-level redaction is supposed to close.
 function _subIsSealed(s){ return s && s.answer_sealed && s.answer_visible === false; }
 function _subAnswerCell(s){
-  if(_subIsSealed(s))return `<span class="sub-answer-sealed" title="Sealed answer — only the person who created this challenge, or a superadmin who has revealed it on the record, can see what was submitted.">${ICO.lock} sealed</span>`;
+  if(_subIsSealed(s))return `<span class="sub-answer-sealed" title="Sealed answer — only the person who created this question, or a superadmin who has revealed it on the record, can see what was submitted.">${ICO.lock} sealed</span>`;
   return esc(s.answer||'');
 }
 function _subAnswerTitle(s){ return _subIsSealed(s) ? 'Sealed answer' : esc(s.answer||''); }

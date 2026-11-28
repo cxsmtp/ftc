@@ -573,7 +573,7 @@ test("the persona switch is a real segmented control and every view is its own d
 
   const view = page.locator("#team-persona-view");
   const seen = {};
-  for (const [persona, marker] of [["se", "Every challenge"], ["marketing", "Qualifying answers"], ["sales", "Accounts, most ready first"], ["sdr", "Noor Report"], ["manager", "Hot still to contact"]]) {
+  for (const [persona, marker] of [["se", "Every question"], ["marketing", "Qualifying answers"], ["sales", "Accounts, most ready first"], ["sdr", "Noor Report"], ["manager", "Hot still to contact"]]) {
     const b = page.locator(`[data-action="team-persona"][data-persona="${persona}"]`);
     await b.click();
     await expect(page.locator(`[data-action="team-persona"][data-persona="${persona}"]`)).toHaveAttribute("aria-pressed", "true");

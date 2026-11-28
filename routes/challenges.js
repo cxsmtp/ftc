@@ -25,7 +25,7 @@ const { jsonExactMatch, VALID_ANSWER_TYPES, VALID_DIFFICULTIES, POINTS, PENALTY,
 // v8.9.0 — the ONE refusal for a hint on an any-answer challenge (POST, PUT).
 // Restore and the import make the same decision with their own posture (409 /
 // skip) and cite this sentence. It names the remedy, per FROZEN_REMEDY's rule.
-const ANY_HINT_REFUSAL = "An any-answer challenge cannot have a hint: every non-empty answer is accepted, so there is nothing to hint towards. Clear the hint, or choose another answer type.";
+const ANY_HINT_REFUSAL = "An any-answer question cannot have a hint: every non-empty answer is accepted, so there is nothing to hint towards. Clear the hint, or choose another answer type.";
 const { validateChoices, parseChoices, parseCorrectIds, gradeChoice, choiceIdsByText, legacySelectionIds, storedChoicePickedNothing } = require("../lib/choices");
 // Event team reports — an event asks each qualifying question once (ruling N7),
 // and an answered one keeps its options in place (ruling 84); lib/qualifying.js.
@@ -212,8 +212,8 @@ function _assignTarget(task, cid) {
 // bulk door's ledger key.
 function _assignTargetStateRefusal(task, tgt, isSuperAdmin) {
   if (tgt === task) return null;
-  if (tgt.status !== "published") return { kind: "draft", message: "This event's own copy of the challenge is not published; publish it in the event to add it back." };
-  if (tgt.locked && !isSuperAdmin) return { kind: "locked", message: "This event's own copy of the challenge is locked. Only a superadmin can change event assignments." };
+  if (tgt.status !== "published") return { kind: "draft", message: "This event's own copy of the question is not published; publish it in the event to add it back." };
+  if (tgt.locked && !isSuperAdmin) return { kind: "locked", message: "This event's own copy of the question is locked. Only a superadmin can change event assignments." };
   return null;
 }
 
@@ -284,8 +284,8 @@ function _taskVisibilitySql(req, alias) {
 // organiser's event names or challenge titles.
 function _heldTopicClause(req, comp, dup) {
   return competitionDenied(req, comp.id)
-    ? "an event holding this challenge that you do not organise already has a qualifying question on this topic"
-    : `“${comp.name}” holds this challenge and already has a qualifying question on this topic (“${dup.held_title}”)`;
+    ? "an event holding this question that you do not organise already has a qualifying question on this topic"
+    : `“${comp.name}” holds this question and already has a qualifying question on this topic (“${dup.held_title}”)`;
 }
 
 // A Program learner an organiser's edit of challenge `taskId` has just made
@@ -336,7 +336,7 @@ function _afterQualifyingFlip(held) {
 module.exports = function register(app) {
 app.post("/api/admin/tasks/:id/publish", requireAdmin, csrfProtection, (req, res) => {
   const task = db.prepare("SELECT id, status, locked, created_by_id, answer_sealed FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
@@ -378,7 +378,7 @@ app.post("/api/admin/tasks/:id/publish", requireAdmin, csrfProtection, (req, res
     const denied = taskScoringEditDenied(req, task);
     if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
   }
-  if (task.status === "published") return res.status(400).json({ error: "Challenge is already published" });
+  if (task.status === "published") return res.status(400).json({ error: "Question is already published" });
   // v6.16.14 — completes the lock-doctrine coverage. PUT /:id (line
   // 7269), PATCH /:id/visibility (v6.16.10), POST /:id/restore
   // (v6.16.13), POST /:id/recalculate (v6.16.13), submit, hint, and
@@ -386,7 +386,7 @@ app.post("/api/admin/tasks/:id/publish", requireAdmin, csrfProtection, (req, res
   // remaining gap. Superadmin can still publish a locked task because
   // they can also unlock it; regular admin gets 403.
   if (task.locked && !req.session.isSuperAdmin) {
-    return res.status(403).json({ error: "Challenge is locked. Only a superadmin can publish a locked draft." });
+    return res.status(403).json({ error: "Question is locked. Only a superadmin can publish a locked draft." });
   }
   // v6.16.7 — wrap UPDATE + version emit in a single txn.
   // v6.16.16 — re-assert lock state inside the txn (TOCTOU close).
@@ -397,7 +397,7 @@ app.post("/api/admin/tasks/:id/publish", requireAdmin, csrfProtection, (req, res
   // and can re-order its final ranks. See taskFrozenByEndedCompetition.
   {
     const _frozen = taskFrozenByEndedCompetition(req.params.id);
-    if (_frozen) return res.status(409).json({ error: `Cannot publish — this challenge is in "${_frozen.name}", which has an ended session whose final standings are frozen. ${FROZEN_REMEDY}` });
+    if (_frozen) return res.status(409).json({ error: `Cannot publish — this question is in "${_frozen.name}", which has an ended session whose final standings are frozen. ${FROZEN_REMEDY}` });
   }
   const _adminId = getAdminIdentity(req);
   let _pubLockedRace = false;
@@ -409,7 +409,7 @@ app.post("/api/admin/tasks/:id/publish", requireAdmin, csrfProtection, (req, res
   });
   try { runTxnWithMirrorBuffer(() => pubTxn()); }
   catch (e) {
-    if (_pubLockedRace) return res.status(403).json({ error: "Challenge was locked while publishing. Only a superadmin can publish a locked draft." });
+    if (_pubLockedRace) return res.status(403).json({ error: "Question was locked while publishing. Only a superadmin can publish a locked draft." });
     throw e;
   }
   // audit v7.7.36 (C8) — status='published' is a leaderboard predicate (totalTasks
@@ -428,7 +428,7 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
   // adds a rule that reads a column, every SELECT feeding it has to grow.
   // v8.12.0 — `answer_sealed` joins it for the staff-compete seal check below.
   const task = db.prepare("SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not add a challenge to the event they compete in.
   // Asked FIRST, over every named event, ahead of the visibility and locked-task
   // gates: the lock binds every tier, so a question answered before it hands one
@@ -453,7 +453,7 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
     // v8.13.3 — and BOUNDED, like the bulk twin (audit v7.12.3 #9). Each element
     // costs this transaction a SELECT, two slot reads and an INSERT, so an
     // uncapped array is a write-lock hold any admin could make arbitrarily long.
-    if (competitionIds.length > BULK_ADMIN_MAX) return res.status(400).json({ error: `Cannot assign a challenge to more than ${BULK_ADMIN_MAX} events in a single request.` });
+    if (competitionIds.length > BULK_ADMIN_MAX) return res.status(400).json({ error: `Cannot assign a question to more than ${BULK_ADMIN_MAX} events in a single request.` });
     for (const cid of new Set(competitionIds)) {
       const _cmp = refuseCompetitor(res, competitorEditDenied(db, competitorIds(req), cid));
       if (_cmp) return _cmp;
@@ -466,7 +466,7 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
     const denied = taskViewDenied(req, task);
     if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
   }
-  if (task.status !== "published") return res.status(400).json({ error: "Only published challenges can be assigned to events" });
+  if (task.status !== "published") return res.status(400).json({ error: "Only published questions can be assigned to events" });
   // v6.16.16 — comp assignment is scoring-relevant via the auto-end
   // gate's `WHERE t.active=1` count + per-comp leaderboard membership.
   // Locked-task doctrine (PUT, visibility, publish, restore,
@@ -476,7 +476,7 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
   // expand its scoring footprint silently. Superadmin can still
   // assign because they can also unlock.
   if (task.locked && !req.session.isSuperAdmin) {
-    return res.status(403).json({ error: "Challenge is locked. Only a superadmin can change event assignments." });
+    return res.status(403).json({ error: "Question is locked. Only a superadmin can change event assignments." });
   }
   if (!Array.isArray(competitionIds) || competitionIds.length === 0)
     return res.status(400).json({ error: "competitionIds array required" });
@@ -538,7 +538,7 @@ app.post("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req
       const comp = db.prepare("SELECT id, name, event_kind, start_time, duration_minutes, ended_at, staff_compete FROM competitions WHERE id=?").get(cid);
       if (!comp) throw _assignRefusal(`Competition not found: ${cid}`);
       if (competitionStatus(comp) === "ended" || competitionAnySlotEnded(comp)) {
-        throw _assignRefusal(`Cannot modify challenge assignments for competition "${comp.name}" — a session has already ended.`);
+        throw _assignRefusal(`Cannot modify question assignments for competition "${comp.name}" — a session has already ended.`);
       }
       // v8.1.0 (PR 30) — REFUSE rather than assign-and-disappoint. This extends
       // the ended-only gate immediately above it: same transaction, same throw,
@@ -645,7 +645,7 @@ app.post("/api/admin/tasks/assign-competitions", requireAdmin, bulkAdminLimit, c
   // authenticated request can't hold the write lock for a huge batch (it was bounded
   // only by the 5 MB JSON parser → ~100k ids).
   if (taskIds.length > BULK_ADMIN_MAX || competitionIds.length > BULK_ADMIN_MAX) {
-    return res.status(400).json({ error: `Cannot assign more than ${BULK_ADMIN_MAX} challenges or events in a single request.` });
+    return res.status(400).json({ error: `Cannot assign more than ${BULK_ADMIN_MAX} questions or events in a single request.` });
   }
   // Dedupe up front — repeated ids do no useful work (INSERT OR IGNORE) but each
   // still costs a SELECT/renumber pass.
@@ -806,7 +806,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
   // v8.1.0 (PR 30) — title + answer_type for the fit check, as in the POST twin.
   // v8.12.0 — `answer_sealed` for the staff-compete seal check, likewise.
   const task = db.prepare("SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   const { competitionIds, expectedAssignments } = req.body || {};
   // v8.13.3 — THE ELEMENTS ARE VALIDATED BEFORE ANYTHING ASKS ABOUT THEM, for the
   // reason the POST twin gives. Here the pre-pass below FILTERED non-strings into
@@ -841,7 +841,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
     : null;
   const _changeMsg = `Cannot add or remove more than ${BULK_ADMIN_MAX} events in one save.`;
   if (desiredIds && desiredIds.filter(cid => !_curAll.has(cid)).length > BULK_ADMIN_MAX) return res.status(400).json({ error: _changeMsg });
-  if (expectedIds && expectedIds.length > _curAll.size + BULK_ADMIN_MAX) return res.status(400).json({ error: "expectedAssignments lists far more events than this challenge is assigned to." });
+  if (expectedIds && expectedIds.length > _curAll.size + BULK_ADMIN_MAX) return res.status(400).json({ error: "expectedAssignments lists far more events than this question is assigned to." });
   // v8.12.0 — the ADD direction of the competitor lock, asked FIRST for the
   // reason the POST twin gives. "Adding to an event I compete in" is a fact
   // about the whole current set, so it needs no narrowing; the REMOVE direction
@@ -878,10 +878,10 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
     const denied = taskViewDenied(req, task);
     if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
   }
-  if (task.status !== "published") return res.status(400).json({ error: "Only published challenges can be assigned to events" });
+  if (task.status !== "published") return res.status(400).json({ error: "Only published questions can be assigned to events" });
   // v6.16.16 — same lock gate as POST companion above.
   if (task.locked && !req.session.isSuperAdmin) {
-    return res.status(403).json({ error: "Challenge is locked. Only a superadmin can change event assignments." });
+    return res.status(403).json({ error: "Question is locked. Only a superadmin can change event assignments." });
   }
   if (!Array.isArray(competitionIds))
     return res.status(400).json({ error: "competitionIds array required" });
@@ -1034,7 +1034,7 @@ app.put("/api/admin/tasks/:id/competitions", requireAdmin, csrfProtection, (req,
       // v8.12.0 — `staff_compete` joins the SELECT for the seal check below.
       const comp = db.prepare("SELECT id, name, event_kind, start_time, duration_minutes, ended_at, staff_compete FROM competitions WHERE id=?").get(cid);
       if (comp && (competitionStatus(comp) === "ended" || competitionAnySlotEnded(comp))) {
-        throw _assignRefusal(`Cannot modify challenge assignments for competition "${comp.name}" — a session has already ended.`);
+        throw _assignRefusal(`Cannot modify question assignments for competition "${comp.name}" — a session has already ended.`);
       }
       // v8.1.0 (PR 30) — the second extension of an existing ended-only gate.
       // Scoped to ADDITIONS only: `allChangedIds` also holds removals, and
@@ -1159,7 +1159,7 @@ app.delete("/api/admin/tasks/:id/competitions/:cid", requireAdmin, csrfProtectio
   // competing admin on a locked challenge heard "locked" with no code at all.
   { const _cmp = refuseCompetitor(res, competitorEditDenied(db, competitorIds(req), req.params.cid)); if (_cmp) return _cmp; }
   if (task && task.locked && !req.session.isSuperAdmin) {
-    return res.status(403).json({ error: "Challenge is locked. Only a superadmin can change event assignments." });
+    return res.status(403).json({ error: "Question is locked. Only a superadmin can change event assignments." });
   }
   // v8.7.0 — an event admin may take back only what they added: the challenge
   // bank is shared, so removing somebody else's assignment silently shrinks an
@@ -1174,7 +1174,7 @@ app.delete("/api/admin/tasks/:id/competitions/:cid", requireAdmin, csrfProtectio
   const comp = db.prepare("SELECT id, name, start_time, duration_minutes, ended_at FROM competitions WHERE id=?").get(req.params.cid);
   if (!comp) return res.status(404).json({ error: "Event not found" });
   if (competitionStatus(comp) === "ended" || competitionAnySlotEnded(comp)) {
-    return res.status(400).json({ error: `Cannot modify challenge assignments for event "${comp.name}" — a session has already ended.` });
+    return res.status(400).json({ error: `Cannot modify question assignments for event "${comp.name}" — a session has already ended.` });
   }
   const adminId = getAdminIdentity(req);
   const taskTitle = db.prepare("SELECT title FROM tasks WHERE id=?").get(eid)?.title;
@@ -1672,7 +1672,7 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
     ownerComp = db.prepare("SELECT id, name, event_kind, start_time, duration_minutes, ended_at, staff_compete FROM competitions WHERE id=?").get(ownerCompId);
     if (!ownerComp) return res.status(404).json({ error: "Event not found" });
     if (competitionStatus(ownerComp) === "ended" || competitionAnySlotEnded(ownerComp)) {
-      return res.status(400).json({ error: `Cannot modify challenge assignments for event "${ownerComp.name}" — a session has already ended.` });
+      return res.status(400).json({ error: `Cannot modify question assignments for event "${ownerComp.name}" — a session has already ended.` });
     }
     const _probe = { id, title, answer_type: _effTypeC, answer_sealed: _wantSealed, created_by_id: actorId(req) };
     const _fit = _fitError(_probe, ownerComp);
@@ -1690,7 +1690,7 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
   let stagingSpecs = [];
   if (Array.isArray(staging_attachments) && staging_attachments.length) {
     if (staging_attachments.length > ATTACHMENT_MAX_PER_TASK) {
-      return res.status(409).json({ error: `Maximum ${ATTACHMENT_MAX_PER_TASK} attachments per challenge.` });
+      return res.status(409).json({ error: `Maximum ${ATTACHMENT_MAX_PER_TASK} attachments per question.` });
     }
     const seenNames = new Set();
     for (const sa of staging_attachments) {
@@ -1785,7 +1785,7 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
       try { fs.renameSync(mv.dst, mv.src); } catch (undoErr) { swallowed("challenges:create-txn-undo-move", undoErr); }
     }
     log.error({ ...reqContext(req), tag: "attachments", err: e && e.message }, "[attachments] task create txn failed");
-    return res.status(500).json({ error: "Failed to create challenge." });
+    return res.status(500).json({ error: "Failed to create question." });
   }
 
   if (ownerComp && taskStatus === "published") {
@@ -1810,7 +1810,7 @@ app.post("/api/admin/tasks", requireAdmin, csrfProtection, (req, res) => {
 // the source and its event.
 app.post("/api/admin/tasks/:id/save-to-bank", requireAdmin, csrfProtection, (req, res) => {
   const src = db.prepare("SELECT * FROM tasks WHERE id=?").get(req.params.id);
-  if (!src) return res.status(404).json({ error: "Challenge not found" });
+  if (!src) return res.status(404).json({ error: "Question not found" });
   if (!src.owner_competition_id) return res.status(400).json({ error: "This question is already in the Question bank.", code: "save_to_bank_not_event" });
   { const _cmp = refuseCompetitor(res, competitorTaskEditDenied(db, competitorIds(req), src.id)); if (_cmp) return _cmp; }
   {
@@ -1842,13 +1842,13 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
   // for an operator reviewing the log who wants to know "what exactly did
   // Alice change about this challenge?".
   const existing = db.prepare("SELECT * FROM tasks WHERE id=?").get(req.params.id);
-  if (!existing) return res.status(404).json({ error: "Challenge not found" });
+  if (!existing) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
   // first would hand a superadmin a different reason for the same refusal.
   { const _cmp = refuseCompetitor(res, competitorTaskEditDenied(db, competitorIds(req), req.params.id)); if (_cmp) return _cmp; }
-  if (existing.locked) return res.status(403).json({ error: "Challenge is locked. Only a superadmin can unlock it." });
+  if (existing.locked) return res.status(403).json({ error: "Question is locked. Only a superadmin can unlock it." });
   // v8.7.0 — editing is OWNER-ONLY, checked before ANY side effect: this handler
   // goes on to sanitise rich text (which STORES images) and to move attachment
   // binaries out of staging, so a refusal raised later would leave both behind.
@@ -1916,7 +1916,7 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
   // admin UI that pre-dated this check.
   if (req.body.expectedUpdatedAt && existing.updated_at && req.body.expectedUpdatedAt !== existing.updated_at) {
     return res.status(409).json({
-      error: "This challenge was modified by another admin since you opened it. Reload to see the latest values, then retry.",
+      error: "This question was modified by another admin since you opened it. Reload to see the latest values, then retry.",
       conflict: true,
       currentUpdatedAt: existing.updated_at,
     });
@@ -2186,7 +2186,7 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
       const _comp = getCompetition(cid);
       if (_comp && competitionAnySlotEnded(_comp)) {
         return res.status(409).json({
-          error: `Cannot change scoring (correct_answer / answer_type / difficulty) — challenge is in "${_comp.name}" which has at least one ended session. Edit text-only fields instead. ${FROZEN_REMEDY}`,
+          error: `Cannot change scoring (correct_answer / answer_type / difficulty) — question is in "${_comp.name}" which has at least one ended session. Edit text-only fields instead. ${FROZEN_REMEDY}`,
         });
       }
     }
@@ -2211,7 +2211,7 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
       "SELECT COUNT(*) AS c FROM task_attachments WHERE task_id=? AND detached_at IS NULL"
     ).get(req.params.id).c;
     if (currentCount + staging_attachments.length > ATTACHMENT_MAX_PER_TASK) {
-      return res.status(409).json({ error: `Maximum ${ATTACHMENT_MAX_PER_TASK} attachments per challenge.` });
+      return res.status(409).json({ error: `Maximum ${ATTACHMENT_MAX_PER_TASK} attachments per question.` });
     }
     const seenNames = new Set();
     for (const sa of staging_attachments) {
@@ -2327,9 +2327,9 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
   });
   try { updateTxn(); } catch (e) {
     for (const mv of movesApplied) { try { fs.renameSync(mv.dst, mv.src); } catch (undoErr) { swallowed("challenges:update-txn-undo-move", undoErr); } }
-    if (e && e.message === "not_found") return res.status(404).json({ error: "Challenge not found" });
+    if (e && e.message === "not_found") return res.status(404).json({ error: "Question not found" });
     log.error({ ...reqContext(req), tag: "attachments", err: e && e.message }, "[attachments] task update txn failed");
-    return res.status(500).json({ error: "Failed to save challenge." });
+    return res.status(500).json({ error: "Failed to save question." });
   }
 
   // Build a scalar-only diff (skip heavyweight rich-text bodies — their full
@@ -2357,7 +2357,7 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
   for (const k of trackedScalar) {
     if (existing[k] === updated[k]) continue;
     changes[k] = (_sealedNow && SEALED_FIELDS.includes(k))
-      ? "(sealed answer changed — visible to its author, or to a superadmin who has revealed it, in the challenge editor)"
+      ? "(sealed answer changed — visible to its author, or to a superadmin who has revealed it, in the question editor)"
       : { from: existing[k], to: updated[k] };
   }
   // Rich-text fields: record only whether they changed, not the full bodies.
@@ -2391,7 +2391,7 @@ app.put("/api/admin/tasks/:id", requireAdmin, csrfProtection, (req, res) => {
 
 app.patch("/api/admin/tasks/:id/visibility", requireAdmin, csrfProtection, (req, res) => {
   const task = db.prepare("SELECT id, active, locked, created_by_id, answer_sealed FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
@@ -2442,7 +2442,7 @@ app.patch("/api/admin/tasks/:id/visibility", requireAdmin, csrfProtection, (req,
   // Superadmin can still toggle visibility on a locked task because
   // they can also unlock it; regular admin gets 403.
   if (task.locked && !req.session.isSuperAdmin) {
-    return res.status(403).json({ error: "Challenge is locked. Only a superadmin can change visibility." });
+    return res.status(403).json({ error: "Question is locked. Only a superadmin can change visibility." });
   }
   // v6.16.16 — TOCTOU close. The UPDATE WHERE re-asserts the lock
   // state observed at SELECT time so a concurrent /lock that lands
@@ -2468,7 +2468,7 @@ app.patch("/api/admin/tasks/:id/visibility", requireAdmin, csrfProtection, (req,
   // used to recommend this very toggle as the workaround.
   {
     const _frozen = taskFrozenByEndedCompetition(task.id);
-    if (_frozen) return res.status(409).json({ error: `Cannot change visibility — this challenge is in "${_frozen.name}", which has an ended session whose final standings are frozen. ${FROZEN_REMEDY}` });
+    if (_frozen) return res.status(409).json({ error: `Cannot change visibility — this question is in "${_frozen.name}", which has an ended session whose final standings are frozen. ${FROZEN_REMEDY}` });
   }
   let _visLockedRace = false;
   const visTxn = db.transaction(() => {
@@ -2479,7 +2479,7 @@ app.patch("/api/admin/tasks/:id/visibility", requireAdmin, csrfProtection, (req,
   });
   try { runTxnWithMirrorBuffer(() => visTxn()); }
   catch (e) {
-    if (_visLockedRace) return res.status(403).json({ error: "Challenge was locked while changing visibility. Only a superadmin can change visibility on a locked task." });
+    if (_visLockedRace) return res.status(403).json({ error: "Question was locked while changing visibility. Only a superadmin can change visibility on a locked task." });
     throw e;
   }
   // v6.16.7 — visibility flip changes auto-end's `WHERE t.active=1`
@@ -2494,7 +2494,7 @@ app.patch("/api/admin/tasks/:id/visibility", requireAdmin, csrfProtection, (req,
 app.delete("/api/admin/tasks/:id", requireAdmin, requireSuperAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {
   const taskId = req.params.id;
   const task = db.prepare("SELECT * FROM tasks WHERE id=?").get(taskId);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
@@ -2516,7 +2516,7 @@ app.delete("/api/admin/tasks/:id", requireAdmin, requireSuperAdmin, destructiveA
     ).all(taskId);
     const liveComps = _assignedComps.filter(c => competitionStatus(c) === "live");
     if (liveComps.length > 0) {
-      return { error: `Cannot delete challenge while it is used in live event(s): ${liveComps.map(c => c.name).join(", ")}` };
+      return { error: `Cannot delete question while it is used in live event(s): ${liveComps.map(c => c.name).join(", ")}` };
     }
     // audit v7.7.32 (RM2) — mirror the assignment-freeze the assign/unassign
     // routes enforce ("frozen once any session has ended"). Hard delete removes
@@ -2533,13 +2533,13 @@ app.delete("/api/admin/tasks/:id", requireAdmin, requireSuperAdmin, destructiveA
       // leaderboard predicate, so hiding a challenge re-orders a finished
       // competition's ranks. The toggle is now frozen too, so the advice would
       // also be wrong — unassigning is the real path.
-      return { error: `Cannot delete a challenge assigned to an event where a session has ended (final standings are frozen): ${endedComps.map(c => c.name).join(", ")}. ${FROZEN_REMEDY}` };
+      return { error: `Cannot delete a question assigned to an event where a session has ended (final standings are frozen): ${endedComps.map(c => c.name).join(", ")}. ${FROZEN_REMEDY}` };
     }
     if (db.prepare("SELECT 1 FROM submissions WHERE task_id=? LIMIT 1").get(taskId)) {
-      return { error: "Cannot delete a challenge that has submissions. Use visibility toggle to hide it instead." };
+      return { error: "Cannot delete a question that has submissions. Use visibility toggle to hide it instead." };
     }
     if (db.prepare("SELECT 1 FROM hint_reveals WHERE task_id=? LIMIT 1").get(taskId)) {
-      return { error: "Cannot delete a challenge that has hint reveals. Use visibility toggle to hide it instead." };
+      return { error: "Cannot delete a question that has hint reveals. Use visibility toggle to hide it instead." };
     }
     // Capture pre-delete counts for the log line (cascaded rows). Attachment
     // storage paths are collected here so we can unlink the binaries AFTER
@@ -2760,7 +2760,7 @@ app.post("/api/admin/tasks/:id/sealed-reveal", requireAdmin, destructiveAdminLim
   // `explanation` is selected only to decide whether there IS one to name in
   // the record — its value never leaves this handler.
   const task = db.prepare("SELECT id, title, created_by_id, answer_sealed, hint, explanation FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   { const _cmp = refuseCompetitor(res, competitorTaskEditDenied(db, competitorIds(req), task.id)); if (_cmp) return _cmp; }
   {
     const denied = taskViewDenied(req, task);
@@ -2813,13 +2813,13 @@ app.post("/api/admin/tasks/:id/restore", requireAdmin, csrfProtection, (req, res
   // v8.7.0 — `id` + `created_by_id` join the SELECT because the scope gate below
   // needs both (a column-naming SELECT is a list that rots).
   const taskCheck = db.prepare("SELECT id, locked, correct_answer, answer_type, difficulty, active, status, choices, created_by_id, answer_sealed FROM tasks WHERE id=?").get(req.params.id);
-  if (!taskCheck) return res.status(404).json({ error: "Challenge not found" });
+  if (!taskCheck) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
   // first would hand a superadmin a different reason for the same refusal.
   { const _cmp = refuseCompetitor(res, competitorTaskEditDenied(db, competitorIds(req), req.params.id)); if (_cmp) return _cmp; }
-  if (taskCheck?.locked) return res.status(403).json({ error: "Challenge is locked. Only a superadmin can unlock it." });
+  if (taskCheck?.locked) return res.status(403).json({ error: "Question is locked. Only a superadmin can unlock it." });
   // v8.7.0 — the STRICTER gate, and unconditionally: a restore rewrites the whole
   // row from a snapshot, so `correct_answer`, `answer_type`, `difficulty`,
   // `active`, `status` and `choices` all move whatever the operator intended. It
@@ -2854,7 +2854,7 @@ app.post("/api/admin/tasks/:id/restore", requireAdmin, csrfProtection, (req, res
   // snapshots and this check refuses an incomplete one), and "restoring" it
   // would replay the state the challenge already held when the key was shown.
   // The History dialog offers no Restore on it; a hand-built request is refused.
-  if (version.change_type === "sealed_reveal") return res.status(400).json({ error: "That history entry records a sealed answer being revealed; it is not a version of the challenge and cannot be restored." });
+  if (version.change_type === "sealed_reveal") return res.status(400).json({ error: "That history entry records a sealed answer being revealed; it is not a version of the question and cannot be restored." });
   let s;
   try { s = JSON.parse(version.snapshot); } catch { return res.status(500).json({ error: "Corrupted version snapshot" }); }
   // v8.9.0 — an `any` snapshot legitimately carries an empty correct_answer.
@@ -2894,14 +2894,14 @@ app.post("/api/admin/tasks/:id/restore", requireAdmin, csrfProtection, (req, res
     const _snapCorrect = parseCorrectIds(s.correct_answer);
     const _snapIds = new Set(_snapOpts.map(c => c.id));
     if (_snapOpts.length < 2 || !_snapCorrect.length || _snapCorrect.length >= _snapOpts.length || !_snapCorrect.every(id => _snapIds.has(id))) {
-      return res.status(409).json({ error: "That version's multiple-choice options and correct answers do not match, so restoring it would leave a challenge nobody can solve." });
+      return res.status(409).json({ error: "That version's multiple-choice options and correct answers do not match, so restoring it would leave a question nobody can solve." });
     }
   }
   // v8.9.0 — an any-answer version may not carry a hint (no writer stores one;
   // only a hand-edited snapshot can). Refused rather than written, the same
   // posture as the choice check above.
   if (s.answer_type === "any" && richTextHasContent(s.hint)) {
-    return res.status(409).json({ error: `That version is an any-answer challenge that carries a hint, which the type does not allow, so it cannot be restored as it is. ${ANY_HINT_REFUSAL}` });
+    return res.status(409).json({ error: `That version is an any-answer question that carries a hint, which the type does not allow, so it cannot be restored as it is. ${ANY_HINT_REFUSAL}` });
   }
   // v8.1.4 — THE SEVENTH MUTATION PATH, and the one PR 30 did not enumerate.
   //
@@ -2973,12 +2973,12 @@ app.post("/api/admin/tasks/:id/restore", requireAdmin, csrfProtection, (req, res
     _qualifyingChanged = _curQ.size !== _nextQ.size || [..._curQ].some(t => !_nextQ.has(t));
     _qualifyingFlip = (_curQ.size > 0) !== (_nextQ.size > 0);
     if (_qualifyingChanged && taskFrozenByEndedCompetition(req.params.id)) {
-      return res.status(409).json({ error: `Cannot restore that version — it changes whether this is a qualifying question, and the challenge is in an event with an ended session. ${FROZEN_REMEDY}`, code: "qualifying_tag_frozen" });
+      return res.status(409).json({ error: `Cannot restore that version — it changes whether this is a qualifying question, and the question is in an event with an ended session. ${FROZEN_REMEDY}`, code: "qualifying_tag_frozen" });
     }
     if (_newKeys.length) {
       for (const _c of db.prepare("SELECT c.id, c.name FROM competition_tasks ct JOIN competitions c ON c.id=ct.competition_id WHERE ct.task_id=? ORDER BY c.name").all(req.params.id)) {
         const _dup = qualifyingKeyHeldDenied(db, _c, req.params.id, _newKeys);
-        if (_dup) return res.status(409).json({ error: `Cannot restore that version — it makes this challenge a qualifying question, and ${_heldTopicClause(req, _c, _dup)}. An event asks each one once: take it out of that event first, or restore another version.`, code: _dup.code });
+        if (_dup) return res.status(409).json({ error: `Cannot restore that version — it makes this question a qualifying question, and ${_heldTopicClause(req, _c, _dup)}. An event asks each one once: take it out of that event first, or restore another version.`, code: _dup.code });
       }
     }
   }
@@ -3011,7 +3011,7 @@ app.post("/api/admin/tasks/:id/restore", requireAdmin, csrfProtection, (req, res
       const _rComp = getCompetition(cid);
       if (_rComp && competitionAnySlotEnded(_rComp)) {
         return res.status(409).json({
-          error: `Cannot restore — this version changes scoring/availability (correct_answer / answer_type / difficulty / active / status) and the challenge is in "${_rComp.name}" which has at least one ended session. ${FROZEN_REMEDY}`,
+          error: `Cannot restore — this version changes scoring/availability (correct_answer / answer_type / difficulty / active / status) and the question is in "${_rComp.name}" which has at least one ended session. ${FROZEN_REMEDY}`,
         });
       }
     }
@@ -3097,7 +3097,7 @@ app.post("/api/admin/tasks/:id/restore", requireAdmin, csrfProtection, (req, res
   });
   try { runTxnWithMirrorBuffer(() => restoreTxn()); }
   catch (e) {
-    if (_restoreLockedRace) return res.status(403).json({ error: "Challenge was locked while restoring. Unlock it first and retry." });
+    if (_restoreLockedRace) return res.status(403).json({ error: "Question was locked while restoring. Unlock it first and retry." });
     throw e;
   }
   if (_qualifyingChanged) _renumberAfterQualifyingChange(req.params.id);
@@ -3175,7 +3175,7 @@ app.post("/api/admin/tasks/:id/attempt-grant", requireAdmin, destructiveAdminLim
   // The grant is on the event's own question: naming a bank question means this
   // event's copy of it (lib/event-copies.js).
   const task = db.prepare("SELECT id, title, attempt_cap FROM tasks WHERE id=?").get(assignedEventTaskId(db, req.params.id, competitionId) || req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   const comp = getCompetition(competitionId);
   if (!comp) return res.status(404).json({ error: "Event not found" });
   // v8.7.0 — the grant is scoped to ONE event, so the event is the only thing to
@@ -3214,13 +3214,13 @@ app.post("/api/admin/tasks/:id/attempt-grant", requireAdmin, destructiveAdminLim
     return res.status(409).json({ error: "That participant is not enrolled in this event." });
   }
   if (!db.prepare("SELECT 1 FROM competition_tasks WHERE competition_id=? AND task_id=?").get(competitionId, task.id)) {
-    return res.status(409).json({ error: "That challenge is not assigned to this event." });
+    return res.status(409).json({ error: "That question is not assigned to this event." });
   }
   // A grant on an UNCAPPED challenge would be stored and mean nothing — the admin
   // would believe they had helped. Named, because "nothing happened" is the
   // failure mode a desk cannot diagnose.
   if (resolveAttemptCap(task, comp) === null) {
-    return res.status(409).json({ error: "That challenge has no attempt cap in this event, so there is nothing to grant.", code: "not_capped" });
+    return res.status(409).json({ error: "That question has no attempt cap in this event, so there is nothing to grant.", code: "not_capped" });
   }
 
   const granted = grantAttempts(userId, task.id, competitionId, extra);
@@ -3250,7 +3250,7 @@ app.post("/api/admin/tasks/:id/attempt-grant", requireAdmin, destructiveAdminLim
 
 app.post("/api/admin/tasks/:id/lock", requireAdmin, requireSuperAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {
   const task = db.prepare("SELECT id, locked, created_by_id FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
@@ -3283,7 +3283,7 @@ app.post("/api/admin/tasks/:id/lock", requireAdmin, requireSuperAdmin, destructi
 // land. Returns counts so the admin can see what changed.
 app.post("/api/admin/tasks/:id/recalculate", requireAdmin, requireSuperAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {
   const task = db.prepare("SELECT id, title, difficulty, answer_type, correct_answer, choices, locked, created_by_id, answer_sealed FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
@@ -3318,7 +3318,7 @@ app.post("/api/admin/tasks/:id/recalculate", requireAdmin, requireSuperAdmin, de
   // operator-to-operator contract the lock conveys. 423 with explicit
   // "unlock first" guidance forces the reverse path.
   if (task.locked) {
-    return res.status(423).json({ error: "Challenge is locked. Unlock it before recalculating — recalculate rewrites scoring." });
+    return res.status(423).json({ error: "Question is locked. Unlock it before recalculating — recalculate rewrites scoring." });
   }
   // Warn when any competition using this task has a live session — recalculating
   // mid-event changes participant scores without notice. Superadmins who have
@@ -3339,7 +3339,7 @@ app.post("/api/admin/tasks/:id/recalculate", requireAdmin, requireSuperAdmin, de
       // capped event is the only place a re-grade can strand somebody. A refusal
       // must name a remedy the person reading it can actually take (v7.29.0).
       return res.status(409).json({
-        error: "A session using this challenge is currently live. Recalculating will change participant scores mid-event — confirm again to proceed.",
+        error: "A session using this question is currently live. Recalculating will change participant scores mid-event — confirm again to proceed.",
         code: "live_session_confirm",
       });
     }
@@ -3481,7 +3481,7 @@ app.post("/api/admin/tasks/:id/recalculate", requireAdmin, requireSuperAdmin, de
   try { tx(); }
   catch (e) {
     if (_lockedRaceLost) {
-      return res.status(423).json({ error: "Challenge was locked while recalculating. Unlock it first and retry." });
+      return res.status(423).json({ error: "Question was locked while recalculating. Unlock it first and retry." });
     }
     throw e;
   }
@@ -3682,7 +3682,7 @@ app.post("/api/admin/tasks/:id/attachments",
     let _release = null;                       // set once the budget slot is reserved
     try {
       const task = db.prepare("SELECT id, locked, created_by_id FROM tasks WHERE id=?").get(req.params.id);
-      if (!task) { _unlinkAttachmentTempSync(req.file?.path); return res.status(404).json({ error: "Challenge not found" }); }
+      if (!task) { _unlinkAttachmentTempSync(req.file?.path); return res.status(404).json({ error: "Question not found" }); }
       // v8.12.0 — the competitor lock, unlinking the temp file like its neighbours.
       {
         const _cmpDenied = competitorTaskEditDenied(db, competitorIds(req), req.params.id);
@@ -3697,7 +3697,7 @@ app.post("/api/admin/tasks/:id/attachments",
         const denied = taskEditDenied(req, task);
         if (denied) { _unlinkAttachmentTempSync(req.file?.path); return res.status(403).json({ error: denied.message, code: denied.code }); }
       }
-      if (task.locked) { _unlinkAttachmentTempSync(req.file?.path); return res.status(403).json({ error: "Challenge is locked." }); }
+      if (task.locked) { _unlinkAttachmentTempSync(req.file?.path); return res.status(403).json({ error: "Question is locked." }); }
       if (!req.file) return res.status(400).json({ error: "No file uploaded." });
       // ext-audit v7.15.12 — the DIRECT (edit-flow) upload had no in-flight
       // accounting at all: only staging reserved. Concurrent direct uploads
@@ -3805,11 +3805,11 @@ app.post("/api/admin/tasks/:id/attachments",
           // lock the task during that window. Re-reading the committed row here
           // closes the TOCTOU so a locked task can never gain an attachment.
           const fresh = db.prepare("SELECT locked FROM tasks WHERE id=?").get(task.id);
-          if (fresh && fresh.locked) return { reject: 403, msg: "Challenge is locked." };
+          if (fresh && fresh.locked) return { reject: 403, msg: "Question is locked." };
           const c = db.prepare(
             "SELECT COUNT(*) AS c FROM task_attachments WHERE task_id=? AND detached_at IS NULL"
           ).get(task.id).c;
-          if (c >= ATTACHMENT_MAX_PER_TASK) return { reject: 409, msg: `Maximum ${ATTACHMENT_MAX_PER_TASK} attachments per challenge.` };
+          if (c >= ATTACHMENT_MAX_PER_TASK) return { reject: 409, msg: `Maximum ${ATTACHMENT_MAX_PER_TASK} attachments per question.` };
           const dupe = db.prepare(
             "SELECT 1 FROM task_attachments WHERE task_id=? AND detached_at IS NULL AND LOWER(display_name)=LOWER(?)"
           ).get(task.id, displayName);
@@ -3861,7 +3861,7 @@ app.post("/api/admin/tasks/:id/attachments",
 // Rename an attachment's display_name (edit the label, not the file).
 app.patch("/api/admin/tasks/:id/attachments/:aid", requireAdmin, csrfProtection, (req, res) => {
   const task = db.prepare("SELECT id, locked, created_by_id FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
@@ -3871,7 +3871,7 @@ app.patch("/api/admin/tasks/:id/attachments/:aid", requireAdmin, csrfProtection,
     const denied = taskEditDenied(req, task);
     if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
   }
-  if (task.locked) return res.status(403).json({ error: "Challenge is locked." });
+  if (task.locked) return res.status(403).json({ error: "Question is locked." });
   const att = db.prepare(
     "SELECT id, display_name FROM task_attachments WHERE id=? AND task_id=? AND detached_at IS NULL"
   ).get(req.params.aid, task.id);
@@ -3899,7 +3899,7 @@ app.patch("/api/admin/tasks/:id/attachments/:aid", requireAdmin, csrfProtection,
 // to an earlier version can bring the attachment back in full.
 app.delete("/api/admin/tasks/:id/attachments/:aid", requireAdmin, csrfProtection, (req, res) => {
   const task = db.prepare("SELECT id, locked, created_by_id FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
@@ -3909,7 +3909,7 @@ app.delete("/api/admin/tasks/:id/attachments/:aid", requireAdmin, csrfProtection
     const denied = taskEditDenied(req, task);
     if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
   }
-  if (task.locked) return res.status(403).json({ error: "Challenge is locked." });
+  if (task.locked) return res.status(403).json({ error: "Question is locked." });
   const att = db.prepare(
     "SELECT id, display_name FROM task_attachments WHERE id=? AND task_id=? AND detached_at IS NULL"
   ).get(req.params.aid, task.id);
@@ -4277,7 +4277,7 @@ app.post("/api/admin/tasks/:id/tags", requireAdmin, csrfProtection, (req, res) =
   if (_v.error) return res.status(400).json({ error: _v.error });
   const tag = _v.values.tag;
   const task = db.prepare("SELECT id, title, answer_type, choices, created_by_id, answer_sealed, locked FROM tasks WHERE id=?").get(req.params.id);
-  if (!task) return res.status(404).json({ error: "Challenge not found" });
+  if (!task) return res.status(404).json({ error: "Question not found" });
   // v8.12.0 — a competitor may not change a challenge held by the event they
   // compete in. Above the seal and the tier gate, for the reason the seal sits
   // above the tier gate: it binds every tier, so answering another question
@@ -4349,7 +4349,7 @@ app.post("/api/admin/tasks/:id/tags", requireAdmin, csrfProtection, (req, res) =
         const _dup = qualifyingKeyHeldDenied(db, _c, req.params.id, [_key]);
         if (_dup) {
           const _where = _heldTopicClause(req, _c, _dup);
-          return res.status(409).json({ error: `${_where.charAt(0).toUpperCase()}${_where.slice(1)}. An event asks each one once, so this challenge cannot become a second one there: take it out of that event first, or use another key.`, code: _dup.code });
+          return res.status(409).json({ error: `${_where.charAt(0).toUpperCase()}${_where.slice(1)}. An event asks each one once, so this question cannot become a second one there: take it out of that event first, or use another key.`, code: _dup.code });
         }
       }
     }
@@ -4387,7 +4387,7 @@ app.post("/api/admin/tasks/:id/tags", requireAdmin, csrfProtection, (req, res) =
 function _qualifyingNow(taskId) {
   return !!db.prepare("SELECT 1 FROM task_tags WHERE task_id=? AND tag LIKE 'qualifying:%' LIMIT 1").get(taskId);
 }
-const QUALIFYING_LOCKED_ERROR = "Challenge is locked. Only a superadmin can unlock it, and it must be unlocked before it becomes, or stops being, a qualifying question: that re-prices the answers already given.";
+const QUALIFYING_LOCKED_ERROR = "Question is locked. Only a superadmin can unlock it, and it must be unlocked before it becomes, or stops being, a qualifying question: that re-prices the answers already given.";
 
 // The qualifying-tag doors' scoring refusal names no event: the qualifying
 // refusal names another organiser's event only to its organisers (operator ruling
@@ -4395,7 +4395,7 @@ const QUALIFYING_LOCKED_ERROR = "Challenge is locked. Only a superadmin can unlo
 // withholds. Every other refusal (the owner gate's) is passed through as worded.
 function _qualifyingScopeMessage(denied) {
   return denied.code === "event_admin_scoring_locked"
-    ? "This challenge is also used by an event you do not manage, so it cannot become, or stop being, a qualifying question here. Ask an administrator."
+    ? "This question is also used by an event you do not manage, so it cannot become, or stop being, a qualifying question here. Ask an administrator."
     : denied.message;
 }
 
@@ -4414,7 +4414,7 @@ app.delete("/api/admin/tasks/:id/tags/:tag", requireAdmin, csrfProtection, (req,
     const t = db.prepare("SELECT id, created_by_id, answer_sealed, locked FROM tasks WHERE id=?").get(req.params.id);
     // A missing challenge is a 404, as on the add twin; without it the seal
     // check below read `t.id` off undefined and answered a generic 500.
-    if (!t) return res.status(404).json({ error: "Challenge not found" });
+    if (!t) return res.status(404).json({ error: "Question not found" });
     _locked = !!t.locked;
     // v8.12.0 — the competitor lock first of all, for the reason at the publish twin.
     { const _cmp = refuseCompetitor(res, competitorTaskEditDenied(db, competitorIds(req), req.params.id)); if (_cmp) return _cmp; }

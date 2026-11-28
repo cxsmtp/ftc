@@ -951,12 +951,12 @@ test.describe("v7.20.11 — the analytics pickers search everything the record h
     await expect(count).toBeVisible();
     const idle = ((await count.textContent()) || "").trim();
     const total = await visible().count();
-    expect(idle).toBe(`${total} ${total === 1 ? "challenge" : "challenges"}`);
+    expect(idle).toBe(`${total} ${total === 1 ? "question" : "questions"}`);
     expect(idle, "nothing typed yet, so nothing 'matches'").not.toContain("match");
 
     await page.locator("#analytics-task-search").fill(task.title);
     await expect(visible()).toHaveCount(1);
-    await expect(count).toHaveText(`1 of ${total} challenges matches`);
+    await expect(count).toHaveText(`1 of ${total} questions matches`);
 
     // The pre-v7.20.11 picker had NO empty-state node at all: a query matching
     // nothing produced a blank grid and total silence. Both the message and the
@@ -964,8 +964,8 @@ test.describe("v7.20.11 — the analytics pickers search everything the record h
     await page.locator("#analytics-task-search").fill("zzz_no_such_challenge_zzz");
     await expect(visible()).toHaveCount(0);
     await expect(page.locator("#analytics-task-search-empty")).toBeVisible();
-    await expect(page.locator("#analytics-task-search-empty")).toHaveText("No challenges match that search.");
-    await expect(count).toHaveText("No challenges match");
+    await expect(page.locator("#analytics-task-search-empty")).toHaveText("No questions match that search.");
+    await expect(count).toHaveText("No questions match");
 
     await page.locator("#analytics-task-search").fill("");
     await expect(visible()).toHaveCount(total);

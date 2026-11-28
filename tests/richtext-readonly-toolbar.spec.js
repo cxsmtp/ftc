@@ -39,16 +39,16 @@ const { loginViaApi, adminLogin, clickTab, AxeBuilder, AXE_GATED_IMPACTS } = req
 test.use({ baseURL: BASE, viewport: { width: 1440, height: 900 } });
 
 const RO = {
-  lockedUnlock: "Read-only: this challenge is locked. Unlock it from its row's ⋯ menu to edit it.",
-  locked: "Read-only: this challenge is locked, and only a superadmin can unlock it.",
+  lockedUnlock: "Read-only: this question is locked. Unlock it from its row's ⋯ menu to edit it.",
+  locked: "Read-only: this question is locked, and only a superadmin can unlock it.",
   sealed: "Read-only: its answer is sealed, so only the person who created it can edit it.",
   sealedReveal: "Read-only: its answer is sealed. Reveal it (recorded) to see and edit it.",
   sealedRevealPanel: "Read-only: its answer is sealed. Revealing it shows it to you; editing still follows this organiser's rules.",
-  competing: "Read-only: you are competing in an event that holds this challenge.",
-  notMine: "Read-only: you can only edit challenges you created.",
-  lockedNotMine: "Read-only: this challenge is locked, and you can only edit challenges you created.",
+  competing: "Read-only: you are competing in an event that holds this question.",
+  notMine: "Read-only: you can only edit questions you created.",
+  lockedNotMine: "Read-only: this question is locked, and you can only edit questions you created.",
 };
-const SEALED_NOTE_FIRST = "This challenge's answer is sealed by the person who created it.";
+const SEALED_NOTE_FIRST = "This question's answer is sealed by the person who created it.";
 // The 15 tb() buttons and the More toggle, by name: a renamed, added or lost
 // control fails here by name rather than as a count.
 const LABELS = ["Bold", "Italic", "Underline", "Strikethrough", "Text Color", "Highlight", "Font", "Font Size",

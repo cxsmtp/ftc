@@ -900,7 +900,7 @@ export const PLAIN_TABLES = {
   // screen. Where a lead came from and whether they are new are under Columns,
   // so the lead list's default set fits a 1024 px window.
   'team-members': { noun: 'member', paged: false, cols: { member: { grow: true }, actions: { sort: false, filter: null } } },
-  'team-challenges': { noun: 'challenge', paged: false, cols: { challenge: { grow: true }, flag: { filter: 'enum' } } },
+  'team-challenges': { noun: 'question', paged: false, cols: { challenge: { grow: true }, flag: { filter: 'enum' } } },
   'team-accounts': { noun: 'account', paged: false, cols: { company: { grow: true }, signal: { filter: 'enum' } } },
   'team-scorecard': { noun: 'measure', paged: false, cols: { measure: { grow: true }, status: { sort: false, filter: null } } },
   'team-leads': { noun: 'lead', paged: false, hidden: ['new_or_returning', 'where_from'], cols: { lead: { grow: true }, signal: { filter: 'enum' }, owner: { filter: 'enum' }, contacted: { sort: false, filter: null } } },

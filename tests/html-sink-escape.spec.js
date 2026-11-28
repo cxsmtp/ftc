@@ -342,7 +342,7 @@ test.describe("HTML sinks — the dialogs that show stored names", () => {
     await adminLogin(page);
     await page.evaluate(async () => { await /** @type {any} */ (window).loadAdminTasks(); });
     await page.evaluate((id) => { /** @type {any} */ (window).deleteTask(id); }, task.id);
-    await expectInertModal(page, task.title, "Delete Challenge");
+    await expectInertModal(page, task.title, "Delete Question");
   });
 
   test("group name: the Delete Group confirm shows it as text", async ({ page }) => {

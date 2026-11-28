@@ -676,7 +676,7 @@
               <th scope="col" class="sortable" data-action="sort-competitions" data-col="status">Status<span id="sort-comp-status-icon"></span></th>
               <th scope="col" class="sortable" data-action="sort-competitions" data-col="tags">Tags<span id="sort-comp-tags-icon"></span></th>
               <th scope="col" class="sortable" data-action="sort-competitions" data-col="participants">Participants<span id="sort-comp-participants-icon"></span></th>
-              <th scope="col" class="sortable" data-action="sort-competitions" data-col="challenges">Challenges<span id="sort-comp-challenges-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="challenges">Questions<span id="sort-comp-challenges-icon"></span></th>
               <th scope="col" class="sortable" data-action="sort-competitions" data-col="sessions">Sessions<span id="sort-comp-sessions-icon"></span></th>
               <th>Actions</th>
             </tr></thead>
@@ -828,7 +828,7 @@
                      "Any answer": there is no key to type, so the box explains
                      the rule instead of standing empty. -->
                 <div class="form-group" id="tf-any-note-group" style="display:none">
-                  <p class="settings-help" id="tf-any-note" style="margin:0">Any non-empty answer is accepted exactly as typed. No hint and no wrong-answer penalty — a hint or accepted answers this challenge already has are removed when you save.</p>
+                  <p class="settings-help" id="tf-any-note" style="margin:0">Any non-empty answer is accepted exactly as typed. No hint and no wrong-answer penalty — a hint or accepted answers this question already has are removed when you save.</p>
                   <!-- Event team reports — optional options make it a PICK-ONE
                        question: participants choose one, every option is accepted
                        (how a qualifying question is asked). -->
@@ -851,12 +851,12 @@
                   <div class="ce-label-row"><label id="tf-choices-label">Choices <span class="req">*</span> <span class="ce-label-note">tick each correct one</span></label><span data-help="challenge.choices" data-help-label="Choices"></span></div>
                   <div id="tf-choices-list" role="group" aria-labelledby="tf-choices-label"></div>
                   <button type="button" class="ce-link" id="tf-add-choice" data-action="task-add-choice" aria-describedby="tf-choices-cap-note">+ Add choice</button>
-                  <p id="tf-choices-cap-note" class="settings-help" style="margin:6px 0 0" hidden>That is the most a challenge can have: 20 choices.</p>
+                  <p id="tf-choices-cap-note" class="settings-help" style="margin:6px 0 0" hidden>That is the most a question can have: 20 choices.</p>
                   <div id="tf-choices-err" class="form-error" role="alert"></div>
                 </div>
               </div>
             </div>
-            <div class="ce-rail" role="group" aria-label="Challenge settings">
+            <div class="ce-rail" role="group" aria-label="Question settings">
               <!-- Difficulty: a segmented control over the hidden #tf-diff select,
                    which stays the one value the editor code reads and writes
                    (_tfDiffSync keeps the two in step). -->
@@ -887,7 +887,7 @@
                   </label>
                   <span class="help-tip"><button type="button" class="help-tip-btn" id="tf-seal-tip" data-action="help-tip" aria-expanded="false" aria-controls="tf-seal-note" aria-label="About sealing the answer" data-glyph="?"></button></span>
                 </div>
-                <p class="help-tip-note ce-tip-note" id="tf-seal-note" role="note" hidden>Only you then see or change the answer, the explanation and the hint, and only you can edit this challenge, restore an earlier version or recalculate its scores — not other organisers, not administrators. A participant competing in an event can still buy the hint there, as any hint. The one exception is a superadmin who reveals it; every reveal is recorded in the challenge's history, naming them. Participants are never shown the answer, even when the event reveals answers. You can unseal it later; you cannot seal it again.</p>
+                <p class="help-tip-note ce-tip-note" id="tf-seal-note" role="note" hidden>Only you then see or change the answer, the explanation and the hint, and only you can edit this question, restore an earlier version or recalculate its scores — not other organisers, not administrators. A participant competing in an event can still buy the hint there, as any hint. The one exception is a superadmin who reveals it; every reveal is recorded in the question's history, naming them. Participants are never shown the answer, even when the event reveals answers. You can unseal it later; you cannot seal it again.</p>
               </div>
               <!-- v8.10.1 — why sealing (or the free-response type) is unavailable.
                    OUTSIDE #tf-seal-group: the edit form hides that group, and this
@@ -898,12 +898,12 @@
               <p class="settings-help ce-note" id="tf-sealed-note" hidden></p>
               <div class="form-group" id="tf-reveal-row" hidden>
                 <button type="button" class="btn sm secondary" data-action="task-reveal-sealed" data-task-id="">Reveal sealed answer and hint</button>
-                <p class="settings-help" style="margin:6px 0 0">The reveal is recorded in this challenge's history and the event log, naming you.</p>
+                <p class="settings-help" style="margin:6px 0 0">The reveal is recorded in this question's history and the event log, naming you.</p>
               </div>
               <div class="form-group" id="tf-unseal-row" hidden>
                 <label for="tf-unseal" class="checkbox-row">
                   <input type="checkbox" id="tf-unseal"/>
-                  <span>Unseal this answer when I save — everyone who can see this challenge will be able to read it</span>
+                  <span>Unseal this answer when I save — everyone who can see this question will be able to read it</span>
                 </label>
                 <p class="settings-help" style="margin:6px 0 0">This cannot be undone: once unsealed, the answer cannot be sealed again.</p>
               </div>
@@ -948,7 +948,7 @@
               <div class="ce-sec" id="tf-author-sec">
                 <button type="button" class="ce-sec-toggle" data-action="task-sec-toggle" aria-expanded="false" aria-controls="tf-author-body"><span class="ce-sec-name">Author</span><span class="ce-sec-sum" id="tf-author-sum">+ Add author</span></button>
                 <div class="ce-sec-body" id="tf-author-body" hidden>
-                  <div class="form-group"><label for="tf-author-name">Author name</label><input id="tf-author-name" placeholder="Challenge author's name"/></div>
+                  <div class="form-group"><label for="tf-author-name">Author name</label><input id="tf-author-name" placeholder="Question author's name"/></div>
                   <div class="form-group"><label for="tf-author-linkedin">Author LinkedIn</label><input id="tf-author-linkedin" type="url" placeholder="https://linkedin.com/in/..."/></div>
                 </div>
               </div>
@@ -988,7 +988,7 @@
             <button class="btn sm secondary" data-action="close-task-form">Cancel</button>
             <button class="btn sm secondary" id="save-draft-btn" data-action="save-task" data-status="draft">Save as draft</button>
             <button class="btn sm" id="save-publish-btn" data-action="save-task" data-status="published">Save &amp; publish</button>
-            <button class="btn sm" id="save-task-btn" data-action="save-task" style="display:none">Save challenge</button>
+            <button class="btn sm" id="save-task-btn" data-action="save-task" style="display:none">Save question</button>
           </div>
         </div>
         <div id="admin-task-table-card" class="card table-card"><table id="admin-task-table" class="dense" data-tcols="challenges" style="width:100%">
@@ -998,7 +998,7 @@
                its card; the columns past the default set are under Columns
                (ui/table-columns.js). -->
           <thead><tr>
-            <th scope="col" class="cb-cell" data-label=""><label class="cb-all"><input type="checkbox" id="select-all-challenges" data-change-action="toggle-all-challenges" aria-label="Select all challenges on this page"/><span class="cb-all-text">Select all</span></label></th>
+            <th scope="col" class="cb-cell" data-label=""><label class="cb-all"><input type="checkbox" id="select-all-challenges" data-change-action="toggle-all-challenges" aria-label="Select all questions on this page"/><span class="cb-all-text">Select all</span></label></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="title">Title<span id="tsort-title-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="difficulty">Difficulty<span id="tsort-difficulty-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="type">Type<span id="tsort-type-icon"></span></th>
@@ -1173,7 +1173,7 @@
             <th scope="col" class="sortable" data-action="sort-submissions" data-col="participant">Participant<span id="sort-sub-participant-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-submissions" data-col="competition">Event<span id="sort-sub-competition-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-submissions" data-col="session">Session<span id="sort-sub-session-icon"></span></th>
-            <th scope="col" class="sortable" data-action="sort-submissions" data-col="task">Challenge<span id="sort-sub-task-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-submissions" data-col="task">Question<span id="sort-sub-task-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-submissions" data-col="event">Activity<span id="sort-sub-event-icon"></span></th>
             <th scope="col">Detail</th>
             <th scope="col" class="sortable num-cell" data-action="sort-submissions" data-col="points">&#916; pts<span id="sort-sub-points-icon"></span></th>
@@ -1198,7 +1198,7 @@
             <button type="button" class="filter-btn" data-action="audit-type" data-type="event" aria-pressed="false">Events</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="session" aria-pressed="false">Sessions</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="person" aria-pressed="false">People</button>
-            <button type="button" class="filter-btn" data-action="audit-type" data-type="challenge_version" aria-pressed="false">Challenge versions</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="challenge_version" aria-pressed="false">Question versions</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="submission" aria-pressed="false">Submissions</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="hint" aria-pressed="false">Hints</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="log_event" aria-pressed="false">Log events</button>
@@ -1606,17 +1606,17 @@
         <div class="analytics-summary" id="analytics-summary"></div>
         <div class="card" id="analytics-table-card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-            <div class="help-label-row"><h3 style="margin:0">Per-challenge breakdown</h3><span data-help="analytics.columns" data-help-label="Breakdown columns"></span></div>
+            <div class="help-label-row"><h3 style="margin:0">Per-question breakdown</h3><span data-help="analytics.columns" data-help-label="Breakdown columns"></span></div>
             <span id="analytics-table-meta" style="font-size:var(--fs-caption);color:var(--muted)"></span>
             <!-- v7.20.7 — static chrome, so a half-typed query survives the
                  re-render every filter change triggers. -->
-            <div class="search-wrap" style="margin-left:auto"><input id="analytics-search" placeholder="Search challenges..." aria-label="Search analytics rows by challenge number, title, difficulty or tag" data-input-action="analytics-search"/><button class="search-clear hidden" id="analytics-search-clear" data-action="analytics-search-clear" aria-label="Clear analytics search"><span aria-hidden="true">×</span> Clear</button></div>
+            <div class="search-wrap" style="margin-left:auto"><input id="analytics-search" placeholder="Search questions..." aria-label="Search analytics rows by question number, title, difficulty or tag" data-input-action="analytics-search"/><button class="search-clear hidden" id="analytics-search-clear" data-action="analytics-search-clear" aria-label="Clear analytics search"><span aria-hidden="true">×</span> Clear</button></div>
             <!-- v7.24.0 — exports the whole FILTERED set (not the page on
                  screen), in the order the table is showing. Static chrome for
                  the same reason as the search box beside it. -->
             <button class="btn sm secondary" id="analytics-export-csv-btn" data-action="analytics-export-csv">Export CSV</button>
           </div>
-          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch" tabindex="0" role="region" aria-label="Per-challenge breakdown table">
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch" tabindex="0" role="region" aria-label="Per-question breakdown table">
             <table id="analytics-table" class="dense" data-tcols="analytics">
               <thead>
                 <tr>
@@ -1638,7 +1638,7 @@
             </table>
           <div class="pagination" id="analytics-pagination"></div>
           </div>
-          <p id="analytics-empty" style="display:none;color:var(--muted);text-align:center;padding:24px 0">No challenge activity in the selected window.</p>
+          <p id="analytics-empty" style="display:none;color:var(--muted);text-align:center;padding:24px 0">No question activity in the selected window.</p>
         </div>
       </div>
       </div><!-- /.admin-content -->

@@ -72,10 +72,10 @@ test.describe("v8.12.4 — challenges pane, driven through its own controls", ()
       const title = uniq("HideMe"), id = await mkTask(sa, csrf, title);
       await adminLogin(page); await clickTab(page, "Challenges");
       await kebabAction(page, title, "task-toggle-visibility");
-      await confirmModal(page, /Hide Challenge/);
+      await confirmModal(page, /Hide Question/);
       await expect.poll(() => dbGet("SELECT active FROM tasks WHERE id=?", id).active, { timeout: 10000 }).toBe(0);
       await kebabAction(page, title, "task-toggle-visibility");
-      await confirmModal(page, /Show Challenge/);
+      await confirmModal(page, /Show Question/);
       await expect.poll(() => dbGet("SELECT active FROM tasks WHERE id=?", id).active, { timeout: 10000 }).toBe(1);
     } finally { await sa.dispose(); }
   });
@@ -86,7 +86,7 @@ test.describe("v8.12.4 — challenges pane, driven through its own controls", ()
       const title = uniq("DraftMe"), id = await mkTask(sa, csrf, title, { status: "draft" });
       await adminLogin(page); await clickTab(page, "Challenges");
       await kebabAction(page, title, "task-publish");
-      await confirmModal(page, /Publish Challenge/);
+      await confirmModal(page, /Publish Question/);
       await expect.poll(() => dbGet("SELECT status FROM tasks WHERE id=?", id).status, { timeout: 10000 }).toBe("published");
     } finally { await sa.dispose(); }
   });

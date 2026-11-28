@@ -167,7 +167,7 @@ test.describe("command palette", () => {
     expect(go).toContain("Question bank");
     expect(acts, "POSITIVE: an action they may take").toContain("New question");
     for (const gone of ["Settings", "Roles & permissions"]) expect(go, `${gone} is not an event admin's page`).not.toContain(gone);
-    for (const gone of ["New event", "New template", "Export people (CSV)", "Export challenges"]) expect(acts, `${gone} is not an event admin's action`).not.toContain(gone);
+    for (const gone of ["New event", "New template", "Export people (CSV)", "Export questions"]) expect(acts, `${gone} is not an event admin's action`).not.toContain(gone);
     // Typing never surfaces them either (they are not merely ranked out).
     // "New event" is ALSO the sidebar page where every event starts; an event
     // admin legitimately goes there (they start events from templates), so for

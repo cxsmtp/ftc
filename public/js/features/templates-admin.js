@@ -137,7 +137,7 @@ function _tplRow(t) {
   // No label, no kind words: a stored value is never a caption (a wrong chip
   // is worse than none).
   const kind = eventKindLabel(t.event_kind);
-  const meta = [kind, `${t.task_count} challenge${t.task_count === 1 ? '' : 's'}`].filter(Boolean);
+  const meta = [kind, `${t.task_count} question${t.task_count === 1 ? '' : 's'}`].filter(Boolean);
   if (t.withheld_task_count) meta.push(`${t.withheld_task_count} not visible to you`);
   if (t.missing_task_count) meta.push(`${t.missing_task_count} deleted`);
   const on = _picked && _picked.id === t.id;
@@ -274,7 +274,7 @@ export async function protectTemplate(id, on) {
 export async function resetTemplate(id) {
   const t = (_templates || []).find(x => x.id === id);
   if (!t) return;
-  const ok = await showModal({ title: 'Reset to default', message: `Reset <strong>${esc(t.name)}</strong> to the template the platform ships? Its name, description, type and settings go back to the defaults, and its challenge list is emptied. Events already made from it are not affected.`, confirmText: 'Reset' });
+  const ok = await showModal({ title: 'Reset to default', message: `Reset <strong>${esc(t.name)}</strong> to the template the platform ships? Its name, description, type and settings go back to the defaults, and its question list is emptied. Events already made from it are not affected.`, confirmText: 'Reset' });
   if (!ok) return;
   const r = await _tplPost(`/api/admin/event-templates/${encodeURIComponent(id)}/reset`);
   if (!r.ok) { showToast((r.d && r.d.error) || 'Could not reset the template.', 'error'); return; }
@@ -331,7 +331,7 @@ export async function pickTemplate(id) {
   // What the event WILL do: a setting the template leaves out takes the kind's
   // seed (`_tplSetting`), exactly as the spawn decides it.
   const facts = [
-    t.task_count ? `${t.task_count} challenge${t.task_count === 1 ? '' : 's'}` : 'No challenges yet: add them in the workspace',
+    t.task_count ? `${t.task_count} question${t.task_count === 1 ? '' : 's'}` : 'No questions yet: add them in the workspace',
     _tplSetting(settings, t.event_kind, 'self_enroll_enabled') ? 'Join link and QR code ready' : null,
     settings.duration_minutes ? `Runs for ${settings.duration_minutes >= 60 ? `${Math.round(settings.duration_minutes / 6) / 10} h` : `${settings.duration_minutes} min`}` : null,
     (settings.tags || []).length ? `Tags: ${(settings.tags || []).join(', ')}` : null,
@@ -598,7 +598,7 @@ async function _openEditor(id, mode) {
         </fieldset>
         <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Play</legend>
           <div class="form-group"><label for="tpl-ed-duration" id="tpl-ed-duration-label">Runs for (minutes)</label><input id="tpl-ed-duration" type="number" min="1" step="1" value="${esc(String(s.duration_minutes || 60))}"/></div>
-          <div class="form-group"><label for="tpl-ed-cap">Attempts per challenge <span class="t-muted">(empty: unlimited)</span></label><input id="tpl-ed-cap" type="number" min="1" max="1000" step="1" value="${s.attempt_cap ? esc(String(s.attempt_cap)) : ''}"/></div>
+          <div class="form-group"><label for="tpl-ed-cap">Attempts per question <span class="t-muted">(empty: unlimited)</span></label><input id="tpl-ed-cap" type="number" min="1" max="1000" step="1" value="${s.attempt_cap ? esc(String(s.attempt_cap)) : ''}"/></div>
           ${chk('staff_compete', 'Staff compete (their scores count)')}
           ${chk('cxone_disabled', 'Do not create Checkmarx One accounts')}
         </fieldset>
@@ -608,19 +608,19 @@ async function _openEditor(id, mode) {
           ${chk('measure_presence', 'Record time on the platform')}
           <div class="form-group tpl-ed-opt" data-opt="time_basis"><label for="tpl-ed-time_basis">Ties are broken by</label><select id="tpl-ed-time_basis"><option value="elapsed"${s.time_basis !== 'presence' ? ' selected' : ''}>Time since starting</option><option value="presence"${s.time_basis === 'presence' ? ' selected' : ''}>Time on the platform</option></select></div>
           <p class="tpl-ed-why" data-why="time_basis" hidden></p>
-          <div class="form-group tpl-ed-opt" data-opt="clock_start"><label for="tpl-ed-clock_start">Each participant's clock starts</label><select id="tpl-ed-clock_start"><option value="first_open"${clock0 === 'first_open' ? ' selected' : ''}>When they open their first challenge</option><option value="entry"${clock0 === 'entry' ? ' selected' : ''}>When they enter the event</option></select></div>
+          <div class="form-group tpl-ed-opt" data-opt="clock_start"><label for="tpl-ed-clock_start">Each participant's clock starts</label><select id="tpl-ed-clock_start"><option value="first_open"${clock0 === 'first_open' ? ' selected' : ''}>When they open their first question</option><option value="entry"${clock0 === 'entry' ? ' selected' : ''}>When they enter the event</option></select></div>
           <p class="tpl-ed-why" data-why="clock_start" hidden></p>
           <div class="form-group tpl-ed-opt" data-opt="leaderboard_mode"><label for="tpl-ed-leaderboard_mode">With sessions, the board is</label><select id="tpl-ed-leaderboard_mode"><option value="per_slot"${s.leaderboard_mode !== 'global' ? ' selected' : ''}>One board per session</option><option value="global"${s.leaderboard_mode === 'global' ? ' selected' : ''}>One board across sessions</option></select></div>
           <p class="tpl-ed-why" data-why="leaderboard_mode" hidden></p>
         </fieldset>
-        <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Challenges</legend>
-          <p class="t-small t-muted tpl-ed-task-order">Events number their challenges by difficulty, then title.</p>
+        <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Questions</legend>
+          <p class="t-small t-muted tpl-ed-task-order">Events number their questions by difficulty, then title.</p>
           <ul class="tpl-ed-tasks" id="tpl-ed-tasks"></ul>
           ${canLib ? `<div class="tpl-ed-task-find"><span class="topic-filter"><label for="tpl-ed-task-topic">Topic</label><select id="tpl-ed-task-topic"><option value="">All topics</option></select></span>
           <div class="search-wrap"><input id="tpl-ed-task-search" type="text" autocomplete="off" placeholder="Find a published question by title or topic…" aria-label="Find a published question by title or topic"/></div></div>
           <div class="tpl-ed-task-bar"><p class="settings-help list-count" id="tpl-ed-task-count" role="status" aria-live="polite" aria-atomic="true"></p><button type="button" class="btn sm secondary" id="tpl-ed-task-addall" hidden>Add all shown</button></div>
           <ul class="tpl-ed-task-results" id="tpl-ed-task-results"></ul>`
-          : '<p class="t-small t-muted" id="tpl-ed-task-unseen">Your role cannot view the challenge library, so it cannot add challenges here. The template keeps the challenges listed above unless you remove them.</p>'}
+          : '<p class="t-small t-muted" id="tpl-ed-task-unseen">Your role cannot view the question library, so it cannot add questions here. The template keeps the questions listed above unless you remove them.</p>'}
         </fieldset>
         <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Certificates</legend>
           <p class="t-small">Events made from this template use the platform's certificate design. Give one event its own design from its <strong>Certificates</strong> section; the platform design is under <strong>Settings</strong>.</p>
@@ -750,9 +750,9 @@ function _renderTasks(ov, state) {
   // the role reads the library, else the save's own refusal naming it (task_id).
   const why = (t) => _competingIn(lib(t.id)).length ? _competingWhy(lib(t.id), 'Remove it to save: ')
     : (state.refused && state.refused.id === t.id ? `${state.refused.message} Remove it to save.` : '');
-  setSafeHtml(ul, state.tasks.length ? state.tasks.map((t) => `<li class="tpl-ed-task"><span class="tpl-ed-task-title">${esc(t.title || 'Challenge')}</span><small class="t-muted">${esc(t.difficulty || '')}</small>${why(t) ? `<small class="tpl-ed-why">${esc(why(t))}</small>` : ''}
-      <button type="button" class="btn sm secondary" data-tpl-task="${esc(t.id)}" data-op="remove" aria-label="Remove ${esc(t.title || 'challenge')}">${ICO.x}</button></li>`).join('')
-    : '<li class="ws-empty">No challenges yet: events start empty and you add them in the workspace.</li>');
+  setSafeHtml(ul, state.tasks.length ? state.tasks.map((t) => `<li class="tpl-ed-task"><span class="tpl-ed-task-title">${esc(t.title || 'Question')}</span><small class="t-muted">${esc(t.difficulty || '')}</small>${why(t) ? `<small class="tpl-ed-why">${esc(why(t))}</small>` : ''}
+      <button type="button" class="btn sm secondary" data-tpl-task="${esc(t.id)}" data-op="remove" aria-label="Remove ${esc(t.title || 'question')}">${ICO.x}</button></li>`).join('')
+    : '<li class="ws-empty">No questions yet: events start empty and you add them in the workspace.</li>');
 }
 
 // How many matches the picker lists at once; the count says when there are more.
@@ -783,7 +783,7 @@ function _renderTaskResults(ov, state) {
     if (cnt) cnt.textContent = text;
     if (addAll) { addAll.hidden = n < 2; addAll.textContent = `Add all ${n} shown`; }
   };
-  if (!Array.isArray(_libTasks)) { setSafeHtml(ul, '<li class="ws-empty">Could not load the challenge library.</li>'); paint('', 0); return; }
+  if (!Array.isArray(_libTasks)) { setSafeHtml(ul, '<li class="ws-empty">Could not load the question library.</li>'); paint('', 0); return; }
   const q = ov.querySelector('#tpl-ed-task-search')?.value || '';
   const topic = ov.querySelector('#tpl-ed-task-topic')?.value || '';
   if (!q.trim() && !topic) { setSafeHtml(ul, ''); paint('', 0); return; }
@@ -843,21 +843,21 @@ function _syncEditor(ov, state) {
   if (!k) {
     // Nothing the event will do can be said before its type is chosen.
     setSafeHtml(ov.querySelector('#tpl-ed-sum'), `<li>${ICO.info}<span>Choose an event type to see what events made from this template will do.</span></li>`
-      + `<li>${ICO.check}<span>${esc(`${state.tasks.length} challenge${state.tasks.length === 1 ? '' : 's'}`)}</span></li>`);
+      + `<li>${ICO.check}<span>${esc(`${state.tasks.length} question${state.tasks.length === 1 ? '' : 's'}`)}</span></li>`);
     return;
   }
   const facts = [
     `${(k && k.label) || 'This event type'}, ${p.schedule === 'deadline' ? `open for ${span}` : `runs for ${span}`}`,
     on('self_enroll_enabled') ? 'Join link and QR code' : 'By invitation only',
     on('late_entry_enabled') ? 'Late entries after the end' : null,
-    v.settings.attempt_cap ? `${v.settings.attempt_cap} attempt${v.settings.attempt_cap === 1 ? '' : 's'} per challenge` : 'Unlimited attempts',
+    v.settings.attempt_cap ? `${v.settings.attempt_cap} attempt${v.settings.attempt_cap === 1 ? '' : 's'} per question` : 'Unlimited attempts',
     p.ranking_enabled !== false ? `Ranked${v.settings.group_leaderboard_enabled ? ', with a team board' : ''}` : 'Not ranked',
     v.settings.reveal_answers_on_end ? 'Answers shown at the end' : null,
     v.settings.measure_presence ? `Time on the platform recorded${v.settings.time_basis === 'presence' ? ' and used for ties' : ''}` : null,
-    p.clock_start === 'allowed' ? (ov.querySelector('#tpl-ed-clock_start')?.value === 'entry' ? 'Each clock starts on entry' : "Each clock starts at the person's first challenge") : null,
+    p.clock_start === 'allowed' ? (ov.querySelector('#tpl-ed-clock_start')?.value === 'entry' ? 'Each clock starts on entry' : "Each clock starts at the person's first question") : null,
     v.settings.staff_compete ? 'Staff compete' : null,
     (on('cxone_disabled') || _forbidReason('cxone_disabled', kind)) ? 'No Checkmarx One accounts' : 'Checkmarx One accounts on enrolment',
-    `${state.tasks.length} challenge${state.tasks.length === 1 ? '' : 's'}`,
+    `${state.tasks.length} question${state.tasks.length === 1 ? '' : 's'}`,
   ].filter(Boolean);
   setSafeHtml(ov.querySelector('#tpl-ed-sum'), facts.map(f => `<li>${ICO.check}<span>${esc(f)}</span></li>`).join(''));
 }

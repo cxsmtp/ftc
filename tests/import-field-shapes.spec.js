@@ -105,7 +105,7 @@ test.describe("Challenge import: field shapes, normalisation and caps (v8.3.20)"
       const r = await sa.post("/api/admin/import/tasks", { headers: H(csrf), data: payload([row(), row(bad)]) });
       expect(r.status(), `${label}: expected a named 400, got ${r.status()}`).toBe(400);
       const d = await r.json();
-      expect(d.error, `${label}: the refusal must name the row`).toMatch(/Challenge #2/);
+      expect(d.error, `${label}: the refusal must name the row`).toMatch(/Question #2/);
       expect(d.error, `${label}: and must not be the generic 500 text`).not.toMatch(/internal error/i);
     }
     await sa.dispose();
@@ -120,7 +120,7 @@ test.describe("Challenge import: field shapes, normalisation and caps (v8.3.20)"
       headers: H(csrf), data: dryRun([row({ title: { a: 1 } })]),
     });
     expect(r.status()).toBe(400);
-    expect((await r.json()).error).toMatch(/Challenge #1/);
+    expect((await r.json()).error).toMatch(/Question #1/);
     await sa.dispose();
   });
 

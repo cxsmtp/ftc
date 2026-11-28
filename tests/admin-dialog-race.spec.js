@@ -609,7 +609,7 @@ test.describe("v8.12.6 (sweep) — the challenge dialogs show what they were ope
     page.on("request", (rq) => { if (rq.method() === "PUT" && /^\/api\/admin\/tasks\/[^/]+\/competitions$/.test(new URL(rq.url()).pathname)) puts.push({ task: new URL(rq.url()).pathname.split("/")[4], body: rq.postDataJSON() }); });
     await page.locator(`#assign-task-overlay input[type=checkbox][value="${w.F.id}"]`).check();
     await page.locator("#assign-task-overlay #assign-task-save-btn").click();
-    await expect(page.locator("#toast-stack .toast", { hasText: "Challenge assignments updated" })).toBeVisible();
+    await expect(page.locator("#toast-stack .toast", { hasText: "Question assignments updated" })).toBeVisible();
     expect(puts, "one write, to Y").toHaveLength(1);
     expect(puts[0].task).toBe(w.Y.id);
     expect(puts[0].body.competitionIds.sort(), "Y's own ticks: E (already on it) and the F just ticked").toEqual([w.E.id, w.F.id].sort());
@@ -634,7 +634,7 @@ test.describe("v8.12.6 (sweep) — the challenge dialogs show what they were ope
     await settled(page, "__aY");
     release();
     // The save really answered before anything is judged.
-    await expect(page.locator("#toast-stack .toast", { hasText: "Challenge assignments updated" })).toBeVisible();
+    await expect(page.locator("#toast-stack .toast", { hasText: "Question assignments updated" })).toBeVisible();
     const d = await dialogs(page, "#assign-task-overlay", "h3");
     expect(d, "X's save must not close the dialog the admin opened for Y meanwhile").toHaveLength(1);
     expect(d[0]).toContain(w.Y.title);
@@ -739,7 +739,7 @@ test.describe("v8.12.6 (sweep) — a restore closes only its own History dialog"
     await settled(page, "__hB");
     release();
     await settled(page, "__r");
-    await expect(page.locator("#toast-stack .toast", { hasText: "Challenge restored" })).toBeVisible();
+    await expect(page.locator("#toast-stack .toast", { hasText: "Question restored" })).toBeVisible();
     const s = await histState(page);
     expect(s.overlays, "the restore must not close the History the admin opened for B meanwhile").toBe(1);
     expect(s.title).toContain(ev.B.name);
@@ -752,7 +752,7 @@ test.describe("v8.12.6 (sweep) — a restore closes only its own History dialog"
     await enterAdmin(page, ev);
     await startRestore(page, task);
     await settled(page, "__r");
-    await expect(page.locator("#toast-stack .toast", { hasText: "Challenge restored" })).toBeVisible();
+    await expect(page.locator("#toast-stack .toast", { hasText: "Question restored" })).toBeVisible();
     await expect(page.locator("#hist-overlay"), "the restore closes the dialog it came from").toHaveCount(0);
   });
 });

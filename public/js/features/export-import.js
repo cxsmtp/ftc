@@ -43,24 +43,24 @@ export function _importDropNote(d){
   // vanish from the file with every number on screen unchanged. The note names
   // the remedy, because "it did not import" with no reason is what sends somebody
   // hunting through a 500-row file.
-  if(d.sealed_type_skipped)bits.push(`${d.sealed_type_skipped} challenge${d.sealed_type_skipped===1?' with a sealed answer was':'s with sealed answers were'} not overwritten — the file would make ${d.sealed_type_skipped===1?'it':'them'} an Any answer challenge, which has no answer to seal`);
-  if(d.sealed_skipped)bits.push(`${d.sealed_skipped} challenge${d.sealed_skipped===1?' with a sealed answer was':'s with sealed answers were'} refused — a sealed answer belongs to the account that created it, which this platform has no record of, so create ${d.sealed_skipped===1?'it':'them'} here instead`);
+  if(d.sealed_type_skipped)bits.push(`${d.sealed_type_skipped} question${d.sealed_type_skipped===1?' with a sealed answer was':'s with sealed answers were'} not overwritten — the file would make ${d.sealed_type_skipped===1?'it':'them'} an Any answer question, which has no answer to seal`);
+  if(d.sealed_skipped)bits.push(`${d.sealed_skipped} question${d.sealed_skipped===1?' with a sealed answer was':'s with sealed answers were'} refused — a sealed answer belongs to the account that created it, which this platform has no record of, so create ${d.sealed_skipped===1?'it':'them'} here instead`);
   // v8.3.20 — an embedded image over the per-image byte cap is STRIPPED, and the
   // row still imports. Same rule as the clamp above it: the operator has to be
   // told the content is not all there, or the drop is the v7.21.2 defect.
   if(d.images_dropped)bits.push(`${d.images_dropped} embedded image${d.images_dropped===1?' was':'s were'} too large and removed from the text`);
   // v8.12.0 — the CHALLENGE import skips an overwrite of a challenge held by an
   // event the importer competes in (the competitor lock's import door).
-  if(d.competitor_skipped)bits.push(`${d.competitor_skipped} challenge${d.competitor_skipped===1?' was':'s were'} not overwritten because you compete in an event that holds ${d.competitor_skipped===1?'it':'them'}`);
+  if(d.competitor_skipped)bits.push(`${d.competitor_skipped} question${d.competitor_skipped===1?' was':'s were'} not overwritten because you compete in an event that holds ${d.competitor_skipped===1?'it':'them'}`);
   // Operator rulings N7 and 84 (14 Nov 2026) — and an overwrite the qualifying-
   // question rules refuse: an event asks each one once, and an answered one's
   // options keep their places. Each names what to change in the file.
-  {const n=d.qualifying_key_held_skipped;if(n)bits.push(`${n} challenge${n===1?' was':'s were'} not overwritten because the file would make ${n===1?'it a qualifying question':'them qualifying questions'} on a topic an event holding ${n===1?'it':'them'} already asks (an event asks each one once)`);}
-  {const n=d.qualifying_not_pick_one_skipped;if(n)bits.push(`${n} challenge${n===1?' was':'s were'} not imported because ${n===1?'it is a qualifying question that is':'they are qualifying questions that are'} not a pick-one question (Any answer, with two or more options), which every qualifying question must be`);}
+  {const n=d.qualifying_key_held_skipped;if(n)bits.push(`${n} question${n===1?' was':'s were'} not overwritten because the file would make ${n===1?'it a qualifying question':'them qualifying questions'} on a topic an event holding ${n===1?'it':'them'} already asks (an event asks each one once)`);}
+  {const n=d.qualifying_not_pick_one_skipped;if(n)bits.push(`${n} question${n===1?' was':'s were'} not imported because ${n===1?'it is a qualifying question that is':'they are qualifying questions that are'} not a pick-one question (Any answer, with two or more options), which every qualifying question must be`);}
   // Sweep #413 — an overwrite that could mean one of several events' own copies
   // of a qualifying question, and a row adding a malformed qualifying tag.
-  {const n=d.qualifying_copy_skipped;if(n)bits.push(`${n} challenge${n===1?' was':'s were'} not overwritten because ${n===1?'its row':'their rows'} could mean more than one challenge: several share the title (each event's own copy of a qualifying question) or several rows of the file overwrite it (edit the question in its event, or choose Add New)`);}
-  {const n=d.qualifying_tag_invalid_skipped;if(n)bits.push(`${n} challenge${n===1?' was':'s were'} not imported because ${n===1?'its':'their'} qualifying tag is not qualifying:<key> (the key being 1–40 lowercase letters, digits, - or _)`);}
+  {const n=d.qualifying_copy_skipped;if(n)bits.push(`${n} question${n===1?' was':'s were'} not overwritten because ${n===1?'its row':'their rows'} could mean more than one question: several share the title (each event's own copy of a qualifying question) or several rows of the file overwrite it (edit the question in its event, or choose Add New)`);}
+  {const n=d.qualifying_tag_invalid_skipped;if(n)bits.push(`${n} question${n===1?' was':'s were'} not imported because ${n===1?'its':'their'} qualifying tag is not qualifying:<key> (the key being 1–40 lowercase letters, digits, - or _)`);}
   {const n=d.qualifying_options_fixed_skipped;if(n)bits.push(`${n} qualifying question${n===1?' was':'s were'} not overwritten because people have answered ${n===1?'it':'them'} and the file moves or removes options (reword an option where it stands, or add one at the end)`);}
   // v8.14.4 — and the PARTICIPANT import skips an overwrite of an account the
   // importer competes alongside: the overwrite would block, verify, approve,
@@ -83,7 +83,7 @@ export function _importDropNote(d){
   const _sm=Array.isArray(d.skipped_memberships)?d.skipped_memberships:[];
   if(_sm.length){
     const by={};for(const r of _sm)by[r.reason||'other']=(by[r.reason||'other']||0)+1;
-    const label={competition_not_found:'named an event that does not exist here',staff_not_competing:'were staff enrolments into an event where staff do not compete',author_competes:'would have put a challenge author into an event where staff compete',actor_competes:'were into an event you compete in'};
+    const label={competition_not_found:'named an event that does not exist here',staff_not_competing:'were staff enrolments into an event where staff do not compete',author_competes:'would have put a question author into an event where staff compete',actor_competes:'were into an event you compete in'};
     bits.push(`${_sm.length} event enrolment${_sm.length===1?' was':'s were'} skipped (${Object.entries(by).map(([k,n])=>`${n} ${label[k]||k}`).join(', ')})`);
   }
   // v8.12.0 — the ABSENCE ledger is the memberships ledger's sibling (v6.16.9)
@@ -302,15 +302,15 @@ export async function exportCompetitionActivityCsv(compId,compName){
       // problem from "you are not an admin", and a bare "Export failed."
       // is indistinguishable from a broken feature.
       const d=await r.json().catch(()=>({}));
-      showToast(d.error||'Could not export challenge activity.','error');
+      showToast(d.error||'Could not export question activity.','error');
       return;
     }
     // v8.8.15 — one revoke strategy for every generated download; the reasoning,
     // including why `pagehide` ALONE was not kept, is in ui/download.js.
     downloadBlob(await r.blob(),_activityFilename(r.headers.get('content-disposition'),compName));
-    showToast('Challenge activity exported.','success');
+    showToast('Question activity exported.','success');
   }catch(e){
-    showToast(e&&e.name==='AbortError'?'The export timed out. Try again.':'Could not export challenge activity.','error');
+    showToast(e&&e.name==='AbortError'?'The export timed out. Try again.':'Could not export question activity.','error');
   }finally{
     // After the body read, never at the headers — a deadline cleared when
     // fetch() resolves leaves the body unbounded (v7.15.15).
@@ -358,14 +358,14 @@ export function downloadJson(data,filename){
 }
 
 export async function exportTasks(){
-  showToast('Preparing challenge export...');
+  showToast('Preparing question export...');
   let url='/api/admin/export/tasks';
   if(S.adminSelectedCompetitionId)url+=`?competitionId=${S.adminSelectedCompetitionId}`;
   const r=await fetch(url);
   if(!r.ok){showToast('Export failed.','error');return;}
   const data=await r.json();
   downloadJson(data,`tasks-export-${new Date().toISOString().slice(0,10)}.json`);
-  showToast(`Exported ${data.tasks.length} challenge(s).`,'success');
+  showToast(`Exported ${data.tasks.length} question(s).`,'success');
 }
 
 export async function exportParticipants(){
@@ -416,7 +416,7 @@ export async function importTasksFile(input){
     showImportProgress('Reading file...',file.name);
     const data=JSON.parse(await file.text());
     if(data.type!=='hackarena-tasks'||!Array.isArray(data.tasks))throw new Error('Invalid format');
-    updateImportProgress(20,`${data.tasks.length} challenge(s) found. Checking conflicts...`);
+    updateImportProgress(20,`${data.tasks.length} question(s) found. Checking conflicts...`);
     const r=await fetch('/api/admin/import/tasks',{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({data})});
     const d=await r.json();
     hideImportProgress();
@@ -437,7 +437,7 @@ export async function importTasksFile(input){
       // hint. (The conflict-resolution path further down already got this right,
       // which is what made the omission easy to miss.)
       if(!r2.ok){showToast(d2.error||'Import failed.','error');return;}
-      showToast(`Imported ${d2.imported} challenge(s), overwritten ${d2.overwritten}, skipped ${d2.skipped}.${_importDropNote(d2)}`,'success');
+      showToast(`Imported ${d2.imported} question(s), overwritten ${d2.overwritten}, skipped ${d2.skipped}.${_importDropNote(d2)}`,'success');
       loadAdminTasks();
     }
   }catch(e){hideImportProgress();showToast('Failed to read file: '+e.message);}

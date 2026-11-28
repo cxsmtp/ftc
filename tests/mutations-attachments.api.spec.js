@@ -1401,7 +1401,7 @@ test.describe("v6.13.17 — attachment edge cases", () => {
     });
     expect(put.status(), "PUT must 409 when promotion would exceed the cap").toBe(409);
     const body = await put.json();
-    expect(body.error, "409 body must mention the 10-per-task cap").toMatch(/Maximum 10 attachments per challenge/);
+    expect(body.error, "409 body must mention the 10-per-task cap").toMatch(/Maximum 10 attachments per question/);
     // Count unchanged.
     const after = await (await api.get(`/api/admin/tasks/${tid}/attachments`)).json();
     expect(after.length).toBe(10);

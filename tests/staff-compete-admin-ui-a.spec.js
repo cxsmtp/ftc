@@ -480,7 +480,7 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
     // MODAL rather than a toast, because the remedy is per challenge. This arm
     // drives the REAL form path, so it also locks the one line that wires the
     // save's failure branch to the renderer.
-    await expect(page.locator("#modal-title"), "the refusal names its remedy").toHaveText(/Seal these challenges first/, { timeout: 15000 });
+    await expect(page.locator("#modal-title"), "the refusal names its remedy").toHaveText(/Seal these questions first/, { timeout: 15000 });
     await expect(page.locator("#modal-body"), "…and the challenge").toContainText(cTask.title);
     await expect(page.locator("#modal-cancel-btn"), "an OK-only modal").toBeHidden();
     await page.locator("#modal-confirm-btn").click();
@@ -504,7 +504,7 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
     await page.locator("#comp-staff-compete").check();
     await saveEdit(page);
     await page.locator("#comp-form-overlay").waitFor({ state: "hidden", timeout: 15000 });
-    await expect(page.locator("#modal-title")).not.toHaveText(/Seal these challenges first/);
+    await expect(page.locator("#modal-title")).not.toHaveText(/Seal these questions first/);
     await expect.poll(async () => !!(await compRow(cUpSealed.id)).staff_compete,
       { message: "the switch round-trips ON", timeout: 10000 }).toBe(true);
   });
@@ -526,7 +526,7 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
     await expect(page.locator("#modal-body"), "the enrolled author is NAMED").toContainText(pAuth.nickname);
     await expect(page.locator("#modal-body"), "…with the challenge they wrote").toContainText(aSealed.title);
     await expect(page.locator("#modal-body"), "…and the remedy names Manage Participants, not the seal").toContainText(/Manage Participants/);
-    await expect(page.locator("#modal-title"), "and NOT the unsealed-challenge refusal — the challenge is sealed").not.toHaveText(/Seal these challenges first/);
+    await expect(page.locator("#modal-title"), "and NOT the unsealed-challenge refusal — the challenge is sealed").not.toHaveText(/Seal these questions first/);
     await expect(page.locator("#modal-cancel-btn"), "an OK-only modal").toBeHidden();
     await page.locator("#modal-confirm-btn").click();
     await expect(page.locator("#modal-overlay")).not.toHaveClass(/open/);
@@ -574,7 +574,7 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
     expect(onBody.code).toBe("staff_compete_unsealed_challenges");
     expect((onBody.challenges || []).map(c => c.id), "…naming the challenge").toContain(cTask.id);
     expect(await page.evaluate(d => window.showStaffCompeteRefusalModal(d), onBody), "the renderer recognises the code").toBe(true);
-    await expect(page.locator("#modal-title")).toHaveText(/Seal these challenges first/);
+    await expect(page.locator("#modal-title")).toHaveText(/Seal these questions first/);
     await expect(page.locator("#modal-body")).toContainText(cTask.title);
     await expect(page.locator("#modal-cancel-btn"), "an OK-only modal").toBeHidden();
     await page.locator("#modal-confirm-btn").click();

@@ -72,7 +72,7 @@ test.describe("New event — one place, one form", () => {
     await expect(form).toBeVisible({ timeout: 10000 });
     // Seeded from the template, and saying so.
     await expect(form.locator("#comp-form-from")).toContainText(tplName);
-    await expect(form.locator("#comp-form-from")).toContainText("1 challenge");
+    await expect(form.locator("#comp-form-from")).toContainText("1 question");
     await expect(form.locator('input[name="comp-kind-seg"][value="tournament"]')).toBeChecked();
     await expect(form.locator("#comp-name")).toHaveValue(tplName);
     await expect(form.locator("#comp-attempt-cap")).toHaveValue("4");

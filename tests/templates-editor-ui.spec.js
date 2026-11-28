@@ -311,7 +311,7 @@ test.describe("Templates — the editor", () => {
     await openTemplates(page);
     await page.locator("#tpl-list .tpl-row").filter({ has: page.locator("button.card-open", { hasText: name }) }).locator("button.card-open").click();
     const facts = page.locator("#tpl-spin .tpl-spin-facts");
-    await expect(facts, "the count").toContainText("2 challenges", { timeout: 10000 });
+    await expect(facts, "the count").toContainText("2 questions", { timeout: 10000 });
     await expect(facts, "and no order an event would not keep").not.toContainText("same order");
   });
 
