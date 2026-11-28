@@ -97,6 +97,7 @@ import * as _ns72 from "./../features/users-admin.js";     // RBAC — Users & r
 import * as _ns83 from "./../features/event-team.js";      // event team + persona reports (workspace Team & reports)
 import * as _ns84 from "./../features/task-assign.js";     // the one add-challenges-to-an-event path
 import * as _ns85 from "./../features/topics-admin.js";    // stage B — the Question bank's topics
+import * as _ns86 from "./../features/marketing-admin.js"; // the Marketing page (GET /api/admin/analytics/marketing)
 import * as _ns41 from "./../features/choice-tap.js"; // v8.13.0 — the booth tap-to-answer view (CHOICE_TAP_MQ on window for tests)
 import { wirePickerFilter } from "./../ui/list-controls.js"; // v7.20.11 — the analytics pickers filter through it (it mounts its own count node)
 
@@ -121,7 +122,7 @@ function boot() {
   // showing the name and hiding it.
   initPlatformNameFit();
   // Restore the classic-script global namespace (tests + window.* handoffs).
-  Object.assign(window, _ns0, _ns1, _ns2, _ns3, _ns4, _ns5, _ns6, _ns7, _ns8, _ns9, _ns10, _ns11, _ns12, _ns13, _ns14, _ns16, _ns17, _ns18, _ns19, _ns20, _ns21, _ns22, _ns23, _ns24, _ns25, _ns26, _ns27, _ns28, _ns29, _ns30, _ns31, _ns32, _ns33, _ns35, _ns34, _ns36, _ns37, _ns38, _ns39, _ns40, _ns41, _ns42, _ns50, _ns51, _ns52, _ns53, _ns60, _ns61, _ns62, _ns63, _ns64, _ns65, _ns70, _ns72, _ns81, _ns66, _ns83, _ns84, _ns85);
+  Object.assign(window, _ns0, _ns1, _ns2, _ns3, _ns4, _ns5, _ns6, _ns7, _ns8, _ns9, _ns10, _ns11, _ns12, _ns13, _ns14, _ns16, _ns17, _ns18, _ns19, _ns20, _ns21, _ns22, _ns23, _ns24, _ns25, _ns26, _ns27, _ns28, _ns29, _ns30, _ns31, _ns32, _ns33, _ns35, _ns34, _ns36, _ns37, _ns38, _ns39, _ns40, _ns41, _ns42, _ns50, _ns51, _ns52, _ns53, _ns60, _ns61, _ns62, _ns63, _ns64, _ns65, _ns70, _ns72, _ns81, _ns66, _ns83, _ns84, _ns85, _ns86);
   // Live getters/setters mirroring the S state object onto window.
   for (const _k of Object.keys(S)) {
     if (!(_k in window)) { try { Object.defineProperty(window, _k, { get: () => S[_k], set: (v) => { S[_k] = v; }, configurable: true }); } catch (e) { console.warn('Could not expose state key on window', _k, e); } }
@@ -1864,6 +1865,7 @@ function boot() {
   // reaches them without nav importing either module.
   _ns50.initEventWorkspace();
   _ns83.initEventTeam({ registerAction, registerChange });   // after the workspace: wraps its adminNavBuilt hook
+  _ns86.initMarketingAdmin({ registerAction, registerChange }); // the Marketing page: its loader, actions and "?" tips
   _ns62.initFiltersPanels();
   registerAction("filters-toggle",          (e, el) => _ns62.toggleFiltersPanel(el.dataset.panel));
   registerAction("filters-clear",           (e, el) => _ns62.clearFiltersPanel(el.dataset.panel));
@@ -1877,6 +1879,7 @@ function boot() {
   _ns63.defineTable("rankings", _ns18.RANKINGS_TABLE_COLUMNS);
   _ns63.defineTable("rankings-group", _ns18.RANKINGS_GROUP_TABLE_COLUMNS);
   _ns63.defineTable("analytics", _ns5.ANALYTICS_TABLE_COLUMNS);
+  _ns63.defineTable("marketing", _ns86.MARKETING_TABLE_COLUMNS);
   for (const [k, c] of Object.entries(_ns63.PLAIN_TABLES)) _ns63.defineTable(k, c);
   _ns63.installTableColumns();
   _ns28.adminPaneLoaders.set('admin-templates-tab', () => _ns51.loadTemplatesPane());

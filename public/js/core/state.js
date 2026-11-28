@@ -410,6 +410,10 @@ export const S = {
   // only stops requests that have not been SENT; once two are in flight the
   // network decides which the admin reads.
   _analyticsFetchSeq: 0,
+  // The Marketing page (features/marketing-admin.js): its stale-response guard
+  // and the debounce over its filter changes.
+  _mkFetchSeq: 0,
+  _mkDebounce: null,
   _analyticsCompCache: null,
   _analyticsTaskCache: null,
   _helpLastDoc: null,

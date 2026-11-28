@@ -891,6 +891,7 @@ export const _ADMIN_NAV_ICONS={
   'admin-audit-tab':ICO.clipboardCheck,
   'admin-rankings-tab':ICO.trophy,
   'admin-analytics-tab':ICO.barChart,
+  'admin-marketing-tab':ICO.target,
   'admin-logs-tab':ICO.fileText,
   'admin-settings-tab':ICO.settings,
   'admin-users-tab':ICO.users,
@@ -913,6 +914,8 @@ export const ADMIN_NAV_PERMISSIONS={
   'admin-templates-tab':['templates.view','events.create'],
   'admin-participants-tab':'participants.view','admin-groups-tab':'groups.view','admin-rankings-tab':'leaderboard.view',
   'admin-submissions-tab':'audit.view','admin-analytics-tab':'analytics.view','admin-logs-tab':'audit.raw_logs',
+  // Marketing reads every event on the platform (GET /api/admin/analytics/marketing).
+  'admin-marketing-tab':'analytics.marketing',
   // Settings opens for ANY of its cards' first reads (operator ruling,
   // 14 Nov 2026): GET /api/admin/settings (settings.view), the platform
   // certificate design (certificates.design), the alerts (ops.alerts), retention
@@ -971,7 +974,11 @@ export function adminCan(perm){
   // A list (a page that opens for either of its uses) is any one of them.
   if(Array.isArray(perm))return perm.some(p=>adminCan(p));
   if(Array.isArray(S.permissions))return S.permissions.includes(perm);
-  if(perm==='users.view')return !S.isEventAdmin;
+  // Two permissions no event admin ever holds, so they are decided from the
+  // tier until the permissions are known (neither item flashes into an event
+  // admin's sidebar while /api/admin/me loads): Users & roles, and Marketing,
+  // which reads every event.
+  if(perm==='users.view'||perm==='analytics.marketing')return !S.isEventAdmin;
   return true;
 }
 // Decided before `S.permissions` is known from the built-in tiers (a global
@@ -1478,7 +1485,7 @@ export async function toggleAdminView(toAdmin){
 
 // The organiser shell's pane list. The four event-only panes are reached from
 // the EVENT WORKSPACE's own section tabs; Templates from the sidebar.
-export const ADMIN_PANES=['admin-competitions-tab','admin-templates-tab','admin-event-overview-tab','admin-tasks-tab','admin-participants-tab','admin-groups-tab','admin-submissions-tab','admin-audit-tab','admin-rankings-tab','admin-analytics-tab','admin-event-certs-tab','admin-event-team-tab','admin-event-settings-tab','admin-logs-tab','admin-settings-tab','admin-users-tab'];
+export const ADMIN_PANES=['admin-competitions-tab','admin-templates-tab','admin-event-overview-tab','admin-tasks-tab','admin-participants-tab','admin-groups-tab','admin-submissions-tab','admin-audit-tab','admin-rankings-tab','admin-analytics-tab','admin-marketing-tab','admin-event-certs-tab','admin-event-team-tab','admin-event-settings-tab','admin-logs-tab','admin-settings-tab','admin-users-tab'];
 // Panes that exist only inside an event workspace: shown with an event open, never
 // from the sidebar (the workspace's own tab strip is their only door).
 export const WORKSPACE_ONLY_PANES=new Set(['admin-event-overview-tab','admin-event-certs-tab','admin-event-team-tab','admin-event-settings-tab']);

@@ -134,6 +134,16 @@ custom role cannot be viewed as a participant.
 Admins can see Roles & permissions but cannot change anything on it; event admins do
 not see it.
 
+## Marketing analytics and custom roles
+
+The **Marketing** page (described in the administrator guide) adds up every
+event on the platform, so its permission, **See marketing analytics across
+every event** (`analytics.marketing`), is one a custom role can hold only with
+the scope **Every event**: the role form refuses it on a role scoped to its
+events. The built-in admin and superadmin hold it; an event admin never does.
+Give it to a marketing colleague's custom role on its own and they see that page
+and nothing else of the admin panel.
+
 ## Role promotion
 
 Role changes are made on **Roles & permissions** (above), and only there: a

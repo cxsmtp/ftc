@@ -13583,6 +13583,188 @@ paths:
         "403": { description: "Not an admin." }
         "404": { description: "Competition or timeslot not found." }
 
+  /api/admin/analytics/marketing:
+    get:
+      tags: [Admin - Analytics]
+      summary: The platform's success figures across events (marketing analytics)
+      security: [{ sessionAuth: [] }]
+      description: >-
+        Counts of what the platform recorded, over the events whose START falls in
+        the range (`from` inclusive, `to` exclusive, and no later than now), less every
+        event tagged `test/dry run` (reported as `dry_run_excluded`), narrowed by
+        `kinds` and `events`. One basis for every figure: an event's people, answers,
+        certificates and leads belong to the range its start falls in. Nothing is
+        estimated, and every figure comes with its denominator.
+
+
+        **Who counts.** Per event, its members less the people its boards leave out
+        there: `staff`-tagged accounts (unless the event lets staff compete),
+        `benchmark` accounts and every role the boards leave out (the event admin and
+        any custom role of its class). Activity is read from `challenge_events` with
+        impersonated rows left out. Certificates count only unrevoked ones whose
+        holder is outside the same set.
+
+
+        **Figures.** `reach`: events by kind; `joined` (member rows, a person in two
+        events twice); `people` (distinct); `returning` (people in more than one of
+        the selected events); `new_accounts` (people whose account was created inside
+        the range, by `desk`, `invitation`, `join_link` or `other`: the records do not
+        tell a sign-up form from an import); the top eight `countries` and
+        `companies` (grouped ignoring case and company endings), with `other` and
+        `not_given`. `engagement`: `played` (joins whose person answered anything,
+        right or wrong, a quick question included); `answers` (to scoring questions)
+        and `quick_answers`; `answered_pairs` / `solved_pairs` (the solve rate: of the
+        (event, person, scoring question) pairs answered at least once, those with a
+        correct answer); `finished` / `finish_base` / `finish_events` (people who
+        played and solved every scoring question the event shows now, over those who
+        played, in events that have scoring questions); `presence` (the median net
+        active time in minutes of the people seen, only in events that measure it).
+        `outcomes`: `certificates` by stored basis (`not_recorded` for certificates
+        issued before the basis was stored) and `shared` (the holder pressed Share);
+        `programs` (Program learners' own grades: finished, graded, passed at 60% or
+        more, per band, with each band's words). `pipeline`: the event team reports'
+        leads, by their own rules (hot, warm, cold; the follow-up question's yes and
+        no, those saying no being no leads; leads marked contacted), only from events
+        that asked readable qualifying questions (`events_asked`). `events`: one row
+        per selected event, newest start first.
+
+
+        Permission `analytics.marketing`, platform-wide: the built-in admin and
+        superadmin hold it, an event admin never (403 `event_admin_forbidden`), and a
+        role scoped to its events cannot be given it. Answers are cached for 30 s per
+        query string.
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, example: "2026-01-01T00:00:00.000Z" }, description: "An ISO date or instant: the earliest event start counted. Absent: no lower bound." }
+        - { name: to, in: query, required: false, schema: { type: string, example: "2027-01-01T00:00:00.000Z" }, description: "An ISO date or instant: the end of the range, excluded. Absent: now." }
+        - { name: kinds, in: query, required: false, schema: { type: string, example: "booth,program" }, description: "Comma-separated event kinds (booth, tournament, program). Absent: every kind." }
+        - { name: events, in: query, required: false, schema: { type: string }, description: "Comma-separated event ids, at most 1000. Absent: every event in the range." }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "400": { description: "`marketing_query_invalid` (a field not given once as text), `marketing_range_invalid` (a date that cannot be read, or a start not before the end), `marketing_kind_unknown`, `marketing_event_invalid`, `marketing_too_many_events`, or `query_param_repeated` (a repeated query parameter)." }
+        "200":
+          description: The figures.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  generated_at: { type: string, format: date-time }
+                  range:
+                    type: object
+                    properties:
+                      from: { type: string, format: date-time, nullable: true }
+                      to: { type: string, format: date-time }
+                      basis: { type: string, enum: [event_start] }
+                  filters:
+                    type: object
+                    properties:
+                      kinds: { type: array, items: { type: string } }
+                      event_ids: { type: array, items: { type: string } }
+                  dry_run_excluded: { $ref: '#/components/schemas/SafeInteger' }
+                  reach:
+                    type: object
+                    properties:
+                      events: { $ref: '#/components/schemas/SafeInteger' }
+                      events_by_kind: { type: object, additionalProperties: { $ref: '#/components/schemas/SafeInteger' } }
+                      joined: { $ref: '#/components/schemas/SafeInteger' }
+                      people: { $ref: '#/components/schemas/SafeInteger' }
+                      returning: { $ref: '#/components/schemas/SafeInteger' }
+                      new_accounts:
+                        type: object
+                        properties:
+                          total: { $ref: '#/components/schemas/SafeInteger' }
+                          by_source:
+                            type: object
+                            properties:
+                              desk: { $ref: '#/components/schemas/SafeInteger' }
+                              invitation: { $ref: '#/components/schemas/SafeInteger' }
+                              join_link: { $ref: '#/components/schemas/SafeInteger' }
+                              other: { $ref: '#/components/schemas/SafeInteger' }
+                      countries: { $ref: '#/components/schemas/MarketingTopList' }
+                      companies: { $ref: '#/components/schemas/MarketingTopList' }
+                  engagement:
+                    type: object
+                    properties:
+                      joined: { $ref: '#/components/schemas/SafeInteger' }
+                      played: { $ref: '#/components/schemas/SafeInteger' }
+                      answers: { $ref: '#/components/schemas/SafeInteger' }
+                      quick_answers: { $ref: '#/components/schemas/SafeInteger' }
+                      answered_pairs: { $ref: '#/components/schemas/SafeInteger' }
+                      solved_pairs: { $ref: '#/components/schemas/SafeInteger' }
+                      finished: { $ref: '#/components/schemas/SafeInteger' }
+                      finish_base: { $ref: '#/components/schemas/SafeInteger' }
+                      finish_events: { $ref: '#/components/schemas/SafeInteger' }
+                      presence:
+                        type: object
+                        properties:
+                          events_measured: { $ref: '#/components/schemas/SafeInteger' }
+                          people_seen: { $ref: '#/components/schemas/SafeInteger' }
+                          median_minutes: { type: number, nullable: true }
+                  outcomes:
+                    type: object
+                    properties:
+                      certificates:
+                        type: object
+                        properties:
+                          placement: { $ref: '#/components/schemas/SafeInteger' }
+                          participation: { $ref: '#/components/schemas/SafeInteger' }
+                          completion: { $ref: '#/components/schemas/SafeInteger' }
+                          not_recorded: { $ref: '#/components/schemas/SafeInteger' }
+                          total: { $ref: '#/components/schemas/SafeInteger' }
+                          shared: { $ref: '#/components/schemas/SafeInteger' }
+                      programs:
+                        type: object
+                        properties:
+                          events: { $ref: '#/components/schemas/SafeInteger' }
+                          learners: { $ref: '#/components/schemas/SafeInteger' }
+                          finished: { $ref: '#/components/schemas/SafeInteger' }
+                          graded: { $ref: '#/components/schemas/SafeInteger' }
+                          passed: { $ref: '#/components/schemas/SafeInteger' }
+                          bands: { type: object, additionalProperties: { $ref: '#/components/schemas/SafeInteger' } }
+                          band_labels:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string, enum: [excellent, very_good, good, satisfactory, try_again] }
+                                label: { type: string }
+                  pipeline:
+                    type: object
+                    properties:
+                      events_asked: { $ref: '#/components/schemas/SafeInteger' }
+                      leads: { $ref: '#/components/schemas/SafeInteger' }
+                      hot: { $ref: '#/components/schemas/SafeInteger' }
+                      warm: { $ref: '#/components/schemas/SafeInteger' }
+                      cold: { $ref: '#/components/schemas/SafeInteger' }
+                      follow_up_yes: { $ref: '#/components/schemas/SafeInteger' }
+                      follow_up_no: { $ref: '#/components/schemas/SafeInteger' }
+                      contacted: { $ref: '#/components/schemas/SafeInteger' }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        kind: { type: string, enum: [booth, tournament, program] }
+                        start_time: { type: string, format: date-time }
+                        joined: { $ref: '#/components/schemas/SafeInteger' }
+                        played: { $ref: '#/components/schemas/SafeInteger' }
+                        answers: { $ref: '#/components/schemas/SafeInteger' }
+                        answered_pairs: { $ref: '#/components/schemas/SafeInteger' }
+                        solved_pairs: { $ref: '#/components/schemas/SafeInteger' }
+                        solve_rate: { type: number, nullable: true, minimum: 0, maximum: 1 }
+                        scoring_questions: { $ref: '#/components/schemas/SafeInteger' }
+                        finished: { type: integer, format: int64, nullable: true }
+                        completion: { type: number, nullable: true, minimum: 0, maximum: 1 }
+                        certificates: { $ref: '#/components/schemas/SafeInteger' }
+                        asked_qualifying: { type: boolean }
+                        hot_leads: { type: integer, format: int64, nullable: true }
   /api/admin/leaderboard:
     get:
       tags: [Admin - Submissions]
@@ -18533,6 +18715,23 @@ components:
         label: { type: string, nullable: true }
         scope_mode: { type: string, enum: [none, granted, all] }
         builtin: { type: boolean }
+    MarketingTopList:
+      description: >-
+        The most common values of a profile field among the people counted, once
+        per person (marketing analytics): the top eight, the rest summed as `other`
+        (`other_kinds` distinct values), and the people who gave none.
+      type: object
+      properties:
+        top:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              count: { $ref: '#/components/schemas/SafeInteger' }
+        other: { $ref: '#/components/schemas/SafeInteger' }
+        other_kinds: { $ref: '#/components/schemas/SafeInteger' }
+        not_given: { $ref: '#/components/schemas/SafeInteger' }
     SafeInteger:
       description: >-
         A whole number. The server is JavaScript, so every integer it reads or

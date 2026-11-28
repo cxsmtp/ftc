@@ -36,6 +36,7 @@ const NAV_FIRST_READ = {
   "admin-rankings-tab": ["GET /api/admin/leaderboard"],
   "admin-submissions-tab": ["GET /api/admin/submissions"],
   "admin-analytics-tab": ["GET /api/admin/analytics/challenges"],
+  "admin-marketing-tab": ["GET /api/admin/analytics/marketing"],
   "admin-logs-tab": ["GET /api/admin/logs"],
   // Settings opens for any of its cards' first reads (operator ruling, 14 Nov 2026).
   "admin-settings-tab": ["GET /api/admin/settings", "GET /api/admin/certificate-config", "GET /api/admin/alerts",

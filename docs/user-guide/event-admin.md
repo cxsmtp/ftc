@@ -696,7 +696,9 @@ All three start from your events.
   question, so somebody who has entered but opened nothing is not on the board
   yet. The administrator guide's *Start each participant's clock* has the rest.
 - **Analytics** — pick one of your events or sessions. There is no
-  platform-wide option: it would aggregate events that are not yours. Inside an
+  platform-wide option: it would aggregate events that are not yours. For the
+  same reason the administrators' **Marketing** page, which adds up every event
+  on the platform, is not in your sidebar. Inside an
   event, its **Analytics** section is that event alone (Whole event, or one of
   its sessions), with no event picker. The tag
   and group lists you can filter by are likewise drawn only from participants you

@@ -64,7 +64,7 @@ function readSurface() {
       admits: /could not|failed to|unable to|network error|try again/i.test(txt),
       // The empty-state claims this product actually makes. Each is a real string
       // from the codebase, so a new one has to be added here deliberately.
-      falseClaim: /no participants yet|no submissions yet|no challenge activity|no events found|no challenges found|no history available|no open alerts|no platform users yet|no templates yet|no one on the team yet|nobody has joined yet/i.test(txt),
+      falseClaim: /no participants yet|no submissions yet|no challenge activity|no events found|no challenges found|no history available|no open alerts|no platform users yet|no templates yet|no one on the team yet|nobody has joined yet|no events started in this range/i.test(txt),
       text: txt.replace(/\s+/g, " ").slice(0, 160),
     };
   };
@@ -114,6 +114,8 @@ const ADMIN = [
       if (await b.count()) await b.click();
     }],
   ["challenges",   "**/api/admin/tasks*",        "Challenges",   "admin-tasks-tab",        "#admin-tasks-tab"],
+  // The Marketing page (features/marketing-admin.js): one read, on entry.
+  ["marketing",    "**/api/admin/analytics/marketing*", "Marketing", "admin-marketing-tab", "#admin-marketing-tab"],
   // v8.3.33 — Settings was the ONE admin pane this table omitted, and it was the
   // one that was broken: `loadAdminSettings` answered a failed load with a toast
   // and nothing in the pane, the only such loader in the SPA. Worse than blank —

@@ -850,6 +850,29 @@
       }
     },
     {
+      "screen": "admin-marketing",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-marketing-tab",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab marketing ; waitFor #mk-body .mk-section",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "#admin-marketing-tab|mk-filterbar|mk-table"
+        },
+        "behaviour": {
+          "path": "public/js/features/marketing-admin.js",
+          "grep": "renderMarketing|_renderTable|_kpi|_bars|_section"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.mk-|#mk-|#admin-marketing-tab"
+        }
+      },
+      "note": "The Marketing page: the platform's success figures across events (Reach, Engagement, Outcomes, Pipeline) and the per-event table. The fixture's events need activity for the sections to carry numbers; with none it shows its empty state."
+    },
+    {
       "screen": "admin-challenges",
       "status": "pending",
       "route": "/",
