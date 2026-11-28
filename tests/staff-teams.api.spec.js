@@ -28,10 +28,13 @@
 //      an existing organiser are skipped with their reasons; a participant
 //      account is granted (its role becomes event_admin, audited on both
 //      histories with `via: "staff_team"`); an event admin is refused at the gate.
+//   6. The competitor lock binds both event doors: a user-backed admin enrolled
+//      in a staff-compete event is refused 403 competitor_cannot_edit, nothing
+//      written; an admin enrolled nowhere (CONTROL) adds the same team.
 
 const { test, expect } = require("./isolated-test");
 const { BASE, TEST_DB_PATH, apiLogin } = require("./helpers");
-const { H, uniq, makeParticipant, makeCompetition, grantEventAdmin } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeCompetition, grantEventAdmin, enrol } = require("./event-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -320,5 +323,49 @@ test.describe("staff teams — as an event's organisers", () => {
     expect(r.body.skipped.find(s => s.staff_member_id === mP.id).code).toBe("already_organiser");
     r = await call(sa, saCsrf, "POST", `/api/admin/competitions/${comp.id}/admins/staff-team`, { teamId: "missing" });
     expect([r.status, r.body.code]).toEqual([404, "staff_team_not_found"]);
+  });
+});
+
+test.describe("staff teams — the competitor lock on both event doors", () => {
+  test("an admin competing in the event is refused both doors; an admin enrolled nowhere adds the team (CONTROL)", async () => {
+    try {
+      await setDomains(["corp.example"]);
+      const comp = await makeCompetition(sa, saCsrf, "stlock", { staff_compete: true });
+      const team = await makeTeam(`Lock crew ${T}`);
+      const acct = await makeParticipant(sa, saCsrf, "stlockorg");
+      await addMember(team.id, { name: "Rep Recipient", email: `rep.${T}@corp.example`, default_role: "sales" });
+      await addMember(team.id, { name: "Org Account", email: acct.email });
+      const mkAdmin = async (label, competeIn) => {
+        const p = await makeParticipant(sa, saCsrf, label);
+        const r = await call(sa, saCsrf, "POST", `/api/admin/participants/${p.id}/role`, { role: "admin" });
+        expect(r.status, JSON.stringify(r.body)).toBe(200);
+        if (competeIn) await enrol(sa, saCsrf, competeIn, [p.id]);
+        const l = await apiLogin(p.email);
+        return { ...p, api: l.api, csrf: l.csrf };
+      };
+      const rival = await mkAdmin("stlockrival", comp.id);
+      const ctrl = await mkAdmin("stlockctrl", null);
+      const held = ro(db => db.prepare("SELECT user_id FROM competition_users WHERE competition_id=?").all(comp.id).map(r => r.user_id));
+      expect(held, "PRECONDITION: the rival holds a row in the event, the control none").toEqual([rival.id]);
+      const counts = () => ro(db => [
+        db.prepare("SELECT COUNT(*) n FROM event_team_members WHERE competition_id=?").get(comp.id).n,
+        db.prepare("SELECT COUNT(*) n FROM competition_admins WHERE competition_id=?").get(comp.id).n,
+      ]);
+
+      for (const door of ["team/staff-team", "admins/staff-team"]) {
+        const r = await call(rival.api, rival.csrf, "POST", `/api/admin/competitions/${comp.id}/${door}`, { teamId: team.id });
+        expect([r.status, r.body && r.body.code], `${door}: the competing admin is locked out`).toEqual([403, "competitor_cannot_edit"]);
+        expect(r.body.competitionId, `${door}: the refusal names the event`).toBe(comp.id);
+      }
+      expect(counts(), "the refusals wrote nothing").toEqual([0, 0]);
+
+      let r = await call(ctrl.api, ctrl.csrf, "POST", `/api/admin/competitions/${comp.id}/team/staff-team`, { teamId: team.id });
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      expect(r.body.added.map(a => a.name)).toEqual(["Rep Recipient"]);
+      r = await call(ctrl.api, ctrl.csrf, "POST", `/api/admin/competitions/${comp.id}/admins/staff-team`, { teamId: team.id });
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      expect(r.body.granted.map(g => g.user_id)).toEqual([acct.id]);
+      expect(counts(), "CONTROL: the admin enrolled nowhere added both").toEqual([1, 1]);
+    } finally { await setDomains([]); }
   });
 });

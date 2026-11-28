@@ -3002,7 +3002,7 @@ function _grantOrganiser(req, comp, target, extraDetails = {}) {
   // RBAC — every unscoped (class `all`) role, built-in or custom.
   if (require("../lib/rbac").isGlobalClassRole(target.role)) {
     return { refused: { status: 403, body: {
-      error: "That account is already an administrator. Change its role from the participant's row instead.",
+      error: "That account is already an administrator, who runs every event. Change its role on Roles & permissions instead.",
       code: "event_admin_target_privileged",
     } } };
   }
