@@ -232,7 +232,7 @@ live on a mistyped date with nobody in it.
 
 Moving the start into the future puts the event back to **upcoming**, which
 also re-opens the settings that lock the moment an event starts — its event
-type, its leaderboard mode and its time basis. Moving it far enough backwards
+type, its ranking and its time basis. Moving it far enough backwards
 that the event's end would land in the past is refused separately, however
 pristine the event: ending an event is what **End Now** is for. If anyone has
 touched the event, the save is refused and names what it found; end the event

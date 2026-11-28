@@ -144,7 +144,9 @@ const _RK_SORTERS = {
   last:    _rkTextCmp('lastName'),
   company: _rkTextCmp('company'),
   email:   _rkTextCmp('email'),
-  score:   (a, b) => (a.score ?? 0) - (b.score ?? 0),
+  // A board ranking by percentages (an overall board, per-session question sets)
+  // carries `percent`: its Score column is the percentage.
+  score:   (a, b) => (a.percent ?? a.score ?? 0) - (b.percent ?? b.score ?? 0),
   time:    (a, b) => (a.solveTimeMs ?? Number.MAX_SAFE_INTEGER) - (b.solveTimeMs ?? Number.MAX_SAFE_INTEGER),
   solved:  (a, b) => (a.allSolved ? 1 : 0) - (b.allSolved ? 1 : 0),
 };
@@ -579,7 +581,7 @@ export const RANKINGS_TABLE_COLUMNS={
       case 'last':return u.lastName||'';
       case 'company':return u.company||'';
       case 'email':return u.email||'';
-      case 'score':return u.score??'';
+      case 'score':return u.percent??u.score??'';
       case 'time':return fmtSolveTime(u.solveTimeMs);
       case 'solved':return _rkSolvedText(u);
       default:return '';
@@ -783,6 +785,14 @@ export function exportRankingsCsv(key){
   downloadCsv(`rankings-${_rkSlug(entry.label)}-${date}.csv`, RANKINGS_CSV_HEADERS, rows);
 }
 
+// PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026) — a row's score: its
+// points, or on an overall board ranking by percentages the percentage first,
+// with the points and the session's maximum it is a share of beside it.
+function _rkScoreCell(u){
+  if(typeof u.percent!=='number')return `<td><strong>${u.score}</strong> pts</td>`;
+  const pct=`${u.percent.toFixed(1).replace(/\.0$/,'')}%`;
+  return `<td><strong>${esc(pct)}</strong> <span class="settings-help">${u.score} of ${Number(u.maxPoints)||0} pts</span></td>`;
+}
 export function renderLeaderboardTable(board,sortKey,boardKey,label){
   // Sort only the regular entries; benchmark rows stay pinned in their own
   // section below the divider regardless of the chosen column.
@@ -810,7 +820,7 @@ export function renderLeaderboardTable(board,sortKey,boardKey,label){
       <td><strong>#${u.rank}</strong></td>
       <td>${_rkPlayerCell(u)}</td>
       ${idCells(u)}
-      <td><strong>${u.score}</strong> pts</td>
+      ${_rkScoreCell(u)}
       ${timeCell(u)}
     </tr>`).join('');
   if(all.length>RANKINGS_PAGE){
@@ -840,7 +850,7 @@ export function renderLeaderboardTable(board,sortKey,boardKey,label){
         ${_rkPersonLink(u.nickname)}
         <span class="badge draft badge-xs late-entrant-tag">late entrant</span></div></td>
       ${idCells(u)}
-      <td><strong>${u.score}</strong> pts</td>
+      ${_rkScoreCell(u)}
       ${timeCell(u)}
     </tr>`).join('');
   }
@@ -853,7 +863,7 @@ export function renderLeaderboardTable(board,sortKey,boardKey,label){
         ${_rkPersonLink(u.nickname)}
         <span class="badge draft badge-xs benchmark-tag">benchmark</span></div></td>
       ${idCells(u)}
-      <td><strong>${u.score}</strong> pts</td>
+      ${_rkScoreCell(u)}
       ${timeCell(u)}
     </tr>`).join('');
   }
@@ -934,6 +944,8 @@ export async function loadAdminLeaderboardAllLive(comps){
   for(const c of comps){
     const ts=c.timeslots||[];
     if(ts.length>1&&(c.leaderboard_mode||'per_slot')==='per_slot'){
+      // Per-session question sets: "both" adds the overall board (no session named).
+      if(c.leaderboard_overall)fetches.push({comp:c,ts:{id:'overall',name:'Overall',overall:true},url:`/api/admin/leaderboard?competitionId=${c.id}`});
       for(const t of ts){
         fetches.push({comp:c,ts:t,url:`/api/admin/leaderboard?competitionId=${c.id}&timeslotId=${t.id}`});
       }
@@ -993,7 +1005,7 @@ export async function loadAdminLeaderboardAllLive(comps){
     const label=ts?`${esc(comp.name)} → ${esc(ts.name)}`:esc(comp.name);
     // The UNESCAPED label, for the download filename — `label` above is markup.
     const rawLabel=ts?`${comp.name} ${ts.name}`:comp.name;
-    const statusObj=ts||comp;
+    const statusObj=ts&&!ts.overall?ts:comp;
     const _rkKey=`live-${comp.id}${ts?'-'+ts.id:''}`;
     const rows=board.length?renderLeaderboardTable(board,_rkKey,_rkKey,rawLabel)
       :`<tr><td colspan="${rankingsColspan()}" class="rankings-empty-row compact">No participants yet.</td></tr>`;
@@ -1037,7 +1049,11 @@ export async function loadAdminLeaderboardPerSlot(comp,timeslots){
   // the request set, and every non-sort caller misses because it does not set
   // `_rkSortOnly`. The check must stay ABOVE the first `await` — `_rkSortOnly`
   // is cleared synchronously by the caller's `finally`.
-  const _urls=timeslots.map(ts=>`/api/admin/leaderboard?competitionId=${comp.id}&timeslotId=${ts.id}`);
+  // Per-session question sets: an event ranking per session AND overall shows
+  // its overall board first (the event-wide board: no session named).
+  const _both=!!comp.leaderboard_overall;
+  if(_both)timeslots=[{id:'overall',name:'Overall',overall:true,start_time:comp.start_time,duration_minutes:comp.duration_minutes,ended_at:comp.ended_at},...timeslots];
+  const _urls=timeslots.map(ts=>ts.overall?`/api/admin/leaderboard?competitionId=${comp.id}`:`/api/admin/leaderboard?competitionId=${comp.id}&timeslotId=${ts.id}`);
   const _key=_urls.join("|");
   let results;
   if(_rkCacheHit("per-slot",_key)){
@@ -1056,13 +1072,13 @@ export async function loadAdminLeaderboardPerSlot(comp,timeslots){
     if(mySeq!==S._rkFetchSeq)return;   // superseded mid-flight
     S._rkCache={kind:"per-slot",key:_key,data:results};
   }
-  const tsSt=ts=>computeCompStatus(ts);
+  const tsSt=ts=>computeCompStatus(ts.overall?comp:ts);
   const statusLabel=ts=>{const s=tsSt(ts);return s==='live'?'Live':s==='ended'?'Ended':'Upcoming';};
   const statusClass=ts=>`is-${tsSt(ts)}`;
   const _q=_rkSearchTerm();               // v7.22.0 — see loadAdminLeaderboardAllLive
   let _matched=0,_total=0,_hiddenCards=0;
   let html=`<div class="rankings-section-header">
-    <h3 id="admin-rankings-title">${esc(comp.name)} - Per Session Rankings</h3>
+    <h3 id="admin-rankings-title">${esc(comp.name)} - ${_both?'Overall and Per Session Rankings':'Per Session Rankings'}</h3>
     <button class="btn sm secondary" data-action="rankings-refresh">Refresh</button>
   </div>
   <div class="rankings-card-grid">`;
@@ -1076,6 +1092,7 @@ export async function loadAdminLeaderboardPerSlot(comp,timeslots){
       :`<tr><td colspan="${rankingsColspan()}" class="rankings-empty-row compact">No participants yet.</td></tr>`;
     html+=`<div class="card rankings-slot-card">
       <h4 class="rankings-card-title">${esc(ts.name)} <span class="rankings-status-pill ${statusClass(ts)}">(${statusLabel(ts)})</span>${board.length?_rkExportBtn(_rkKey,rawLabel):''}</h4>
+      ${ts.overall?`<p class="settings-help rankings-overall-note">Every session together${comp.leaderboard_percent?', ranked by the percentage of each person’s own session’s points; time breaks a tie':', ranked by points'}.</p>`:''}
       <table data-tcols="rankings">
         ${rankingsThead(_rkKey)}
         <tbody>${rows}</tbody>

@@ -4464,6 +4464,7 @@ const { now, formatEmailDate, reminderLeadTime } = require("./lib/time"); // v7.
 // projection's own member, equal to `attempts` whenever it is present.
 const { attemptState, participantsFinishedAll, participantsFinishedAllDetail,
         ATTEMPT_CAP_MIN, ATTEMPT_CAP_MAX } = require("./lib/attempts");
+const { inSessionSql } = require("./lib/session-tasks");   // per-session question sets
 const { taskConflictingEvent } = require("./lib/challenge-fit");
 const { recordPresence, presenceMs, presenceRowCount, BUCKET_MS } = require("./lib/presence");
 function attemptsWire(st) {
@@ -5091,7 +5092,9 @@ const submitLimit = rateLimit(60_000, 120, "submit");
 // only gets here by choosing too large a file).
 const _submitDeclaredLengthGate = declaredLengthGate(_SUBMIT_UPLOAD_LIMITS, _MULTER_TOO_LARGE.LIMIT_FILE_SIZE);
 // A bank question id named in the session's event means that event's own copy (lib/event-copies.js).
-const _resolveEventTask = require("./lib/event-copies").resolveEventTaskParam(db, "id");
+// Per-session question sets: then a question outside the session the request
+// plays answers the same 404 an unassigned one does (lib/session-tasks.js).
+const _resolveEventTask = [require("./lib/event-copies").resolveEventTaskParam(db, "id"), require("./lib/session-tasks").requireTaskInSession(db, "id")];
 app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, csrfProtection, _submitDeclaredLengthGate, upload.single("file"), async (req, res) => {
   // v6.13.14 — perf-span instrumentation. POST /api/tasks/:id/submit
   // is the hot write-path on the platform; v6.13.13's 4 h run logged
@@ -5764,6 +5767,12 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
         return { autoEndInfo: null, attempts: capAfter };
       }
       const totalTasks = publishedTaskCount(compId);
+      // PER-SESSION QUESTION SETS — the submitter finishes the questions of
+      // THEIR OWN session (their competition_users row's), so their fast-path
+      // count is measured against that set; `totalTasks` above stays the
+      // event's, the guard that anything counts at all.
+      const _mySlot = (db.prepare("SELECT timeslot_id FROM competition_users WHERE competition_id=? AND user_id=?").get(compId, req.session.userId) || {}).timeslot_id || null;
+      const myTotal = _mySlot ? publishedTaskCount(compId, _mySlot) : totalTasks;
       // v6.8.1 — cheap pre-filter: the current submitter can only be the
       // "last solver" if they themselves have now solved every task. If
       // their personal count is still below totalTasks, skip the full
@@ -5776,8 +5785,9 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
           `SELECT COUNT(DISTINCT s.task_id) as c FROM submissions s
            JOIN competition_tasks ct ON ct.task_id=s.task_id AND ct.competition_id=s.competition_id
            JOIN tasks t ON t.id=s.task_id
-           WHERE s.user_id=? AND s.competition_id=? AND s.is_correct=1 AND t.active=1 AND t.status='published' AND ${notQualifyingSql("t")}`
-        ).get(req.session.userId, compId).c;
+           WHERE s.user_id=? AND s.competition_id=? AND s.is_correct=1 AND t.active=1 AND t.status='published' AND ${notQualifyingSql("t")}
+             AND ${inSessionSql("ct.competition_id", "ct.task_id", "?")}`
+        ).get(req.session.userId, compId, _mySlot).c;
         // v8.1.0 — THE FAST PATH ENCODED THE SAME ASSUMPTION AS THE OUTER GATE,
         // one layer down, and fixing only the gate left it dead.
         //
@@ -5793,7 +5803,7 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
         // fast path exists for (a correct submit during a final-minute burst) is
         // unchanged. Only when a cap is actually in play do we ask the shared
         // predicate, and only about THIS ONE participant.
-        let mineFinished = mineSolved >= totalTasks;
+        let mineFinished = myTotal > 0 && mineSolved >= myTotal;
         if (!mineFinished && (freshComp?.attempt_cap != null || db.prepare(
           `SELECT 1 FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id
             WHERE ct.competition_id=? AND t.active=1 AND t.status='published' AND t.attempt_cap IS NOT NULL LIMIT 1`

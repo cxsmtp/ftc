@@ -1395,7 +1395,12 @@ export function openCompetitionForm(editId,opts){
   // create from one, else the server's create default (per session). Both
   // options test it alone, so a template's "one board across sessions" is the
   // one selected and the PUT after its spawn keeps it.
-  const lbMode=src?.leaderboard_mode==='global'?'global':'per_slot';
+  // Per-session question sets (owner decision, 27 Nov 2026): the RANKING is three
+  // choices on one control. "Both" is stored as the per-session mode plus an
+  // overall board beside it (`leaderboard_overall`), so the select's other two
+  // values stay the stored ones.
+  const lbMode=src?.leaderboard_mode==='global'?'global':(src?.leaderboard_overall?'both':'per_slot');
+  const lbPercent=!!src?.leaderboard_percent&&lbMode!=='per_slot';
   const lbLocked=hasAnySlotStarted;
   // Can't switch modes once slots have started or if editing with existing timeslots that have activity
   const modeLocked=comp&&hasAnySlotStarted;
@@ -1752,13 +1757,20 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
     ${showSessions?`<div id="comp-multi-section" style="${isMulti?'':'display:none'}">
       <div id="comp-sessions-list"></div>
       <button class="btn sm secondary" style="margin-top:8px" data-action="comp-add-form-session">+ Add Session</button>
-      <div class="form-group" style="margin-top:12px">
-        <label for="comp-lb-mode">Leaderboard Mode</label><span data-help="event.lbmode" data-help-label="Leaderboard mode"></span>
-        <select id="comp-lb-mode" ${lbLocked?'disabled':''} style="max-width:200px">
-          <option value="per_slot" ${lbMode!=='global'?'selected':''}>Per Session</option>
-          <option value="global" ${lbMode==='global'?'selected':''}>Global (all sessions)</option>
+      <div class="form-group comp-form-ranking" style="margin-top:12px">
+        <div class="help-label-row"><label for="comp-lb-mode">Ranking</label><span data-help="event.lbmode" data-help-label="Ranking"></span></div>
+        <select id="comp-lb-mode" data-change-action="comp-lb-mode-changed" ${lbLocked?'disabled':''} aria-describedby="comp-lb-mode-note">
+          <option value="per_slot" ${lbMode==='per_slot'?'selected':''}>A winner per session</option>
+          <option value="global" ${lbMode==='global'?'selected':''}>One overall winner</option>
+          <option value="both" ${lbMode==='both'?'selected':''}>Both: a winner per session and overall</option>
         </select>
-        ${lbLocked?'<span style="font-size:var(--fs-12);color:var(--muted);margin-left:8px">Locked</span>':''}
+        <div class="help-label-row comp-form-percent-row">
+          <label class="checkbox-row" style="cursor:pointer">
+            <input type="checkbox" id="comp-lb-percent" ${lbPercent?'checked':''} ${lbLocked||lbMode==='per_slot'?'disabled':''} aria-describedby="comp-lb-mode-note"/>
+            <span>Turn scores into percentages on the overall board</span>
+          </label><span data-help="event.lbpercent" data-help-label="Percentages"></span>
+        </div>
+        <p class="comp-form-cxone-note" id="comp-lb-mode-note">${esc(_rankingNote(lbMode,lbLocked))}</p>
       </div>
     </div>`:''}
 
@@ -2790,6 +2802,43 @@ function _collectLateDeadline(){
   return d?d.toISOString():undefined;
 }
 
+// THE RANKING CHOICE (per-session question sets, owner decision 27 Nov 2026):
+// the select's three values to the stored three fields. Nothing is sent while the
+// control is locked (a session has started) or not rendered, so a save never
+// writes a ranking nobody chose.
+function _collectRanking(lbSelect){
+  if(!lbSelect||lbSelect.disabled)return {leaderboard_mode:null};
+  const v=lbSelect.value;
+  const pct=document.getElementById('comp-lb-percent');
+  return {
+    leaderboard_mode:v==='both'?'per_slot':(v||null),
+    leaderboard_overall:v==='both',
+    leaderboard_percent:v!=='per_slot'&&!!pct&&!pct.disabled&&pct.checked,
+  };
+}
+// The sentence under the ranking control: what the choice does, and why the
+// percentages box is off when it is.
+function _rankingNote(v,locked){
+  const what=v==='global'?'Everyone is ranked on one overall board, whichever session they play.'
+    :v==='both'?'Each session has its own winners, and everyone is also ranked on one overall board.'
+    :'Each session has its own winners.';
+  if(locked)return `${what} The ranking is fixed once a session has started.`;
+  return v==='per_slot'?`${what} Percentages rank an overall board, so choose an overall winner (or both) to turn them on.`
+    :`${what} Percentages make sessions with different questions compare fairly; time breaks a tie.`;
+}
+/** The ranking control changed: the percentages box follows it, and so does the note. */
+export function compLbModeChanged(){
+  const sel=document.getElementById('comp-lb-mode');
+  const pct=document.getElementById('comp-lb-percent');
+  const note=document.getElementById('comp-lb-mode-note');
+  if(!sel)return;
+  if(pct){
+    pct.disabled=sel.disabled||sel.value==='per_slot';
+    if(sel.value==='per_slot')pct.checked=false;
+  }
+  if(note)note.textContent=_rankingNote(sel.value,sel.disabled);
+}
+
 export function _collectCompFormData(){
   const nameEl=document.getElementById('comp-name');
   const name=nameEl.value.trim();
@@ -2844,7 +2893,7 @@ export function _collectCompFormData(){
       _highlightField(document.getElementById('comp-time'));
       return null;
     }
-    return {name,start_time,duration_minutes:duration,mode,sessions:[],leaderboard_mode:lbSelect?.disabled?null:lbSelect?.value||null,event_kind:eventKind,deadline_at:deadlineIso,..._collectSharedCompFields()};
+    return {name,start_time,duration_minutes:duration,mode,sessions:[],..._collectRanking(lbSelect),event_kind:eventKind,deadline_at:deadlineIso,..._collectSharedCompFields()};
   }
 
   // Multi mode — collect sessions from inline form rows
@@ -2898,7 +2947,7 @@ export function _collectCompFormData(){
   }):null;
   const compStart=earliest?earliest.start_time:null;
   const totalDur=compStart&&latest?Math.ceil((new Date(latest.start_time).getTime()+latest.duration_minutes*60000-new Date(compStart).getTime())/60000):null;
-  return {name,start_time:compStart,duration_minutes:totalDur,mode,sessions,leaderboard_mode:lbSelect?.disabled?null:lbSelect?.value||null,event_kind:eventKind,deadline_at:deadlineIso,..._collectSharedCompFields()};
+  return {name,start_time:compStart,duration_minutes:totalDur,mode,sessions,..._collectRanking(lbSelect),event_kind:eventKind,deadline_at:deadlineIso,..._collectSharedCompFields()};
 }
 
 // v8.2.0 — the kind's own label for the save confirmations. A Program admin
@@ -3000,7 +3049,7 @@ function _markSpawnedForm(spawned){
 // one that did not, or that someone else's change followed (`saveCompetition`).
 // A field it cannot judge counts as different, so the answer errs toward "not
 // this form's write", which leaves the server's own conflict check standing.
-const _ROW_FLAG_KEYS=new Set(['reveal_answers_on_end','group_leaderboard_enabled','cxone_disabled','measure_presence','staff_compete','late_entry_enabled']);
+const _ROW_FLAG_KEYS=new Set(['reveal_answers_on_end','group_leaderboard_enabled','cxone_disabled','measure_presence','staff_compete','late_entry_enabled','leaderboard_overall','leaderboard_percent']);
 const _ROW_DATE_KEYS=new Set(['start_time','deadline_at','late_entry_deadline_at']);
 const _ipSet=v=>String(v||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean).sort().join(',');
 function _compRowHolds(row,body){
@@ -3089,6 +3138,8 @@ export async function saveCompetition(){
     body.duration_minutes=fd.duration_minutes;
   }
   if(fd.leaderboard_mode)body.leaderboard_mode=fd.leaderboard_mode;
+  if(fd.leaderboard_overall!==undefined)body.leaderboard_overall=fd.leaderboard_overall;
+  if(fd.leaderboard_percent!==undefined)body.leaderboard_percent=fd.leaderboard_percent;
   // v6.16.0 / v7.11.7 / v7.13.1 — these three used to be sent UNCONDITIONALLY,
   // on the reasoning that an explicit boolean is what lets unticking reset a flag.
   // That is still true, and it is still what happens whenever the control is on

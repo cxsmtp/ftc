@@ -21,6 +21,7 @@ import { addTasksToCompetition, runBoundedCollect } from "./task-assign.js"; // 
 import { tipsAllOn } from "../ui/help-tips.js";
 import { _stopAllPolls, _announceSignout } from "./session-monitor.js";
 import { adminCan } from "../ui/nav.js"; // RBAC — the one permission predicate (ESM tolerates the nav cycle: read inside functions only)
+import { loadTaskSessions, taskSessionsCellHtml } from "./task-sessions.js"; // per-session question sets: the workspace row's Sessions chip
 
 // v7.23.0 — one loader for the admin challenge list, because both call sites
 // had the same two defects.
@@ -539,7 +540,9 @@ export async function loadAdminTasks(){
   const mySeq=++S._taskFetchSeq;                     // ext-audit v7.15.13 — see _subFetchSeq
   // Stage B — the topics are read beside the questions (a failed read leaves the
   // last good list; the filter and picker then offer what they hold).
-  const [_tasks]=await Promise.all([_loadAdminTaskList(),loadTopics()]);
+  // Per-session question sets: inside a workspace the event's session choices are
+  // read beside them (each of its questions shows the sessions it is in).
+  const [_tasks]=await Promise.all([_loadAdminTaskList(),loadTopics(),S.adminSelectedCompetitionId?loadTaskSessions(S.adminSelectedCompetitionId):(S.adminTaskSessions=null)]);
   // v8.12.2 (second review) — the OUTCOME is returned ('landed' | 'superseded' |
   // 'failed'), because two callers act on the model right after awaiting this
   // and must not act on a stale one: a superseded load leaves the PREVIOUS rows
@@ -995,7 +998,7 @@ export function renderAdminTasks(){
       <td class="cell-ts ${cellDim}">${esc(t.changed_by||'—')}</td>
       <td class="cell-ts ${cellDim}">${esc(t.author_name||'—')}</td>
       <td class="${cellDim}" data-col="topic">${t.topic_name?`<span class="topic-chip" title="${esc(t.topic_name)}">${esc(t.topic_name)}</span>`:'<span class="cell-empty">&mdash;</span>'}</td>
-      <td class="${cellDim}" style="white-space:normal;min-width:160px"><div class="cell-chips">${compBadgesHtml}</div></td>
+      <td class="${cellDim}" style="white-space:normal;min-width:160px"><div class="cell-chips">${taskSessionsCellHtml(t)}${compBadgesHtml}</div></td>
       <td><div class="action-cell task-actions" style="gap:4px">${primaryBtn}</div>
         <button class="kebab-btn kebab-always" aria-label="More actions" data-action="kebab-toggle">⋮</button>
         <div class="kebab-menu">${kebabActions}</div>

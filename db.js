@@ -340,6 +340,25 @@ db.exec(`
     created_at       TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_timeslots_comp ON competition_timeslots(competition_id);
+
+  /* PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026). A Competition's
+     question is in EVERY session unless it has rows here, which name the
+     sessions it is in. No rows is the default and what every event that
+     predates this table keeps, so an event nobody narrows behaves exactly as
+     before. Read through lib/session-tasks.js (inSessionSql), never directly.
+     Keyed to the ASSIGNMENT (competition_tasks), so taking a question out of
+     the event takes its choice with it; ON UPDATE CASCADE so the event-copies
+     migration, which moves an assignment to the event's own copy, moves its
+     sessions too. Deleting a session deletes its rows: a question left with
+     none is back in every session. */
+  CREATE TABLE IF NOT EXISTS competition_task_sessions (
+    competition_id TEXT NOT NULL,
+    task_id        TEXT NOT NULL,
+    timeslot_id    TEXT NOT NULL REFERENCES competition_timeslots(id) ON DELETE CASCADE,
+    PRIMARY KEY (competition_id, task_id, timeslot_id),
+    FOREIGN KEY (competition_id, task_id) REFERENCES competition_tasks(competition_id, task_id) ON DELETE CASCADE ON UPDATE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_competition_task_sessions_slot ON competition_task_sessions(timeslot_id);
 `);
 
 
@@ -1223,6 +1242,15 @@ try {
   // grades included: those print as they always did.
   if (!abCols.includes("grade_band")) db.exec("ALTER TABLE achievement_badges ADD COLUMN grade_band TEXT");
   if (!abCols.includes("grade_permille")) db.exec("ALTER TABLE achievement_badges ADD COLUMN grade_permille INTEGER");
+  // THE BOARD A PLACE WAS ON (owner decision, 27 Nov 2026): a Competition with
+  // sessions ranks per session, overall, or both, so a "1st Place" must say
+  // which. `board_kind` is 'session' or 'overall'; `board_name` the session's
+  // name AS IT WAS at mint (a rename afterwards must not relabel a certificate
+  // already filed). Both NULL on every certificate of an event with fewer than
+  // two sessions, and on every certificate issued before this column: those
+  // print as they always did.
+  if (!abCols.includes("board_kind")) db.exec("ALTER TABLE achievement_badges ADD COLUMN board_kind TEXT");
+  if (!abCols.includes("board_name")) db.exec("ALTER TABLE achievement_badges ADD COLUMN board_name TEXT");
   // NOT PARTIAL, deliberately, and the asymmetry with the index below is the
   // point: a REVOKED code must still resolve, or the credential page cannot
   // answer "revoked" and a revoked certificate becomes indistinguishable from a
@@ -2097,6 +2125,18 @@ try {
   // seed (lib/event-policy.js `clockStartDefault`). Inside this fatal block
   // because the create INSERT names it.
   add("clock_start", "clock_start TEXT NOT NULL DEFAULT 'entry' CHECK(clock_start IN ('first_open','entry'))");
+  // THE RANKING OF A COMPETITION WITH SESSIONS (owner decision, 27 Nov 2026).
+  // `leaderboard_mode` keeps its two stored meanings (`per_slot`: a winner per
+  // session; `global`: one overall board), so every reader of it stays right.
+  // `leaderboard_overall` = 1 adds the overall board BESIDE the per-session
+  // boards ("both"); it means something only with `per_slot`. And
+  // `leaderboard_percent` = 1 ranks the overall board by each participant's
+  // points as a share of their own session's maximum, so sessions with
+  // different question sets compare fairly; it means something only where an
+  // overall board exists. DEFAULT 0 is every existing row's backfill: no board
+  // changes. Inside this fatal block because the create INSERT names both.
+  add("leaderboard_overall", "leaderboard_overall INTEGER NOT NULL DEFAULT 0");
+  add("leaderboard_percent", "leaderboard_percent INTEGER NOT NULL DEFAULT 0");
 
   // Three ALTERs are three autocommit statements, so VERIFY rather than assume.
   // A partial apply is the same wrong state as a total failure, and only a
@@ -2105,7 +2145,7 @@ try {
   const missing = ["event_kind", "registration_field_policy", "linkedin_signup_enabled",
     "deadline_at", "time_basis",
     "measure_presence", "auto_end_on_all_solved", "attempt_cap",
-    "join_code", "late_entry_enabled", "late_entry_deadline_at", "staff_compete", "certificate_config", "event_look", "event_look_locked", "clock_start"].filter(c => !after.includes(c));
+    "join_code", "late_entry_enabled", "late_entry_deadline_at", "staff_compete", "certificate_config", "event_look", "event_look_locked", "clock_start", "leaderboard_overall", "leaderboard_percent"].filter(c => !after.includes(c));
   if (missing.length) throw new Error(`columns absent after ALTER: ${missing.join(", ")}`);
   const bad = db.prepare(
     "SELECT COUNT(*) c FROM competitions WHERE event_kind IS NULL OR event_kind NOT IN ('booth','tournament','program')"
@@ -2181,7 +2221,8 @@ try {
     "  ALTER TABLE competitions ADD COLUMN event_kind TEXT NOT NULL DEFAULT 'tournament';",
     "  (and likewise registration_field_policy, linkedin_signup_enabled, deadline_at,",
     "   time_basis, measure_presence, auto_end_on_all_solved, attempt_cap, join_code,",
-    "   late_entry_enabled, late_entry_deadline_at, staff_compete, clock_start)",
+    "   late_entry_enabled, late_entry_deadline_at, staff_compete, clock_start,",
+    "   leaderboard_overall, leaderboard_percent)",
   ].join("\n"));
   process.exit(1);
 }

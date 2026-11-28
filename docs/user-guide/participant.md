@@ -787,9 +787,15 @@ side. If you don't see it, the organizer hasn't enabled it for this event.
 
 ![Team Rankings board below the individual leaderboard](../screenshots/participant/12-team-rankings.png)
 
-With **per-session leaderboards**, you're ranked only against your own
-session and can't see the others. The organiser chooses this when creating
-the event.
+On an event with sessions, the organiser chooses how it is ranked: a winner per
+session (you are ranked against your own session, named above the board, and
+can't see the others), one overall winner (everyone together), or both (your
+session's board, and the **Overall** board below it). Each session can have its
+own questions, so your Challenges page shows only your session's. Where the
+overall board ranks by **percentages**, it ranks everyone by the share of their
+own session's points they earned, and shows the points under it; time still
+breaks a tie. A top-three place on either board earns a certificate that names
+the board, so with both you can earn two.
 
 ---
 

@@ -3232,6 +3232,11 @@ html[data-theme="light"] .rich-body pre code .hljs-deletion,html[data-theme="lig
 .rankings-group-hint,.lb-group-hint{font-size:var(--fs-13);color:var(--muted);margin:0 0 10px}
 .rankings-group-card{margin-top:16px}
 .lb-group-title{margin:0 0 4px;font-size:var(--fs-17)}
+/* Per-session question sets — the board's caption, and a percentage board's score cell. */
+.lb-board-caption{margin:0 0 12px;font-size:var(--fs-14);color:var(--text-2)}
+.lb-board-caption[hidden]{display:none}
+.lb-pct{font-variant-numeric:tabular-nums}
+.lb-pts-sub,.podium-pts-sub{color:var(--muted);font-size:var(--fs-13)}
 .group-board-icon{display:inline-flex;align-items:center;color:var(--accent2)}
 .group-board-icon svg{width:16px;height:16px}
 .group-board-meta{font-size:var(--fs-12);color:var(--muted);white-space:nowrap}
@@ -6421,6 +6426,26 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .topic-filter label{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-2)}
 .topic-filter select{max-width:min(260px, 60vw)}
 .topic-chip{display:inline-block;padding:1px 8px;border-radius:var(--r-s);font-size:var(--fs-12);font-weight:var(--fw-semibold);background:var(--surface-2);color:var(--text);border:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:8em;vertical-align:middle}
+/* Per-session question sets (owner decision, 27 Nov 2026) — the sessions a
+   question is in, on each of the open event's questions in its workspace
+   (features/task-sessions.js). A button where the viewer may change it, else
+   text. Narrowed to chosen sessions: an accent edge and accent ink, so a
+   question in every session (the default) reads quiet. 24 px is the SC 2.5.8
+   floor of a dense admin table (the accepted touch-target rulings). */
+.session-chip{display:inline-flex;align-items:center;min-height:24px;padding:1px 8px;margin:0 4px 2px 0;border-radius:var(--r-s);font-family:var(--font-text);font-size:var(--fs-12);font-weight:var(--fw-semibold);background:var(--surface-2);color:var(--text);border:1px solid var(--border);white-space:normal;text-align:left;vertical-align:middle;max-width:16em}
+.session-chip.is-narrowed{border-color:var(--accent);color:var(--accent-ink)}
+button.session-chip{cursor:pointer;transition:border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out)}
+@media(hover:hover){
+  button.session-chip:hover{background:var(--surface-2);border-color:var(--accent);color:var(--accent-ink)}
+  button.session-chip.is-narrowed:hover{background:var(--surface-2);color:var(--text)}
+}
+button.session-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(pointer:coarse),(max-width:768px){button.session-chip{min-height:44px;padding:4px 12px}}
+.tsq-modal .picker-rows{min-height:0;flex:none;display:flex;flex-direction:column;gap:6px}
+.tsq-modal .tsq-name{min-width:0;overflow-wrap:anywhere}
+.tsq-modal .tsq-why{color:var(--muted);font-size:var(--fs-12)}
+.tsq-modal .tsq-error[hidden]{display:none}
+.tsq-modal .tsq-list{border:0;padding:0;margin:0}
 .topics-card{max-width:min(560px, calc(100vw - 32px));width:100%;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto}
 .topics-add{margin:12px 0}
 .topics-add label{display:block;font-size:var(--fs-13);font-weight:var(--fw-semibold);margin-bottom:6px}

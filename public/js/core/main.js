@@ -15,13 +15,13 @@ import { _analyticsClosePicker, _analyticsParseLocalDate, _analyticsRowCharts, _
 import { _autoFillCityFromTz, leaveJoinedEvent, checkInvitation, confirmParticipantViewProfile, doLogin, doLogout, doRegister, openProfileCompletionGate, openProfileEditor, saveProfile, selectAvatar, toggleJobFunctionOther, updateProfileTimezones, signinCodeRedeem, signinCodeRestart, signinCodeResend, syncLoginEmailHint, loginCodeInstead, openSignInMethodDialog, saveSignInMethod, savePasswordPrompt, keepCodesPrompt, registerCancel, paintRegLocation, regLocationChange, paintCsrfBusy, _paintCodeCells } from "./../features/auth.js";
 import { _renderTaskFormAttachments, tfAddChoice, tfRemoveChoice, tfSetChoiceText, tfSetChoiceCorrect, tfSyncAnswerType, tfAddExtraAnswer, tfRemoveExtraAnswer, tfSetExtraAnswer, _closeAttachPicker, _deleteSavedAttachment, _deleteStagingAttachment, _openAttachPicker, _renameSavedAttachment, _renameStagingAttachment, _uploadAttachmentNow,  assignPickedTasks, challengeBulkAssignExecute, challengesBulkAssign, toggleAllChallenges, toggleChallengeSelection, closeTaskForm, closeTaskPreview, deleteAllFeedback, deleteFeedback, deleteTask, editTask, loadAdminTasks, openAddTasksToCompetition, openAssignTaskToComps, openAttemptGrant, openTaskForm, openTaskPickerForCompetition, publishTask, recalculateTaskScores, revealSealedAnswer, removeTaskFromComp, renderAdminTasks, restoreTaskVersion, saveTask, saveTaskCompAssignments, sortAdminTasks, toggleTaskDiffFilter, toggleTaskLock, toggleTaskStateFilter, toggleTaskStatusFilter, toggleTaskVisibility, updateAssignSaveBtn, updateTaskPickerCount, viewTaskAsParticipant } from "./../features/challenges-admin.js";
 import { chooseTimeslot, COMP_CATEGORY_LABEL, compDisplayCategory, handleCompetitionsNav, loadMyCompetitions, pickCompetition, renderCompetitionPicker, requestReminder, selectCompetition, setCompFilter, setCompOtherFilter, showCompetitionsPage, showPendingPageForCompetition, showTimeslotPicker, startCompDataPoll, leaveCompetition } from "./../features/competition-picker.js";
-import { closeLateEntriesNow, compareCompsForPicker, compKindSelect, openNewEventPage, openCompetitionForm, compFormDeadlineChanged, toggleNoDeadline, toggleLateEntry, toggleLateAuto, compFormLateDeadlineChanged, addCompFormSession, addCompTag, compFormDurChanged, compFormUpdateEndTime, compRegFieldChanged, deleteCompetition, editCompetition, endNow, loadAdminCompetitions, removeCompCxOne, removeCompTag, renderAdminCompetitions, renderScopeBanner, saveCompCxOne, saveCompetition, setAdminTimeslotScope, showCompetitionDelivery, sortCompetitions, startAdminCompPoll, startNow, toggleCompFilter, toggleCompKindFilter, toggleCompFormMode, toggleCxoneDisabled, updateSessionRemoveBtns } from "./../features/competitions-admin.js";
+import { closeLateEntriesNow, compareCompsForPicker, compKindSelect, openNewEventPage, openCompetitionForm, compFormDeadlineChanged, compLbModeChanged, toggleNoDeadline, toggleLateEntry, toggleLateAuto, compFormLateDeadlineChanged, addCompFormSession, addCompTag, compFormDurChanged, compFormUpdateEndTime, compRegFieldChanged, deleteCompetition, editCompetition, endNow, loadAdminCompetitions, removeCompCxOne, removeCompTag, renderAdminCompetitions, renderScopeBanner, saveCompCxOne, saveCompetition, setAdminTimeslotScope, showCompetitionDelivery, sortCompetitions, startAdminCompPoll, startNow, toggleCompFilter, toggleCompKindFilter, toggleCompFormMode, toggleCxoneDisabled, updateSessionRemoveBtns } from "./../features/competitions-admin.js";
 import { executeConflictImport, exportCompetitionActivityCsv, exportParticipants, exportParticipantsCSV, exportTasks, importParticipantsFile, importTasksFile, onConflictResChange, proceedToConflictCheck, renderImportParticipantRows, setAllConflictResolutions, toggleAllImportParticipants, toggleImportParticipant } from "./../features/export-import.js";
 import { bulkAddToGroup, createGroupDialog, deleteGroup, loadAdminGroups, manageGroupCompetitions, manageGroupMembers, renameGroupDialog, renderAdminGroups } from "./../features/groups-admin.js";
 import { _helpLoadDoc, closeHelpDrawer, openHelpDrawer } from "./../features/help-drawer.js";
 import { openReleaseNotes } from "./../features/release-notes.js";
 import { _histSort, closeHistoryDialog, loadMoreHistory, renderHistoryDialog, showCompetitionHistory, showTaskHistory, showUserHistory } from "./../features/history.js";
-import { loadLeaderboard, sortLeaderboard, sortLeaderboardGroup, sortLeaderboardLate, forgetCertHeld } from "./../features/leaderboard.js";
+import { loadLeaderboard, sortLeaderboard, sortLeaderboardGroup, sortLeaderboardLate, sortLeaderboardOverall, forgetCertHeld } from "./../features/leaderboard.js";
 import { openBadgeShare, copyBadgeLink, copyPostAndOpenLinkedIn, startProgramRetakeFlow } from "./../features/badge-share.js";
 import { exitImpersonation, impersonateParticipant, renderImpersonationBanner } from "./../features/impersonation.js";
 import { _endedPopupChannel, filterTasks, fireNavigatedAway, fitAnswerArea, handleStarKeydown, hoverStars, loadTasks, openTask, rearmOpenTask, refreshScore, renderTasks, resetStars, revealHint, setSolveFilter, submitAnswer, submitFeedback, tapChoice, tapChoiceToggled } from "./../features/participant-tasks.js";
@@ -99,6 +99,7 @@ import * as _ns84 from "./../features/task-assign.js";     // the one add-challe
 import * as _ns85 from "./../features/topics-admin.js";    // stage B — the Question bank's topics
 import * as _ns86 from "./../features/staff-teams.js";     // the staff-teams directory (Settings → People) and its two event doors
 import * as _ns87 from "./../features/marketing-admin.js"; // the Marketing page (GET /api/admin/analytics/marketing)
+import * as _ns88 from "./../features/task-sessions.js";   // per-session question sets: the workspace Questions section's Sessions choice
 import * as _ns41 from "./../features/choice-tap.js"; // v8.13.0 — the booth tap-to-answer view (CHOICE_TAP_MQ on window for tests)
 import { wirePickerFilter } from "./../ui/list-controls.js"; // v7.20.11 — the analytics pickers filter through it (it mounts its own count node)
 
@@ -123,7 +124,7 @@ function boot() {
   // showing the name and hiding it.
   initPlatformNameFit();
   // Restore the classic-script global namespace (tests + window.* handoffs).
-  Object.assign(window, _ns0, _ns1, _ns2, _ns3, _ns4, _ns5, _ns6, _ns7, _ns8, _ns9, _ns10, _ns11, _ns12, _ns13, _ns14, _ns16, _ns17, _ns18, _ns19, _ns20, _ns21, _ns22, _ns23, _ns24, _ns25, _ns26, _ns27, _ns28, _ns29, _ns30, _ns31, _ns32, _ns33, _ns35, _ns34, _ns36, _ns37, _ns38, _ns39, _ns40, _ns41, _ns42, _ns50, _ns51, _ns52, _ns53, _ns60, _ns61, _ns62, _ns63, _ns64, _ns65, _ns70, _ns72, _ns81, _ns66, _ns83, _ns84, _ns85, _ns86, _ns87);
+  Object.assign(window, _ns0, _ns1, _ns2, _ns3, _ns4, _ns5, _ns6, _ns7, _ns8, _ns9, _ns10, _ns11, _ns12, _ns13, _ns14, _ns16, _ns17, _ns18, _ns19, _ns20, _ns21, _ns22, _ns23, _ns24, _ns25, _ns26, _ns27, _ns28, _ns29, _ns30, _ns31, _ns32, _ns33, _ns35, _ns34, _ns36, _ns37, _ns38, _ns39, _ns40, _ns41, _ns42, _ns50, _ns51, _ns52, _ns53, _ns60, _ns61, _ns62, _ns63, _ns64, _ns65, _ns70, _ns72, _ns81, _ns66, _ns83, _ns84, _ns85, _ns86, _ns87, _ns88);
   // Live getters/setters mirroring the S state object onto window.
   for (const _k of Object.keys(S)) {
     if (!(_k in window)) { try { Object.defineProperty(window, _k, { get: () => S[_k], set: (v) => { S[_k] = v; }, configurable: true }); } catch (e) { console.warn('Could not expose state key on window', _k, e); } }
@@ -914,6 +915,7 @@ function boot() {
 
   registerAction('sort-leaderboard-group',     (e, el) => sortLeaderboardGroup(el.dataset.col));
   registerAction('sort-leaderboard-late',      (e, el) => sortLeaderboardLate(el.dataset.col));
+  registerAction('sort-leaderboard-overall',   (e, el) => sortLeaderboardOverall(el.dataset.col));
 
   registerAction('sort-rankings',              (e, el) => sortRankings(el.dataset.key, el.dataset.col));
 
@@ -1042,6 +1044,9 @@ function boot() {
 
   registerChange('comp-form-deadline-changed', () => compFormDeadlineChanged());
   registerChange('toggle-no-deadline',         () => toggleNoDeadline());
+  // Per-session question sets — the ranking control drives the percentages box.
+  registerChange('comp-lb-mode-changed',       () => compLbModeChanged());
+  registerAction('task-sessions',              (e, el) => _ns88.openTaskSessions(el.dataset.taskId));
   // v8.6.0 — late entries: the feature toggle shows/hides the deadline block, and
   // the Automatic toggle fills-and-disables the pair rather than blanking it.
   registerChange('toggle-late-entry',          () => toggleLateEntry());

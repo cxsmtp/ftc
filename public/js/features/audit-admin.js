@@ -218,6 +218,8 @@ export const AUDIT_ACTIVITY_LABELS = Object.freeze({
   tag_removed: "Tag removed",
   task_added: "Question added",
   task_removed: "Question removed",
+  task_sessions_carried: "Question sessions copied",
+  task_sessions_changed: "Question sessions changed",
   test_email_sent: "Test email sent",
   timeslot_added: "Session added",
   timeslot_cleared: "Session choice cleared",

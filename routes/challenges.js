@@ -36,7 +36,9 @@ const { rescoreAfterQualifyingFlip } = require("../lib/qualifying-rescore");
 const { eventTaskFor, eventTaskTarget, assignedEventTaskId, eventsHolding, resolveEventTaskParam } = require("../lib/event-copies");
 // A bank question id named in the session's event means that event's own copy, on the
 // participant's attachment download too (its siblings: routes/participant.js, the submit).
-const _resolveEventTaskForAttachment = resolveEventTaskParam(db, "taskId");
+// Per-session question sets: a question outside the session the request plays
+// downloads nothing (lib/session-tasks.js).
+const _resolveEventTaskForAttachment = [resolveEventTaskParam(db, "taskId"), require("../lib/session-tasks").requireTaskInSession(db, "taskId")];
 const { validateUrl } = require("../lib/util");
 const { validateBody } = require("../lib/validate");
 const { now } = require("../lib/time");

@@ -4258,7 +4258,14 @@ test.describe("v6.14.1 — participant leaderboard top-20 cap", () => {
         // never admitted by relaxing the scanner. `placementCertificates` is a
         // boolean about the EVENT (a dry run issues no certificates), naming no
         // population.
-        const allowedKeys = new Set(["ranking_enabled", "top3", "board", "me", "groupBoard", "lateBoard", "leaderboard_mode", "timeslot_id", "board_limit", "ended", "canShareBadge", "lateEntrantMe", "lateWindowOpen", "lateDeadline", "placementCertificates"]);
+        // Per-session question sets (owner decision, 27 Nov 2026): `ranking` (which
+        // boards the event ranks on, a fixed word), `percent` (a boolean: the main
+        // board ranks by percentages), `sessionName` (the caller's own session's
+        // name) and `overallBoard` (null here; when present the overall board under
+        // the main board's viewing rules: capped at `board_limit`, `me` resolved
+        // before the cap, no count). None names a population, and none matches
+        // `leakyNamePattern` below.
+        const allowedKeys = new Set(["ranking_enabled", "top3", "board", "me", "groupBoard", "lateBoard", "leaderboard_mode", "timeslot_id", "board_limit", "ended", "canShareBadge", "lateEntrantMe", "lateWindowOpen", "lateDeadline", "placementCertificates", "ranking", "percent", "overallBoard", "sessionName"]);
         const extraKeys = Object.keys(body).filter(k => !allowedKeys.has(k));
         expect(extraKeys, `unexpected key(s) in /api/leaderboard response: ${JSON.stringify(extraKeys)}. Any new top-level field must be evaluated for participant-count leakage.`).toEqual([]);
         // Defence-in-depth: recursively scan for any field whose NAME
@@ -4354,6 +4361,9 @@ test.describe("v6.14.1 — participant leaderboard top-20 cap", () => {
           "solveTimeMs", "allSolved", "rank", "isBenchmark",
           // group-board entry shape (routes/leaderboard.js strips memberCount)
           "type", "groupId", "name", "mine",
+          // an overall board ranking by percentages: the row's own share of its
+          // session's maximum (per-session question sets); never the maximum itself
+          "percent",
         ]);
         const offenders = [];
         const walkEntries = (arr, where) => {
@@ -4368,6 +4378,8 @@ test.describe("v6.14.1 — participant leaderboard top-20 cap", () => {
         walkEntries(body.me ? [body.me] : [], "me");
         walkEntries(body.groupBoard?.board, "groupBoard.board");
         walkEntries(body.groupBoard?.me ? [body.groupBoard.me] : [], "groupBoard.me");
+        walkEntries(body.overallBoard?.board, "overallBoard.board");
+        walkEntries(body.overallBoard?.me ? [body.overallBoard.me] : [], "overallBoard.me");
         expect(offenders,
           `unexpected key(s) on a participant leaderboard ENTRY: ${JSON.stringify(offenders)}. ` +
           `The participant board carries the public handle only — first/last name, company and ` +

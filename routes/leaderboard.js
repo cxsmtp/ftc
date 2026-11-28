@@ -5,7 +5,7 @@
 
 const db = require("../db");
 const { requireParticipant, requireCompetitionContext, requireParticipantInCompetition, requireAdmin, rateLimit } = require("../lib/middleware");
-const { buildLeaderboard, buildAdminLeaderboard, buildGroupLeaderboard, buildLateLeaderboard, ADMIN_PENALTY_FIELDS } = require("../lib/leaderboard");
+const { buildLeaderboard, buildAdminLeaderboard, buildGroupLeaderboard, buildLateLeaderboard, ADMIN_PENALTY_FIELDS, rankingChoice, rankBasis, sessionCount } = require("../lib/leaderboard");
 const { getCompetition, getTimeslot, competitionFullyEnded, isDryRunCompetition, participantAttempted } = require("../lib/competitions");
 const { eventPolicyForWire } = require("../lib/event-policy"); // v8.1.0 (PR 18)
 const { competitionDenied } = require("../lib/event-admin"); // v8.7.0
@@ -58,6 +58,7 @@ module.exports = function register(app) {
       return res.json({
         ranking_enabled: false,
         top3: [], board: [], me: null, groupBoard: null, lateBoard: null,
+        ranking: null, percent: false, overallBoard: null, sessionName: null,
         leaderboard_mode: comp.leaderboard_mode || "per_slot",
         timeslot_id: null,
         board_limit: PARTICIPANT_LEADERBOARD_BOARD_LIMIT,
@@ -118,6 +119,26 @@ module.exports = function register(app) {
     const groupBoard = _participantGroupBoard(
       buildGroupLeaderboard(compId, tsId), compId, req.session.userId, PARTICIPANT_LEADERBOARD_BOARD_LIMIT
     );
+    // PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026) — the boards this
+    // event ranks on. `ranking` names the choice ("per_session" | "overall" |
+    // "both", null for a kind without sessions); `percent` says this response's
+    // MAIN board ranks by percentages (an overall board whose event turned
+    // scores into them: each row then carries `percent`). On "both", a
+    // participant playing a session also gets the OVERALL board beside their
+    // session's, under the main board's viewing rules: capped, `me` resolved
+    // before the cap, no count. Their session's name labels the main board.
+    const _ranking = sessionCount(compId) >= 2 ? rankingChoice(comp) : null;
+    let overallBoard = null, sessionName = null;
+    if (_ranking === "both" && tsId) {
+      const _ovFull = buildLeaderboard(compId, null);
+      overallBoard = {
+        board: _ovFull.slice(0, PARTICIPANT_LEADERBOARD_BOARD_LIMIT),
+        me: _ovFull.find(u => u.userId === req.session.userId) || null,
+        board_limit: PARTICIPANT_LEADERBOARD_BOARD_LIMIT,
+        percent: rankBasis(comp, null) === "percent",
+      };
+    }
+    if (_ranking && tsId) sessionName = (getTimeslot(tsId) || {}).name || null;
     res.json({
       // v8.1.0 (PR 18) — present on BOTH branches, so a client never has to treat
       // an absent key as "probably ranked".
@@ -127,6 +148,10 @@ module.exports = function register(app) {
       me,
       groupBoard,
       lateBoard,
+      ranking: _ranking,
+      percent: rankBasis(comp, tsId) === "percent",
+      overallBoard,
+      sessionName,
       // v8.6.0 — WHY the CTA reads the way it does, so the client can say it rather
       // than infer it. A late entrant inside an open window is offered a
       // participation certificate and told when the placement one is issued; the

@@ -20,7 +20,7 @@ const { actorPermissions, handHolds } = require("../lib/rbac");
 const { originKeyFor } = require("../lib/login-code");   // the wrong-surname budgets' source
 const { eventPolicy, eventKind, EVENT_KINDS } = require("../lib/event-policy"); // v8.1.0 — certificate mode + the kind vocabulary
 const { getCompetition, competitionFullyEnded, isDryRunCompetition, participantAttempted, competitionEffectiveEnd, timeslotEffectiveEnd, lateEntryWindowOpen, lateEntryDeadline } = require("../lib/competitions");
-const { buildLeaderboard, buildLateLeaderboard, boardSlotOf, rankedBoards } = require("../lib/leaderboard");
+const { buildLeaderboard, buildLateLeaderboard, boardSlotOf, rankedBoards, rankingChoice, boardOfPlace, sessionCount } = require("../lib/leaderboard");
 const { resolveCertificateConfig, certificateTier } = require("../lib/certificate-config");
 // v8.15.1 — the automatic certificate issue and the congratulations email.
 const certificateDispatch = require("../lib/certificate-dispatch");
@@ -393,7 +393,7 @@ const _NO_STORED_IMAGE = "";
 // participant's mint route and `_autoIssueCertificate`), so the frozen facts a
 // certificate carries cannot depend on who asked for it.
 const _BADGE_INSERT_SQL =
-  "INSERT INTO achievement_badges (token, user_id, competition_id, timeslot_id, rank, image_id, nickname_snapshot, score_snapshot, name_snapshot, basis, name_match_snapshot, public_code, date_snapshot, late_entrant, created_at, grade_band, grade_permille) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+  "INSERT INTO achievement_badges (token, user_id, competition_id, timeslot_id, rank, image_id, nickname_snapshot, score_snapshot, name_snapshot, basis, name_match_snapshot, public_code, date_snapshot, late_entrant, created_at, grade_band, grade_permille, board_kind, board_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 function _badgeInsertValues({ token, userId, comp, tsId, me, nickname, placement, badgeName, basis,
   nameMatchParts, publicCode, badgeEnd, lateEntrant, ts, grade = null }) {
   return [token, userId, comp.id, tsId, me.rank, _NO_STORED_IMAGE, nickname,
@@ -417,7 +417,40 @@ function _badgeInsertValues({ token, userId, comp, tsId, me, nickname, placement
     // Program grades — the band and percentage the certificate was issued with,
     // frozen for the reason the snapshots above are. NULL for every other basis.
     grade ? grade.band : null,
-    grade ? grade.permille : null];
+    grade ? grade.permille : null,
+    // THE BOARD THE PLACE WAS ON (owner decision, 27 Nov 2026): a session (its
+    // name as it is now, frozen) or the overall board, for an event with two or
+    // more sessions; NULL for one board. Frozen for the reason `basis` is.
+    ...(() => { const b = boardOfPlace(comp, tsId); return b ? [b.kind, b.kind === "session" ? (b.name || null) : null] : [null, null]; })()];
+}
+
+/**
+ * The board a certificate's place was on, in words, from its FROZEN columns:
+ * "Overall", the session's name as minted, or null (one board, or a
+ * certificate from before boards were recorded). Printed only beside a
+ * placement (`_placeBoardLabel`): a participation certificate names no place.
+ */
+function _boardLabel(row) {
+  if (!row || !row.board_kind) return null;
+  if (row.board_kind === "overall") return "Overall";
+  if (row.board_kind === "session") return row.board_name || null;
+  return null;
+}
+function _placeBoardLabel(row) {
+  return isPlacementBasis(row && row.basis, row && row.rank) ? _boardLabel(row) : null;
+}
+/** "1st Place — Overall", "2nd Place — Session B", or the label alone. */
+function _placeLabelFor(row) {
+  const b = _placeBoardLabel(row);
+  return `${badgeBasisLabel(row.basis, row.rank)}${b ? ` — ${b}` : ""}`;
+}
+
+// THE OVERALL BOARD BESIDE THE SESSIONS ("both", owner decision 27 Nov 2026):
+// its certificates are PLACEMENTS ONLY (taking part is what the session
+// certificate says), minted as a second row with no session (`timeslot_id`
+// NULL), which the per-session uniqueness index admits beside the session one.
+function _overallBesideSessions(comp) {
+  return rankingChoice(comp) === "both" && sessionCount(comp.id) >= 2;
 }
 
 // The share image a certificate's row still names a stored copy of (one issued
@@ -608,6 +641,11 @@ function _badgeArt(row, comp) {
     // completion certificate issued before grades included), which renders as
     // it always did.
     grade: _frozenGrade(row),
+    // The board the PLACE was on (owner decision, 27 Nov 2026): "Overall" or the
+    // session's name, from the FROZEN columns; null for one board, no place, or a
+    // certificate from before boards were recorded (which then renders as it
+    // always did). Read by `buildCertificateSvg` and the public page.
+    board: _placeBoardLabel(row),
     // v8.8.20 — the printed verification code, and where to take it. Both are
     // read by `buildCertificateSvg` ALONE; `buildBadgeSvg` and the public page
     // ignore them, which is the decision recorded at that renderer. NULL on a
@@ -796,7 +834,10 @@ function _badgePayload(row, { mayReadCodes = true } = {}) {
     // From the frozen basis, as the label beside it is: a late entrant's
     // participation certificate keeps its podium rank, and is still no placing.
     placement: isPlacementBasis(row.basis, row.rank),
-    rankLabel: badgeBasisLabel(row.basis, row.rank),
+    rankLabel: _placeLabelFor(row),
+    // The board the place was on ("Overall" or a session's name, frozen at
+    // mint); absent for one board or no place.
+    ...(_placeBoardLabel(row) ? { board: _placeBoardLabel(row) } : {}),
     basis: row.basis || null,
     // v8.6.0 — so the share dialog and the certificates list can label it. FROZEN
     // at mint, so it says what the artefact says rather than what the event's
@@ -906,29 +947,37 @@ function _placementPodium(comp) {
   const heldStmt = db.prepare("SELECT 1 FROM achievement_badges WHERE competition_id=? AND user_id=? AND IFNULL(timeslot_id,'')=IFNULL(?,'') LIMIT 1");
   const userStmt = db.prepare("SELECT blocked, denied_at, approved FROM users WHERE id=?");
   const out = [];
-  for (const { timeslotId: tsId, timeslotName, late } of ranked) {
+  for (const { timeslotId: tsId, timeslotName, late, overall } of ranked) {
     const places = [];
+    // The overall board beside the sessions ranks every member, each of whom
+    // also holds a session board: there `slotOf` names their OTHER board.
+    const besideSessions = !!overall && !late && _overallBesideSessions(comp);
     for (const e of (late ? boards.late(tsId) : boards.main(tsId))) {
       if (!isPlacementRank(e.rank)) continue;
       // Ranked where the mint ranks them, or not on this board for the mint.
-      if ((slotOf.has(e.userId) ? slotOf.get(e.userId) : _badgeTimeslot(comp, e.userId)) !== tsId) continue;
+      if (!besideSessions && (slotOf.has(e.userId) ? slotOf.get(e.userId) : _badgeTimeslot(comp, e.userId)) !== tsId) continue;
       const v = _mintEligibility(e.userId, comp, tsId, { boards });
       if (!v.ok || !v.placement || !!v.lateEntrant !== late) continue;
       if (_accountNeverIssued(userStmt.get(e.userId))) continue;
       places.push({ userId: e.userId, rank: e.rank, held: !!heldStmt.get(comp.id, e.userId, tsId) });
     }
-    out.push({ timeslotId: tsId, timeslotName: tsId ? (timeslotName || null) : null, late, places });
+    out.push({ timeslotId: tsId, timeslotName: tsId ? (timeslotName || null) : null, late, ...(overall ? { overall: true } : {}), places });
   }
   return out;
 }
 
-async function _autoIssueCertificate(userId, comp, { boards = null, reissue = null } = {}) {
-  const tsId = _badgeTimeslot(comp, userId);
+async function _autoIssueCertificate(userId, comp, { boards = null, reissue = null, board = null, audit = null } = {}) {
+  // `board: "overall"` (an event ranking per session AND overall): the overall
+  // board's certificate, a placement or nothing, as a row with no session.
+  const overallBoard = board === "overall";
+  if (overallBoard && !_overallBesideSessions(comp)) return { skip: "no_overall_board" };
+  const tsId = overallBoard ? null : _badgeTimeslot(comp, userId);
   const existing = _findBadge(userId, comp.id, tsId);
   if (existing) return { row: existing, minted: false };
   if (!reissue && db.prepare(_REVOKED_SQL).get(userId, comp.id, tsId)) return { skip: "revoked" };
   const verdict = _mintEligibility(userId, comp, tsId, { fresh: true, boards });
   if (!verdict.ok) return { skip: (verdict.body && verdict.body.code) || `refused_${verdict.status}` };
+  if (overallBoard && !verdict.placement) return { skip: "no_overall_place" };
   if (verdict.lateEntrant) {
     const _effEnd = competitionEffectiveEnd(comp);
     if (lateEntryWindowOpen(comp, _effEnd, Date.now())) return { defer: lateEntryDeadline(comp, _effEnd) };
@@ -983,8 +1032,11 @@ async function _autoIssueCertificate(userId, comp, { boards = null, reissue = nu
   }
   if (!reissue) {
     try {
-      recordCompetitionEvent(comp.id, "badge_minted", "system", {
-        user_id: userId, nickname, rank: me.rank, placement, via: "automatic",
+      // `audit` (the participant's own press, minting the overall certificate
+      // beside the session one): who asked, with their request's context.
+      recordCompetitionEvent(comp.id, "badge_minted", audit ? audit.actor : "system", {
+        user_id: userId, nickname, rank: me.rank, placement, via: audit ? "participant" : "automatic",
+        ...(overallBoard ? { board: "overall" } : {}), ...(audit ? audit.details : {}),
       });
     } catch (e) {
       // audit is best-effort
@@ -1002,7 +1054,7 @@ async function _autoIssueCertificate(userId, comp, { boards = null, reissue = nu
 async function _certificatePdfFor(row, comp) {
   const art = _badgeArt(row, comp);
   const svg = buildCertificateSvg(art);
-  const pdf = await renderBadgePdf(svg, `${badgeBasisLabel(row.basis, row.rank)} — ${comp.name} — ${art.displayName}`);
+  const pdf = await renderBadgePdf(svg, `${_placeLabelFor(row)} — ${comp.name} — ${art.displayName}`);
   // A filename the participant can find later; ASCII-folded because
   // Content-Disposition filenames are not reliably Unicode across clients.
   const slug = String(comp.name).replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "certificate";
@@ -1021,7 +1073,7 @@ function _certificateFacts(row) {
   return {
     tier,
     rank: row.rank,
-    label: badgeBasisLabel(row.basis, row.rank),
+    label: _placeLabelFor(row),
     basis: row.basis || null,
     score: (isPlacementBasis(row.basis, row.rank) && Number.isFinite(row.score_snapshot)) ? row.score_snapshot : null,
     lateEntrant: !!row.late_entrant,
@@ -1029,6 +1081,11 @@ function _certificateFacts(row) {
     // Program grades (27 Nov 2026): the band and percentage it was issued with,
     // frozen; null for any other certificate.
     grade: _frozenGrade(row),
+    // The board a PLACE was on ("Overall" or the session's name, frozen), or
+    // null: one board, or no place. `boardKind` lets a list say which row is
+    // the overall board's ("overall" | "session" | null), placement or not.
+    board: _placeBoardLabel(row),
+    boardKind: row.board_kind || null,
   };
 }
 
@@ -1081,7 +1138,7 @@ function _heldCertificate(compId, userId) {
 module.exports = function register(app) {
   // v8.15.1 — the automatic issue and its PDF, handed to the dispatcher (a lib
   // module cannot require a route module).
-  certificateDispatch.setCertificateIssuer({ issue: _autoIssueCertificate, renderPdf: _certificatePdfFor, boardsFor: _eligibilityBoards, podium: _placementPodium });
+  certificateDispatch.setCertificateIssuer({ issue: _autoIssueCertificate, renderPdf: _certificatePdfFor, boardsFor: _eligibilityBoards, podium: _placementPodium, overallBeside: _overallBesideSessions });
 
   // ── Mint (or return the existing) badge for a verified top-3 finish ──────────
   app.post("/api/competitions/:id/badge", requireParticipant, rateLimit(60_000, 20, "badge-mint"), requireCompleteProfile, csrfProtection, async (req, res) => {
@@ -1130,8 +1187,27 @@ module.exports = function register(app) {
     // The revocation check deliberately stays BELOW this: `_findBadge` filters
     // `revoked_at IS NULL`, so a revoked badge can never be returned here, and
     // the re-mint refusal is what stops the holder minting a replacement.
+    // PER-SESSION QUESTION SETS — on an event ranking per session AND overall,
+    // the same press also collects the overall board's certificate when the
+    // person placed there (a second row, placement only: `_autoIssueCertificate`
+    // with `board: "overall"`, the automatic issue's own steps), answered as
+    // `also`. Asked after the session certificate's answer is settled, and only
+    // when that answer is a certificate.
+    const _withOverall = async (payload) => {
+      if (!_overallBesideSessions(comp)) return payload;
+      try {
+        const self = db.prepare("SELECT email FROM users WHERE id=?").get(userId);
+        const r = await _autoIssueCertificate(userId, comp, { board: "overall", audit: { actor: (self && self.email) || "system", details: reqContext(req) } });
+        if (r && r.row) return { ...payload, also: [_badgePayload(r.row, { mayReadCodes: _participantMayReadCodes(req) })] };
+      } catch (e) {
+        // The session certificate stands; the overall one is issued by the
+        // automatic pass (or the next press) once the renderer is back.
+        if (!(e instanceof BadgeRenderUnavailable)) throw e;
+      }
+      return payload;
+    };
     const existing = _findBadge(userId, comp.id, tsId);
-    if (existing) return res.json(_badgePayload(existing, { mayReadCodes: _participantMayReadCodes(req) }));
+    if (existing) return res.json(await _withOverall(_badgePayload(existing, { mayReadCodes: _participantMayReadCodes(req) })));
 
     // v8.1.0 (PR 27) — A REVOKED CERTIFICATE IS NOT RE-MINTABLE, and this refusal
     // is why the uniqueness index below it could safely become partial.
@@ -1264,7 +1340,7 @@ module.exports = function register(app) {
     // The notes (`name_fallback`, `salutation_dropped`) are the artwork
     // resolver's own decision, read in `_badgePayload` for this row as for a held
     // one, so the note and the picture cannot disagree.
-    res.json(_badgePayload(db.prepare("SELECT * FROM achievement_badges WHERE token=?").get(token), { mayReadCodes: _participantMayReadCodes(req) }));
+    res.json(await _withOverall(_badgePayload(db.prepare("SELECT * FROM achievement_badges WHERE token=?").get(token), { mayReadCodes: _participantMayReadCodes(req) })));
   });
 
   // ── Program grades: TRY AGAIN (owner decision, 27 Nov 2026) ─────────────────
@@ -1697,7 +1773,7 @@ module.exports = function register(app) {
         competitionId: row.competition_id,
         competitionName: row.competition_name,
         kind: (EVENT_KINDS.find(k => k.value === eventKind(comp || row)) || {}).label || null,
-        label: badgeBasisLabel(row.basis, row.rank),
+        label: _placeLabelFor(row),
         basis: row.basis || null,
         // v8.6.0 — frozen at mint, so a held certificate is labelled by what it
         // says rather than by what the event's schedule now implies.
@@ -1720,6 +1796,8 @@ module.exports = function register(app) {
         tier: _certificateFacts(row).tier,
         // Program grades — the band and percentage it was issued with (null without).
         grade: _frozenGrade(row),
+        // The board the place was on ("Overall" or a session's name), frozen; null without.
+        board: _placeBoardLabel(row),
         rank: row.rank,
         score: _certificateFacts(row).score,
         issuedAt: row.created_at,
@@ -2061,7 +2139,18 @@ module.exports = function register(app) {
     if (typeof userId !== "string" || !userId) {
       return res.status(400).json({ error: "Name the participant as { userId }.", code: "user_id_required" });
     }
-    const tsId = _badgeTimeslot(comp, userId);
+    // `board: "overall"` reissues the overall board's certificate of an event
+    // ranking per session and overall (a row with no session); absent, the
+    // participant's own board's, as before.
+    const board = req.body?.board;
+    if (board !== undefined && board !== "overall") {
+      return res.status(400).json({ error: "board must be \"overall\" or left out.", code: "board_invalid" });
+    }
+    const overallBoard = board === "overall" && _overallBesideSessions(comp);
+    if (board === "overall" && !overallBoard) {
+      return res.status(400).json({ error: "This event has no overall board beside its sessions.", code: "no_overall_board" });
+    }
+    const tsId = overallBoard ? null : _badgeTimeslot(comp, userId);
     if (_findBadge(userId, comp.id, tsId)) return res.status(409).json({ error: _HELD, code: "certificate_held" });
     const revoked = db.prepare(
       "SELECT basis, rank FROM achievement_badges WHERE user_id=? AND competition_id=? AND IFNULL(timeslot_id,'')=IFNULL(?, '') AND revoked_at IS NOT NULL ORDER BY revoked_at DESC LIMIT 1"
@@ -2070,7 +2159,7 @@ module.exports = function register(app) {
     let r;
     try {
       // The render is an await: the acting admin is re-asked inside the write.
-      r = await _autoIssueCertificate(userId, comp, { reissue: { recheck: () => adminAuthzDenied(req, { perm: "certificates.revoke" }) } });
+      r = await _autoIssueCertificate(userId, comp, { ...(overallBoard ? { board: "overall" } : {}), reissue: { recheck: () => adminAuthzDenied(req, { perm: "certificates.revoke" }) } });
     } catch (e) {
       if (e instanceof BadgeRenderUnavailable) return res.status(503).json({ error: "Certificate rendering is unavailable." });
       throw e;
@@ -2086,12 +2175,14 @@ module.exports = function register(app) {
     try {
       recordUserEvent(userId, "badge_reissued", actor, {
         competition_id: comp.id, competition_name: comp.name, basis: r.row.basis, rank: r.row.rank,
-        previous_basis: revoked.basis || null, previous_rank: revoked.rank == null ? null : revoked.rank, ...reqContext(req),
+        previous_basis: revoked.basis || null, previous_rank: revoked.rank == null ? null : revoked.rank,
+        ...(overallBoard ? { board: "overall" } : {}), ...reqContext(req),
       });
     } catch (e) { swallowed("badge:reissue-audit", e); }
     try {
       recordCompetitionEvent(comp.id, "badge_minted", actor, {
-        user_id: userId, nickname: r.nickname, rank: r.rank, placement: r.placement, via: "reissue", ...reqContext(req),
+        user_id: userId, nickname: r.nickname, rank: r.rank, placement: r.placement, via: "reissue",
+        ...(overallBoard ? { board: "overall" } : {}), ...reqContext(req),
       });
     } catch (e) { swallowed("badge:reissue-mint-audit", e); }
     // Mailed now, detached (like Resend), with the event's email switch honoured.
@@ -2312,7 +2403,7 @@ module.exports = function register(app) {
       name: art.displayName,
       nameChanged: _credentialNameChanged(parts, art.matchParts),
       basis: row.basis || null,
-      label: badgeBasisLabel(row.basis, row.rank),
+      label: _placeLabelFor(row),
       // FROZEN, so the page confirms what the paper says rather than what the
       // event's schedule now implies.
       lateEntrant: !!row.late_entrant,
@@ -2379,7 +2470,7 @@ module.exports = function register(app) {
       res.status(404).type("html").send(_badgeNotFoundHtml());
       return;
     }
-    const rankLabel = badgeBasisLabel(row.basis, row.rank);
+    const rankLabel = _placeLabelFor(row);
     const platform = getPlatformName();
     const imgAbs = `${BASE_URL}/badge/${row.token}/badge.png`;
     const pageAbs = `${BASE_URL}/badge/${row.token}`;

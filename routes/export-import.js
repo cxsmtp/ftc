@@ -604,7 +604,7 @@ app.get("/api/admin/export/competitions", requireAdmin, exportLimiter, (req, res
     // trusted_network_ips and the retired self_enroll_allow_instant (see
     // tests/competitions-drift.spec.js for the reasons).
     `SELECT id, name, start_time, duration_minutes, ended_at, ended_manually,
-            leaderboard_mode, reveal_answers_on_end, cxone_group_name,
+            leaderboard_mode, leaderboard_overall, leaderboard_percent, reveal_answers_on_end, cxone_group_name,
             self_enroll_enabled,
             group_leaderboard_enabled, cxone_disabled, staff_compete,
             created_at
@@ -628,15 +628,26 @@ app.get("/api/admin/export/competitions", requireAdmin, exportLimiter, (req, res
   }
   // Task assignments — resolve task_id → task title for portability.
   const allCT = db.prepare(
-    `SELECT ct.competition_id, t.title AS task_title, ct.assigned_at
+    `SELECT ct.competition_id, ct.task_id, t.title AS task_title, ct.assigned_at
        FROM competition_tasks ct
        JOIN tasks t ON t.id = ct.task_id`
   ).all();
+  // Per-session question sets: a question narrowed to chosen sessions carries
+  // their NAMES (the file's timeslots are named, never by id); absent, every session.
+  const slotNameById = new Map(allSlots.map(s => [s.id, s.name]));
+  const sessionsOf = new Map();
+  for (const r of db.prepare("SELECT competition_id, task_id, timeslot_id FROM competition_task_sessions").all()) {
+    const k = `${r.competition_id}|${r.task_id}`;
+    if (!sessionsOf.has(k)) sessionsOf.set(k, []);
+    sessionsOf.get(k).push(slotNameById.get(r.timeslot_id) || r.timeslot_id);
+  }
   const tasksByComp = {};
   for (const ct of allCT) {
+    const _sess = sessionsOf.get(`${ct.competition_id}|${ct.task_id}`);
     (tasksByComp[ct.competition_id] = tasksByComp[ct.competition_id] || []).push({
       task_title: ct.task_title,
       assigned_at: ct.assigned_at || null,
+      ...(_sess ? { sessions: _sess.sort() } : {}),
     });
   }
   const competitions = compRows.map(c => ({
@@ -646,6 +657,10 @@ app.get("/api/admin/export/competitions", requireAdmin, exportLimiter, (req, res
     ended_at: c.ended_at || null,
     ended_manually: !!c.ended_manually,
     leaderboard_mode: c.leaderboard_mode || "per_slot",
+    // Per-session question sets: the rest of the ranking choice (an overall
+    // board beside the sessions; percentages on the overall board).
+    leaderboard_overall: !!c.leaderboard_overall,
+    leaderboard_percent: !!c.leaderboard_percent,
     reveal_answers_on_end: !!c.reveal_answers_on_end,
     cxone_group_name: c.cxone_group_name || null,
     self_enroll_enabled: !!c.self_enroll_enabled,
@@ -810,7 +825,7 @@ app.get("/api/admin/export/competition-activity", requireAdmin, exportLimiter, (
   // the five reads see one consistent view, so an admin assigning a challenge
   // or removing a participant mid-export cannot split the file. COMMIT sits in
   // the `finally` so a throw still closes the implicit lock.
-  let participants, challenges, subRows, hintRows, navRows;
+  let participants, challenges, subRows, hintRows, navRows, taskSessions;
   db.exec("BEGIN");
   try {
     // Every ENROLLED participant, minus `staff`.
@@ -835,13 +850,15 @@ app.get("/api/admin/export/competition-activity", requireAdmin, exportLimiter, (
     const _staffCompete = require("../lib/staff-compete").staffCompeteOn(comp);
     participants = db.prepare(
       `SELECT u.id AS id, u.nickname AS nickname, u.first_name AS first_name,
-              u.last_name AS last_name, u.company AS company
+              u.last_name AS last_name, u.company AS company, cu.timeslot_id AS timeslot_id
          FROM competition_users cu
          JOIN users u ON u.id = cu.user_id
         WHERE cu.competition_id = ?
           ${_staffCompete ? "" : "AND u.id NOT IN (SELECT user_id FROM user_tags WHERE tag = 'staff')"}
         ORDER BY u.nickname COLLATE NOCASE, u.id`
     ).all(compId);
+    // Per-session question sets: the questions narrowed to chosen sessions.
+    taskSessions = require("../lib/session-tasks").taskSessionsMap(db, compId);
 
     // Every challenge ASSIGNED to the competition, including any since hidden
     // (active=0) or unpublished (restoring an old version leaves the assignment
@@ -943,6 +960,12 @@ app.get("/api/admin/export/competition-activity", requireAdmin, exportLimiter, (
   const rows = [];
   for (const p of participants) {
     for (const t of challenges) {
+      // PER-SESSION QUESTION SETS — a question outside the participant's own
+      // session was never theirs to answer, so it has no row for them (rather
+      // than an all-No row reading as a question they skipped). One with no
+      // session yet keeps every question, as the participant routes do.
+      const _in = taskSessions.get(t.id);
+      if (_in && p.timeslot_id && !_in.includes(p.timeslot_id)) continue;
       const k = cell(p.id, t.id);
       const s = subMap.get(k);
       rows.push([
@@ -1377,9 +1400,12 @@ app.get("/api/admin/competitions/:id/certificates/top3.zip", requireAdmin, expor
   // folder, or the top of the ZIP for the main board.
   const slotNames = new Map(db.prepare("SELECT id, name FROM competition_timeslots WHERE competition_id=?").all(comp.id).map(t => [t.id, t.name]));
   const folders = new Map();
-  const usedFolders = new Set(["late-entrants"]);
+  const usedFolders = new Set(["late-entrants", "overall"]);
   const folderFor = (row) => {
     if (row.late_entrant) return "late-entrants/";
+    // Per-session question sets: an event ranking per session AND overall puts
+    // the overall board's certificates in `overall/` beside the sessions' folders.
+    if (row.board_kind === "overall" && slotNames.size >= 2 && rows.some(r => r.timeslot_id)) return "overall/";
     if (!row.timeslot_id) return "";
     if (!folders.has(row.timeslot_id)) {
       const base = _slugForDownload(slotNames.get(row.timeslot_id) || `session-${String(row.timeslot_id).slice(0, 8)}`).replace(/^\.+/, "") || "session";

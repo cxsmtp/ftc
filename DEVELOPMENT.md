@@ -211,7 +211,7 @@ lib/*.js               # 85 shared backend modules — regenerate this list from
                        #   impersonation, invitation-claim, late-entry, leaderboard, lockout, log, log-sort,
                        #   countries, login-code, login-method, marketing-analytics, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
                        #   program-grade, qualifying, qualifying-rescore, query-plan, rbac, registration-fields, sanitise, scanner-classify, schema-required,
-                       #   scheduler, scoring, self-enroll, session-index, sessions, settings, smtp-settings, staff-compete, staff-teams,
+                       #   scheduler, scoring, self-enroll, session-index, session-tasks, sessions, settings, smtp-settings, staff-compete, staff-teams,
                        #   build-info, backup-status,
                        #   task-fields, team-recipient, team-report-mail, team-reports, time, topics, user-tags, util, validate, zip-writer —
                        #   required directly; one process-global singleton each

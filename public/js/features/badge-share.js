@@ -65,6 +65,12 @@ export async function openBadgeShare(compId){
     if(!r.ok){ showToast(data.error||'Could not create your badge.','error'); return; }
   }catch{ showToast('Network error creating your badge.','error'); return; }
   S._badgeShare=data;
+  // Per-session question sets: on an event ranking per session AND overall the
+  // same press also collects the overall board's certificate when they placed
+  // there (`also`); this dialog opens the session one, so the other is named.
+  if(Array.isArray(data.also)&&data.also.length){
+    showToast(`Also yours: ${data.also.map(a=>a.rankLabel).filter(Boolean).join(', ')}. It is with your certificates on this event’s Challenges page.`,'success');
+  }
   // Operator ruling, 29 Oct 2026 — the holder's ready-made LinkedIn post (the same
   // text the emailed share page shows), fetched NOW so the copy can run inside the
   // click that asks for it. A failure only withholds the button.
@@ -84,6 +90,14 @@ export async function openBadgeShare(compId){
   // entrants!". The completion test is kept here as well: a title has to be
   // true of the certificate it is over. A legacy badge (no basis) derives both
   // from the rank.
+  // "1st place overall" / "2nd place in Session B": the board a place was on
+  // rides beside the label (`board`), never lower-cased with it.
+  const _placeWords=(d)=>{
+    const b=d.board||'';
+    const full=String(d.rankLabel||'top 3'), tail=` — ${b}`;
+    const base=(b&&full.endsWith(tail)?full.slice(0,-tail.length):full).toLowerCase();
+    return b?(b==='Overall'?`${base} overall`:`${base} in ${b}`):base;
+  };
   const _completion=data.basis==='completion';
   const _placement=!_completion&&!!data.placement; // top-3 placement vs generic participation
   const label=esc(data.rankLabel||(_placement?'Top 3':'Participant'));
@@ -162,8 +176,8 @@ export async function openBadgeShare(compId){
     title:_completion?'Your certificate is ready'
       :(_placement
         ? (data.lateEntrant
-          ? `You placed ${(data.rankLabel||'top 3').toLowerCase()} among the late entrants!`
-          : `You placed ${(data.rankLabel||'top 3').toLowerCase()}!`)
+          ? `You placed ${_placeWords(data)} among the late entrants!`
+          : `You placed ${_placeWords(data)}!`)
         : 'Share your participation!'),
     message:body,
     // The share is the modal's PRIMARY button, so withholding it means collapsing

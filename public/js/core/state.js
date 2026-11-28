@@ -72,6 +72,9 @@ export const S = {
   // page sort independently of one another.
   lbLateSortCol: null,
   lbLateSortAsc: true,
+  // Per-session question sets: the overall board's own column sort.
+  lbOverallSortCol: null,
+  lbOverallSortAsc: true,
   lbInterval: null,
   // v8.6.0 — is THIS participant playing on past the event's end, inside the
   // late-entry window? Read by the header chip; refreshed by every /api/status
@@ -184,6 +187,9 @@ export const S = {
   _groupsSearchDebounce: undefined,
   _loadingCount: 0,
   adminTasksData: [],
+  // Per-session question sets: the open event's choices ({compId, offered,
+  // timeslots, tasks}) or null (features/task-sessions.js).
+  adminTaskSessions: null,
   // v7.19.0 — the multiple-choice editor's model. The DOM is a rendering of
   // this, so adding/removing a row cannot lose what was typed into the others.
   _tfChoices: [],

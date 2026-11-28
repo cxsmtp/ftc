@@ -201,6 +201,8 @@ export function formatEventChange(ev){
     case 'credential_resolved':return `Certificate checked — its code was looked up to find its holder${d.revoked===true?' (the certificate had been revoked)':''}`;
     case 'task_added':return `+ question: <strong>${esc(d.task_title||d.task_id||'')}</strong>`;
     case 'task_removed':return `− question: <strong>${esc(d.task_title||d.task_id||'')}</strong>`;
+    case 'task_sessions_changed':{const w=v=>Array.isArray(v)?v.map(esc).join(', '):esc(v||'every session');return `Sessions for <strong>${esc(d.task_title||d.task_id||'')}</strong>: ${w(d.from)} → ${w(d.to)}`;}
+    case 'task_sessions_carried':return `Question sessions copied from the source event (${esc(String(d.questions||0))} question${d.questions===1?'':'s'})`;
     case 'scores_recalculated':return `Scores recalculated: <strong>${esc(d.task_title||d.task_id||'')}</strong>${d.reason==='qualifying_tag_added'?' (now a qualifying question)':d.reason==='qualifying_tag_removed'?' (no longer a qualifying question)':d.reason==='restore'?' (a restored version)':d.reason==='import'?' (an import changed whether it is a qualifying question)':''}`;
     case 'user_added':{const via=d.via?` (via <em>${esc(d.via)}</em>)`:'';return `+ participant: <strong>${esc(d.nickname||d.user_id||'')}</strong>${via}${_lateEntrantSfx(d.late_entry)}${_freeMailSfx(d.bypassed_free_email_rule)}`;}
     case 'user_removed':return `− participant: <strong>${esc(d.nickname||d.user_id||'')}</strong>${_lateEntrantSfx(d.late_entrant)}`;

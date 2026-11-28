@@ -105,7 +105,10 @@ workspace](admin.md#the-event-workspace)).
 Inside one of your events you have the same controls an administrator has:
 
 - edit its name, schedule, timezone and duration
-- add, edit and delete its sessions
+- add, edit and delete its sessions, choose its **Ranking** (a winner per
+  session, one overall winner, or both, optionally by percentages) and which
+  questions each session asks (see
+  [Questions per session](admin.md#questions-per-session))
 - set its **Trusted network IPs**, so a room on the venue's Wi-Fi is not
   throttled; standing in the venue on its network, **Use my current address**
   fills in the venue's address (see

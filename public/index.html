@@ -473,6 +473,9 @@
         <span id="lb-live-badge" class="lb-live-pill" style="display:none"><span class="live-dot"></span>Live</span>
       </div>
       <p class="lb-help-row"><span data-help="lb.board" data-help-label="How the ranking works"></span></p>
+      <!-- Per-session question sets — which board this is (the participant's
+           session's, or the one overall board), filled by loadLeaderboard(). -->
+      <p id="lb-board-caption" class="lb-board-caption" hidden></p>
       <div id="podium-row" class="podium"></div>
       <div class="card">
         <table class="lb-table">
@@ -494,6 +497,10 @@
         </table>
       </div>
       <div id="lb-me-banner" style="margin-top:16px"></div>
+      <!-- Per-session question sets — the OVERALL board beside the session's, on
+           an event ranking per session and overall. Mounted static and empty, as
+           the boards below are. -->
+      <div id="lb-overall-section" style="display:none;margin-top:20px"></div>
       <!-- v7.11.0 — group / team rankings, shown only when the competition has groups. -->
       <div id="lb-group-section" style="display:none;margin-top:20px"></div>
       <!-- v8.6.0 — the LATE-ENTRANT section. Mounted statically and empty, exactly

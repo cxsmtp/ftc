@@ -571,6 +571,9 @@ async function _openEditor(id, mode) {
     clockExplicit: Object.prototype.hasOwnProperty.call(s, 'clock_start'),
   };
   const clock0 = (s.clock_start === 'entry' || s.clock_start === 'first_open') ? s.clock_start : _kindClockSeed(kind0);
+  // The ranking (per-session question sets): "both" is the per-session mode with
+  // an overall board beside it.
+  const lbChoice0 = s.leaderboard_mode === 'global' ? 'global' : (s.leaderboard_overall ? 'both' : 'per_slot');
   document.getElementById('tpl-editor')?.remove();
   const ov = document.createElement('div');
   ov.id = 'tpl-editor';
@@ -610,7 +613,8 @@ async function _openEditor(id, mode) {
           <p class="tpl-ed-why" data-why="time_basis" hidden></p>
           <div class="form-group tpl-ed-opt" data-opt="clock_start"><label for="tpl-ed-clock_start">Each participant's clock starts</label><select id="tpl-ed-clock_start"><option value="first_open"${clock0 === 'first_open' ? ' selected' : ''}>When they open their first question</option><option value="entry"${clock0 === 'entry' ? ' selected' : ''}>When they enter the event</option></select></div>
           <p class="tpl-ed-why" data-why="clock_start" hidden></p>
-          <div class="form-group tpl-ed-opt" data-opt="leaderboard_mode"><label for="tpl-ed-leaderboard_mode">With sessions, the board is</label><select id="tpl-ed-leaderboard_mode"><option value="per_slot"${s.leaderboard_mode !== 'global' ? ' selected' : ''}>One board per session</option><option value="global"${s.leaderboard_mode === 'global' ? ' selected' : ''}>One board across sessions</option></select></div>
+          <div class="form-group tpl-ed-opt" data-opt="leaderboard_mode"><label for="tpl-ed-leaderboard_mode">With sessions, the ranking is</label><select id="tpl-ed-leaderboard_mode"><option value="per_slot"${lbChoice0 === 'per_slot' ? ' selected' : ''}>A winner per session</option><option value="global"${lbChoice0 === 'global' ? ' selected' : ''}>One overall winner</option><option value="both"${lbChoice0 === 'both' ? ' selected' : ''}>Both: per session and overall</option></select>
+            <label class="checkbox-row"><input type="checkbox" id="tpl-ed-leaderboard_percent"${s.leaderboard_percent && lbChoice0 !== 'per_slot' ? ' checked' : ''}/> <span>Turn scores into percentages on the overall board</span></label></div>
           <p class="tpl-ed-why" data-why="leaderboard_mode" hidden></p>
         </fieldset>
         <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Questions</legend>
@@ -831,6 +835,12 @@ function _syncEditor(ov, state) {
     const note = ov.querySelector(`[data-why="${key}"]`);
     if (note) { note.textContent = why; note.hidden = !why; }
   }
+  // Percentages rank an overall board: off, and unticked, with per-session winners only.
+  const lbSel = ov.querySelector('#tpl-ed-leaderboard_mode'), lbPct = ov.querySelector('#tpl-ed-leaderboard_percent');
+  if (lbSel && lbPct && !lbSel.disabled) {
+    lbPct.disabled = lbSel.value === 'per_slot';
+    if (lbPct.disabled) lbPct.checked = false;
+  }
   const dl = ov.querySelector('#tpl-ed-duration-label');
   if (dl) dl.textContent = p.schedule === 'deadline' ? 'Open for (minutes from the start)' : 'Runs for (minutes)';
   // The live summary. It reads what the event WILL do, so a seeded setting the
@@ -876,7 +886,12 @@ function _readEditor(ov, state) {
     settings[key] = !!val(key).checked;
   }
   if (!_forbidReason('time_basis', kind) && settings.measure_presence) settings.time_basis = val('time_basis').value;
-  if (!_forbidReason('leaderboard_mode', kind)) settings.leaderboard_mode = val('leaderboard_mode').value;
+  if (!_forbidReason('leaderboard_mode', kind)) {
+    const choice = val('leaderboard_mode').value;
+    settings.leaderboard_mode = choice === 'both' ? 'per_slot' : choice;
+    settings.leaderboard_overall = choice === 'both';
+    settings.leaderboard_percent = choice !== 'per_slot' && !!val('leaderboard_percent').checked;
+  }
   if (!_forbidReason('clock_start', kind) && state.clockExplicit) settings.clock_start = val('clock_start').value;
   if (!_forbidReason('registration_fields', kind)) {
     settings.registration_fields = {};

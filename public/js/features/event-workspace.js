@@ -30,7 +30,7 @@
 import { S } from "../core/state.js";
 import { csrfHeaders, fetchJsonList, fetchJsonObject } from "../core/api.js";
 import { setSafeHtml } from "../core/trusted-types.js";
-import { esc, fmtDt, eventKindLabel, eventKindChipHtml, DRY_RUN_TAG, policyOrDefault, NO_FIXED_DEADLINE, eventEndText } from "../ui/format.js";
+import { esc, fmtDt, eventKindLabel, eventKindChipHtml, DRY_RUN_TAG, policyOrDefault, NO_FIXED_DEADLINE, eventEndText, rankingWords } from "../ui/format.js";
 import { ICO, DIFF_PTS } from "../ui/icons.js";
 import { overlayDismiss, showModal } from "../ui/modal.js";
 import { showToast } from "../ui/toast.js";
@@ -2184,7 +2184,7 @@ export function loadEventSettings() {
     row('Schedule', esc(_scheduleText(c))),
     row('Sessions', slots.length ? esc(slots.map(t => t.name).join(', ')) : 'None — one sitting'),
     row('Join link', yes(c.self_enroll_enabled) + (c.self_enroll_enabled ? ` · ${esc(_JOIN_RULE_TEXT)}` : '')),
-    pol.ranking_enabled !== false ? row('Leaderboard', esc(c.leaderboard_mode === 'global' ? 'One board across sessions' : 'Per session')) : '',
+    pol.ranking_enabled !== false && pol.sessions === 'many' ? row('Ranking', esc(rankingWords(c))) : '',
     row('Attempts per question', c.attempt_cap ? esc(String(c.attempt_cap)) : 'Unlimited'),
     pol.reveal_answers !== 'forbidden' ? row('Show answers when it ends', yes(c.reveal_answers_on_end)) : '',
     pol.group_leaderboard !== 'forbidden' ? row('Team leaderboard', yes(c.group_leaderboard_enabled)) : '',

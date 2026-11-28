@@ -549,3 +549,18 @@ export function compareTaskNumbers(a, b) {
   }
   return 0;
 }
+
+// PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026) — the ranking of a
+// Competition with sessions, in the words the event form uses: "per_session",
+// "overall" or "both" from the stored `leaderboard_mode` + `leaderboard_overall`,
+// with " · overall board by percentages" where the overall board ranks by them.
+export function rankingChoiceOf(c){
+  if(!c)return 'per_session';
+  if(c.leaderboard_mode==='global')return 'overall';
+  return c.leaderboard_overall?'both':'per_session';
+}
+export function rankingWords(c){
+  const ch=rankingChoiceOf(c);
+  const what=ch==='overall'?'One overall winner':ch==='both'?'A winner per session and overall':'A winner per session';
+  return ch!=='per_session'&&c&&c.leaderboard_percent?`${what} · overall board by percentages`:what;
+}

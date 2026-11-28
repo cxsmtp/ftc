@@ -4032,6 +4032,30 @@ paths:
                   leaderboard_mode:
                     type: string
                     enum: [global, per_slot]
+                  ranking:
+                    type: string
+                    nullable: true
+                    enum: [per_session, overall, both, null]
+                    description: "How an event with two or more sessions ranks: a winner per session, one overall winner, or both. null for an event without sessions (or with one) and on an unranked kind."
+                  percent:
+                    type: boolean
+                    description: "The main `board` ranks by percentages (each row then carries `percent`)."
+                  sessionName:
+                    type: string
+                    nullable: true
+                    description: "The caller's session's name, labelling the main board, on an event that ranks per session."
+                  overallBoard:
+                    type: object
+                    nullable: true
+                    description: "On an event ranking 'both', a participant playing a session also gets the overall board, under the main board's rules: capped at `board_limit`, `me` resolved before the cap, no count. null otherwise."
+                    properties:
+                      board: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/LeaderboardEntry' } }
+                      me:
+                        nullable: true
+                        allOf:
+                          - $ref: '#/components/schemas/LeaderboardEntry'
+                      board_limit: { type: integer, format: int32, minimum: 0, maximum: 2147483647, example: 20 }
+                      percent: { type: boolean, description: "The overall board ranks by percentages." }
                   timeslot_id:
                     type: string
                     nullable: true
@@ -4143,7 +4167,12 @@ paths:
                   withheld: { type: boolean, enum: [true], description: "Present, true, only while an admin who does not hold `certificates.lookup` views as the participant: the code, the token and every link built from it are left out." }
                   rank: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "The caller's real leaderboard rank at mint time (1-based)." }
                   placement: { type: boolean, description: "true for a placement certificate (a top-three place with points above zero); false for participation or completion." }
-                  rankLabel: { type: string, example: "1st Place", description: "'Nth Place' for a placement badge, 'Participant' for a participation badge, 'Completed' for a completion badge." }
+                  rankLabel: { type: string, example: "1st Place", description: "'Nth Place' for a placement badge, 'Participant' for a participation badge, 'Completed' for a completion badge. On an event with two or more sessions a placement names its board: '1st Place — Session A' or '1st Place — Overall'." }
+                  board: { type: string, description: "Present on a placement certificate of an event with two or more sessions: the board the place was won on (the session's name, frozen at mint, or 'Overall')." }
+                  also:
+                    type: array
+                    description: "On an event ranking a winner per session AND overall, the overall board's placement certificate this press also collected (or already held), in this same shape. Absent when there is none."
+                    items: { type: object, additionalProperties: true }
                   grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
                   name_fallback:
                     type: boolean
@@ -4840,6 +4869,8 @@ paths:
                     deadline-kind editor sends both fields on every save, and
                     start is editable while the event is upcoming.
                 leaderboard_mode: { type: string, enum: [per_slot, global], description: "Multi-slot ranking mode. 'per_slot' (default) gives each timeslot its own ranked board; 'global' merges every slot into one. Locked once any slot has started." }
+                leaderboard_overall: { type: boolean, default: false, description: "With leaderboard_mode 'per_slot' on an event with two or more sessions, also rank everyone together on an overall board ('Both'). Refused 400 `leaderboard_overall_needs_per_session` with 'global', `leaderboard_ranking_forbidden` on a kind without sessions; locked once any session starts (`leaderboard_ranking_locked`)." }
+                leaderboard_percent: { type: boolean, default: false, description: "Rank the overall board ('global', or the overall board of 'Both') by each person's score as a percentage of the most their own session's questions could earn, compared exactly; time breaks ties. Refused 400 `leaderboard_percent_needs_overall` where there is no overall board; locked once any session starts." }
                 reveal_answers_on_end:
                   type: boolean
                   default: false
@@ -5121,6 +5152,8 @@ paths:
                     deadline-kind editor sends both fields on every save, and
                     start is editable while the event is upcoming.
                 leaderboard_mode: { type: string, enum: [per_slot, global], description: "Locked once any slot has started." }
+                leaderboard_overall: { type: boolean, default: false, description: "With leaderboard_mode 'per_slot' on an event with two or more sessions, also rank everyone together on an overall board ('Both'). Refused 400 `leaderboard_overall_needs_per_session` with 'global', `leaderboard_ranking_forbidden` on a kind without sessions; locked once any session starts (`leaderboard_ranking_locked`)." }
+                leaderboard_percent: { type: boolean, default: false, description: "Rank the overall board ('global', or the overall board of 'Both') by each person's score as a percentage of the most their own session's questions could earn, compared exactly; time breaks ties. Refused 400 `leaderboard_percent_needs_overall` where there is no overall board; locked once any session starts." }
                 reveal_answers_on_end:
                   type: boolean
                   description: |
@@ -6829,6 +6862,128 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /api/admin/competitions/{id}/task-sessions:
+    get:
+      tags: [Admin - Sessions]
+      summary: Which sessions each of an event's questions is in
+      description: >-
+        The Questions section's Sessions choice. `tasks` maps a question id to
+        the ids of the sessions it is in; a question with no entry is in every
+        session (the default, and what every question of an event created before
+        the choice existed reads as). `offered` is true only where the choice can
+        be used: a kind that runs sessions, with two or more of them. Each
+        session carries its derived `status`, as a session's questions are fixed
+        once it starts. Scoped like every event read (`events.view`).
+      security: [{ sessionAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/EventNotFound' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: "The event's sessions and each question's choice."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  offered: { type: boolean, description: "True only for a kind that runs sessions, with two or more." }
+                  timeslots:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        start_time: { type: string, format: date-time }
+                        status: { type: string, enum: [upcoming, live, ended] }
+                  tasks:
+                    type: object
+                    description: "Question id → the session ids it is in. A question with no entry is in every session."
+                    additionalProperties: { type: array, items: { type: string } }
+
+  /api/admin/competitions/{id}/tasks/{taskId}/sessions:
+    put:
+      tags: [Admin - Sessions]
+      summary: Choose the sessions one of an event's questions is in
+      description: >-
+        Each session of a Competition can hold its own set of questions. A
+        participant sees, answers and finishes only the questions of their own
+        session; a question in no chosen session is in every session.
+        `timeslotIds` is a list of this event's session ids, or null for every
+        session (an empty list is refused: to take a question out of the event,
+        remove it from the event). `expectedTimeslotIds` (optional, same shape)
+        is the choice the dialog was drawn from: a change made meanwhile answers
+        409 `task_sessions_changed`. Refused 400 `task_sessions_forbidden` on a
+        kind without sessions, `task_sessions_need_two` with fewer than two
+        sessions, `task_sessions_unknown` for an id that is not this event's,
+        `task_sessions_empty`, `task_sessions_qualifying` (a Quick question is
+        asked of everyone), `task_sessions_invalid` for a wrong-typed body; and
+        409 `task_sessions_locked` when a session the change adds the question
+        to or takes it from has started. The competitor lock is asked first,
+        then scope. Recorded as the event's `task_sessions_changed` with the
+        sessions before and after by name; an unchanged choice answers
+        `changed:false` and records nothing.
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: taskId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [timeslotIds]
+              properties:
+                timeslotIds:
+                  type: array
+                  nullable: true
+                  items: { type: string }
+                  description: "This event's session ids, or null for every session."
+                expectedTimeslotIds:
+                  type: array
+                  nullable: true
+                  items: { type: string }
+                  description: "The choice the caller last read (null for every session); a different stored choice answers 409."
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "200":
+          description: "Stored (or unchanged)."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  changed: { type: boolean }
+                  timeslotIds: { type: array, nullable: true, items: { type: string } }
+        "400": { description: "`task_sessions_invalid`, `task_sessions_forbidden`, `task_sessions_need_two`, `task_sessions_unknown`, `task_sessions_empty` or `task_sessions_qualifying` (see the description)." }
+        "403":
+          description: >-
+            `competitor_cannot_edit` — the caller competes in this event (asked
+            first, binding a superadmin too); or the caller's role does not
+            reach this event.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "404": { description: "Event not found, or the question is not in this event (`task_not_in_event`)." }
+        "409": { description: "`task_sessions_locked` — a session the change touches has started; or `task_sessions_changed` — the choice changed since the caller read it." }
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
 
   /api/admin/competitions/{id}/timeslots/bulk-delete:
@@ -15898,6 +16053,10 @@ paths:
               required: [userId]
               properties:
                 userId: { type: string }
+                board:
+                  type: string
+                  enum: [overall]
+                  description: "On an event ranking a winner per session AND overall, `overall` reissues the participant's overall-board certificate; left out, the certificate of their own board. Refused 400 `board_invalid` for any other value, `no_overall_board` where the event has no overall board beside its sessions."
       responses:
         default: { $ref: '#/components/responses/UnexpectedError' }
         "500": { $ref: '#/components/responses/InternalError' }
@@ -15925,7 +16084,7 @@ paths:
                       issuedAt: { type: string, format: date-time }
                       code: { type: string, description: "The new certificate's credential code, grouped as printed. Present only for a caller holding `certificates.lookup`." }
                   emailQueued: { type: boolean }
-        "400": { description: "`user_id_required`." }
+        "400": { description: "`user_id_required`, `board_invalid` or `no_overall_board`." }
         "401": { description: Not signed in }
         "403":
           description: >-
@@ -17436,6 +17595,8 @@ paths:
                         ended_at:               { type: string, format: date-time, nullable: true }
                         ended_manually:         { type: boolean }
                         leaderboard_mode:       { type: string, enum: [global, per_slot] }
+                        leaderboard_overall:    { type: boolean }
+                        leaderboard_percent:    { type: boolean }
                         reveal_answers_on_end:  { type: boolean }
                         cxone_group_name:       { type: string, nullable: true }
                         self_enroll_enabled:    { type: boolean, description: "Whether the event's join link is live." }
@@ -19716,6 +19877,8 @@ components:
           type: string
           enum: [global, per_slot]
           description: "'global' ranks every participant together; 'per_slot' renders a separate leaderboard per session. Locked once any session starts."
+        leaderboard_overall: { type: boolean, description: "'per_slot' plus an overall board (the form's 'Both')." }
+        leaderboard_percent: { type: boolean, description: "The overall board ranks by exact percentage of each person's own maximum." }
         reveal_answers_on_end:
           type: integer
           format: int32
@@ -19938,6 +20101,8 @@ components:
       properties:
         duration_minutes: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
         leaderboard_mode: { type: string, enum: [per_slot, global] }
+        leaderboard_overall: { type: boolean }
+        leaderboard_percent: { type: boolean }
         reveal_answers_on_end: { type: boolean }
         self_enroll_enabled: { type: boolean }
         group_leaderboard_enabled: { type: boolean }
@@ -20795,6 +20960,12 @@ components:
         allSolved: { type: boolean }
         rank: { type: integer, format: int32, nullable: true, minimum: 1, maximum: 2147483647 }
         isBenchmark: { type: boolean }
+        percent:
+          type: number
+          format: double
+          minimum: -9007199254740991
+          maximum: 100
+          description: "Present only on a board that ranks by percentages: the score as a percentage of the most this person's own session's questions could earn, rounded DOWN to one decimal place for display. The ranking compares the exact fractions, never this figure. A negative score reads below 0; nothing earnable reads 0."
 
     SettingsEventRecord:
       allOf:

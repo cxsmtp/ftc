@@ -58,7 +58,10 @@ const { attemptState, outOfAttemptsTaskIds } = require("../lib/attempts"); // v8
 const { isStaff } = require("../lib/user-tags");
 const { staffCompeteOn, refuseCompetitor, competitorEventsForTask } = require("../lib/staff-compete"); // v8.12.0; refuseCompetitor v8.12.1 (the toggle's compete refusal); competitorEventsForTask v8.12.2 (the seal never opens to a competitor)
 // A bank question id named in the session's event means that event's own copy (lib/event-copies.js).
-const _resolveEventTask = require("../lib/event-copies").resolveEventTaskParam(db, "id");
+// Per-session question sets: then a question outside the session the request
+// plays answers the same 404 an unassigned one does (lib/session-tasks.js).
+const { inSessionSql } = require("../lib/session-tasks");
+const _resolveEventTask = [require("../lib/event-copies").resolveEventTaskParam(db, "id"), require("../lib/session-tasks").requireTaskInSession(db, "id")];
 const { verificationGraceState } = require("../lib/self-enroll");
 const { impersonationActor, impersonationEndedDetails, isImpersonating, actingAdminCompetesInTargetEvents, destroyImpersonationSession, restoreImpersonationTargetInactive, organiserPanelOpensTo } = require("../lib/impersonation");
 const { _capsOk, _firstNonStringField, _profileMissingFields, isValidTimezone, isFreeEmail, isValidEmailFormat, normaliseEmail, sameSlotEmails, validateUrl, _nicknameCharsOk, NICKNAME_CHARSET_ERROR, PROFILE_GATE_JOIN, PROFILE_GATE_COLUMNS, profileVersionSql, awaitDeliveryWithDeadline, MAIL_REPORT_DEADLINE_MS, profileTextControlField, profileTextControlBody } = require("../lib/util");
@@ -1896,13 +1899,16 @@ app.get("/api/tasks", requireParticipant, requireCompetitionContext, requirePart
   // (eject to the competition picker). Message-text matching is brittle.
   if (_gate) return res.status(403).json({ error: _gate.needsSlot ? "Please choose a session to view challenges." : `${sanitiseForLog(_gate.name)} has not started yet`, not_started: true, needsSlot: !!_gate.needsSlot });
   ensureTaskNumbers(compId, req.competition);
+  // Per-session question sets: the questions of the session this request plays
+  // (lib/session-tasks.js `inSessionSql`; none named: every question).
   const tasks = db.prepare(
     `SELECT t.id, t.title, t.description, t.difficulty, t.answer_type, t.active, ct.task_number
      FROM tasks t
      JOIN competition_tasks ct ON ct.task_id=t.id AND ct.competition_id=?
      WHERE ct.competition_id=? AND t.status='published' AND t.active=1
+       AND ${inSessionSql("ct.competition_id", "ct.task_id", "?")}
      ORDER BY ct.task_number, t.difficulty, t.title`
-  ).all(compId, compId).sort((a, b) => compareTaskNumbers(a.task_number, b.task_number));   // numerically, not as text; the SQL order breaks ties
+  ).all(compId, compId, req.session.timeslotId || null).sort((a, b) => compareTaskNumbers(a.task_number, b.task_number));   // numerically, not as text; the SQL order breaks ties
   const solved = db.prepare("SELECT DISTINCT task_id FROM submissions WHERE user_id=? AND competition_id=? AND is_correct=1")
     .all(req.session.userId, compId).map(r => r.task_id);
   // v7.21.0 — CATEGORIES. One batched read for the whole page rather than a

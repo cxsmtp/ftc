@@ -27,6 +27,10 @@ test.describe("v7.29.0 — competitions export/schema drift", () => {
     // decision about WHO is on the board, and an event re-created without it
     // would keep the staff it was built for off the board with nothing erroring.
     "staff_compete",
+    // The ranking of a Competition with sessions (owner decision, 27 Nov 2026):
+    // exported beside `leaderboard_mode`, whose meaning they complete (per
+    // session, overall or both, and percentages on the overall board).
+    "leaderboard_overall", "leaderboard_percent",
   ]);
   const EXCLUDED = new Map([
     // v7.29.0 — the event-kind columns. EXPORTED once the kinds are reachable and

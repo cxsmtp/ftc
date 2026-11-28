@@ -299,7 +299,8 @@ From here you can:
 - **Top 3** — on an ended, ranked event, this button beside **Open**
   downloads a ZIP of the issued 1st, 2nd and 3rd place certificates (a top-three
   place earns one only with points above zero) of every leaderboard the event has: one top three per session when each session is
-  ranked on its own (each session's files in a folder named after it), and the
+  ranked on its own (each session's files in a folder named after it), the
+  overall board's in `overall` when the event ranks both, and the
   late entrants' own top three beside the main one (in `late-entrants`). Each
   file is named after its place and its holder, as the certificate prints the
   name (for example `1-josé-garcía-certificate.pdf`), so you can tell whose it
@@ -871,7 +872,9 @@ are competing in.
 
 An event's **Certificates** section lists every certificate it has issued —
 holder (named as the certificate prints the name, which is also what the
-downloads are called), which certificate (1st, 2nd, 3rd place, participation or completion),
+downloads are called), which certificate (1st, 2nd, 3rd place, participation or completion;
+on an event with two or more sessions a place names its board, such as *1st
+Place — Session A* or *1st Place — Overall*, and the certificate prints it),
 score and whether the holder has been emailed it — with
 **PDF** and **PNG** downloads and **Re-send** for the email (one holder at a time,
 and it works with the congratulations email switched off; a delivery cut short
@@ -998,12 +1001,12 @@ a qualifying question (an **Any answer** question) can never be sealed, so such
 an event asks none.
 
 **The form carries only the settings the type you picked can actually use.** A
-Program has no Schedule toggle and no Leaderboard Mode, because it has no
+Program has no Schedule toggle and no Ranking choice, because it has no
 sessions; a Booth Event has no *Record time on platform*, because its window is
 too short for the measurement to say anything. This is not the form hiding
 things from you — those settings do not exist for that type, and the server
 refuses almost all of them if something else tries to set them. Two are simply
-inert rather than refused — Leaderboard Mode on a type with no sessions, and the
+inert rather than refused — the ranking mode on a type with no sessions, and the
 tie-break basis on a Program — because there are no sessions to rank against
 each other and no placings to break ties for.
 
@@ -1017,7 +1020,7 @@ Here is the whole matrix, so you know what to expect before you click:
 | **Schedule** toggle (single / multiple sessions) | — | ● | — |
 | **Duration** (the end is shown beneath) | ● | ● | — |
 | **Deadline** (with *No fixed deadline*) | — | — | ● |
-| **Leaderboard Mode** (per session / global) | — | ● | — |
+| **Ranking** (per session / overall / both, and percentages) | — | ● | — |
 | **Reveal correct answers** when it ends | ● | ● | — |
 | **Group (team) leaderboard** | ● | ● | — |
 | **Record time on platform** | — | ● | ● |
@@ -1035,7 +1038,7 @@ Why the gaps are where they are:
 
 - **Sessions** — only a Competition has them. A Booth Event is one room for one
   afternoon; a Program is rolling enrolment against a deadline. Since neither has
-  sessions, neither has a **Leaderboard Mode** either: that setting decides how
+  sessions, neither has a **Ranking** choice either: that setting decides how
   sessions are ranked against each other, and with no sessions it names nothing.
 - **Duration vs deadline** — a Booth Event and a Competition run for a *length of
   time* from their start. A Program runs *until a date*, so it asks for a
@@ -1085,15 +1088,24 @@ Why the gaps are where they are:
   Checkmarx One account minted for every attendee. Untick it if yours does.
 
 For a multi-session Competition, add sessions with **+ Add Session** — each has
-its own name, start time, timezone and duration — and choose a **Leaderboard
-Mode**:
+its own name, start time, timezone and duration — and choose its **Ranking**:
 
-- **Per Session** — each session ranked independently.
-- **Global** — everyone competes on one combined leaderboard.
+- **A winner per session** — each session ranked on its own board.
+- **One overall winner** — everyone ranked together on one board.
+- **Both: a winner per session and overall** — each session's board, and an
+  overall board beside them.
+
+The overall board ranks by score, and time breaks a tie. Because each session can
+hold its own questions (see [Questions per session](#questions-per-session)), a
+session with more or harder questions has more points on offer; tick **Rank the
+overall board by percentages** to rank everyone by the share of their own
+session's points they earned instead (a wrong answer or a hint still counts
+against it, and two percentages are compared exactly, never as the rounded figure
+shown). The box is offered only where there is an overall board.
 
 ![New Competition — multiple sessions](../screenshots/admin/20-competition-create-multi.png)
 
-The leaderboard mode locks once any session starts.
+The ranking and the percentages box lock once any session starts.
 
 **Editing uses the same form.** Opening an existing event goes straight to it,
 with **Advanced settings** open and, again, only the settings the event's type
@@ -1970,6 +1982,30 @@ immediately.
 > **Select all shown** and **Unselect all shown** apply to the questions
 > currently *visible*, which is what the labels say. With a filter active they
 > leave everything hidden by that filter exactly as it was.
+
+#### Questions per session
+
+On a Competition with two or more sessions, each session can hold its own set
+of questions. In the event's **Questions** section every question of the event
+shows a **Sessions** chip (**All sessions**, or the sessions it is in); press it
+to tick the sessions that ask it, then **Save**. A participant sees, answers and
+finishes only their own session's questions, so an all-solved early end, a
+participant's finish time and a percentage ranking all count their own session's
+set. A question in no chosen session is in every session, which is also how every
+question starts. Three rules hold it steady:
+
+- **A session's questions are fixed once it starts**, so everyone in it answers
+  the same set: the box of a session that has started is greyed out, with the
+  reason.
+- **Quick (qualifying) questions stay in every session**: they are asked of
+  everyone.
+- **A question must be in at least one session.** To take it out of the event,
+  remove it from the event.
+
+Each change is recorded on the event's History. Deleting a session a question was
+chosen for leaves it in the sessions still chosen; if none is left it is back in
+every session. Cloning an event keeps each question's sessions, matched by the
+sessions' order; a template does not record them.
 
 Three things the dialog will not let you do, and tells you why rather than
 failing at Save:
@@ -3991,8 +4027,11 @@ event, side by side.
 
 ![Rankings tab](../screenshots/admin/05-rankings.png)
 
-**Global** mode is one ranking for everyone regardless of session;
-**per-session** shows separate rankings side by side. Staff users are
+**One overall winner** is one ranking for everyone regardless of session; **a
+winner per session** shows separate rankings side by side; **both** adds the
+**Overall** board beside the sessions' boards. Where the overall board ranks by
+percentages, each row shows the percentage and, under it, the points out of the
+most that person's session offered. Staff users are
 excluded — unless the event lets staff compete, in which case the staff enrolled
 in it are ranked like anyone else (see [Letting staff
 compete](#letting-staff-compete)); benchmark users appear in a separate section.

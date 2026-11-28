@@ -2190,6 +2190,26 @@
       "note": "Challenge library → a row's ⋯ → Grant Attempts. Fixture adCapped: a live event holding a challenge with an attempt limit of 3 and two enrolled participants."
     },
     {
+      "screen": "task-sessions-dialog",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#task-sessions-overlay",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture wsSessions ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search {{wsSessions.name}} ; click #admin-comp-body tr:has-text('{{wsSessions.name}}') td:nth-child(1) ; waitFor #ws-record ; section admin-tasks-tab ; waitFor #admin-task-body .session-chip.is-narrowed ; click #admin-task-body .session-chip.is-narrowed ; waitFor #task-sessions-overlay .tsq-box",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/task-sessions.js",
+          "grep": null
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.session-chip|\\.tsq-|\\.picker-(overlay|modal|modal-flow|modal-head|modal-foot|rows|row|note)\\b"
+        }
+      },
+      "note": "Per-session question sets: an event workspace's Questions section → a question's Sessions chip → the Sessions dialog. Fixture wsSessions: an upcoming Competition with two sessions, one of its three questions in the evening session only."
+    },
+    {
       "screen": "table-insert-dialog",
       "status": "pending",
       "route": "/",
