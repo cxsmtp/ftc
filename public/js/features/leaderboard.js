@@ -557,12 +557,20 @@ export async function loadLeaderboard(opts){
         // nickname for a name its fonts cannot draw.
         const _cu = S.currentUser || {};
         const _who = (_held && _held.name) || _cu.certificate_printed_name || _cu.nickname || '';
+        // A BOARD RANKED BY PERCENTAGES (owner decision, 28 Nov 2026: "just show
+        // level"): before a certificate is held the card names only the level
+        // the mint would issue ("1st Place — Overall", "Participant"), with no
+        // score figure at all: neither the live points, which the board did not
+        // rank on, nor a percentage. Once one is held the card shows what that
+        // certificate holds (its frozen scoreLabel). A points board is unchanged.
+        const _levelOnly = !_held && _lb.percent === true;
+        const _levelWords = _isTop3 ? `${_ord} Place${_lb.ranking === 'overall' ? ' — Overall' : ''}` : 'Participant';
         const _thumb = `<div class="lb-cert-thumb${_isTop3 ? ` is-p${_place}` : ''}" data-look="signature" data-theme="dark" aria-hidden="true">
-            <span class="lb-cert-t">${_held && _held.label ? esc(_held.label) : (_isTop3 ? `Certificate of achievement · ${_ord} place` : 'Certificate of participation')}</span>
+            <span class="lb-cert-t">${_held && _held.label ? esc(_held.label) : _levelOnly ? esc(_levelWords) : (_isTop3 ? `Certificate of achievement · ${_ord} place` : 'Certificate of participation')}</span>
             <span class="lb-cert-rule"><i></i></span>
             <span class="lb-cert-n">${esc(_who)}</span>
             <span class="lb-cert-e">${_compName}</span>
-            <span class="lb-cert-g">${_held && _held.scoreLabel ? esc(_held.scoreLabel) : `${esc(String(_held && _held.score != null ? _held.score : _ctaMe.score))} pts`}${_held && _held.dateLabel ? ` · ${esc(_held.dateLabel)}` : ''}</span>
+            ${_levelOnly ? '' : `<span class="lb-cert-g">${_held && _held.scoreLabel ? esc(_held.scoreLabel) : `${esc(String(_held && _held.score != null ? _held.score : _ctaMe.score))} pts`}${_held && _held.dateLabel ? ` · ${esc(_held.dateLabel)}` : ''}</span>`}
             <span class="lb-cert-med"></span>
           </div>`;
         const _shareLabel = _codesHidden ? (_held ? 'View certificate' : 'Generate certificate')
@@ -590,7 +598,7 @@ export async function loadLeaderboard(opts){
                  _held.emailedAt ? `Emailed to you on ${esc(fmtDt(new Date(_held.emailedAt), 'short'))}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
             <div class="lb-cert-kpis">
               ${(!_lateOpenCta && !lateEntrantMe) ? `<div><span class="eyebrow">Rank</span><b class="bignum">${esc(String(_ctaMe.rank))}</b></div>` : ''}
-              <div><span class="eyebrow">Points</span><b class="bignum">${esc(String(_ctaMe.score))}</b></div>
+              ${_levelOnly ? '' : `<div><span class="eyebrow">Points</span><b class="bignum">${esc(String(_ctaMe.score))}</b></div>`}
               ${_ctaMe.solveTimeMs != null ? `<div><span class="eyebrow">Time</span><b class="bignum">${esc(_keepUnits(lbSolveTime(_ctaMe.solveTimeMs)))}</b></div>` : ''}
             </div>
           </div>`);

@@ -10845,7 +10845,9 @@ test.describe("Docs hygiene", () => {
     const fn = _f2Block(reaper, fnHdr, "function deleteUserCascade(");
     const txnHdr = fn.search(/const\s+txn\s*=\s*db\.transaction\(\s*\(\)\s*=>\s*\{/);
     const txnBody = _f2Block(fn, txnHdr, "const txn = db.transaction(() => {");
-    const callAt = fn.search(/\n\s*txn\(\)\s*;/);
+    // The call, bare or through the audit mirror buffer (the transaction records
+    // staff-team removals, so CLAUDE.md's mirror rule wraps it): both commit here.
+    const callAt = fn.search(/\n\s*(?:runTxnWithMirrorBuffer\(\s*\(\)\s*=>\s*txn\(\)\s*\)|txn\(\))\s*;/);
     const stampAt = txnBody.search(/=\s*stampDeletionForUser\(\s*db\s*,\s*userId\s*,/);
     const usersAt = txnBody.search(/DELETE FROM users WHERE id\s*=\s*\?/);
     const kicks = [...fn.matchAll(/\bscheduleRealmWithdrawal\s*\(/g)].map(m => m.index);

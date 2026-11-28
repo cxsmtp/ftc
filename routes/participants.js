@@ -3818,7 +3818,7 @@ app.delete("/api/admin/participants/:id", requireAdmin, requireSuperAdmin, destr
   // (`cxone_accounts_unrecorded`: removed in the tenant by hand), and set-up
   // records that cannot be read (`cxone_records_unreadable`: someone checks the
   // tenant). Each only when non-zero, counts only. The reaper records the same.
-  const { purgedSessions, cxoneCounts: _cxoneCounts } = deleteUserCascade(req.params.id);
+  const { purgedSessions, cxoneCounts: _cxoneCounts, staffTeamMembershipsRemoved: _staffRemoved } = deleteUserCascade(req.params.id, { actor: adminId, context: reqContext(req) });
   recordOrphanedAuditEvent("user", user.id, "deleted", adminId, {
     email: user.email,
     nickname: user.nickname,
@@ -3829,6 +3829,8 @@ app.delete("/api/admin/participants/:id", requireAdmin, requireSuperAdmin, destr
     cascaded: counts,
     purged_sessions: purgedSessions,
     ..._cxoneCounts,
+    // Owner decision, 28 Nov 2026: its primary address left every staff team.
+    ...(_staffRemoved ? { staff_team_memberships_removed: _staffRemoved } : {}),
     ...reqContext(req),
   });
   res.json({ ok: true, ..._cxoneCounts });

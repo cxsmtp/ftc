@@ -4750,7 +4750,10 @@ manager…). Choose a team in the list to see its members. **New team**, **Renam
 the teams but not change them reads them only. Where your role may see people,
 an **Account** column says whether the address signs in here: only those
 members can be made organisers. Members are a list of people, not accounts, and
-changing a team later changes no event it was added to. An event's **Team &
+changing a team later changes no event it was added to. Deleting an account
+removes its address from every team (each removal is recorded on the Audit
+page, naming the team and the address's domain); another member of the same
+team stays. An event's **Team &
 reports** can add a whole team, and its Overview's **Organisers** card can make a
 whole team its organisers.
 

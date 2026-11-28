@@ -708,7 +708,8 @@ still running. You get two choices:
 
 Deleting a participant removes everything attached to them in one
 all-or-nothing operation — memberships, submissions, revealed hints,
-question ratings, reminders, and tags — though an audit line still goes to
+question ratings, reminders, and tags, and their address in every staff team
+(**Settings → Staff teams**; recorded per team) — though an audit line still goes to
 Logs so the deletion stays traceable. Regular admins don't see this option.
 A superadmin also can't delete — or demote — **their own** account: the role
 actions aren't offered on your own row, and the platform refuses a

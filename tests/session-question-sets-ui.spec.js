@@ -15,7 +15,7 @@ const { test, expect } = require("./isolated-test");
 const { BASE, codeLogin, settleFiniteAnimations } = require("./helpers");
 const { adminLogin, openEventEdit, viewComp, clickTab, AxeBuilder, AXE_GATED_IMPACTS } = require("./ui-admin-helpers");
 const { H, uniq, sa, makeParticipant, enrol, participantCtx, submit, rawAll } = require("./late-entry-fixture");
-const { addQuestion, sessionEvent, setSessions, goLive, chooseSession } = require("./session-sets-fixture");
+const { addQuestion, sessionEvent, setSessions, goLive, chooseSession, endAll } = require("./session-sets-fixture");
 
 test.use({ baseURL: BASE });
 
@@ -198,4 +198,72 @@ test.describe("the participant's leaderboard", () => {
       expect(await scan(page, "#leaderboard-page"), "the leaderboard passes axe").toEqual([]);
     });
   }
+});
+
+// THE CERTIFICATE CARD BEFORE ISSUE on a board ranked by percentages (owner
+// decision, 28 Nov 2026: "just show level"): it names the level the mint would
+// issue and draws NO score figure, neither the live points nor a percentage.
+// CONTROL: on a points board the card still shows the points.
+test.describe("the leaderboard's certificate card before issue", () => {
+  async function endedFor(create, nickTag) {
+    const { api, csrf } = await sa();
+    const ctxs = [];
+    try {
+      const ev = await sessionEvent(api, csrf, { create });
+      const [A, B] = ev.slots;
+      const qa = await addQuestion(api, csrf, ev.comp.id, { difficulty: "easy" });
+      const qb = await addQuestion(api, csrf, ev.comp.id, { difficulty: "hard" });
+      expect((await setSessions(api, csrf, ev.comp.id, qa, [A.id])).ok()).toBeTruthy();
+      expect((await setSessions(api, csrf, ev.comp.id, qb, [B.id])).ok()).toBeTruthy();
+      await goLive(ev.comp.id, [A.id, B.id]);
+      const p = await makeParticipant(api, csrf, `${nickTag}${uniq()}`);
+      await enrol(api, csrf, ev.comp.id, p.id);
+      const c = await participantCtx(p.email, ev.comp.id);
+      ctxs.push(c);
+      await chooseSession(c, A.id);
+      expect((await (await submit(c.api, c.csrf, qa)).json()).correct).toBe(true);
+      await endAll(ev.comp.id);
+      return { ev, p };
+    } finally { for (const c of ctxs) await c.api.dispose(); await api.dispose(); }
+  }
+  async function openCard(page, p, compId) {
+    const { csrfToken } = await (await page.request.get("/api/csrf-token")).json();
+    expect((await codeLogin(page.request, p.email, H(csrfToken))).ok()).toBeTruthy();
+    const tok = H((await (await page.request.get("/api/csrf-token")).json()).csrfToken);
+    expect((await page.request.post("/api/select-competition", { headers: tok, data: { competitionId: compId } })).ok()).toBeTruthy();
+    // The "event ended" popup would cover the board: dismissed, as a participant would.
+    expect((await page.request.post("/api/dismiss-ended", { headers: tok })).ok()).toBeTruthy();
+    await page.goto("/");
+    await page.locator("#nav-leaderboard:not([aria-disabled=true])").waitFor({ state: "visible", timeout: 20000 });
+    await page.locator("#nav-leaderboard").click();
+    const card = page.locator("#lb-badge-cta");
+    await expect(card.locator('[data-action="open-badge-share"]'), "PRECONDITION: the card offers the certificate, none held").toHaveText(/Get my certificate/);
+    return card;
+  }
+  for (const width of [1440, 390]) {
+    test(`a percentage board's card names the level and draws no score (${width} px)`, async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize({ width, height: 900 });
+      const { ev, p } = await endedFor({ leaderboard_mode: "global", leaderboard_percent: true }, "lvl");
+      const card = await openCard(page, p, ev.comp.id);
+      await expect(card.locator(".lb-cert-t"), "the level the mint would issue").toHaveText("1st Place — Overall");
+      await expect(card.locator(".lb-cert-g"), "no score line on the rendition").toHaveCount(0);
+      const text = await card.evaluate(el => el.textContent);
+      expect(text, "no points figure anywhere on the card").not.toMatch(/\bpts\b|Points|\d+(\.\d+)?%/);
+      await expect(card.locator(".lb-cert-kpis .eyebrow")).not.toContainText(["Points"]);
+      // Geometry: the rendition still holds its name line, drawn and on screen.
+      const box = await card.locator(".lb-cert-n").boundingBox();
+      expect(box && box.width > 0 && box.height > 0, "the name is drawn").toBe(true);
+      expect(await scan(page, "#lb-badge-cta"), "the card passes axe").toEqual([]);
+      await noSidewaysScroll(page, "the leaderboard");
+    });
+  }
+  test("CONTROL: a points board's card still shows the points (1440 px)", async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const { ev, p } = await endedFor({ leaderboard_mode: "per_slot" }, "pts");
+    const card = await openCard(page, p, ev.comp.id);
+    await expect(card.locator(".lb-cert-g"), "the rendition's score line").toContainText("50 pts");
+    await expect(card.locator(".lb-cert-kpis")).toContainText("Points");
+  });
 });

@@ -3692,6 +3692,10 @@ db.exec(`
     UNIQUE (team_id, email)
   );
   CREATE INDEX IF NOT EXISTS idx_staff_team_members_team ON staff_team_members(team_id);
+  -- By address alone (the column is NOCASE): deleting an account removes its
+  -- primary address from every team (lib/account-reaper.js), an index search,
+  -- never a scan of every team's members.
+  CREATE INDEX IF NOT EXISTS idx_staff_team_members_email ON staff_team_members(email);
 `);
 
 // ── Prepared-statement memo (installed AFTER every migration above) ──────────
