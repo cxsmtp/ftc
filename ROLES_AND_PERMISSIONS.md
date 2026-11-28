@@ -93,6 +93,7 @@ non-grantable gives nothing and was removed at boot).
 | `certificates.lookup` | Look up a certificate by its code, see each certificate's code in an event's certificate list, and see a participant's certificate code, link and downloads while viewing as them |  |  | ✓ | superadmin only |
 | `leaderboard.view` | See live rankings | ✓ | ✓ | ✓ | yes |
 | `analytics.view` | See analytics | ✓ | ✓ | ✓ | yes |
+| `analytics.marketing` | See marketing analytics across every event: the **Marketing** page (`GET /api/admin/analytics/marketing`), which adds up every event's people, certificates and leads (owner request, 28 Nov 2026). Platform-wide, so a role scoped to its events cannot hold it |  | ✓ | ✓ | yes (a role acting on every event only) |
 | `audit.view` | See the audit trail (each kind of row also needs the permission that guards it elsewhere: see §1b) | ✓ | ✓ | ✓ | yes |
 | `audit.raw_logs` | See the raw request and application logs |  | ✓ | ✓ | yes |
 | `export.data` | Export event, participant and question data | ✓ | ✓ | ✓ | yes |
@@ -168,7 +169,7 @@ gets a privileged account's note, profile and History only, as on People.
 
 **A platform-wide permission needs a role that acts on every event.** Its routes
 reach beyond any one event, so nothing narrows them to a role's events: some read
-about EVERY event (`audit.raw_logs`, `ops.alerts`, `export.platform`,
+about EVERY event (`audit.raw_logs`, `ops.alerts`, `export.platform`, `analytics.marketing`,
 `export.settings`, `settings.view`, `ops.metrics`, `ops.retention_view`,
 `ops.email`), some change what every event shares (`settings.edit`,
 `templates.manage`, `certificates.design` — both design layers are global admins'
@@ -489,6 +490,7 @@ route's own tier guard.
 | `GET /api/admin/alerts` | **forbidden** | Operational alerts cover the whole platform. To allow a venue's network, edit Trusted network IPs on your own event. |
 | `POST /api/admin/alerts/:id/ack` | **forbidden** | Operational alerts cover the whole platform, so they are not available to event admins. |
 | `GET /api/admin/analytics/challenges` | **scoped** |  |
+| `GET /api/admin/analytics/marketing` | **forbidden** | Marketing analytics cover every event on the platform, so only an administrator can open them. Analytics for your own events are on each event's Analytics tab. |
 | `POST /api/admin/attachment-staging` | open |  |
 | `DELETE /api/admin/attachment-staging/:id` | open |  |
 | `PATCH /api/admin/attachment-staging/:id` | open |  |
@@ -685,6 +687,7 @@ route's own tier guard.
 | **Submissions** | An event's **Activity** section: that event's. Across all their events, the **Audit** page (its submission and hint rows). |
 | **Rankings** | An event's **Rankings** section: that event, or the session picked. **Live rankings**: the live events they can see. |
 | **Analytics** | Their events and sessions, their challenges, their groups, their participants. **No platform-wide scope.** Tag vocabularies list only tags on participants they can see. |
+| **Marketing** | Hidden: it adds up every event on the platform (`analytics.marketing`, which an event admin never holds; 403 `event_admin_forbidden`). |
 | **Logs** | Hidden. |
 | **Settings** | Hidden. |
 | **Participant view** | The events they are **enrolled** in — which is unrelated to the events they administer. Being an event admin grants no participant membership anywhere. The switch is **two-way**, as it is for every other admin tier: **Admin View** returns them to the panel, and the admin session is unaffected. **One section, not two (v8.12.0).** A `staff`-**tagged** user's picker is split into *Your Events* — the events they hold a row on — and *All other events*, everything they may merely enter as staff, because the tag admits them to every event without a row and the two lists mean different things (§9.8). An event admin is not tagged and is admitted nowhere without a row, so their picker keeps a **single enrolment-only section**. When they are enrolled in an event whose **Staff can compete** switch is on, they compete on it like anybody else — but the **Competing** badge is rendered only on a `staff`-**tagged** user's own rows (the picker keys it on the tag, `S.isUserStaff`), so an event admin's card carries no marker: the row is on the board and the wire says `competing: true`, and the picker does not say so. The same tag gate covers the *Compete in this event?* confirmation the join link shows a staff member before enrolling them — an untagged event admin never sees it. |

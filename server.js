@@ -4795,6 +4795,8 @@ require("./routes/event-overview")(app);
 require("./routes/event-team")(app);
 // The staff-teams directory (routes/staff-teams.js; lib/staff-teams.js).
 require("./routes/staff-teams")(app);
+// Marketing analytics: the platform's success figures across events (routes/marketing-analytics.js; lib/marketing-analytics.js).
+require("./routes/marketing-analytics")(app);
 
 // Reminder email sender — runs every 30 seconds.
 //

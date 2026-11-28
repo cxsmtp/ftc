@@ -544,6 +544,7 @@
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-tasks-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Question bank</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-rankings-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Live rankings</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-analytics-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Analytics</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-marketing-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Marketing</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-audit-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Audit</span></button></li>
         </ul>
         <p class="admin-nav-section" aria-hidden="true" data-nav-group="participants">Participants</p>
@@ -1651,6 +1652,65 @@
           <div class="pagination" id="analytics-pagination"></div>
           </div>
           <p id="analytics-empty" style="display:none;color:var(--muted);text-align:center;padding:24px 0">No question activity in the selected window.</p>
+        </div>
+      </div>
+      <!-- Marketing (features/marketing-admin.js; GET /api/admin/analytics/marketing):
+           the platform's success figures across events. The filter bar is static,
+           a SIBLING of #mk-body and the table body, which each answer re-renders. -->
+      <div id="admin-marketing-tab" style="display:none">
+        <div class="help-label-row"><h2 class="admin-pane-title">Marketing</h2><span data-help="marketing.page" data-help-label="Marketing"></span></div>
+        <p class="mk-lede">How the platform is doing across events, counted from what it recorded: each figure says what it counts and out of what. Nothing here is an estimate.</p>
+        <div class="card mk-filterbar" id="mk-filterbar">
+          <div class="mk-filter-row">
+            <div class="mk-field">
+              <div class="help-label-row"><label for="mk-preset">Events that started</label><span data-help="marketing.range" data-help-label="Range"></span></div>
+              <select id="mk-preset" data-change-action="mk-preset">
+                <option value="30d">In the last 30 days</option>
+                <option value="90d" selected>In the last 90 days</option>
+                <option value="365d">In the last 12 months</option>
+                <option value="ytd">This year</option>
+                <option value="all">At any time</option>
+                <option value="custom">Between two dates</option>
+              </select>
+            </div>
+            <div class="mk-custom" id="mk-custom" hidden>
+              <div class="mk-field"><label for="mk-from">From</label><input type="date" id="mk-from" data-change-action="mk-date"/></div>
+              <div class="mk-field"><label for="mk-to">To (included)</label><input type="date" id="mk-to" data-change-action="mk-date"/></div>
+            </div>
+            <fieldset class="mk-field mk-kinds-field"><legend>Event types (none ticked: every type)</legend><div class="mk-kinds" id="mk-kinds"></div></fieldset>
+          </div>
+          <details class="mk-events-pick" id="mk-events-pick"><summary id="mk-events-summary">Events: all in the range</summary><div id="mk-events-list"></div></details>
+          <p class="mk-status" id="mk-status" role="status"></p>
+        </div>
+        <div id="mk-body"></div>
+        <!-- The heading, then the table component's bar (Columns, Sort & filter),
+             then the table: the bar is inserted before the table's own
+             .table-card host, which sits INSIDE this card. -->
+        <div class="card mk-table-card" id="mk-table-card" hidden>
+          <div class="mk-table-head">
+            <div class="help-label-row"><h3>Per event</h3><span data-help="marketing.per-event" data-help-label="Per event"></span></div>
+            <span id="mk-table-meta" class="mk-table-meta"></span>
+            <button class="btn sm secondary" id="mk-export-csv-btn" data-action="mk-export-csv">Export CSV</button>
+          </div>
+          <div class="table-card mk-table-host">
+          <table id="mk-table" class="dense" data-tcols="marketing">
+            <thead>
+              <tr>
+                <th scope="col" data-tcol="name">Event</th>
+                <th scope="col" data-tcol="kind">Type</th>
+                <th scope="col" data-tcol="start">Started</th>
+                <th scope="col" data-tcol="joined" class="num-cell">Joined</th>
+                <th scope="col" data-tcol="played" class="num-cell">Played</th>
+                <th scope="col" data-tcol="solve_rate" class="num-cell">Solve rate</th>
+                <th scope="col" data-tcol="completion" class="num-cell">Completion</th>
+                <th scope="col" data-tcol="certificates" class="num-cell">Certificates</th>
+                <th scope="col" data-tcol="hot_leads" class="num-cell">Hot leads</th>
+              </tr>
+            </thead>
+            <tbody id="mk-table-body"></tbody>
+          </table>
+          </div>
+          <div class="pagination" id="mk-pagination"></div>
         </div>
       </div>
       </div><!-- /.admin-content -->

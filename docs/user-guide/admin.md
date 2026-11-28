@@ -705,7 +705,7 @@ the note *You are competing in this event — you can view it, not change it* (s
 [The competitor lock](#the-competitor-lock)).
 
 **The sidebar is for the pages about every event**: **Events**, **New event**,
-**Question bank**, **Live rankings**, **Analytics** and **Audit** under
+**Question bank**, **Live rankings**, **Analytics**, **Marketing** and **Audit** under
 *Manage*; **People** (participants and event organisers; admin accounts are on
 **Roles & permissions**) and **Groups** under *Participants*;
 **Roles & permissions** and **Settings** under *Admin*. Opening one of those leaves the
@@ -4331,6 +4331,70 @@ grid.
 ![Analytics — question picker](../screenshots/admin/08-analytics-challenge-picker.png)
 
 ---
+
+## Marketing
+
+**Marketing** (in the sidebar, under *Manage*) says how the platform is doing
+across events: how many people the events reached, what they did, what they
+took away and what came of it for the event teams. Every figure is a **count of
+what the platform recorded**, shown with what it is out of; nothing is an
+estimate and nothing is compared with an outside benchmark. A figure only some
+events can answer says how many could. Each figure has a **?** saying exactly
+what it counts.
+
+It is for administrators: it adds up every event on the platform, so an event
+admin never sees it, and a custom role needs **See marketing analytics across
+every event**, which only a role acting on every event can hold.
+
+**Which events.** The page counts the events whose **start** falls in the range
+you choose (the last 30 or 90 days, the last 12 months, this year, any time, or
+between two dates, both included). An event counts in the range its start falls
+in, with everything its people did, whenever they did it, so the totals and the
+per-event table always add up. Events that have not started are not counted.
+Tick **Event types** to count only those types, or open **Events** to tick
+particular events. Dry runs (events tagged `test/dry run`) are never counted;
+the page says how many it left out.
+
+**Who counts.** In each event, the people its boards count: staff are left out
+unless the event lets staff compete, and so are benchmark accounts, event admins
+(and custom roles like theirs), and everything an administrator did while
+viewing as somebody.
+
+- **Reach** — **Events run** (by type), **People** (each once, however many
+  events they joined; the line under it gives the joins), **New accounts**
+  (people among them whose account was created inside the range, and how the
+  records say it came: by join link, by invitation, at the desk, or otherwise —
+  the sign-up form and an import look the same in the records), and the eight
+  most common **countries** and **companies** people gave on their profile.
+  A country is one row however it was spelled (the code a profile stores, the
+  country's name, or USA, U.S., UK, U.K., Great Britain), named as the profile
+  form names it; anything else is shown as typed. Companies are grouped ignoring
+  case and endings such as Inc or Ltd.
+- **Engagement** — **Played** (joins where the person answered anything, a
+  quick question included), **Answers** to scoring questions (quick questions
+  counted apart), **Solve rate** (of every question a person answered at least
+  once, the share they got right in the end), **Completion** (of the people who
+  played, the share who solved every scoring question the event shows now, in
+  events that have scoring questions), **Active time** (the median net active
+  time, only in events that measure it, saying how many did) and **Returning**
+  (people in more than one of the selected events). The bar chart follows the
+  joins down to the people who solved everything.
+- **Outcomes** — **Certificates** issued and not revoked, by what they record
+  (a top-three place, taking part, completing a Program); **Shared** (certificates whose holder pressed Share — whether a post followed
+  is not known to the platform); and the Programs' **Pass rate**: learners who
+  finished (every scoring question solved or out of attempts) with 60% or more,
+  out of those who finished, with the grade bands.
+- **Pipeline** — the leads the event team reports show (Hot, Warm, Cold, by the
+  reports' own rule), **Want follow-up** (the people who asked to be contacted) and those who said
+  no follow-up is needed (who are not leads), and the leads an organiser marked
+  contacted. Only events that asked the qualifying questions have leads, and the
+  section says how many those were.
+
+**Per event** lists the selected events: type, start, joined, solve rate,
+completion and hot leads (**Played** and **Certificates** are under
+**Columns**). Sort and filter from any heading; the filters cover every row,
+not only the page on screen. **Export CSV** saves exactly the rows the filters
+leave, on every page, in the order shown, with every column.
 
 ## The Audit page
 
