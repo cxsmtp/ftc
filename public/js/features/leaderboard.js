@@ -37,7 +37,9 @@ export function lbSolveTime(ms){
 const _LB_SORTERS = {
   place:  (a, b) => (a.rank ?? 0) - (b.rank ?? 0),
   player: (a, b) => String(a.nickname || a.name || '').localeCompare(String(b.nickname || b.name || ''), undefined, { sensitivity: 'base' }),
-  score:  (a, b) => (a.score ?? 0) - (b.score ?? 0),
+  // A board ranking by percentages (an overall board, per-session question sets)
+  // carries `percent` on every row: its Score column is the percentage.
+  score:  (a, b) => (a.percent ?? a.score ?? 0) - (b.percent ?? b.score ?? 0),
   // Unfinished entries have a null/undefined solveTimeMs; park them after every
   // real time in ascending order rather than letting them sort as 0 (fastest).
   time:   (a, b) => (a.solveTimeMs ?? Number.MAX_SAFE_INTEGER) - (b.solveTimeMs ?? Number.MAX_SAFE_INTEGER),
@@ -148,7 +150,7 @@ function _certHeldFor(compId){
   return _certCache.compId === compId ? _certCache.held : null;
 }
 // What the card draws from a held certificate: a change in any of it repaints.
-const _certSig = h => h ? JSON.stringify([h.revoked, h.pdfUrl, h.imageUrl, h.code, h.emailedAt, h.label, h.score, h.dateLabel, h.name, h.withheld]) : '';
+const _certSig = h => h ? JSON.stringify([h.revoked, h.pdfUrl, h.imageUrl, h.code, h.emailedAt, h.label, h.score, h.scoreLabel, h.dateLabel, h.name, h.withheld]) : '';
 // One read of the participant's own list into the cache; true when it answered.
 async function _readCertHeld(compId){
   try {
@@ -233,6 +235,10 @@ export async function loadLeaderboard(opts){
   if(_gen!==S._compGen)return;
   if(!_lb){ _lbLoadFailed(); _lbShowLoadError(); return; }
   const{top3,board,me,groupBoard,board_limit,ended,canShareBadge,lateEntrantMe,lateWindowOpen,lateDeadline,placementCertificates}=_lb;
+  // PER-SESSION QUESTION SETS — which board this is, said above it: the
+  // participant's own session's (an event ranking per session, or both), or the
+  // one overall board (and that it ranks by percentages where it does).
+  _paintBoardCaption(_lb);
   // v6.16.46 — populate the design-aligned page header. Subtitle:
   // "<Comp name> · Updates automatically" — the dot-separator shape of the
   // design's preview. It names no interval: the board is re-read when it moves
@@ -279,7 +285,7 @@ export async function loadLeaderboard(opts){
     <div class="podium-slot ps${u.rank}${me&&u.userId===me.userId?' is-me':''}">
       <div class="podium-num m${u.rank}">${medal(u.rank)}<b class="podium-n" aria-hidden="true">${u.rank}</b></div>
       <div class="podium-who">${avatarHtml(u.avatar,28)}<span class="podium-name">${esc(u.nickname)}</span></div>
-      <div class="podium-pts"><span class="bignum">${esc(String(u.score))}</span> pts</div>
+      <div class="podium-pts">${_lb.percent?`<span class="bignum">${esc(_pctText(u.percent))}</span> <span class="podium-pts-sub">${esc(String(u.score))} pts</span>`:`<span class="bignum">${esc(String(u.score))}</span> pts`}</div>
       <div class="podium-sub">${u.allSolved?'All solved':''}${u.allSolved&&u.solveTimeMs!=null?' · ':''}${u.solveTimeMs!=null?esc(lbSolveTime(u.solveTimeMs)):''}</div>
       ${ended&&placementCertificates===true&&earnsPlacement(u)?`<span class="podium-cert podium-cert-${u.rank}">${ICO.medal}${certTier(u.rank)}<span class="podium-cert-word"> certificate</span></span>`:''}
       <div class="podium-block ${podiumClass(u.rank)}" aria-hidden="true"><span class="podium-roman">${roman(u.rank)}</span></div>
@@ -332,7 +338,7 @@ export async function loadLeaderboard(opts){
     <tr class="${meCls}" data-uid="${esc(u.userId)}" data-score="${u.score}"${_onPodium.has(u.userId)?' hidden':''}>
       <td><span class="lb-rank">${rankIcon(u.rank)}</span>${delta}</td>
       <td><div class="lb-who">${avatarHtml(u.avatar,28)} ${esc(u.nickname)}</div></td>
-      <td><strong class="lb-score">${u.score}</strong> pts</td>
+      ${_scoreCell(u,_lb.percent)}
       <td class="lb-time-cell">${lbSolveTime(u.solveTimeMs)}</td>
       ${solvedCell(u.allSolved)}
     </tr>`;
@@ -434,7 +440,7 @@ export async function loadLeaderboard(opts){
           <tr class="me">
             <td>${rankIcon(me.rank)}</td>
             <td><div class="lb-who">${avatarHtml(me.avatar,28)} ${esc(me.nickname)}</div></td>
-            <td><strong>${me.score}</strong> pts</td>
+            ${_scoreCell(me,_lb.percent,{plain:true})}
             <td class="lb-time-cell">${lbSolveTime(me.solveTimeMs)}</td>
             ${solvedCell(me.allSolved)}
           </tr>
@@ -444,6 +450,7 @@ export async function loadLeaderboard(opts){
     setSafeHtml(document.getElementById('lb-me-banner'), '');
   }
   // v7.11.0 — team / group rankings (present only when the competition has groups).
+  _renderParticipantOverallBoard(_lb.overallBoard);
   _renderParticipantGroupBoard(groupBoard);
   _renderParticipantLateBoard(_lb.lateBoard);
   // v7.1.0 / v7.6.x — LinkedIn share-badge CTA. The server's `canShareBadge`
@@ -550,12 +557,20 @@ export async function loadLeaderboard(opts){
         // nickname for a name its fonts cannot draw.
         const _cu = S.currentUser || {};
         const _who = (_held && _held.name) || _cu.certificate_printed_name || _cu.nickname || '';
+        // A BOARD RANKED BY PERCENTAGES (owner decision, 28 Nov 2026: "just show
+        // level"): before a certificate is held the card names only the level
+        // the mint would issue ("1st Place — Overall", "Participant"), with no
+        // score figure at all: neither the live points, which the board did not
+        // rank on, nor a percentage. Once one is held the card shows what that
+        // certificate holds (its frozen scoreLabel). A points board is unchanged.
+        const _levelOnly = !_held && _lb.percent === true;
+        const _levelWords = _isTop3 ? `${_ord} Place${_lb.ranking === 'overall' ? ' — Overall' : ''}` : 'Participant';
         const _thumb = `<div class="lb-cert-thumb${_isTop3 ? ` is-p${_place}` : ''}" data-look="signature" data-theme="dark" aria-hidden="true">
-            <span class="lb-cert-t">${_held && _held.label ? esc(_held.label) : (_isTop3 ? `Certificate of achievement · ${_ord} place` : 'Certificate of participation')}</span>
+            <span class="lb-cert-t">${_held && _held.label ? esc(_held.label) : _levelOnly ? esc(_levelWords) : (_isTop3 ? `Certificate of achievement · ${_ord} place` : 'Certificate of participation')}</span>
             <span class="lb-cert-rule"><i></i></span>
             <span class="lb-cert-n">${esc(_who)}</span>
             <span class="lb-cert-e">${_compName}</span>
-            <span class="lb-cert-g">${esc(String(_held && _held.score != null ? _held.score : _ctaMe.score))} pts${_held && _held.dateLabel ? ` · ${esc(_held.dateLabel)}` : ''}</span>
+            ${_levelOnly ? '' : `<span class="lb-cert-g">${_held && _held.scoreLabel ? esc(_held.scoreLabel) : `${esc(String(_held && _held.score != null ? _held.score : _ctaMe.score))} pts`}${_held && _held.dateLabel ? ` · ${esc(_held.dateLabel)}` : ''}</span>`}
             <span class="lb-cert-med"></span>
           </div>`;
         const _shareLabel = _codesHidden ? (_held ? 'View certificate' : 'Generate certificate')
@@ -583,7 +598,7 @@ export async function loadLeaderboard(opts){
                  _held.emailedAt ? `Emailed to you on ${esc(fmtDt(new Date(_held.emailedAt), 'short'))}` : ''].filter(Boolean).join(' · ')}</p>` : ''}
             <div class="lb-cert-kpis">
               ${(!_lateOpenCta && !lateEntrantMe) ? `<div><span class="eyebrow">Rank</span><b class="bignum">${esc(String(_ctaMe.rank))}</b></div>` : ''}
-              <div><span class="eyebrow">Points</span><b class="bignum">${esc(String(_ctaMe.score))}</b></div>
+              ${_levelOnly ? '' : `<div><span class="eyebrow">Points</span><b class="bignum">${esc(String(_ctaMe.score))}</b></div>`}
               ${_ctaMe.solveTimeMs != null ? `<div><span class="eyebrow">Time</span><b class="bignum">${esc(_keepUnits(lbSolveTime(_ctaMe.solveTimeMs)))}</b></div>` : ''}
             </div>
           </div>`);
@@ -596,6 +611,80 @@ export async function loadLeaderboard(opts){
     }
     document.getElementById('leaderboard-page')?.classList.toggle('lb-has-cert', _cta.style.display !== 'none');
   }
+}
+
+// PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026) — the score cell of
+// a row: points, or on a board ranking by percentages the percentage first with
+// the points beside it. `.lb-score` stays the POINTS figure (the score-tick
+// count-up reads it), so on a percentage board the count-up moves the small one.
+function _pctText(p){return typeof p==='number'&&Number.isFinite(p)?`${p.toFixed(1).replace(/\.0$/,'')}%`:'—';}
+function _scoreCell(u,percent,{plain=false}={}){
+  if(!percent)return plain?`<td><strong>${u.score}</strong> pts</td>`:`<td><strong class="lb-score">${u.score}</strong> pts</td>`;
+  return `<td><strong class="lb-pct">${esc(_pctText(u.percent))}</strong> <span class="lb-pts-sub">${plain?'':'<span class="lb-score">'}${u.score}${plain?'':'</span>'} pts</span></td>`;
+}
+// The line above the board naming it: "Session B" where the event ranks per
+// session (and the overall board then follows below), "Overall" where its one
+// board ranks everyone; and how the overall board ranks.
+function _paintBoardCaption(lb){
+  const el=document.getElementById('lb-board-caption');
+  if(!el)return;
+  let text='';
+  if(lb.ranking==='both'||lb.ranking==='per_session'){
+    if(lb.sessionName)text=`Your session: ${lb.sessionName}${lb.ranking==='both'?'. The overall board, with every session, is below.':''}`;
+  }else if(lb.ranking==='overall'){
+    text=lb.percent?'Overall: everyone, every session, ranked by the percentage of their own session’s points; time breaks a tie.':'Overall: everyone, every session, on one board.';
+  }
+  el.textContent=text;
+  el.hidden=!text;
+}
+// The OVERALL board beside the session's (an event ranking per session AND
+// overall): the main board's viewing rules (capped, the viewer's own place
+// resolved before the cap, no count), a card like the late board's. Renders
+// nothing without one.
+function _renderParticipantOverallBoard(ob){
+  const section=document.getElementById('lb-overall-section');
+  if(!section)return;
+  if(!ob||!Array.isArray(ob.board)||!ob.board.length){
+    setSafeHtml(section, ''); section.style.display='none'; return;
+  }
+  const rankIcon=r=>(r===1||r===2||r===3)?medalTinted(r,{showOrdinal:true}):`<strong>#${r}</strong>`;
+  const meId=ob.me&&ob.me.userId;
+  const rowFor=e=>`<tr class="${e.userId===meId?'me':''}">
+      <td>${rankIcon(e.rank)}</td>
+      <td><div class="lb-who">${avatarHtml(e.avatar,28)} ${esc(e.nickname)}</div></td>
+      ${_scoreCell(e,ob.percent,{plain:true})}
+      <td class="lb-time-cell">${lbSolveTime(e.solveTimeMs)}</td>
+      ${solvedCell(e.allSolved)}
+    </tr>`;
+  const view=S.lbOverallSortCol?_lbApplySort(ob.board,S.lbOverallSortCol,S.lbOverallSortAsc):ob.board;
+  const cap=typeof ob.board_limit==='number'?ob.board_limit:ob.board.length;
+  const meOutside=ob.me&&typeof ob.me.rank==='number'&&ob.me.rank>cap;
+  const meRow=meOutside?`<div class="lb-me-card" style="margin-top:12px"><div class="lb-me-label">Your overall placement</div><table class="lb-table"><tbody>${rowFor(ob.me)}</tbody></table></div>`:'';
+  setSafeHtml(section, `<div class="card">
+    <h3 class="lb-group-title">Overall</h3>
+    <p class="lb-group-hint">${ob.percent
+      ?'Everyone, from every session, ranked by the percentage of their own session’s points, so sessions with different questions compare fairly. Time breaks a tie.'
+      :'Everyone, from every session, ranked by points. Time breaks a tie.'}</p>
+    <table class="lb-table">
+      <thead><tr>
+        <th scope="col" class="sortable" data-action="sort-leaderboard-overall" data-col="place">#<span id="lbosort-place-icon"></span></th>
+        <th scope="col" class="sortable" data-action="sort-leaderboard-overall" data-col="player">Player<span id="lbosort-player-icon"></span></th>
+        <th scope="col" class="sortable" data-action="sort-leaderboard-overall" data-col="score">${ob.percent?'Score (%)':'Score'}<span id="lbosort-score-icon"></span></th>
+        <th scope="col" class="sortable" data-action="sort-leaderboard-overall" data-col="time">Time to Solve<span id="lbosort-time-icon"></span></th>
+        <th scope="col" class="sortable lb-solved-col" data-action="sort-leaderboard-overall" data-col="solved">All Solved<span id="lbosort-solved-icon"></span></th>
+      </tr></thead>
+      <tbody>${view.map(rowFor).join('')}</tbody>
+    </table>
+  </div>${meRow}`);
+  section.style.display='';
+  _lbPaintSortIcons('#lb-overall-section .lb-table thead','lbosort-',S.lbOverallSortCol,S.lbOverallSortAsc);
+}
+
+/** Overall-board header click — mirrors sortLeaderboard for the overall table. */
+export function sortLeaderboardOverall(col){
+  if(S.lbOverallSortCol===col)S.lbOverallSortAsc=!S.lbOverallSortAsc;
+  else{S.lbOverallSortCol=col;S.lbOverallSortAsc=(col==='place'||col==='time');}
+  loadLeaderboard();
 }
 
 // v8.6.0 — the LATE-ENTRANT section.

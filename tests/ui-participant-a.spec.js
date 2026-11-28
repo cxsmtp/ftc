@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").openFi
 // Rows are read and clicked across every Participants column; the default is six.
 test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").showAllParticipantColumns(page); });
 const { registerPost } = require("./helpers");
-const { fillBreakGlass, submitLogin, signUpViaUi, narrowEventsTable } = require("./ui-admin-helpers");
+const { fillBreakGlass, submitLogin, signUpViaUi, narrowEventsTable, openRowEventMenu } = require("./ui-admin-helpers");
 const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, TEST_DB_PATH, gradingHashFor, codeLogin } = require("./helpers");
 
 // v8.7.5 — resolve an admin tab by its `data-tab-id`, never by its visible
@@ -521,6 +521,12 @@ test.describe("Superadmin UI", () => {
         headers: { "x-csrf-token": csrf, "content-type": "application/json" },
         data: { competitionId: liveComp.id },
       });
+      // The seeded event's clock may start at the first open of a challenge rather
+      // than on entry, so open one: the board then lists the caller either way.
+      { const tl = await (await page.request.get("/api/tasks")).json();
+        const first = (Array.isArray(tl) ? tl : (tl.tasks || [])).find(t => !t.qualifying);
+        expect(first, "PRECONDITION: the event has a scoring challenge to open").toBeTruthy();
+        expect((await page.request.get(`/api/tasks/${first.id}`)).ok(), "PRECONDITION: the challenge opens").toBeTruthy(); }
       await page.goto("/");
       await page.locator(".nav-btn:not([aria-disabled=true]):has-text('Leaderboard')").first().click();
       await page.locator("#leaderboard-page").waitFor({ state: "visible", timeout: 15000 });
@@ -1138,7 +1144,7 @@ test.describe("Superadmin UI", () => {
     await sa2.dispose();
   });
 
-  test("Open primary button visible for ended events, edit accessible in kebab", async ({ page }) => {
+  test("Open primary button visible for ended events, edit accessible in its workspace menu", async ({ page }) => {
     await adminLogin(page);
     await clickTab(page, "Events");
     await expect(page.locator(".status-badge.live").first()).toBeVisible({ timeout: 10000 });
@@ -1158,8 +1164,11 @@ test.describe("Superadmin UI", () => {
     // Open is the universal primary action for events (opens the event's workspace)
     await expect(endedRow.locator(".comp-actions button.btn[data-action='comp-open']").first()).toBeVisible({ timeout: 5000 });
     await expect(endedRow.locator(".comp-actions button.btn[data-action='comp-open']").first()).toContainText("Open");
-    // Edit still accessible via the kebab menu (superadmin override allows editing ended comps)
-    await expect(endedRow.locator(".kebab-menu button:has-text('Edit')")).toHaveCount(1);
+    // Edit settings is the event's workspace ⋯ menu's (the row menu keeps only
+    // Delete event); a superadmin may edit an ended event.
+    await expect(endedRow.locator(".kebab-menu [data-action='comp-edit']"), "not on the row").toHaveCount(0);
+    const portal = await openRowEventMenu(page, endedRow);
+    await expect(portal.locator("[data-action='comp-edit']")).toHaveCount(1);
   });
 });
 
@@ -1277,7 +1286,7 @@ test.describe("Participant core flows (v6.20.x)", () => {
         title: `SubmitFlow ${stamp}`, description: "<p>Answer me.</p>", difficulty: "easy",
         answer_type: "text", correct_answer: "the-right-answer", explanation: "—", status: "published",
       }})).json()).id;
-      await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [liveComp.id] } });
+      taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [liveComp.id] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
       me = await createAssignedParticipant(sa, h, liveComp.id);
 
       await enterCompAsParticipant(page, me.email, liveComp.id);
@@ -1552,9 +1561,10 @@ test.describe("v7.11.0 — participant team/group leaderboard", () => {
     const t = Date.now();
     // v7.11.7 — the board is opt-in AND needs >=2 non-empty teams, so enable it and
     // bind the viewer's Squad + a Rivals team.
-    const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: `PTeam ${t}`, start_time: new Date(t - 60_000).toISOString(), duration_minutes: 240, group_leaderboard_enabled: true } })).json()).competition.id;
-    const taskId = (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title: `PTeam-T ${t}`, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [compId] } });
+    // The entry clock: each member is on the board from ENTERING it (below).
+    const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: `PTeam ${t}`, start_time: new Date(t - 60_000).toISOString(), duration_minutes: 240, group_leaderboard_enabled: true, clock_start: "entry" } })).json()).competition.id;
+    let taskId = (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title: `PTeam-T ${t}`, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
+    taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     // Fresh verified+approved participants with a known password.
     const mkParticipant = async (nick) => {
       const em = `pteam_${nick}_${t}@acme.com`;

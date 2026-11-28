@@ -47,12 +47,12 @@ test.beforeAll(async () => {
   taskA = await makeTask(sa, saCsrf, "ovA", { correct_answer: KEY });
   taskB = await makeTask(sa, saCsrf, "ovB", { correct_answer: KEY, difficulty: "hard" });
   taskD = await makeTask(sa, saCsrf, "ovDecoy", { correct_answer: KEY });
-  await assignTask(sa, saCsrf, taskA.id, [W.mine.id]);
-  await assignTask(sa, saCsrf, taskB.id, [W.mine.id]);
-  await assignTask(sa, saCsrf, taskD.id, [W.theirs.id]);
+  Object.assign(taskA, { bankId: taskA.id, id: (await assignTask(sa, saCsrf, taskA.id, [W.mine.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
+  Object.assign(taskB, { bankId: taskB.id, id: (await assignTask(sa, saCsrf, taskB.id, [W.mine.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
+  Object.assign(taskD, { bankId: taskD.id, id: (await assignTask(sa, saCsrf, taskD.id, [W.theirs.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
   for (let i = 0; i < 8; i++) {
     const t = await makeTask(sa, saCsrf, `ovX${i}`, { correct_answer: KEY });
-    await assignTask(sa, saCsrf, t.id, [W.mine.id]);
+    Object.assign(t, { bankId: t.id, id: (await assignTask(sa, saCsrf, t.id, [W.mine.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
     extraTasks.push(t);
   }
   p2 = await makeParticipant(sa, saCsrf, "ovp2");

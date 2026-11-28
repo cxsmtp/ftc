@@ -46,7 +46,7 @@ const { test, expect } = require("./isolated-test");
 test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").openFilterPanels(page); });
 const { registerPost } = require("./helpers");
 const { apiLogin, freshCtx, gradingHashFor, BASE, PARTICIPANT_PASS, TEST_DATA_DIR } = require("./helpers");
-const { adminLogin, clickTab, filterComps, openKebab } = require("./ui-admin-helpers");
+const { adminLogin, clickTab, filterComps, openKebab, openRowEventMenu } = require("./ui-admin-helpers");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -707,7 +707,8 @@ test("v7.23.0: the export emits an attributed data_exported audit event", async 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7. The kebab — the item is gated, and the download really works under the CSP.
+// 7. The event's menu (its workspace ⋯; the Events-row menu keeps only Delete
+//    event) — the item is gated, and the download really works under the CSP.
 // ─────────────────────────────────────────────────────────────────────────────
 test("v7.23.0: the kebab item downloads the CSV for a live competition", async ({ page }) => {
   await adminLogin(page);
@@ -717,7 +718,7 @@ test("v7.23.0: the kebab item downloads the CSV for a live competition", async (
   await filterComps(page, F.compName);
   const row = page.locator("#admin-comp-body tr", { hasText: F.compName }).first();
   await expect(row).toBeVisible({ timeout: 15000 });
-  await openKebab(page, row);
+  await openRowEventMenu(page, row);
 
   const item = page.locator("#kebab-portal [data-action='comp-export-activity']");
   await expect(item).toBeVisible();
@@ -758,7 +759,7 @@ test("v7.23.0: the kebab item is present for an ENDED competition", async ({ pag
   await filterComps(page, name);
   const row = page.locator("#admin-comp-body tr", { hasText: name }).first();
   await expect(row).toBeVisible({ timeout: 15000 });
-  await openKebab(page, row);
+  await openRowEventMenu(page, row);
   await expect(page.locator("#kebab-portal [data-action='comp-export-activity']")).toBeVisible();
 });
 
@@ -777,7 +778,7 @@ test("v7.23.0: the kebab item is absent for an UPCOMING competition", async ({ p
   await filterComps(page, name);
   const row = page.locator("#admin-comp-body tr", { hasText: name }).first();
   await expect(row).toBeVisible({ timeout: 15000 });
-  await openKebab(page, row);
+  await openRowEventMenu(page, row);
   // POSITIVE CONTROL: the menu really did open and really does carry items, so
   // "the export item is absent" is evidence about the gate rather than about an
   // empty portal.

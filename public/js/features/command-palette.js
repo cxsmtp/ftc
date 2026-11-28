@@ -192,7 +192,12 @@ function _actionItems() {
       // The header's own Invite predicate (the role's `participants.enrol`
       // included): an event that takes no new members (ended, its late window
       // shut) is not offered, as the dialog lists none.
-      if (wsInviteOffered(c)) act("ws:invite", "Invite people", () => _dispatch("ws-invite"), `To ${c.name}`);
+      if (wsInviteOffered(c)) {
+        act("ws:invite", "Invite people", () => _dispatch("ws-invite"), `To ${c.name}`);
+        // The header Invite's second choice, by the same predicate; withheld
+        // while it would be refused (sweep #501), as the menu says why.
+        if (!deskApprovalWithheld()) act("ws:desk-invite", "Sign up at the desk", () => _dispatch("desk-invite"), `In ${c.name}`);
+      }
       const doc = document.implementation.createHTMLDocument("");
       const box = doc.createElement("div");
       setSafeHtml(box, wsMenuItemsHtml(c));
@@ -209,7 +214,7 @@ function _actionItems() {
     // (ui/nav.js adminCan; the built-in tiers answer exactly as before), and a
     // door that opens a page first offers only a page the role may open.
     if (_globalAdmin() && adminCan("events.create") && _tabOffered("admin-competitions-tab")) act("act:new-event", "New event", () => { _goAdminTab("admin-competitions-tab"); _dispatch("open-competition-form"); }, "Create");
-    if (adminCan("challenges.edit") && _tabOffered("admin-tasks-tab")) act("act:new-challenge", "New challenge", () => { _goAdminTab("admin-tasks-tab"); _dispatch("open-task-form"); }, "Create");
+    if (adminCan("challenges.edit") && _tabOffered("admin-tasks-tab")) act("act:new-challenge", "New question", () => { _goAdminTab("admin-tasks-tab"); _dispatch("open-task-form"); }, "Create");
     if (!c && adminCan("participants.enrol") && _tabOffered("admin-participants-tab")) {
       act("act:invite", "Invite people", () => { _goAdminTab("admin-participants-tab"); _dispatch("open-invite-dialog"); }, "People");
       // Withheld while it would be refused (sweep #501); the People button says why.
@@ -222,7 +227,7 @@ function _actionItems() {
         // that may read people has (`participants.view`), from the People page
         // it opens first (_exportPeopleOnTheirPage).
         if (adminCan("participants.view") && _tabOffered("admin-participants-tab")) act("act:export-people", "Export people (CSV)", _exportPeopleOnTheirPage, "Export");
-        act("act:export-challenges", "Export challenges", () => _dispatch("export-tasks"), "Export");
+        act("act:export-challenges", "Export questions", () => _dispatch("export-tasks"), "Export");
       }
     }
   }

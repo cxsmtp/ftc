@@ -124,7 +124,23 @@ test.beforeAll(async () => {
     details: { marker: `control-${marker}`, email: control.email } });
   const actorRow = plantOrphan({ scope: "task", scopeId: crypto.randomUUID(), eventType: "deleted", changedBy: victim.email,
     details: { marker: `actor-${marker}` } });
-  F = { sa, saCsrf, comp, victim, control, victimCopy, controlCopy, actorRow, marker };
+  // STAFF TEAMS (owner decision, 28 Nov 2026): the victim's primary address in
+  // two teams (one added through the route, one planted in capitals to prove
+  // the match ignores case), the control's address beside it in the first.
+  const teamIds = [];
+  for (const name of [`Erase SEs ${marker}`, `Erase Sales ${marker}`]) {
+    const t = await sa.post("/api/admin/staff-teams", { headers: H(saCsrf), data: { name } });
+    expect(t.status(), await t.text()).toBe(201);
+    teamIds.push((await t.json()).team.id);
+  }
+  for (const who of [victim, control]) {
+    const m = await sa.post(`/api/admin/staff-teams/${teamIds[0]}/members`, { headers: H(saCsrf), data: { name: `Member ${who.nickname}`, email: who.email } });
+    expect(m.status(), await m.text()).toBe(201);
+  }
+  const plantedMember = crypto.randomUUID();
+  write((db) => db.prepare("INSERT INTO staff_team_members (id, team_id, name, email, added_at, updated_at) VALUES (?,?,?,?,?,?)")
+    .run(plantedMember, teamIds[1], "Victim Again", victim.email.toUpperCase(), new Date().toISOString(), new Date().toISOString()));
+  F = { sa, saCsrf, comp, victim, control, victimCopy, controlCopy, actorRow, marker, teamIds, plantedMember };
 });
 test.afterAll(async () => { try { await F.sa.dispose(); } catch (_) {} });
 
@@ -173,6 +189,18 @@ test.describe("sweep #345 — deleting a person erases their rows in the newer t
 
     // CONTROL: the other person's rows of every kind are exactly as they were.
     expect(rowsAbout(control.id), "the control person's rows are untouched").toEqual(controlBefore);
+
+    // STAFF TEAMS: the victim's address left both teams (the capitals row too);
+    // the control's row in the same team stays, by value.
+    const staff = read((db) => db.prepare("SELECT team_id, lower(email) AS email FROM staff_team_members WHERE team_id IN (SELECT value FROM json_each(?)) ORDER BY team_id, email").all(JSON.stringify(F.teamIds)));
+    expect(staff, "only the control's staff-team row remains").toEqual([{ team_id: F.teamIds[0], email: control.email.toLowerCase() }]);
+    expect(rec.staff_team_memberships_removed, "the deletion record counts the rows").toBe(2);
+    const audits = read((db) => db.prepare("SELECT scope_id, details FROM orphan_events WHERE scope='staff_team' AND event_type='staff_team_member_removed' AND scope_id IN (SELECT value FROM json_each(?))").all(JSON.stringify(F.teamIds)))
+      .map((a) => ({ team: a.scope_id, ...JSON.parse(a.details) }));
+    expect(audits.map((a) => [a.team, a.reason, a.domain]).sort(), "one record per team, its reason and domain")
+      .toEqual([[F.teamIds[0], "account_deleted", victim.email.split("@")[1].toLowerCase()], [F.teamIds[1], "account_deleted", victim.email.split("@")[1].toLowerCase()]].sort());
+    expect(audits.map((a) => a.member_id), "naming the member row removed").toContain(F.plantedMember);
+    expect(JSON.stringify(audits).toLowerCase(), "never the address").not.toContain(victim.email.toLowerCase());
   });
 
   test("the unverified-account reaper's cascade removes the reaped account's stored audit copies and keeps its account_reaped record with address and nickname; another account's copy survives", async () => {
@@ -252,6 +280,8 @@ test("a deletion finds the stored copies about the person by index", () => {
     out.plans = out.sql.map(x => db.prepare("EXPLAIN QUERY PLAN " + x).all(...Array((x.match(/[?]/g) || []).length).fill("x")).map(r => r.detail).join(" | "));
     out.control = db.prepare("EXPLAIN QUERY PLAN DELETE FROM orphan_events WHERE event_type=?").all("x").map(r => r.detail).join(" | ");
     out.left = db.prepare("SELECT id FROM orphan_events WHERE event_type='probe' ORDER BY id").all().map(r => r.id);
+    out.staffSql = seen.filter(x => /FROM staff_team_members m/.test(x));
+    out.staffPlans = out.staffSql.map(x => db.prepare("EXPLAIN QUERY PLAN " + x).all("[]").map(r => r.detail).join(" | "));
     process.stdout.write("\\nCASCADE_PLAN_OUT " + JSON.stringify(out) + "\\n");
   `;
   const r = spawnSync(process.execPath, ["-e", script], {
@@ -268,6 +298,10 @@ test("a deletion finds the stored copies about the person by index", () => {
     expect(out.plans[0], out.sql[0]).toMatch(/SEARCH orphan_events USING (COVERING )?INDEX idx_orphan_events_scope \(scope=\? AND scope_id=\?\)/);
     expect(out.plans[0], out.sql[0]).not.toMatch(/\bSCAN orphan_events\b/);
     expect(out.control, "CONTROL: a delete no index serves reads as a scan").toMatch(/\bSCAN orphan_events\b/);
+    // The staff-team lookup by the deleted address is an index search too.
+    expect(out.staffSql.length, "anti-vacuity: the cascade's staff-team read was seen").toBe(1);
+    expect(out.staffPlans[0], out.staffSql[0]).toMatch(/SEARCH m USING INDEX idx_staff_team_members_email \(email=\?\)/);
+    expect(out.staffPlans[0], out.staffSql[0]).not.toMatch(/\bSCAN m\b/);
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
     fs.rmSync(uploadsDir, { recursive: true, force: true });

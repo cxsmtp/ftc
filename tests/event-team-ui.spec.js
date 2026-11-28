@@ -191,7 +191,7 @@ test("Settings lists the allowed domains; the create form seeds the tick from th
   const { ctx, page } = await superCtx(browser);
   await page.goto(`${BASE}/`);
   await clickTab(page, "settings");
-  await openSettingsSection(page, "email");
+  await openSettingsSection(page, "general");   // the team report domains are under General (owner decision, 27 Nov 2026)
   await expect(page.locator("#team-domains-card")).toBeVisible();
   await page.locator("#team-domains-input").fill("Example.org\nfoo.example.org");
   await page.locator('[data-action="team-domains-save"]').click();
@@ -573,7 +573,7 @@ test("the persona switch is a real segmented control and every view is its own d
 
   const view = page.locator("#team-persona-view");
   const seen = {};
-  for (const [persona, marker] of [["se", "Every challenge"], ["marketing", "Qualifying answers"], ["sales", "Accounts, most ready first"], ["sdr", "Noor Report"], ["manager", "Hot still to contact"]]) {
+  for (const [persona, marker] of [["se", "Every question"], ["marketing", "Qualifying answers"], ["sales", "Accounts, most ready first"], ["sdr", "Noor Report"], ["manager", "Hot still to contact"]]) {
     const b = page.locator(`[data-action="team-persona"][data-persona="${persona}"]`);
     await b.click();
     await expect(page.locator(`[data-action="team-persona"][data-persona="${persona}"]`)).toHaveAttribute("aria-pressed", "true");

@@ -59,9 +59,9 @@ password or an emailed code, never with the built-in account's password.
 
 ---
 
-## Users & roles and custom roles
+## Roles & permissions and custom roles
 
-**Users & roles** (sidebar) lists everyone who can open the admin panel — every
+**Roles & permissions** (sidebar) lists everyone who can open the admin panel — every
 account whose role is not Participant — with their role, the events a scoped
 role organises, and when they last signed in. From there you:
 
@@ -82,6 +82,13 @@ role organises, and when they last signed in. From there you:
   If you compete alongside someone in an event where staff can compete, their
   row says so instead: another organiser changes their role.
 - **Events** on a scoped role's row chooses which events they organise.
+- **⋮** on a row holds the account's own actions, the ones People offers for a
+  participant: **Edit Profile** (or **View Profile** where you may not edit
+  it), **History**, **Block** or **Unblock**, **Unlock** for a locked account
+  and **Email sign-in code**. They act exactly as they do on People, so an
+  administrator who is not a superadmin sees a fellow admin's profile and
+  history only, with a note that only superadmins manage that account, and a
+  role that cannot see People gets none of them.
 
 The **Roles** view lists the four built-in roles — Participant, Event admin,
 Admin, Superadmin — which never change, and the **custom roles** you create.
@@ -95,20 +102,20 @@ stays a superadmin's), and some can be given only by a superadmin. Some reach
 beyond any one event — the raw request and application logs, the operational
 alerts, platform settings, metrics, data retention, test email and the
 unsubscribe list, exporting every event or the settings, imports, event
-templates, certificate designs, Users & roles, deleting accounts, creating
+templates, certificate designs, Roles & permissions, deleting accounts, creating
 events from scratch and adding organisers — so only a role that acts on every
 event can hold them: the matrix offers them only while **every event** is
 chosen. Everything else a role scoped to its events holds works on its own
 events only: it deletes, verifies, revokes or looks up a certificate only
-there, and changes a challenge's scoring (recalculate, lock, delete, or make it
+there, and changes a question's scoring (recalculate, lock, delete, or make it
 a qualifying question) only when every event using it is one of its own. Such
 a role creates events by cloning one or starting from a template, as an event
 admin does. Each Settings card shows to a
 role holding what that card uses, and the **Audit** page shows each kind of
 record only to a role that may read the same records elsewhere — event and
 session records need *See events*, people's histories *See participants*,
-platform settings changes *See platform settings*, challenge versions *See
-challenges*, and logged events that name no event *See the raw request and
+platform settings changes *See platform settings*, question versions *See
+questions*, and logged events that name no event *See the raw request and
 application logs*. A role without that last permission also sees the logged
 events of its events without the details that belong to the raw logs: a
 visitor's or requester's address and browser (someone checking a certificate,
@@ -124,16 +131,28 @@ changing it, and a role allowed to delete accounts cannot delete an administrato
 a superadmin or anyone whose role can do more than its own. Accounts that hold a
 custom role cannot be viewed as a participant.
 
-Admins can see Users & roles but cannot change anything on it; event admins do
+Admins can see Roles & permissions but cannot change anything on it; event admins do
 not see it.
+
+## Marketing analytics and custom roles
+
+The **Marketing** page (described in the administrator guide) adds up every
+event on the platform, so its permission, **See marketing analytics across
+every event** (`analytics.marketing`), is one a custom role can hold only with
+the scope **Every event**: the role form refuses it on a role scoped to its
+events. The built-in admin and superadmin hold it; an event admin never does.
+Give it to a marketing colleague's custom role on its own and they see that page
+and nothing else of the admin panel.
 
 ## Role promotion
 
-Role changes are made on **Users & roles** (above). The participant row's
-three-dot menu in People still offers **Promote to Admin** or
-**Promote to Superadmin** for a participant, and demoting uses the same menu.
+Role changes are made on **Roles & permissions** (above), and only there: a
+participant's row in People offers **Change role on Roles & permissions**, which
+opens that page searched to the person. An admin account is changed with its
+row's **Change role**; a participant is given an admin role with **Add user** and
+their address (the account is kept and gets the role).
 
-![Role promotion confirm](../screenshots/superadmin/01-role-promotion.png)
+![A People row menu linking to Roles & permissions](../screenshots/superadmin/01-role-promotion.png)
 
 A role change immediately signs the target out everywhere — they sign in
 again for the new role to take effect. That reaches work already in progress
@@ -154,7 +173,7 @@ one. Moved to event admin or participant, they sign in with an emailed code.
 
 There is a fourth role, **Event admin**: an organiser scoped to specific events.
 It is granted per event from the participant's row (**Make event admin**) or from
-the event's **Organisers** list, and any admin can do that — see the
+the **Organisers** card on the event's Overview, and any admin can do that — see the
 [Admin guide](admin.md) for what the role can and cannot do.
 
 Two parts of it are yours alone:
@@ -206,14 +225,14 @@ someone technical who tries to work around the form.
 Once an event is live its start time is locked for regular admins, always. As
 a superadmin you can still correct it, but only while **nothing has happened
 in the event**: nobody enrolled, nothing submitted, no hint revealed, nobody
-removed, no challenge opened, no certificate issued, no time on platform
+removed, no question opened, no certificate issued, no time on platform
 recorded, no start reminder pending, nobody with the event selected, and no
 sign-up in flight through its join link. The case this exists for is an event that went
 live on a mistyped date with nobody in it.
 
 Moving the start into the future puts the event back to **upcoming**, which
 also re-opens the settings that lock the moment an event starts — its event
-type, its leaderboard mode and its time basis. Moving it far enough backwards
+type, its ranking and its time basis. Moving it far enough backwards
 that the event's end would land in the past is refused separately, however
 pristine the event: ending an event is what **End Now** is for. If anyone has
 touched the event, the save is refused and names what it found; end the event
@@ -229,14 +248,19 @@ comes from its sessions, so edit the session times there.
 The three-dot menu on an event row includes **Delete**. After you
 confirm, it removes the event and everything attached to it —
 assignments, tags, per-event CxOne override, sessions, events,
-submissions, and reminders — in one all-or-nothing operation. Regular admins
+submissions, and reminders — in one all-or-nothing operation. The event's own
+questions (the copies made when library questions were added to it, and any
+written inside it) are deleted with it, together with their files unless a
+library question still uses the same file; the library questions themselves are
+untouched. An event question that an event template still names is kept and
+moves into the library instead, so the template keeps working. Regular admins
 don't see this option, and the platform refuses it for them.
 
 **A live event can only be deleted while nothing has happened in it** — the
 same footprint check as the start-time correction above, and for the same
 reason: the delete cascades, so it isn't something to do to an event people
 are inside. The moment anyone has joined, submitted, revealed a hint, opened a
-challenge, earned a certificate or been marked absent, Delete is refused and
+question, earned a certificate or been marked absent, Delete is refused and
 names what it found. End the event first, then delete it. A live
 **multi-session** event is refused whatever its footprint.
 
@@ -302,12 +326,12 @@ yours to know about:
 
 - **It binds superadmins.** If you are enrolled in such an event you cannot
   edit it, end it early, close its late entries early, change its tags or
-  **delete** it, and on every challenge assigned to it **Lock**, **Recalculate
-  Scores** and **Delete** are withheld along with **Edit**; the challenge row
-  says *You are competing in "…", which holds this challenge — you can view it,
+  **delete** it, and on every question assigned to it **Lock**, **Recalculate
+  Scores** and **Delete** are withheld along with **Edit**; the question row
+  says *You are competing in "…", which holds this question — you can view it,
   not change it*, and
   the event's own row says *You are competing in this event — you can view it,
-  not change it*. Clearing participants' **feedback** on such a challenge is
+  not change it*. Clearing participants' **feedback** on such a question is
   refused too — and so is every action on a fellow competitor's **account**
   that would move the board: **Block**, **Deny Approval**, **Approve**,
   **Verify**, **Impersonate**, **Email sign-in code**, **Show sign-in code**, a
@@ -331,7 +355,7 @@ yours to know about:
   account, so a regular admin is not offered **Invite to …** on that row, and
   the selection bar and the **Invite** dialog skip it with *only a superadmin
   can enrol an admin*. A bound group is the exception that needs no skip: its
-  live sync enrols every member it holds — the Groups tab and the **Invite**
+  live sync enrols every member it holds — the Groups page and the **Invite**
   dialog put an admin account into a group only for a superadmin. Any organiser
   may enrol themselves. The same rule reaches **Grant Attempts**: on such an
   event an enrolled admin or superadmin can run out of attempts like anyone
@@ -347,8 +371,8 @@ yours to know about:
   is skipped into any event where staff compete, whether or not you compete
   there), and skips overwriting the account of anybody you compete alongside
   (the overwrite would block, verify, approve or re-role them, or change their
-  benchmark tag, which the Participants screen refuses); a challenge import
-  skips overwriting a challenge
+  benchmark tag, which the Participants screen refuses); a question import
+  skips overwriting a question
   held by an event you compete in. Each is counted in the summary by reason, in the same way those
   imports report every other row they leave alone (see [Importing
   participants](#importing-participants)).
@@ -356,45 +380,45 @@ yours to know about:
 The switch itself is an ordinary admin setting, and its locks bind you too: it
 is disabled once the event has started, and stays so once it has ended, with no
 superadmin flag to lift either — and its refusals while the event is still
-upcoming (unsealed challenges assigned, an enrolled author, staff enrolled
+upcoming (unsealed questions assigned, an enrolled author, staff enrolled
 when turning it off) name the rows for you exactly as they do for any admin.
 
 ---
 
-## Recalculating challenge scores
+## Recalculating question scores
 
-If you change a challenge's correct answer or difficulty **after**
+If you change a question's correct answer or difficulty **after**
 participants have submitted, their already-submitted answers aren't re-graded
 automatically — they keep the points they earned at the time. **Recalculate
 Scores** (in the three-dot menu) re-grades those submissions against the
 current rules and rescales any hint deductions to the new difficulty's cost
-(Easy 15, Medium 30, Hard 45 points). On a text challenge that gained an
-accepted answer, earlier guesses matching it flip to correct; on a challenge
+(Easy 15, Medium 30, Hard 45 points). On a text question that gained an
+accepted answer, earlier guesses matching it flip to correct; on a question
 switched to **Any answer**, every earlier non-empty guess becomes correct. A
-pick-one question (an Any answer challenge with options) is graded the same way,
+pick-one question (an Any answer question with options) is graded the same way,
 so adding, rewording or removing an option never turns an earlier answer wrong.
 
 > **Important — recalculate only touches events that are still open.**
 > An event whose session has ended has **frozen** final standings, and
 > recalculate deliberately leaves its submissions exactly as they are. So if a
-> challenge is used only in finished events, recalculate changes nothing
+> question is used only in finished events, recalculate changes nothing
 > and tells you how many submissions it skipped for that reason ("*N left
 > frozen*"). **Fix an answer key while the event is still live** — that
 > is the window in which recalculate can act. It still moves the leaderboard,
-> so announce the re-grade so nobody is surprised that a challenge they
+> so announce the re-grade so nobody is surprised that a question they
 > remember solving is now marked wrong.
 
 Running it again with the same rules gives the same result, so it's safe to
 click again if you're unsure the first run finished. There's no preview — the
-change applies immediately. To undo, restore the challenge to its earlier
+change applies immediately. To undo, restore the question to its earlier
 version (which puts the old grading rules back) and recalculate again.
-Regular admins don't see this option. On a challenge whose answer is **sealed**
+Regular admins don't see this option. On a question whose answer is **sealed**
 it is not offered until the answer is yours to read — because you created the
-challenge, or because you have revealed it on the record: re-grading rewrites
+question, or because you have revealed it on the record: re-grading rewrites
 every stored submission against the answer key. See [Sealed
 answers](#sealed-answers).
 
-**If a session using the challenge is running right now, you're asked a second
+**If a session using the question is running right now, you're asked a second
 time.** {{platformName}} stops with *"A session is LIVE right now"* and only
 proceeds once you confirm again. That second dialog is the normal path, not an
 edge case — the advice above is to fix an answer key while the event is
@@ -404,10 +428,10 @@ people who are still playing.
 **A re-grade can strand somebody on an event that limits attempts.** Flipping
 a correct answer to incorrect can leave a participant with no attempts left
 and no correct answer. The result message names who that happened to;
-**Grant Attempts** on the same challenge's three-dot menu is how you give them
+**Grant Attempts** on the same question's three-dot menu is how you give them
 another try.
 
-To re-grade a challenge in an event that has **already finished**, you
+To re-grade a question in an event that has **already finished**, you
 must reopen that event first, recalculate, then let it end again —
 reopening is the only thing that unfreezes a finished event's scores.
 For a single-session event that means extending its duration so it is
@@ -419,7 +443,7 @@ freeze is per session: one finished session freezes the whole event's
 submissions, extending the event's duration does nothing at all, and you
 have to reopen *every* finished session.
 
-**Multiple-choice challenges.** Re-grading a multiple-choice challenge grades
+**Multiple-choice questions.** Re-grading a multiple-choice question grades
 each submission against the option IDs the participant actually picked, rather
 than against the readable record of their choice ("Paris | Rome").
 
@@ -431,31 +455,31 @@ tells you how many were skipped.
 
 ---
 
-## Locking and unlocking a challenge
+## Locking and unlocking a question
 
-Locking freezes a challenge's grading. A locked challenge:
+Locking freezes a question's grading. A locked question:
 
 - Refuses new submissions and hint reveals — participants see "locked — no
   longer accepting submissions".
 - Blocks all admin edits (any field), version restores **and Recalculate
   Scores** — the Recalculate item disappears from the three-dot menu while the
   lock holds. Only a superadmin can change any of it, and only after
-  unlocking. A challenge form opened on it some other way is read-only, its
+  unlocking. A question form opened on it some other way is read-only, its
   formatting buttons off under a line saying it is locked.
 
 Unlocking is the same three-dot menu entry, and both lock and unlock are
-recorded in the challenge's History so you can trace when it flipped and who
-did it. Use Lock when you decide mid-event that a challenge needs a tweak but
+recorded in the question's History so you can trace when it flipped and who
+did it. Use Lock when you decide mid-event that a question needs a tweak but
 can't risk changing it live — lock first, announce the freeze, edit after.
 
 ---
 
 ## Sealed answers
 
-A challenge can be created with its answer **sealed**. The person creating it
+A question can be created with its answer **sealed**. The person creating it
 turns on *"Seal the answer — only I, or a superadmin on the record, can see or change it"* on the create
 form, and from that moment the correct answer, the explanation and the hint
-reach exactly one account: the one that created the challenge — apart from a
+reach exactly one account: the one that created the question — apart from a
 participant competing in an event that holds it, who can still buy the hint
 there, as they could any hint. Those rows carry
 a **Sealed** badge in the Status column, so you can tell which they are.
@@ -464,103 +488,103 @@ a **Sealed** badge in the Status column, so you can tell which they are.
 is no superadmin flag that lifts a seal; what you have instead is a **reveal** —
 an explicit act that shows you the sealed answer and is written down where the
 author will see it (see [Revealing a sealed answer](#revealing-a-sealed-answer)
-below). Until you have revealed it, on a sealed challenge somebody else created
+below). Until you have revealed it, on a sealed question somebody else created
 you cannot:
 
 - **read the answer, the explanation or the hint** anywhere — not in the
-  Challenges list, not in the editor, not in **View as Participant** (which says
-  the hint is withheld rather than leaving a blank), and not in the Challenges
+  Questions list, not in the editor, not in **View as Participant** (which says
+  the hint is withheld rather than leaving a blank), and not in the Questions
   export;
-- **read them in the challenge's History either.** The blanking is applied when
+- **read them in the question's History either.** The blanking is applied when
   you look, not when the seal was set, so versions saved *before* it was sealed
   are covered too;
-- **edit the challenge.** **Edit** is not offered on the row at all, and the
+- **edit the question.** **Edit** is not offered on the row at all, and the
   save is refused outright if the form is reached some other way;
-- **restore an earlier version.** The challenge's History offers *Not yours to
+- **restore an earlier version.** The question's History offers *Not yours to
   restore* where the button would be;
 - **recalculate its scores.** **Recalculate Scores** is not offered on the row
   until the answer is yours to read, and is refused if reached some other way.
 
 It is held back from the record as well as from the screens. A submitted answer
-to a sealed challenge shows as *sealed* in an event's **Activity** section and is
+to a sealed question shows as *sealed* in an event's **Activity** section and is
 withheld on the **Audit** page, and neither search box will match it, so it
 can't be used to confirm a guess. When
 the author edits the answer, History records *"(sealed answer changed…)"* rather
 than the old and new values, so the answer never reaches the log files at all.
 And when an event ends with **Reveal answers when the event ends** switched on, a
-sealed challenge shows *"Answer not shown"* and says why — its explanation and
+sealed question shows *"Answer not shown"* and says why — its explanation and
 its hint are held back with it.
 
 The **hint** is sealed with the answer. A participant who
-pays 30% of the challenge's points for it during the event still receives it —
+pays 30% of the question's points for it during the event still receives it —
 that is what a hint is for — but on the admin screens, in the export and in the
 reveal at the end of the event it is withheld exactly as the answer is. On a
-multiple-choice challenge the option text still shows, because that is the
+multiple-choice question the option text still shows, because that is the
 question — only which options are correct is withheld.
 
 ### What you can still do
 
-Running events with a sealed challenge is unaffected. You can still preview it,
+Running events with a sealed question is unaffected. You can still preview it,
 **assign it to events** and take it out of them, **grant attempts** on it, open
 its **History**, and **lock or unlock** it. You can also **delete it outright** —
-sealing doesn't protect a challenge from deletion, so it can be removed even
+sealing doesn't protect a question from deletion, so it can be removed even
 though its answer can't be read. The ordinary refusals still apply: see
-[Deleting a challenge](#deleting-a-challenge).
+[Deleting a question](#deleting-a-question).
 
-![A sealed challenge somebody else created, seen by a superadmin — the Sealed badge, and a row menu with no Edit, Publish or Hide, saying the answer is sealed and offering Reveal sealed answer](../screenshots/superadmin/09-sealed-challenge-not-yours.png)
+![A sealed question somebody else created, seen by a superadmin — the Sealed badge, and a row menu with no Edit, Publish or Hide, saying the answer is sealed and offering Reveal sealed answer](../screenshots/superadmin/09-sealed-challenge-not-yours.png)
 
 What you don't get, until you reveal it, is anything that counts as *changing*
-the challenge. The controls for **Publish**, **Hide**/**Show**, **Edit** and
+the question. The controls for **Publish**, **Hide**/**Show**, **Edit** and
 adding or removing its tags all hang off the same question — may I change this
-challenge? — and on a sealed challenge the answer is the author's name, or a
+question? — and on a sealed question the answer is the author's name, or a
 superadmin who has revealed it, so those controls aren't shown to anyone else.
 Attachments go with them, because they are managed inside the editor. If one of
 them is what you need, the author is the person to ask — their address is on the
-*create* entry in the challenge's **History** — or you reveal the answer
+*create* entry in the question's **History** — or you reveal the answer
 yourself and accept that the record says so.
 
 **Sealing is unavailable on *Any answer (free response)*.** That answer type
 accepts every response and stores no answer at all, so there would be nothing for
 a seal to protect — and it would hide the responses from everyone but the author,
-which is what such a challenge exists to gather. The create, the save and a
-version restore all refuse the combination, and the challenge editor takes the
+which is what such a question exists to gather. The create, the save and a
+version restore all refuse the combination, and the question editor takes the
 option away rather than letting anyone reach a save that fails.
 
-Sealing is a **one-way door**. It can only be chosen when the challenge is
+Sealing is a **one-way door**. It can only be chosen when the question is
 created. The author can unseal it later, with **Unseal this answer when I save**
 in the editor — and so can you, once you have revealed the answer — withheld only
-while the challenge sits in an event where staff compete, which admits sealed
-challenges alone (see [The competitor lock binds
+while the question sits in an event where staff compete, which admits sealed
+questions alone (see [The competitor lock binds
 you too](#the-competitor-lock-binds-you-too)) — but nobody can seal it again:
 {{platformName}} refuses, and says why. The answer has already been on
-administrators' screens, in exports and in the challenge's history by then, and
+administrators' screens, in exports and in the question's history by then, and
 a tick-box can't take that back.
 
 Two consequences of "only the author, or a superadmin on the record" are yours
 to know about:
 
-- **The built-in superadmin account can't seal a challenge** — the one thing a
+- **The built-in superadmin account can't seal a question** — the one thing a
   promoted superadmin can do that it cannot. It isn't one of the accounts on the
   Participants tab, so there would be no author at all, and the answer would be
   readable and editable by nobody, for ever. The create is refused with that
   explanation — sign in with a named admin account and create it there.
-- **Sealed challenges don't travel.** A challenge import refuses any row marked
-  sealed and reports how many it skipped, because an imported challenge has no
+- **Sealed questions don't travel.** A question import refuses any row marked
+  sealed and reports how many it skipped, because an imported question has no
   author on the receiving platform. Recreate it there instead. An import won't
-  overwrite an existing sealed challenge somebody else created, either — unless
+  overwrite an existing sealed question somebody else created, either — unless
   you have revealed its answer, in which case it is treated as yours.
 
 ### Revealing a sealed answer
 
-On a sealed challenge you did not create, the row's three-dot menu offers
-**Reveal sealed answer**, and the read-only challenge editor carries a button
+On a sealed question you did not create, the row's three-dot menu offers
+**Reveal sealed answer**, and the read-only question editor carries a button
 reading **Reveal sealed answer and hint** beside the note explaining the seal.
 Both open the same confirmation, headed *Reveal sealed answer*, which says
 plainly that the reveal will be recorded; its button reads **Reveal and record**.
 Press it and the answer, the explanation and the hint are yours to see for the
-rest of this session — the challenge list reloads with them on the row, an open
+rest of this session — the question list reloads with them on the row, an open
 editor becomes editable — and so is everything the author can do: edit the
-challenge, publish or hide it, tag it, restore an earlier version, recalculate
+question, publish or hide it, tag it, restore an earlier version, recalculate
 its scores, read the answers submitted to it (in an event's **Activity**
 section and on the **Audit** page), and
 **unseal** it with the same *Unseal this answer when I save* tick the author is
@@ -569,9 +593,9 @@ compete).
 
 The reveal is not silent, and that is the whole design:
 
-- The challenge's **History** gains a row marked **Record** in place of a
+- The question's **History** gains a row marked **Record** in place of a
   Restore button — a sentence saying which of the sealed answer, explanation
-  and hint were revealed to a superadmin (only the ones the challenge actually
+  and hint were revealed to a superadmin (only the ones the question actually
   has), with your name in the By column. It is a
   record, not a version: it
   cannot be restored, never counts as the current version, and the next edit is
@@ -582,46 +606,46 @@ The reveal is not silent, and that is the whole design:
   reveal's own confirmation comes first, and then the usual *are you sure? This
   will change real data* confirmation that every change made through somebody
   else's panel gets. Inside an organiser's panel the reveal lifts the seal and
-  nothing else: whether you can then **edit** the challenge still follows that
-  organiser's own rules, so a challenge a co-organiser created stays read-only
+  nothing else: whether you can then **edit** the question still follows that
+  organiser's own rules, so a question a co-organiser created stays read-only
   there.
 - The person whose view you were in is named in the History only to a reader
   who could see that person anyway — another administrator, or an event admin
   who shares an event with them. Any other organiser who can open the
-  challenge's History sees that you were impersonating *an account outside
+  question's History sees that you were impersonating *an account outside
   their events*, without the name; the event log keeps the full detail.
 
 A reveal lasts for the session you made it in, and no longer: signing out,
 switching between **Admin View** and **Participant View**, signing in
-elsewhere, and entering or leaving an impersonation all end it, and revealing the challenge again
-afterwards writes a new record. It is per challenge — revealing one sealed
-challenge shows you nothing about another.
+elsewhere, and entering or leaving an impersonation all end it, and revealing the question again
+afterwards writes a new record. It is per question — revealing one sealed
+question shows you nothing about another.
 
-Two things it does not do. It does not unseal the challenge for anybody else —
+Two things it does not do. It does not unseal the question for anybody else —
 other administrators and event admins still see it sealed, and a regular admin
 is never offered the reveal at all, not even while impersonating the author. And
 it is refused outright if you are **competing** in an event that holds the
-challenge: a competitor may not read the key of a challenge they are competing
+question: a competitor may not read the key of a question they are competing
 on, whatever their tier (see [The competitor lock binds you
 too](#the-competitor-lock-binds-you-too)). While the event is still running you
 can remove yourself from it first; once it has ended that is refused (unless you
 joined it as a late entrant, after it ended, had not started playing before
 then, and late entries are still open),
 so you stay a
-competitor there and the reveal stays refused — any change to the challenge then
+competitor there and the reveal stays refused — any change to the question then
 has to be made by another organiser.
 
 In your own **Participant View**, and while impersonating a participant, there
-is no reveal button: a sealed challenge's answer, explanation and hint are shown
+is no reveal button: a sealed question's answer, explanation and hint are shown
 to you wherever its author would see them, and each time one is shown to you
 the same record is written — unless you are **competing** in an event that
-holds the challenge, in which case nothing sealed is shown to you here either.
+holds the question, in which case nothing sealed is shown to you here either.
 A hint you bought as a competing participant is yours like anybody else's and
 is not recorded as a reveal.
 
 **No record, no reveal.** The record is written *before* anything sealed is put
 in front of you, and if it cannot be written — the platform's database briefly
-unable to take the write, say — nothing sealed is shown. The challenge says so
+unable to take the write, say — nothing sealed is shown. The question says so
 in place of the answer or the hint, asking you to open it again to retry, and a
 hint you tried to reveal that way costs no points. The same holds for the
 **Reveal sealed answer** button in the admin panel: if the record cannot be
@@ -641,10 +665,10 @@ genuinely needs a sealed answer back.
 
 **Deleting or demoting the author doesn't release it.** You can still delete
 their account, or set their role back to participant, with all the usual
-consequences — but the challenge stays sealed, and the author it names is then
+consequences — but the question stays sealed, and the author it names is then
 somebody who can no longer reach it. It is not stranded, though: a
 superadmin can still reveal the answer on the record and then unseal or edit
-the challenge. Even so, ask an author to unseal a challenge *before* you take
+the question. Even so, ask an author to unseal a question *before* you take
 their access away, not after — a reveal is a recorded act, not a quiet tidy-up.
 
 **A seal covers {{platformName}}'s own screens, exports and logs — it is not
@@ -684,7 +708,8 @@ still running. You get two choices:
 
 Deleting a participant removes everything attached to them in one
 all-or-nothing operation — memberships, submissions, revealed hints,
-challenge ratings, reminders, and tags — though an audit line still goes to
+question ratings, reminders, and tags, and their address in every staff team
+(**Settings → Staff teams**; recorded per team) — though an audit line still goes to
 Logs so the deletion stays traceable. Regular admins don't see this option.
 A superadmin also can't delete — or demote — **their own** account: the role
 actions aren't offered on your own row, and the platform refuses a
@@ -755,37 +780,37 @@ removals](#checkmarx-one-account-removals).
 
 ---
 
-## Deleting a challenge
+## Deleting a question
 
-Challenges are deletable from the Challenges tab three-dot menu. The platform
+Questions are deletable from the Questions tab three-dot menu. The platform
 asks for confirmation and then refuses, naming which of four things it found:
-the challenge is assigned to an event that is running right now; it is
+the question is assigned to an event that is running right now; it is
 assigned to an event where a **session has finished**; somebody has
 **submitted** an answer to it; or somebody has **revealed its hint** — which
 can be true even when there are no submissions at all.
 
-> **Not by hiding it, either.** Hiding such a challenge with the visibility
+> **Not by hiding it, either.** Hiding such a question with the visibility
 > toggle would change the very thing the
-> refusal protects: a hidden challenge stops counting toward the "solved
+> refusal protects: a hidden question stops counting toward the "solved
 > everything" total, so participants who had *not* finished a completed
 > event would be retroactively counted as having done so — which can reorder
 > the final places without altering anyone's score. Hiding, unpublishing and
-> any **scoring** edit — the correct answer (on a Text challenge, every
+> any **scoring** edit — the correct answer (on a Text question, every
 > accepted answer: adding or removing one counts), the answer type, the
 > difficulty — are all refused on a finished event. Everything else about the
-> challenge stays editable: its title, description, hint (where the type has
-> one — an Any answer challenge never does), explanation and
-> attachments are not scoring fields. To take a challenge out
+> question stays editable: its title, description, hint (where the type has
+> one — an Any answer question never does), explanation and
+> attachments are not scoring fields. To take a question out
 > of one, **reopen the event first** — and for a multi-session event
 > that means reopening every finished session, not just one. Unassigning is
 > refused while the freeze holds, so it is not a way round it.
 
-![Delete challenge confirm](../screenshots/superadmin/02-task-delete-confirm.png)
+![Delete question confirm](../screenshots/superadmin/02-task-delete-confirm.png)
 
-Deletion removes everything attached to the challenge — assignments, tags,
+Deletion removes everything attached to the question — assignments, tags,
 ratings, edit history, and recorded activity — in one operation, but an audit
 entry stays in Logs so you can still trace who deleted it and when. If you are
-competing in an event that holds the challenge, **Delete** is not offered at all
+competing in an event that holds the question, **Delete** is not offered at all
 — see [The competitor lock binds you too](#the-competitor-lock-binds-you-too).
 
 ---
@@ -874,7 +899,7 @@ view, or their **Event Admin Panel**. Inside the panel, every action it offers
 is yours to take, behind the same *"are you sure?"* confirmation, and every
 change lands on the event's or participant's **History** naming *you* as the
 person who made it through the organiser's panel — never as the organiser's own
-act. You never get more than they have: their events only, their challenges and
+act. You never get more than they have: their events only, their questions and
 participants, and no Logs, Settings or **+ New Event**, because a superadmin
 looking through an organiser's panel is still looking at an organiser's panel.
 An admin sees the same panel read-only.
@@ -882,20 +907,20 @@ An admin sees the same panel read-only.
 ![An event admin's panel through a superadmin's impersonation](../screenshots/superadmin/10-impersonate-event-admin-view.png)
 
 A **sealed answer** the organiser wrote is not shown through their panel — not
-on the challenge list, its history, the exports, an event's **Activity**
+on the question list, its history, the exports, an event's **Activity**
 section or the **Audit** page —
 until you reveal it from there: the row menu offers **Reveal sealed answer**
 exactly as in your own panel, behind the reveal's own confirmation and then
 the *this will change real data* one, and the record names you and the
 organiser's view you were in. The reveal lasts only while you stay in that view.
 A seal cannot be set on their behalf — a seal names a person, not a tier. Your
-own sealed challenges stay readable through it, for the same reason. And if you
+own sealed questions stay readable through it, for the same reason. And if you
 are yourself competing in an event that organiser runs where staff compete,
 their panel is refused to you (their participant view still opens, and switching
 up from it is refused the same way): through their hands you could otherwise
 change the board you compete on. The whole of [the competitor
 lock](#the-competitor-lock-binds-you-too) follows you into their panel: an event
-you compete in, a challenge it holds and a fellow competitor's account are
+you compete in, a question it holds and a fellow competitor's account are
 refused through anybody's panel exactly as they are from your own — whichever
 event the organiser runs.
 
@@ -915,7 +940,7 @@ event the organiser runs.
 What you change **counts**: an answer you submit scores for that participant,
 a hint you reveal deducts their points, and both show up on the leaderboard.
 The one thing that doesn't follow is reporting — impersonated activity is left
-out of Analytics, so a repair session never distorts challenge statistics.
+out of Analytics, so a repair session never distorts question statistics.
 
 Everything is attributed. The participant's **History** records when the
 impersonation started and ended and names you, and each request in between is
@@ -988,15 +1013,15 @@ file has one: an export carries the pictures themselves) keeps the account's
 current avatar, or gives a new account the default one, and the summary counts
 it. **Export JSON**,
 in the same menu, makes an "export → edit in a spreadsheet → re-import" cycle
-work cleanly. The same import/export exists for challenges.
+work cleanly. The same import/export exists for questions.
 
 **An import is checked again just before it writes.** If your access is taken
 away while a large file is being processed — you are blocked, removed, or
 moved to a role that cannot import (the admin role cannot) — or your session ends in
 the meantime, the import is refused and nothing from it is written. Each row it
-writes is read again at that moment too: a challenge locked while the file was
+writes is read again at that moment too: a question locked while the file was
 being checked is skipped rather than overwritten (and one unlocked meanwhile is
-overwritten, attachments included), a challenge or participant deleted
+overwritten, attachments included), a question or participant deleted
 meanwhile is skipped rather than failing the import, and a nickname someone
 registered meanwhile stops the import at that row with a message naming it.
 
@@ -1007,21 +1032,21 @@ batch and leaves every earlier batch saved. The error tells
 you how far it got (imported, overwritten and skipped) and the Participants table
 reloads, so you can see the result rather than being told the whole thing
 failed. Fix the file and re-run it: rows that already landed simply come back as
-conflicts on the next preview, so re-running is safe. The **challenge** import
+conflicts on the next preview, so re-running is safe. The **question** import
 behaves differently — it is a single transaction, so a failure there rolls the
-whole file back, pictures pasted into the challenges included. A row it cannot
+whole file back, pictures pasted into the questions included. A row it cannot
 store does not fail the file, though: it is
-**skipped** and counted in the summary. That covers a challenge with an invalid
-difficulty or answer type, a multiple-choice challenge whose options do not
-work, an **Any answer** challenge that carries a hint (the type never stores
-one — clear it in the file), and a **Text** challenge whose accepted answers
-are all blank. A Text challenge's accepted-answer list is tidied on the way in
+**skipped** and counted in the summary. That covers a question with an invalid
+difficulty or answer type, a multiple-choice question whose options do not
+work, an **Any answer** question that carries a hint (the type never stores
+one — clear it in the file), and a **Text** question whose accepted answers
+are all blank. A Text question's accepted-answer list is tidied on the way in
 exactly as the editor tidies it: blank lines and duplicates are dropped.
 
-**A large import pauses the platform while it writes.** The challenge import
-cleans each challenge's text (description, explanation and hint) before it
+**A large import pauses the platform while it writes.** The question import
+cleans each question's text (description, explanation and hint) before it
 starts writing, answering everyone else's requests meanwhile, but the writing
-itself holds the platform: about three seconds for 10 000 challenges, and one
+itself holds the platform: about three seconds for 10 000 questions, and one
 to two seconds for 5 000 participants, on a fast server. Import a large file
 outside an event's live hours.
 
@@ -1042,7 +1067,7 @@ sign-in method as they were.
 
 **An unrecognised role is ignored rather than stored.** An import accepts a
 role this platform has: a built-in one (participant, event admin, admin,
-superadmin) or a custom role from **Users & roles** (an export carries its id).
+superadmin) or a custom role from **Roles & permissions** (an export carries its id).
 Anything else in a `role` field — a custom role from another platform, say — is
 skipped and counted, and the toast tells you how many: a **new** account
 imports as a participant, and an **existing** one keeps whatever role it
@@ -1060,7 +1085,7 @@ toast says why.** Each participant row may carry the events that person was
 enrolled in on the platform the file came from. An enrolment is skipped, and
 counted by reason in the summary, when the event does not exist here; when it is
 a `staff`-tagged account going into an event where staff do not compete; when
-that person wrote a challenge assigned to an event that lets staff compete; and
+that person wrote a question assigned to an event that lets staff compete; and
 when it is into an event **you are competing in** yourself — the competitor
 lock's import door (see [The competitor lock binds you
 too](#the-competitor-lock-binds-you-too)). Your own row is never skipped;
@@ -1074,20 +1099,20 @@ the same summary: one naming an event or session that does not exist here, one
 into an event you compete in, and any of your own into an event where staff
 compete (whether or not you compete there). And a **group
 association** whose group is bound to an event you compete in is dropped and
-counted, because that group live-syncs a row into the event. The **challenge**
-import has the matching rule: an overwrite of a challenge held by an event you
+counted, because that group live-syncs a row into the event. The **question**
+import has the matching rule: an overwrite of a question held by an event you
 compete in is skipped and counted, exactly as an overwrite of somebody else's
-sealed challenge is, and so is an overwrite the qualifying-question rules refuse:
+sealed question is, and so is an overwrite the qualifying-question rules refuse:
 one that would make an event ask a qualifying topic twice, or move or remove the
 options of a qualifying question somebody has answered (the summary names each).
 Each event holds its own copy of the built-in qualifying questions under the same
-title, and a file names a challenge by its title alone, so an overwrite that could
+title, and a file names a question by its title alone, so an overwrite that could
 mean more than one of them (or two rows of the file overwriting one title) is
 skipped and counted rather than applied to one: edit the question in its event, or
 choose **Add New**. A row that adds a `qualifying:` tag that is not
 `qualifying:<key>` (1–40 lowercase letters, digits, - or _) is skipped too; one the
-challenge already carries is kept.
-An overwrite that would make a sealed challenge an **Any answer** challenge is
+question already carries is kept.
+An overwrite that would make a sealed question an **Any answer** question is
 skipped and counted too: the seal would stay over an answer type with no answer
 to seal.
 And an overwrite of the account of anybody you compete
@@ -1141,7 +1166,7 @@ so the placing it prints is final.
 
 A new account is approved the moment it is created, because its owner has just
 proven the address with an emailed code. Tick **Require admin approval for new
-accounts** under **Settings → Sign-in & accounts** to change that: from then on a new account
+accounts** under **Settings → Sign-in** to change that: from then on a new account
 waits in the approval queue and sees a "Pending Approval" message until an
 organiser approves it. People who sign up through an open event's join link, QR
 code or event code (typing their code in the browser where they asked for it,
@@ -1168,7 +1193,7 @@ recorded in the settings history.
 
 ### The platform look (Settings)
 
-**Settings → Look & appearance → Platform look** sets the whole starting appearance: the **Look**,
+**Settings → Branding → Platform look** sets the whole starting appearance: the **Look**,
 the **Mode** (or leave it to each browser, which follows its device until they choose) and, for Ambient, the
 **Light colour**. The app uses it from its very first moment, the sign-in page
 included, and so do the help page (which opens in its own tab), the pages
@@ -1196,33 +1221,65 @@ Each change is recorded in the settings history.
 
 ## The Settings page
 
-Settings is two panes: the list of sections on the left, the chosen section on
-the right (on a phone, a **Section** picker above it). The sections are
-**Platform** (the platform name), **Look & appearance** (the platform look),
-**Sign-in & accounts** (approval for new
-accounts), **Email** (the mail relay's last check, **Send test email**, the
-unsubscribe list and the [event team report
-domains](#event-team-report-domains)), **Certificates design**, **Checkmarx One** (the default
-integration and the account removals), **Data & retention** (how long event
-history is kept and when it was last swept; the operator sets the period; and
-how many unused pictures that sweep removed, or that it held their clean-up
-because the database failed a start-up check or maintenance was on; a picture
-is unused once no challenge or saved version, account photo, frozen team board
-or older certificate shows it, and the next daily sweep removes it (never within
-a week of it being stored), links to it from outside the platform included; the **Audit** page's record of each
-sweep lists the pictures it removed, so one can be restored from a backup),
-**Alerts** (blocked-address alerts that are still open, each with **Review**),
-and **Break-glass** (only in the built-in account's own session). Each setting
-is one row with its own **?** for the longer explanation, and each form has its
-own Save. The section you last opened is remembered in this browser.
+Settings is two panes: the list on the left, grouped under **People**,
+**Records** and **System**, and the chosen section on the right (on a phone, a
+**Section** picker above it).
 
-Each card shows to whoever may use it: a regular admin sees **Certificates
-design**, the event team report domains (read-only), **Data & retention** and
-**Alerts**; a custom role sees the cards for the permissions you gave it.
+- **People**: **Sign-in** holds approval for new accounts and, only in the
+  built-in account's own session, the **Break-glass account**; **Staff teams**
+  is the directory of colleagues an event's Team & reports, or its organisers,
+  take in one step (see the [admin guide](admin.md#staff-teams)). Seeing it is
+  the `teams.view` permission and changing it `teams.manage`; both are
+  platform-wide, so only a role that covers every event can hold them.
+- **Records**: **CxOne API audit** is a table of every call the platform made
+  to Checkmarx One, newest first: an account set up, linked to an existing one,
+  refused, deferred or given up, a group grant, and each removal of a deleted
+  participant's account, with its time, event, person, result and the error it
+  met. Filter and sort it by its column headings and page through it; a row
+  shows only where your role may see that person's or event's history, as on the
+  Audit page. Below it, the Checkmarx One accounts waiting to be removed for
+  deleted participants.
+- **System**: **General** (the default Checkmarx One integration, how long
+  event history is kept and when it was last swept, open blocked-address alerts,
+  each with **Review**, and the [event team report
+  domains](#event-team-report-domains)), **Branding** (the platform name, the
+  platform look and the certificate design), **Email (SMTP)** (the [mail
+  server](#the-mail-server-smtp) in use, with **Send test email** for it, and
+  its form, and the unsubscribe list) and **About & health**: **This server** (the version, and the
+  commit, build time and release channel a release image was built with; when
+  the server started and how long it has run; the database's start-up checks
+  and size; maintenance mode; the mail relay and its last check; free disk space;
+  the backups the server can see, how many and when the newest finished; and how
+  long event history is kept) and the newest **Release notes**, with **All
+  release notes**. A server set up with the Podman installer checks daily for a
+  new signed release image on its channel and restarts on it, after backing up
+  its database; the backups show here because the installer mounts its backups
+  folder into the app, read-only. Any other deployment shows "not visible" unless
+  its operator does the same (`BACKUP_DIR`).
+
+The pages the sidebar opens (People, Groups, Roles & permissions, Audit and the
+guides) are not repeated in Settings. The running version is at the foot of the
+sidebar (its short form while the sidebar is collapsed).
+
+The history sweep also reports how many unused pictures it removed, or that it
+held their clean-up because the database failed a start-up check or maintenance
+was on; a picture is unused once no question or saved version, account photo,
+frozen team board or older certificate shows it, and the next daily sweep
+removes it (never within a week of it being stored), links to it from outside
+the platform included; the **Audit** page's record of each sweep lists the
+pictures it removed, so one can be restored from a backup. Each setting is one
+row with its own **?** for the longer explanation, and each form has its own
+Save. The section you last opened is remembered in this browser.
+
+Each card shows to whoever may use it: a regular admin sees the **Certificate
+design**, the mail server in use (read-only), the event team report domains (read-only), event history retention,
+the blocked-address alerts, the **CxOne API audit** and **About & health** (without the details only a superadmin
+sees: the database and backup sizes, the Node.js version and when the server started); a custom role sees the cards
+for the permissions you gave it.
 
 ## Platform name
 
-**Settings → Platform** is where the platform is named, and **only a superadmin (or a
+**Settings → Branding** is where the platform is named, and **only a superadmin (or a
 custom role you give both *See platform settings* and *Change platform settings*)
 can change it** — a regular admin does not see that section at all.
 
@@ -1235,10 +1292,11 @@ their inbox** on
 every email the platform sends: invitations, verification, sign-in codes,
 reminders, the lot.
 
-What it does **not** change is the sender *address*. That is fixed by the
-operator in the `EMAIL_FROM` environment variable, on a domain the deployment
-actually controls, because it is the identity SPF is checked against and the
-address bounces come back to. So renaming the platform changes
+What it does **not** change is the sender *address*. That belongs to the [mail
+server](#the-mail-server-smtp) (the `EMAIL_FROM` environment variable, or the
+address saved with the mail server under **Email (SMTP)**), on a domain the
+deployment actually controls, because it is the identity SPF is checked against
+and the address bounces come back to. So renaming the platform changes
 
 ```
 From: Old Name <no-reply@yourdomain.com>
@@ -1263,9 +1321,55 @@ old name in their subject and body; only new batches pick the new one up.
 
 ---
 
+## The mail server (SMTP)
+
+**Settings → Email (SMTP) → Mail server (SMTP)** shows the server every email
+goes through: its host and port, the connection's security, the username,
+whether a password is set (never the password), the sender address, the
+server's last health check, and for each value whether it was **set in the
+app** or comes **from the server's environment** (the `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASS` and `EMAIL_FROM` the server was started with). Anyone
+who may open Settings sees it; only a superadmin can change it, and everyone
+else is told so.
+
+To change it, fill in the form under the facts:
+
+- **Security**: STARTTLS (normally port 587) upgrades the connection and is
+  required; TLS from the start is port 465. The platform never sends in the
+  clear unless the server's operator allowed it for local development.
+- **Username** empty means the server takes mail without signing in.
+- **Password** is stored encrypted and never shown again. Leave it empty to
+  keep the current one: that works only for the same host and username, so a
+  saved password is never sent to another server. Saving for the first time
+  with the box empty copies the environment's password into the app, after
+  which the server's operator can remove it from the environment.
+- **Sender address** is the address mail comes from; the name recipients see is
+  still the platform name.
+
+**Send test email**, under the facts, sends one plain message through the
+server in use, so you can see that mail arrives and what the sender looks like;
+the card's **Last check** is the relay's health. A custom role that may send a
+test but not read the mail server gets the same test on its own **Outbound
+email** card instead.
+
+**Test with these values** sends one message to the address you type, through
+the values in the form, before anything is saved, and shows the server's answer
+if it refuses. **Save** asks first, then sends all email through the new server
+at once, with no restart; mail already on its way finishes on the old one.
+**Remove saved settings** goes back to the server's environment (offered only
+while the environment names a server). Each save is recorded in the Audit log
+with the fields it changed (never the password or username).
+
+After a restore from a backup, or a move to another server, the saved password
+cannot be read (its key is never in a backup). The card says so: mail goes
+through the environment's server meanwhile, if it names one, until you enter
+the password again and save.
+
+---
+
 ## Default CxOne integration
 
-**Settings → Checkmarx One** holds the platform-wide CxOne credentials.
+**Settings → General** holds the platform-wide CxOne credentials.
 
 ![Settings — default CxOne](../screenshots/superadmin/05-cxone-settings.png)
 
@@ -1304,8 +1408,12 @@ their own value, or to no integration if neither is set.
 The **Don't create CxOne accounts for this event** checkbox (top of the
 CxOne section) is **pre-set from the event type**: it arrives clear on a
 Competition — every participant added gets a CxOne account provisioned — and
-already ticked on a Booth Event and a Program, neither of which normally wants a
-Checkmarx One account minted for every attendee. The create dialog says which way
+already ticked on a Program, which does not normally want a Checkmarx One
+account minted for every attendee. A **Booth Event never creates Checkmarx One
+accounts** whatever is asked: its form has no CxOne section, the platform refuses
+accounts or a key override for one, and changing an event to a Booth Event turns
+its accounts off (recorded in its History). Booth Events that had accounts on
+were turned off once when this rule arrived, each recorded in its History. The create dialog says which way
 it has been pre-set for the type you chose. Tick it when an event
 shouldn't touch CxOne at all (a dry run, an external event, a practice
 round): no accounts are created for its participants through any path
@@ -1518,7 +1626,7 @@ a locked account) **and approval notices**.
 > someone learns the account they asked for is usable, and nobody should have to
 > re-subscribe to find that out.
 
-The **Unsubscribe list** under **Settings → Email** (superadmins only) shows each
+The **Unsubscribe list** under **Settings → Email (SMTP)** (superadmins only) shows each
 opted-out address, the date, and the reason. Click **Remove** on a row to
 re-enable delivery for someone who has since consented again.
 
@@ -1622,7 +1730,7 @@ be recovered from Raw logs, from a log backup or from a log shipper. To
 rescue a user whose email never arrived, see [Signing someone in when their
 email is broken](#signing-someone-in-when-their-email-is-broken).
 
-A [sealed](#sealed-answers) challenge's answer is kept out of the logs by that
+A [sealed](#sealed-answers) question's answer is kept out of the logs by that
 same mechanism: an edit to it is written as a note that the sealed answer
 changed, never as the old and new values, so there is nothing in the
 unredacted view for you to read. A superadmin's reveal of one is logged here

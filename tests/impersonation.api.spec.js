@@ -61,9 +61,10 @@ async function mkTask(api, H, compId, title, answer) {
     title, description: "<p>x</p>", difficulty: "easy",
     answer_type: "text", correct_answer: answer, explanation: "<p>e</p>", hint: "a hint", status: "published",
   }});
-  const taskId = (await r.json()).id;
-  await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H, data: { competitionIds: [compId] } });
-  return taskId;
+  const bankId = (await r.json()).id;
+  const a = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H, data: { competitionIds: [compId] } });
+  if (!a.ok()) throw new Error(`assign ${title}: ${a.status()} ${await a.text()}`);
+  return (await a.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is answered in it
 }
 
 // Impersonate `targetId` from a fresh session logged in as `email`
@@ -466,10 +467,12 @@ test.describe("Participant impersonation (v7.14.0)", () => {
     expect(an1.summary.incorrect, "an impersonated WRONG answer must not count either").toBe(0);
     expect(an1.summary.unique_participants).toBe(0);
 
-    // A REAL participant action still counts (and stamps the clock normally).
+    // A REAL participant action still counts (and stamps the clock normally: on
+    // entry, or at the first open where the event starts it there).
     const tgt = await apiLogin(ST.tgtEmail, PARTICIPANT_PASS);
     await tgt.api.post("/api/select-competition", { headers: h(tgt.csrf), data: { competitionId: ST.compId } });
-    expect(dbGet("SELECT login_time FROM competition_users WHERE competition_id=? AND user_id=?", ST.compId, ST.tgtId).login_time, "REAL entry stamps the clock").toBeTruthy();
+    expect((await tgt.api.get(`/api/tasks/${ST.taskB}`)).ok()).toBeTruthy();
+    expect(dbGet("SELECT login_time FROM competition_users WHERE competition_id=? AND user_id=?", ST.compId, ST.tgtId).login_time, "REAL entry and open stamp the clock").toBeTruthy();
     await tgt.api.post(`/api/tasks/${ST.taskB}/submit`, { headers: h(tgt.csrf), data: { answer: "wrong-guess" , gradingHash: await gradingHashFor(tgt.api, ST.taskB)} });
     await tgt.api.dispose();
     await expect.poll(async () => {

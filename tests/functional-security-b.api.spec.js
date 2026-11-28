@@ -741,7 +741,11 @@ test.describe("Remove-from-competition session cleanup", () => {
       // Self-contained live comp (started 1h ago) + published task + enrolled user.
       compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: `PUTCache ${tag}`, start_time: new Date(Date.now() - 3600_000).toISOString(), duration_minutes: 180 } })).json()).competition.id;
       taskId = (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title: `PUTCacheTask ${tag}`, difficulty: "easy", correct_answer: "x", answer_type: "text", status: "published" } })).json()).id;
-      await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [compId] } });
+      const asg = await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [compId] } });
+      expect(asg.ok(), await asg.text()).toBeTruthy();
+      // The event's own copy (lib/event-copies.js): the row a submission names. The
+      // desired-state PUT below still names the BANK question, which is "in" the event through it.
+      const heldId = (await asg.json()).copies[0].task_id;
       const email = `putcache_${tag}@acme.com`;
       await registerPost(sa, "/api/register", { headers: saH, data: { firstName: "Put", lastName: "Cache", nickname: `putcache_${tag}`, email, company: "Acme", title: "Eng", country: "US", timezone: "America/New_York", jobFunction: "Software Developer / Engineer", city: "NYC" } });
       const u = (await (await sa.get("/api/admin/participants?limit=2000")).json()).participants.find(p => p.email === email);
@@ -753,7 +757,7 @@ test.describe("Remove-from-competition session cleanup", () => {
       const dbW = new Database(TEST_DB_PATH);
       try {
         dbW.prepare("INSERT INTO submissions (id, user_id, task_id, competition_id, timeslot_id, is_correct, points_delta, answer, submitted_at) VALUES (?,?,?,?,NULL,1,50,'x',?)")
-          .run(`pc_${tag}`, userId, taskId, compId, new Date().toISOString());
+          .run(`pc_${tag}`, userId, heldId, compId, new Date().toISOString());
       } finally { dbW.close(); }
       // Set the user's password so they can read their own participant board.
       // Warm the participant leaderboard cache (buildLeaderboard caches per comp).

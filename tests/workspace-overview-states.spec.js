@@ -73,20 +73,20 @@ test("Ready to start? counts scoring challenges only and claims nothing it has n
   // Only the four quick questions: no challenge to play yet.
   await openWs(page, onlyQ);
   const ready = page.locator("#ws-ov-ready");
-  await expect(ready).toContainText("No challenges yet", { timeout: 15000 });
+  await expect(ready).toContainText("No questions yet", { timeout: 15000 });
   await expect(ready, "never 'published' for questions that score nothing").not.toContainText("published");
   await expect(page.locator('[data-kpi-tile="tasks"] .ws-kpi-sub')).toHaveText("none yet");
 
   // The other event, opened while its pulse read fails: nothing is claimed.
   await page.route(pulseUrl(withOne.id), (route) => route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"boom"}' }));
   await openWs(page, withOne);
-  await expect(ready).toContainText("Could not check the challenges", { timeout: 15000 });
+  await expect(ready).toContainText("Could not check the questions", { timeout: 15000 });
   await expect(ready, "no 'published' claim without a read").not.toContainText("published");
   await expect(page.locator('[data-kpi-tile="tasks"] .ws-kpi-sub'), "nor in the tile").not.toHaveText("all published");
   await page.unroute(pulseUrl(withOne.id));
   await ready.locator('[data-action="ws-pulse-retry"]').click();
   // CONTROL: read, the one scoring challenge counts and the four questions do not.
-  await expect(ready).toContainText("1 challenge published", { timeout: 15000 });
+  await expect(ready).toContainText("1 question published", { timeout: 15000 });
   await expect(page.locator('[data-kpi-tile="tasks"] .ws-kpi-sub')).toHaveText("all published");
   await expect(page.locator('[data-kpi-tile="tasks"] .ws-count')).toHaveAttribute("data-count", "1");
 
@@ -157,8 +157,8 @@ test("the live attention row: what needs you, then 'Nothing needs you'; a failed
     ev = await createEvent(sa.api, sa.csrf, { event_kind: "tournament", start_time: new Date(Date.now() - 600_000).toISOString(), duration_minutes: 240 });
     t1 = await makeTask(sa.api, sa.csrf, "wsoattn1", { correct_answer: "right" });
     t2 = await makeTask(sa.api, sa.csrf, "wsoattn2", { correct_answer: "right" });
-    await assignTask(sa.api, sa.csrf, t1.id, [ev.id]);
-    await assignTask(sa.api, sa.csrf, t2.id, [ev.id]);
+    Object.assign(t1, { bankId: t1.id, id: (await assignTask(sa.api, sa.csrf, t1.id, [ev.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
+    Object.assign(t2, { bankId: t2.id, id: (await assignTask(sa.api, sa.csrf, t2.id, [ev.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
     const hide = await sa.api.patch(`/api/admin/tasks/${t2.id}/visibility`, { headers: H(sa.csrf), data: { active: false } });
     expect(hide.ok(), `hide: ${await hide.text()}`).toBeTruthy();
     p = await makeParticipant(sa.api, sa.csrf, "wsoattnp");
@@ -171,8 +171,8 @@ test("the live attention row: what needs you, then 'Nothing needs you'; a failed
   await adminLogin(page);
   await openWs(page, ev);
   const attn = page.locator("#ws-ov-attn");
-  await expect(attn).toContainText("1 challenge is not visible to participants.", { timeout: 20000 });
-  await expect(attn).toContainText("Nobody has solved this challenge yet:");
+  await expect(attn).toContainText("1 question is not visible to participants.", { timeout: 20000 });
+  await expect(attn).toContainText("Nobody has solved this question yet:");
   await expect(attn).toContainText(t1.title);
   await expect(attn.locator(".ws-allclear"), "nothing is all clear while two things need the organiser").toHaveCount(0);
 

@@ -66,18 +66,25 @@ function withDb(fn, opts = { readonly: true }) {
 }
 const dbGet = (sql, ...a) => withDb(db => db.prepare(sql).get(...a));
 const dbExec = sql => withDb(db => db.exec(sql), { readonly: false });
-const heldCount = tid => dbGet("SELECT COUNT(*) c FROM competition_tasks WHERE task_id=?", tid).c;
-const held = (cid, tid) => !!dbGet("SELECT 1 x FROM competition_tasks WHERE competition_id=? AND task_id=?", cid, tid);
-const assignmentRow = (cid, tid) => dbGet("SELECT assigned_at, assigned_by_id FROM competition_tasks WHERE competition_id=? AND task_id=?", cid, tid);
+// A challenge is held by an event as itself or, for a bank question, as that
+// event's own copy of it — what every assign door puts in (lib/event-copies.js).
+const HELD_AS = "(ct.task_id=? OR ct.task_id IN (SELECT id FROM tasks WHERE copied_from_task_id=? AND owner_competition_id=ct.competition_id))";
+const heldCount = tid => dbGet(`SELECT COUNT(*) c FROM competition_tasks ct WHERE ${HELD_AS}`, tid, tid).c;
+const held = (cid, tid) => !!dbGet(`SELECT 1 x FROM competition_tasks ct WHERE ct.competition_id=? AND ${HELD_AS}`, cid, tid, tid);
+const assignmentRow = (cid, tid) => dbGet(`SELECT assigned_at, assigned_by_id FROM competition_tasks ct WHERE ct.competition_id=? AND ${HELD_AS}`, cid, tid, tid);
 const assignEvents = (cid, tid) => dbGet(
   "SELECT COUNT(*) c FROM competition_events WHERE competition_id=? AND event_type IN ('task_added','task_removed') AND details LIKE ?",
   cid, `%${tid}%`).c;
 const taskRow = tid => dbGet("SELECT title, updated_at, attachment_url FROM tasks WHERE id=?", tid);
 
-/** Run `fn` with every INSERT of `taskId` into competition_tasks failing; the trigger is ALWAYS dropped. */
+/**
+ * Run `fn` with every INSERT of `taskId` — or of an event's copy of it, made in
+ * the same transaction (lib/event-copies.js) — into competition_tasks failing;
+ * the trigger is ALWAYS dropped.
+ */
 async function withAssignFailing(taskId, token, fn) {
   const trig = `zz_assignerr_${taskId.replace(/[^a-zA-Z0-9]/g, "")}`;
-  dbExec(`CREATE TRIGGER ${trig} BEFORE INSERT ON competition_tasks WHEN NEW.task_id='${taskId}' BEGIN SELECT RAISE(ABORT,'${token}'); END;`);
+  dbExec(`CREATE TRIGGER ${trig} BEFORE INSERT ON competition_tasks WHEN NEW.task_id='${taskId}' OR NEW.task_id IN (SELECT id FROM tasks WHERE copied_from_task_id='${taskId}') BEGIN SELECT RAISE(ABORT,'${token}'); END;`);
   try {
     expect(dbGet("SELECT 1 x FROM sqlite_master WHERE type='trigger' AND name=?", trig), "precondition: the failure is really armed").toBeTruthy();
     return await fn();
@@ -158,7 +165,7 @@ test.describe("v8.13.3 — an internal error in the assignment transaction is a 
     });
     const ok = await putDesired({ api: sa, csrf: saCsrf }, T.id, [C.id], []);
     expect(ok.status(), await ok.text()).toBe(200);
-    expect(await ok.json()).toEqual({ ok: true, added: 1, removed: 0 });
+    expect(await ok.json()).toEqual({ ok: true, added: 1, removed: 0, copies: [{ competition_id: C.id, task_id: expect.any(String) }] });   // the event's own copy
   });
 
   test("CONTROL — every DELIBERATE refusal keeps its status and its exact body, on both doors", async () => {
@@ -170,7 +177,7 @@ test.describe("v8.13.3 — an internal error in the assignment transaction is a 
     const ended = await makeCompetition(sa, saCsrf, "ended", {
       start_time: new Date(Date.now() - 2 * 3_600_000).toISOString(), duration_minutes: 30,
     });
-    const endedMsg = `Cannot modify challenge assignments for competition "${ended.name}" — a session has already ended.`;
+    const endedMsg = `Cannot modify question assignments for competition "${ended.name}" — a session has already ended.`;
     await expectNamed400(await postAssign(SA, T.id, [ended.id]), endedMsg, "POST into an ended event");
     await expectNamed400(await putDesired(SA, T.id, [ended.id], []), endedMsg, "PUT into an ended event");
 
@@ -254,7 +261,7 @@ test.describe("v8.13.3 — competitionIds / expectedAssignments must be arrays o
     // CONTROL — the well-formed round trip is a true no-op: 200, nothing moved.
     const ok = await putDesired(SA, T.id, [C1.id], [C1.id]);
     expect(ok.status(), await ok.text()).toBe(200);
-    expect(await ok.json()).toEqual({ ok: true, added: 0, removed: 0 });
+    expect(await ok.json()).toEqual({ ok: true, added: 0, removed: 0, copies: [] });
     expect(assignmentRow(C1.id, T.id)).toEqual(before);
   });
 
@@ -272,7 +279,7 @@ test.describe("v8.13.3 — competitionIds / expectedAssignments must be arrays o
     // CONTROL — their own event, as a string, lands.
     const ok = await putDesired(E, T.id, [mine.id], []);
     expect(ok.status(), await ok.text()).toBe(200);
-    expect(await ok.json()).toEqual({ ok: true, added: 1, removed: 0 });
+    expect(await ok.json()).toEqual({ ok: true, added: 1, removed: 0, copies: [{ competition_id: mine.id, task_id: expect.any(String) }] });   // the event's own copy
   });
 
   test("a PUT naming an id that does not exist tells an event admin nothing an out-of-scope id does not", async () => {
@@ -308,7 +315,7 @@ test.describe("v8.13.3 — competitionIds / expectedAssignments must be arrays o
     const T = await makeTask(sa, saCsrf, "cap");
     // The POST twin adds exactly what it lists, so its LIST is the change.
     const over = Array(BULK_ADMIN_MAX + 1).fill(C.id);
-    await expectNamed400(await postAssign(SA, T.id, over), `Cannot assign a challenge to more than ${BULK_ADMIN_MAX} events in a single request.`, "POST over the cap");
+    await expectNamed400(await postAssign(SA, T.id, over), `Cannot assign a question to more than ${BULK_ADMIN_MAX} events in a single request.`, "POST over the cap");
     expect(heldCount(T.id)).toBe(0);
     // The PUT is a DESIRED-STATE door, so its bound is on the CHANGE (the
     // pre-release review): more than BULK_ADMIN_MAX DISTINCT new ids is refused
@@ -318,7 +325,7 @@ test.describe("v8.13.3 — competitionIds / expectedAssignments must be arrays o
     await expectNamed400(await putDesired(SA, T.id, ghosts, []), changeMsg, "PUT adding more than the cap");
     // …and an expected set far beyond what the challenge holds cannot be what
     // the dialog was shown.
-    await expectNamed400(await putDesired(SA, T.id, [C.id], ghosts), "expectedAssignments lists far more events than this challenge is assigned to.", "PUT expectedAssignments far beyond the state");
+    await expectNamed400(await putDesired(SA, T.id, [C.id], ghosts), "expectedAssignments lists far more events than this question is assigned to.", "PUT expectedAssignments far beyond the state");
     expect(heldCount(T.id)).toBe(0);
     // …while REPEATS are one id, on both doors: the list's length is not the cap.
     const okPost = await postAssign(SA, T.id, Array(BULK_ADMIN_MAX).fill(C.id));

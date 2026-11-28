@@ -250,8 +250,10 @@ the event leaves the strip, even while later sessions are still to run.
 ranked: it has a leaderboard, a running score and placings. A **Booth Event** is
 a short walk-up session at a stand (on a phone, its multiple-choice questions are
 large tiles you tap). A **Program** is self-paced material running to a
-deadline: it has no leaderboard and no placings, and its certificate is issued as
-soon as you have solved every challenge rather than when the event finishes. Its
+deadline: it has no leaderboard and no placings. Once you have finished every
+challenge (solved it or used every attempt) you get a grade, and a grade of 60%
+or more earns your certificate straight away rather than when the event
+finishes (see *Your grade on a Program*). Its
 points still count — each challenge shows what it is worth, and answering one
 tells you your total — but the header, the play bar and the progress strip show
 no score.
@@ -486,8 +488,9 @@ more, a **Day 2 of 5** chip sits beside it. A Program whose closing date is five
 years or more away says **No fixed deadline** there instead, with no day chip.
 On a ranked event your running score is shown beside your account button and
 keeps itself up to date: about every 15 seconds while you are using the page,
-less often while it sits idle. When the clock runs out the countdown is replaced
-by the event's name and *Ended*.
+less often while it sits idle (on an open challenge the play bar shows it
+instead, so the page says it once). When the clock runs out the countdown is
+replaced by the event's name and *Ended*.
 
 ![Challenges grid](../screenshots/participant/04-tasks-list.png)
 
@@ -749,7 +752,8 @@ Click **Leaderboard** for live rankings.
 ![Leaderboard](../screenshots/participant/07-leaderboard.png)
 
 Ranking is by **score** (highest first), then by **finish time** (faster
-first) among ties. The top three stand on a **podium**, and the table below
+first) among ties. Your time is measured from **when your clock started** —
+see *When your clock starts* below. The top three stand on a **podium**, and the table below
 starts at rank 4. Your own row is highlighted, and the board updates by itself:
 soon after a score on it changes, and at least once a minute. When the event
 ends, an open board turns into the **Final standings** by itself within a
@@ -783,9 +787,18 @@ side. If you don't see it, the organizer hasn't enabled it for this event.
 
 ![Team Rankings board below the individual leaderboard](../screenshots/participant/12-team-rankings.png)
 
-With **per-session leaderboards**, you're ranked only against your own
-session and can't see the others. The organiser chooses this when creating
-the event.
+On an event with sessions, the organiser chooses how it is ranked: a winner per
+session (you are ranked against your own session, named above the board, and
+can't see the others), one overall winner (everyone together), or both (your
+session's board, and the **Overall** board below it). Each session can have its
+own questions, so your Challenges page shows only your session's. Where the
+overall board ranks by **percentages**, it ranks everyone by the share of their
+own session's points they earned, and shows the points under it; time still
+breaks a tie. A top-three place on either board earns a certificate that names
+the board, so with both you can earn two; a place on an overall board ranked by
+percentages prints your percentage rather than your points. Before you collect
+it, the certificate card on such a board shows only the place you would get
+(for example *1st Place — Overall*), with no score.
 
 ---
 
@@ -1036,9 +1049,42 @@ three kinds:
   a challenge doesn't get one. A Gold, Silver or Bronze certificate already
   issued to a top-three place on zero points or fewer keeps its medal: what a
   certificate attests is fixed when it is issued.
-- **Completion certificate** — on a **Program**, you earn a certificate the
-  moment you have solved every challenge assigned to you. You do not wait for
-  the programme's deadline.
+- **Completion certificate** — on a **Program**, your certificate carries your
+  **grade**, and you earn it the moment you have finished every challenge
+  assigned to you (solved it, or used up its attempts) with **60% or more**. You
+  do not wait for the programme's deadline. See *Your grade on a Program* below.
+
+### Your grade on a Program
+
+A Program is not a competition: there is no leaderboard, and everyone is graded
+on their own performance. Your grade is the points you hold out of the most the
+Program's challenges can give (Easy 50, Medium 100, Hard 150 each). Every wrong
+answer (5 points) and every hint you reveal (30% of the challenge's points)
+counts against it, and it never goes below 0%. Quick questions score nothing and
+are left out of it.
+
+| Grade | Band |
+|---|---|
+| 90% or more | **Excellent** |
+| 80% to under 90% | **Very good** |
+| 70% to under 80% | **Good** |
+| 60% to under 70% | **Satisfactory** |
+| under 60% | no certificate: **try the quiz again** |
+
+**The Program tells you where you stand.** The top of the **Challenges** page
+shows your grade so far (*Where you stand: 45%*). It counts once you have
+finished every challenge. At 60% or more your certificate is ready, printed with
+your band and percentage (for example **Very good**, **85%**), and it is emailed
+to you. Under 60% there is no certificate: the page says **try the quiz again**
+and offers **Try again**.
+
+**Try again** starts every challenge afresh and counts your grade again from
+zero; this is attempt 2 (then 3, and so on), and the page tells you what your
+last attempt ended on. Your earlier answers are kept in your history, not
+deleted, and your answers to Quick questions stay as they are. You can try again
+only while the Program is running, and only while your grade is under 60%: once
+you have passed, your certificate is issued with that grade and there is nothing
+to take again.
 
 For a competition or a booth event, open the **Leaderboard** for the finished
 event: if you're eligible, a **Your certificate** card appears with a small
@@ -1050,7 +1096,7 @@ the card says so and offers nothing to download or share. A Program has no
 leaderboard, so its certificate
 is offered at the top of the **Challenges** page instead — **Your certificate is
 ready**, then **Get my certificate**. Either route opens a preview carrying your
-placement (or "took part", or "Completed"), the event name and date, and
+placement (or "took part", or your Program grade), the event name and date, and
 your display name. The **Challenges** page offers it for every other event too,
 and once you hold it shows **Your certificate** with **View certificate**.
 
@@ -1122,9 +1168,9 @@ against is frozen when the certificate is created, so after a rename its
 `/credential` page shows your new name, still expects the old family name, and
 notes that the name has changed. Decide on a **Certificate name** before you
 claim a certificate — an issued one cannot be re-issued under a new spelling.
-The score and the date on one are fixed when it is created and never move. A
-Program's certificate is dated the day you answered your last scored challenge:
-a Quick question you answer or change later does not change it.
+The score, the grade and the date on one are fixed when it is created and never
+move. A Program's certificate is dated the day you finished: your last answer to
+a scored challenge. A Quick question you answer or change later does not change it.
 The certificate prints names
 in Latin, Greek and Cyrillic, and in Arabic, Hebrew, Thai, Chinese, Japanese and
 Korean. When your salutation is all that stops your name being printed — a
@@ -1152,6 +1198,30 @@ is no leave control, so ask an organiser to take you out.
   them to remove you instead.
 - An event that has already finished cannot be left.
 
+## When your clock starts
+
+Your **time to solve** — what separates you from someone with the same score —
+is measured from a starting moment, and on most events that moment is **when you
+open your first challenge**, not when the event began or when you arrived. The
+challenge list says so:
+
+> Your time to solve starts when you open your first challenge, not when you arrive.
+
+So arriving late, waiting in the lobby, or reading the list of challenges costs
+you nothing. Your clock starts the first time you open a challenge that scores
+points (answering one, or asking for a hint, before you have opened anything
+also starts it). The **Quick questions** at the end of the list do not start
+it. Until your clock has started you are not on the leaderboard yet. Opening
+more challenges, leaving and coming back, or being removed from the event and
+added again never restarts it.
+
+The countdown at the top still shows how long the **event** has left: your own
+clock does not change when the event ends.
+
+Some events — every event set up before this rule, and any whose organiser
+chose so — start your clock **when you enter the event** instead, and say
+nothing about it on the list.
+
 ## Time on platform
 
 Some events record how much time you spend on the platform. Where they do, you
@@ -1162,7 +1232,8 @@ will see it said on the event itself:
 It counts five-minute blocks in which you were actually doing something —
 typing, clicking, scrolling. Leaving a tab open in the background does not count,
 and neither does anything you do after you have finished every challenge, so
-there is nothing to gain by staying logged in.
+there is nothing to gain by staying logged in. On an event that starts your clock
+at your first challenge, nothing counts before you open one either.
 
 Organisers use it to tell a five-day event apart from five days of elapsed time.
 On some events it also breaks a tie between equal scores, in which case finishing

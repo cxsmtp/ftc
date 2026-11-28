@@ -61,9 +61,9 @@ async function makeEvent(api, csrf, { kind, tasks = 2, person = {} }) {
     });
     expect(tr.ok(), await tr.text()).toBeTruthy();
     const id = (await tr.json()).id;
-    ids.push(id);
     const asg = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), await asg.text()).toBeTruthy();
+    ids.push((await asg.json()).copies[0].task_id);   // the event's own copy (lib/event-copies.js): what its participants open and answer
   }
 
   const user = await makeParticipant(api, csrf, uniq(), person);

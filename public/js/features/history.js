@@ -199,8 +199,10 @@ export function formatEventChange(ev){
     }
     // An administrator's Look up a certificate by its code (the holder's History).
     case 'credential_resolved':return `Certificate checked — its code was looked up to find its holder${d.revoked===true?' (the certificate had been revoked)':''}`;
-    case 'task_added':return `+ challenge: <strong>${esc(d.task_title||d.task_id||'')}</strong>`;
-    case 'task_removed':return `− challenge: <strong>${esc(d.task_title||d.task_id||'')}</strong>`;
+    case 'task_added':return `+ question: <strong>${esc(d.task_title||d.task_id||'')}</strong>`;
+    case 'task_removed':return `− question: <strong>${esc(d.task_title||d.task_id||'')}</strong>`;
+    case 'task_sessions_changed':{const w=v=>Array.isArray(v)?v.map(esc).join(', '):esc(v||'every session');return `Sessions for <strong>${esc(d.task_title||d.task_id||'')}</strong>: ${w(d.from)} → ${w(d.to)}`;}
+    case 'task_sessions_carried':return `Question sessions copied from the source event (${esc(String(d.questions||0))} question${d.questions===1?'':'s'})`;
     case 'scores_recalculated':return `Scores recalculated: <strong>${esc(d.task_title||d.task_id||'')}</strong>${d.reason==='qualifying_tag_added'?' (now a qualifying question)':d.reason==='qualifying_tag_removed'?' (no longer a qualifying question)':d.reason==='restore'?' (a restored version)':d.reason==='import'?' (an import changed whether it is a qualifying question)':''}`;
     case 'user_added':{const via=d.via?` (via <em>${esc(d.via)}</em>)`:'';return `+ participant: <strong>${esc(d.nickname||d.user_id||'')}</strong>${via}${_lateEntrantSfx(d.late_entry)}${_freeMailSfx(d.bypassed_free_email_rule)}`;}
     case 'user_removed':return `− participant: <strong>${esc(d.nickname||d.user_id||'')}</strong>${_lateEntrantSfx(d.late_entrant)}`;
@@ -253,7 +255,7 @@ export function formatEventChange(ev){
       const ex=Number(d.exhausted_participants)||0;
       return ex>0
         ? `Ended automatically: every participant finished — ${ex} ran out of attempts rather than solving everything`
-        : 'Ended automatically: all participants solved all challenges';
+        : 'Ended automatically: all participants solved all questions';
     }
     // ── Login / logout ──
     case 'login_success':{
@@ -335,6 +337,12 @@ export function formatEventChange(ev){
       if(d.changes)return '<span style="color:var(--muted)">self-edit</span><br>'+Object.entries(d.changes).map(([k,v])=>_fmtDiffLine(k,v.from,v.to)).join('');
       return 'Profile updated';
     case 'password_changed':return 'Password changed';
+    // Program grades (27 Nov 2026): the learner closed an attempt under the pass
+    // mark and started again; the closed attempt's grade is in the details.
+    case 'program_retake_started':{
+      const pct=Number.isFinite(Number(d.grade_permille))?`${(Number(d.grade_permille)/10).toFixed(1).replace(/\.0$/,'')}%`:'';
+      return `Started the program again (attempt ${esc(String(d.attempt||''))})${pct?`<br><span style="color:var(--muted)">attempt ${esc(String(d.closed_attempt||''))} ended on ${esc(pct)}: ${esc(String(d.points??''))} of ${esc(String(d.max_points??''))} points</span>`:''}`;
+    }
     case 'password_reset_requested':return 'Password reset requested';
     case 'password_reset_completed':return 'Password reset completed';
     case 'session_chosen':{const prev=d.previous_timeslot_id?' (switched)':'';return `Session chosen: <strong>${esc(d.timeslot_name||'')}</strong> in ${esc(d.competition_name||'')}${prev}`;}
@@ -465,7 +473,7 @@ const _SEALED_TASK_FIELDS=['correct_answer','explanation','hint'];
 function _sealedFieldNote(curr,prev){
   const gone=_SEALED_TASK_FIELDS.some(f=>!(f in curr)||(prev&&!(f in prev)));
   return gone
-    ? `<div><span style="color:var(--muted)">answer:</span> <span style="color:var(--muted)">sealed — only the challenge's author, or a superadmin who reveals it on the record, can see it</span></div>`
+    ? `<div><span style="color:var(--muted)">answer:</span> <span style="color:var(--muted)">sealed — only the question's author, or a superadmin who reveals it on the record, can see it</span></div>`
     : '';
 }
 
@@ -653,7 +661,7 @@ export function renderHistoryDialog(){
     const actionCell=isTaskHistory?`<td style="text-align:center">${i.raw.id===currentVersionId
       ?'<span class="badge history-current-badge">current</span>'
       :_isRevealRow(i.raw)
-      ?'<span class="cell-empty" style="font-size:var(--fs-12)" title="This entry records a sealed answer being revealed; it is not a version of the challenge.">Record</span>'
+      ?'<span class="cell-empty" style="font-size:var(--fs-12)" title="This entry records a sealed answer being revealed; it is not a version of the question.">Record</span>'
       :(task?.locked
         ?`<span class="history-locked-icon" title="Locked">${ICO.lock}</span>`
         // v8.8.5 — RESTORE IS ALWAYS A SCORING EDIT, and this dialog offered it
@@ -667,9 +675,9 @@ export function renderHistoryDialog(){
         :(task&&Array.isArray(task.competing_in)&&task.competing_in.length
           // v8.12.0 — a competitor's reason comes first, or a superadmin is told a
           // rule that does not bind them (the v8.10.1 wrong-reason lesson).
-          ?`<span class="cell-empty" style="font-size:var(--fs-12)" title="You are competing in an event that holds this challenge, so you cannot change it.">Not while competing</span>`
+          ?`<span class="cell-empty" style="font-size:var(--fs-12)" title="You are competing in an event that holds this question, so you cannot change it.">Not while competing</span>`
           :task&&task.can_edit_scoring===false
-          ?`<span class="cell-empty" style="font-size:var(--fs-12)" title="Restoring a version rewrites the challenge's answer and difficulty, which another organiser's event is scoring on.">Not yours to restore</span>`
+          ?`<span class="cell-empty" style="font-size:var(--fs-12)" title="Restoring a version rewrites the question's answer and difficulty, which another organiser's event is scoring on.">Not yours to restore</span>`
           :`<button class="btn sm secondary history-restore-btn" data-action="task-restore-version" data-task-id="${esc(taskId)}" data-version-id="${esc(i.raw.id)}" data-version-num="${Number(i.raw.version_num)}">Restore</button>`))}</td>`:'';
     return `<tr>
       <td><span class="badge history-type-badge">${esc(i.type)}</span></td>
@@ -734,7 +742,8 @@ export async function showCompetitionHistory(compId){
 }
 
 export async function showUserHistory(userId){
-  const user=S.adminParticipantsData.find(p=>p.id===userId);
+  // People's row, else the admin account a Roles & permissions row names.
+  const user=(S.adminParticipantsData||[]).find(p=>p.id===userId)||(S.adminUserRows||[]).find(p=>p.id===userId);
   const name=user?`${user.first_name||''} ${user.last_name||''}`.trim()||user.nickname||user.email:'';
   const seq=++_histOpenSeq;
   const {events,total,snapshotBefore,snapshotTie,failed}=await _fetchEventsPaged(`/api/admin/participants/${userId}/events`);
@@ -753,8 +762,8 @@ export async function showTaskHistory(taskId){
   const seq=++_histOpenSeq;
   const versions=await fetchJsonList(`/api/admin/tasks/${taskId}/versions`);
   if(seq!==_histOpenSeq)return;   // v8.12.6 — superseded by a later open
-  if(versions===null){await showModal({title:'Version History',message:'Could not load the version history for this challenge. The request failed — try again, and check the admin Logs if it keeps happening.',confirmText:'OK',cancelText:null});return;}
-  if(!versions.length){await showModal({title:'Version History',message:'No version history available for this challenge.',confirmText:'OK',cancelText:null});return;}
+  if(versions===null){await showModal({title:'Version History',message:'Could not load the version history for this question. The request failed — try again, and check the admin Logs if it keeps happening.',confirmText:'OK',cancelText:null});return;}
+  if(!versions.length){await showModal({title:'Version History',message:'No version history available for this question.',confirmText:'OK',cancelText:null});return;}
   openHistoryDialog({title:`History: ${task?.title||''}`,events:versions,isTaskHistory:true,task,taskId});
 }
 

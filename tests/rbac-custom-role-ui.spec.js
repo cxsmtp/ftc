@@ -165,13 +165,17 @@ test.describe("RBAC — a custom role in the browser", () => {
     const gbind = await sa.post("/api/admin/competitions/assign", { headers: H(saCsrf), data: { groupIds: [group.id], competitionIds: [comp.id] } });
     expect(gbind.ok(), `bind group: ${gbind.status()} ${await gbind.text()}`).toBeTruthy();
     // A capped challenge on the live event (Grant Attempts is offered only where
-    // a cap holds), and the participant entered it, so the board lists them.
+    // a cap holds), and the participant entered it and opened that challenge, so
+    // the board lists them (its clock starts at the first open; opening spends no
+    // attempt).
     capTask = await makeTask(sa, saCsrf, "crcap", { attempt_cap: 2 });
-    await assignTask(sa, saCsrf, capTask.id, [comp.id]);
+    const capAsg = await assignTask(sa, saCsrf, capTask.id, [comp.id]);
     const p = await apiLogin(partU.email, PARTICIPANT_PASS);
     try {
       const sel = await p.api.post("/api/select-competition", { headers: H(p.csrf), data: { competitionId: comp.id } });
       expect(sel.ok(), `PRECONDITION: the participant entered the event: ${sel.status()} ${await sel.text()}`).toBeTruthy();
+      const opened = await p.api.get(`/api/tasks/${capAsg.copies[0].task_id}`);
+      expect(opened.ok(), `PRECONDITION: the participant opened its challenge: ${opened.status()}`).toBeTruthy();
     } finally { await p.api.dispose(); }
     // A built-in event admin organising `comp` and an event with nobody in it.
     emptyComp = await makeCompetition(sa, saCsrf, "crempty");
@@ -374,17 +378,17 @@ test.describe("RBAC — a custom role in the browser", () => {
     await expect.poll(() => wsTabsShown(page), { message: "only the sections events.view reads", timeout: 15000 })
       .toEqual(["admin-event-overview-tab", "admin-event-team-tab", "admin-event-settings-tab"]);
     // The header: no Invite, no join pill; the ⋯ menu holds only the reads.
-    await expect(page.locator('#ws-quick [data-action="ws-invite"]')).toHaveCount(0);
+    await expect(page.locator('#ws-quick .ws-invite-btn')).toHaveCount(0);
     await expect(page.locator(".ws-join-pill")).toHaveCount(0);
     await page.locator("#ws-quick .ws-more-btn").click();
     await expect(page.locator("#kebab-portal")).toBeVisible();
     const items = await page.locator("#kebab-portal [data-action]").evaluateAll((els) => els.map((e) => e.dataset.action));
-    expect(items, "only the doors events.view opens").toEqual(["comp-history", "comp-organisers", "comp-delivery"]);
+    expect(items, "only the doors events.view opens").toEqual(["comp-history", "comp-delivery"]);
     await page.keyboard.press("Escape");
     // The palette inherits the same gates (Invite and every workspace write).
     await openPalette(page);
     const acts = (await paletteOptions(page, "")).filter((o) => o.section === "Actions").map((o) => o.label);
-    for (const gone of ["Invite people", "Edit settings", "Clone", "Export everything", "Add challenges", "Sign up at the desk", "Join-link settings", "Save as template", "New event", "New challenge"]) {
+    for (const gone of ["Invite people", "Edit settings", "Clone", "Export everything", "Add from bank", "Sign up at the desk", "Join-link settings", "Save as template", "New event", "New question"]) {
       expect(acts, `${gone} is not this role's`).not.toContain(gone);
     }
     expect(acts, "POSITIVE: the read doors are listed").toContain("History");
@@ -396,15 +400,12 @@ test.describe("RBAC — a custom role in the browser", () => {
     await expect(page.locator("#admin-event-settings-tab")).toContainText("Your role can view this event's settings, not change them.");
     await expect(page.locator('#admin-event-settings-tab [data-action="comp-edit"]')).toHaveCount(0);
     await expect(page.locator('#admin-event-settings-tab [data-action="event-look-save"]')).toHaveCount(0);
-    // The Events row menu asks the same permissions.
+    // The Events row menu holds only Delete event, which this role is not
+    // granted: the row draws no ⋮ at all.
     await page.locator("#ws-record [data-action='scope-clear'], [data-action='scope-clear']").first().click();
     const row = page.locator("#admin-comp-body tr", { hasText: comp.name }).first();
     await expect(row).toBeVisible({ timeout: 15000 });
-    await openKebab(page, row);
-    const rowItems = await page.locator("#kebab-portal [data-action]").evaluateAll((els) => els.map((e) => e.dataset.action));
-    for (const gone of ["comp-edit", "comp-assign-challenges", "comp-manage-participants", "comp-self-enroll", "comp-end-now", "comp-delete", "comp-export-activity"]) {
-      expect(rowItems, `${gone} is not offered`).not.toContain(gone);
-    }
+    await expect(row.locator(".kebab-btn"), "no row menu without events.delete").toHaveCount(0);
     for (const p of ["/api/admin/submissions", "/api/admin/leaderboard", "/api/admin/tasks", "/api/admin/participants"]) {
       expect(t.reads.filter((x) => x === `GET ${p}`), `the workspace read no ${p}`).toEqual([]);
     }
@@ -421,7 +422,8 @@ test.describe("RBAC — a custom role in the browser", () => {
     await openKebab(page, row);
     const del = page.locator('#kebab-portal [data-action="comp-delete"]');
     await expect(del, "the permission it was granted is offered").toHaveCount(1);
-    await expect(page.locator('#kebab-portal [data-action="comp-edit"]'), "control: no Edit without events.edit").toHaveCount(0);
+    expect(await page.locator("#kebab-portal [data-action]").evaluateAll((els) => els.map((e) => e.dataset.action)),
+      "the row menu holds Delete event alone").toEqual(["comp-delete"]);
     await del.click();
     const box = page.locator("#modal-overlay.open");
     await expect(box).toBeVisible();
@@ -532,7 +534,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     await signIn(page, U.tplMgr);
     const ed = await openEditor(page);
     await expect(ed.locator("#tpl-ed-task-unseen"), "the editor says why no challenge can be added")
-      .toHaveText("Your role cannot view the challenge library, so it cannot add challenges here. The template keeps the challenges listed above unless you remove them.");
+      .toHaveText("Your role cannot view the question library, so it cannot add questions here. The template keeps the questions listed above unless you remove them.");
     await expect(ed.locator("#tpl-ed-tasks .tpl-ed-task-title"), "the template's own challenge is listed").toHaveText([tplTask.title]);
     await expect(ed.locator("#tpl-ed-task-search"), "no picker").toHaveCount(0);
     await expect(ed.locator('[data-tpl-task][data-op="remove"]'), "Remove needs no library read, so it stays").toHaveCount(1);
@@ -640,7 +642,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     await showAllParticipantColumns(page);
     await signIn(page, regAdmin);
     await page.evaluate(() => window.adminTab(null, "admin-participants-tab"));
-    await page.locator("#p-include-admins").check();
+    await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
     await narrowPeopleTable(page, U.desk.email);
     const all = page.locator("#admin-participants-body tr", { hasText: U.desk.email }).first();
     await expect(all, "PRECONDITION: the unscoped holder is listed with admin accounts shown").toBeVisible({ timeout: 15000 });
@@ -705,7 +707,7 @@ test.describe("RBAC — a custom role in the browser", () => {
       await expect(srow.locator('td.cb-cell input[type="checkbox"]'), "CONTROL: the row can be selected to assign").toHaveCount(1);
       await openKebab(sp, srow);
       const sk = await sp.locator("#kebab-portal").innerText();
-      for (const want of ["Edit", "Assign to Events", "Delete"]) expect(sk, `CONTROL: ${want}`).toContain(want);
+      for (const want of ["Edit", "Delete"]) expect(sk, `CONTROL: ${want}`).toContain(want);   // stage B: assigning is the selection bar's Add to events (the box above)
     } finally { await ctx.close(); }
 
     const t = recordTraffic(page);
@@ -995,7 +997,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     expect(t.refused, "no refused request").toEqual([]);
   });
 
-  test("New event for a role that may create but not see templates or the library: blank starters only, no refused read (a role holding both: control)", async ({ page, browser }) => {
+  test("New event for a role that may create but not see templates: blank starters only, no refused read (a role holding both: control)", async ({ page, browser }) => {
     test.setTimeout(120_000);
     const ctx = await browser.newContext({ baseURL: BASE, viewport: { width: 1440, height: 900 } });
     try {
@@ -1005,8 +1007,11 @@ test.describe("RBAC — a custom role in the browser", () => {
       await cp.locator("#new-competition-btn").click({ timeout: 15000 });
       await expect(cp.locator("#tpl-list .tpl-row").first(), "CONTROL: the templates are listed").toBeVisible({ timeout: 15000 });
       await cp.locator('[data-action="new-event-start"]').first().click();
-      await expect(cp.locator("#comp-ch-search"), "CONTROL: the form offers the challenge library").toBeVisible({ timeout: 15000 });
-      await expect.poll(() => ct.reads.includes("GET /api/admin/tasks"), { message: "CONTROL: the library was read" }).toBe(true);
+      // Stage B — the form picks no questions (the event's one door is + Add
+      // from bank), so even a role that may read the bank reads nothing here.
+      await expect(cp.locator("#comp-name"), "CONTROL: the form is open").toBeVisible({ timeout: 15000 });
+      await expect(cp.locator("#comp-ch-search"), "the form lists no questions").toHaveCount(0);
+      expect(ct.reads.filter((x) => x === "GET /api/admin/tasks"), "no library read from the form").toEqual([]);
       expect(ct.refused).toEqual([]);
     } finally { await ctx.close(); }
 
@@ -1017,8 +1022,7 @@ test.describe("RBAC — a custom role in the browser", () => {
     await expect(page.locator("#tpl-list-unseen"), "no templates: said, not failed").toHaveText("Your role cannot see templates. Start a blank event above.", { timeout: 15000 });
     await expect(page.locator('[data-action="new-event-start"]').first(), "POSITIVE: the blank starters").toBeVisible();
     await page.locator('[data-action="new-event-start"]').first().click();
-    await expect(page.locator("#comp-ch-unseen"), "the form says why it offers no challenges").toContainText("Your role cannot add challenges to an event", { timeout: 15000 });
-    await expect(page.locator("#comp-ch-search")).toHaveCount(0);
+    await expect(page.locator("#comp-ch-search"), "the form lists no questions").toHaveCount(0);
     await expect(page.locator("#comp-name"), "POSITIVE: the create form is open").toBeVisible();
     expect(t.reads.filter((x) => x === "GET /api/admin/event-templates" || x === "GET /api/admin/tasks"), "no template or library read").toEqual([]);
     expect(t.refused, "no refused request").toEqual([]);

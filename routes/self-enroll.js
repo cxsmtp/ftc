@@ -151,7 +151,7 @@ module.exports = function register(app) {
       if (_refusal === "spectator") return res.json({ ok: true, competitionId: comp.id, alreadyMember: false, staffSpectator: true });
       if (_refusal) {
         return res.status(409).json({
-          error: `You created ${_refusal.authored.length === 1 ? "a challenge" : `${_refusal.authored.length} challenges`} assigned to “${comp.name}” (${_refusal.authored.map(t => `“${t.title}”`).join(", ")}), so you cannot compete in it — a challenge's answer is known to its author.`,
+          error: `You created ${_refusal.authored.length === 1 ? "a question" : `${_refusal.authored.length} questions`} assigned to “${comp.name}” (${_refusal.authored.map(t => `“${t.title}”`).join(", ")}), so you cannot compete in it — a question's answer is known to its author.`,
           code: STAFF_COMPETE_CODES.AUTHOR_COMPETES, tasks: _refusal.authored,
         });
       }

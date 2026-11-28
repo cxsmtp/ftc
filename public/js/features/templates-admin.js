@@ -2,29 +2,35 @@
 
 // ── NEW EVENT: the one place every event starts ─────────────────────────────
 //
-// "New event" (the sidebar item, and + New Event on the Events page). Two ways
-// to start, both ending in the ONE create form (features/competitions-admin.js
-// `openCompetitionForm`), where the kind is a field:
-//   • a BLANK starter per kind (`new-event-start`);
-//   • a TEMPLATE row: the form opens seeded from the template, and saving
-//     spawns it (POST /api/admin/event-templates/:id/spawn — its challenges,
-//     join link and provenance) and applies the form on top.
-// An event admin cannot create from scratch (spawning a template and cloning one
-// of their events are their tier's only ways to make an event),
-// so they get no blank starters and a template opens the QUICK SPIN panel
-// instead (a name and a start). Global admins also manage templates here:
-// edit, duplicate, protect, reset a built-in, delete (a soft delete) and
-// restore from Recently deleted. The server decides every door.
+// "New event" (the sidebar item, and + New Event on the Events page). ONE card
+// per event type, each offering two starts that end in the ONE create form
+// (features/competitions-admin.js `openCompetitionForm`), where the kind is a
+// field:
+//   • RECOMMENDED SETUP: the kind's built-in template (`tpl-pick`): the form
+//     opens seeded from it, and saving spawns it (POST
+//     /api/admin/event-templates/:id/spawn) and applies the form on top. A
+//     kind whose built-in is missing offers Start blank alone (Recently
+//     deleted's "Restore built-in templates" brings it back);
+//   • START BLANK (`new-event-start`).
+// Below, "Your templates" lists only the templates organisers made; a
+// built-in is edited, duplicated or reset from its kind card's ⋮ menu.
+// An event admin cannot create from scratch (spawning a template and cloning
+// one of their events are their tier's only ways to make an event), so their
+// cards offer the recommended setup alone, and a template opens the QUICK
+// SPIN panel instead (a name and a start). Global admins also manage
+// templates here: edit, duplicate, protect, reset a built-in, delete (a soft
+// delete) and restore from Recently deleted. The server decides every door.
 
 import { S } from "../core/state.js";
 import { csrfHeaders, fetchJsonObject } from "../core/api.js";
 import { setSafeHtml } from "../core/trusted-types.js";
-import { esc, fmtDt, eventKindLabel, policyOrDefault, DEFAULT_REGISTRATION_FIELDS } from "../ui/format.js";
+import { esc, fmtDt, eventKindLabel, eventKindPhraseClient, policyOrDefault, DEFAULT_REGISTRATION_FIELDS } from "../ui/format.js";
 import { overlayDismiss } from "../ui/modal.js";
 import { fetchJsonList } from "../core/api.js";
 import { ICO } from "../ui/icons.js";
 import { showModal } from "../ui/modal.js";
-import { taskMatchesQuery, taskTagHit, isQualifyingTask } from "../ui/task-search.js";   // the one qualifying test
+import { taskMatchesQuery, isQualifyingTask, isBankTask } from "../ui/task-search.js";   // the one qualifying test
+import { loadTopics, paintTopicFilter, taskInTopic, topicName } from "./topics-admin.js";   // stage B — questions are picked by topic, as in the bank
 import { showToast } from "../ui/toast.js";
 import { wallClockToUtcChecked, dstGapMessage } from "../data/country-tz.js";
 import { loadAdminCompetitions, openCompetitionForm } from "./competitions-admin.js";
@@ -32,6 +38,7 @@ import { openEventWorkspace, skippedSummary } from "./event-workspace.js";
 import { adminCan } from "../ui/nav.js"; // RBAC — the one permission predicate (read inside functions only)
 
 let _templates = null;
+let _templatesFailed = false;   // the last list read failed (the cards stop waiting for it)
 let _picked = null;   // the template the quick spin is showing
 let _spinModal = null; // the phone sheet's modal contract (overlayDismiss's cleanup), while open
 let _loadSeq = 0;
@@ -55,23 +62,67 @@ function _kindBullets(k) {
   return `<ul class="tpl-kind-bullets">${lines.map(l => `<li>${ICO.check}<span>${esc(l)}</span></li>`).join('')}</ul>`;
 }
 
-// The blank starters: one per kind, each opening the ONE create form with that
-// kind selected (`new-event-start`). An event admin never creates a blank
-// event (a template or a clone, nothing else), so they get none.
-// A card is never the button (its bullet list is no button content): the
-// control is the `.card-open` in its title, and a click anywhere on the card
-// still starts it (the card keeps the action, as the template rows do).
+// The kind's RECOMMENDED SETUP: its built-in template, or null while the list
+// is unread or when none is listed for the kind (missing, or edited to
+// another type). Matched by type, the wire carrying no key-to-kind table.
+function _builtinFor(kind) {
+  return (_templates || []).find(t => t.is_builtin && t.event_kind === kind) || null;
+}
+
+// ONE CARD PER EVENT TYPE. The card itself is no button (its bullet list is
+// no button content, and it holds two starts): its controls are the buttons
+// in its foot, each named from the words it shows first.
+//   • Recommended setup — the kind's built-in, offered to a role that may read
+//     templates and start from one (`templates.view`, `events.clone`); shown
+//     disabled while the list is read, so the card does not move when it lands.
+//   • Start blank — a role holding `events.create` (the built-in event admin
+//     lacks it: spawning a template or cloning an event is how their tier makes
+//     one).
+// A role that may manage templates gets the built-in's own doors in the card's
+// ⋮ menu (Edit, Duplicate, Reset to default): the list below shows only the
+// templates organisers made.
 function _kindCards() {
   const kinds = Array.isArray(S.eventKinds) ? S.eventKinds : [];
-  // RBAC — a blank starter opens the create form, whose route needs
-  // `events.create` (the built-in event admin lacks it: spawning a template or
-  // cloning an event is how their tier makes one).
-  if (!adminCan('events.create')) return '';
+  const canBlank = adminCan('events.create');
+  const canRec = adminCan('templates.view') && adminCan('events.clone');
+  if (!canBlank && !canRec) return '';
   if (!kinds.length) return '<p class="ws-empty">The event-type list did not load. Reload the page to start a new event.</p>';
-  return kinds.map(k => `<div class="tpl-kind" data-action="new-event-start" data-kind="${esc(k.value)}">
+  const manage = adminCan('templates.manage');
+  return kinds.map(k => {
+    const rec = canRec ? _builtinFor(k.value) : null;
+    const waiting = canRec && !rec && _templates === null && !_templatesFailed;
+    if (!canBlank && !rec && !waiting) return '';
+    const kindName = eventKindPhraseClient(k.value) || k.label;   // "a Booth Event": the table's article
+    const recBtn = rec
+      ? `<button type="button" class="btn sm tpl-kind-rec" data-action="tpl-pick" data-tpl-id="${esc(rec.id)}" aria-label="Recommended setup — start ${esc(kindName)} from ${esc(rec.name)}"${_picked && _picked.id === rec.id ? ' aria-current="true"' : ''}>Recommended setup</button>`
+      : waiting ? '<button type="button" class="btn sm tpl-kind-rec" disabled aria-label="Recommended setup — loading">Recommended setup</button>' : '';
+    const blankBtn = canBlank
+      ? `<button type="button" class="btn sm secondary tpl-kind-blank" data-action="new-event-start" data-kind="${esc(k.value)}" aria-label="Start blank — an empty ${esc(k.label)} with nothing set up">Start blank</button>`
+      : '';
+    const more = rec && manage ? `<button type="button" class="kebab-btn kebab-always tpl-kind-more" data-action="kebab-toggle" aria-label="More actions for the ${esc(k.label)} recommended setup">⋮</button><div class="kebab-menu">
+        <button data-action="tpl-edit" data-tpl-id="${esc(rec.id)}">${ICO.edit} Edit recommended setup</button>
+        <button data-action="tpl-duplicate" data-tpl-id="${esc(rec.id)}">${ICO.copy} Duplicate as a template</button>
+        <button data-action="tpl-reset" data-tpl-id="${esc(rec.id)}">${ICO.refresh} Reset to default</button>
+      </div>` : '';
+    const about = rec ? `<p class="tpl-kind-rec-about"><b>${esc(rec.name)}</b>${rec.description ? ` · ${esc(rec.description)}` : ''}</p>` : '';
+    return `<div class="tpl-kind${_picked && rec && _picked.id === rec.id ? ' active' : ''}" data-kind="${esc(k.value)}">
       <span class="tpl-kind-art">${KIND_ART[k.value] || ''}</span>
-      <div class="tpl-kind-body"><span class="tpl-kind-title"><button type="button" class="card-open" aria-label="${esc(k.label)} — start a blank event of this type">${esc(k.label)}</button></span>${k.isDefault ? '<span class="tpl-kind-default">Most common</span>' : ''}${_kindBullets(k)}</div>
-    </div>`).join('');
+      <div class="tpl-kind-body">
+        <div class="tpl-kind-head"><h4 class="tpl-kind-title">${esc(k.label)}</h4>${more}</div>
+        ${k.isDefault ? '<span class="tpl-kind-default">Most common</span>' : ''}${_kindBullets(k)}
+        ${about}
+        <div class="tpl-kind-actions">${recBtn}${blankBtn}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _renderKindCards() {
+  const kinds = document.getElementById('tpl-kind-cards');
+  if (!kinds) return;
+  setSafeHtml(kinds, _kindCards()); kinds.hidden = !kinds.innerHTML.trim();
+  const head = document.getElementById('tpl-blank-head');
+  if (head) head.hidden = kinds.hidden;
 }
 
 // The row icon, from the kind's wire POLICY (never its stored value): a
@@ -86,13 +137,14 @@ function _tplRow(t) {
   // No label, no kind words: a stored value is never a caption (a wrong chip
   // is worse than none).
   const kind = eventKindLabel(t.event_kind);
-  const meta = [kind, `${t.task_count} challenge${t.task_count === 1 ? '' : 's'}`].filter(Boolean);
+  const meta = [kind, `${t.task_count} question${t.task_count === 1 ? '' : 's'}`].filter(Boolean);
   if (t.withheld_task_count) meta.push(`${t.withheld_task_count} not visible to you`);
   if (t.missing_task_count) meta.push(`${t.missing_task_count} deleted`);
   const on = _picked && _picked.id === t.id;
-  // Badges say why a template has no Delete: a built-in never has one, and a
-  // protected one waits for a global admin to unprotect it.
-  const badges = [t.is_builtin ? '<span class="tpl-badge">Built in</span>' : '', t.protected ? `<span class="tpl-badge tpl-badge-protected">${ICO.lock} Protected</span>` : ''].join('');
+  // The badge says why a template has no Delete: a protected one waits for a
+  // global admin to unprotect it. (A built-in is never a row: it is its kind
+  // card's recommended setup, `_kindCards`.)
+  const badges = t.protected ? `<span class="tpl-badge tpl-badge-protected">${ICO.lock} Protected</span>` : '';
   // The delete door and its explanation come from the server's own predicate
   // (`can_delete` / `delete_refused`), never re-derived here.
   const protTo = t.protected ? "0" : "1";
@@ -108,15 +160,13 @@ function _tplRow(t) {
     <div class="tpl-row-main"${canStart ? ` data-action="tpl-pick" data-tpl-id="${esc(t.id)}"` : ''}>
       <span class="tpl-row-ico" aria-hidden="true">${_tplIcon(t.event_kind)}</span>
       <span class="tpl-row-txt"><b>${canStart ? `<button type="button" class="card-open" data-action="tpl-pick" data-tpl-id="${esc(t.id)}" aria-label="${esc(t.name)} — start an event from this template"${on ? ' aria-current="true"' : ''}>${esc(t.name)}</button>` : esc(t.name)}</b>${badges ? `<span class="tpl-badges">${badges}</span>` : ''}<small>${esc(meta.join(' · '))}</small>${t.description ? `<small class="tpl-row-desc">${esc(t.description)}</small>` : ''}</span>
-      <span class="tpl-row-when">${t.is_builtin ? 'Built in' : `Updated ${esc(fmtDt(t.updated_at, 'short'))}`}</span>
+      <span class="tpl-row-when">Updated ${esc(fmtDt(t.updated_at, 'short'))}</span>
       ${canStart ? `<span class="tpl-row-chev" aria-hidden="true">${ICO.chevronRight}</span>` : ''}
     </div>
     ${adminCan('templates.manage') ? `<button type="button" class="kebab-btn kebab-always tpl-row-more" data-action="kebab-toggle" aria-label="More actions for template ${esc(t.name)}">⋮</button><div class="kebab-menu">
       <button data-action="tpl-edit" data-tpl-id="${esc(t.id)}">${ICO.edit} Edit</button>
       <button data-action="tpl-duplicate" data-tpl-id="${esc(t.id)}">${ICO.copy} Duplicate</button>
-      ${t.is_builtin
-        ? `<button data-action="tpl-reset" data-tpl-id="${esc(t.id)}">${ICO.refresh} Reset to default</button>`
-        : `<button data-action="tpl-protect" data-tpl-id="${esc(t.id)}" data-protect="${protTo}">${ICO.lock} ${protLabel}</button>`}
+      <button data-action="tpl-protect" data-tpl-id="${esc(t.id)}" data-protect="${protTo}">${ICO.lock} ${protLabel}</button>
       <div class="km-sep" role="separator"></div>
       ${del}
     </div>` : ''}
@@ -124,12 +174,7 @@ function _tplRow(t) {
 }
 
 export async function loadTemplatesPane() {
-  const kinds = document.getElementById('tpl-kind-cards');
-  if (kinds) {
-    setSafeHtml(kinds, _kindCards()); kinds.hidden = !kinds.innerHTML.trim();
-    const head = document.getElementById('tpl-blank-head');
-    if (head) head.hidden = kinds.hidden;
-  }
+  _renderKindCards();
   // Making and changing templates needs `templates.manage` (held server-side).
   const nb = document.getElementById('tpl-new-btn');
   if (nb) nb.hidden = !adminCan('templates.manage');
@@ -150,9 +195,13 @@ export async function loadTemplatesPane() {
   const d = await fetchJsonObject('/api/admin/event-templates');
   if (seq !== _loadSeq) return;
   if (!d || !Array.isArray(d.templates)) {
+    // The kind cards drop their waiting Recommended setup and keep Start blank.
+    _templatesFailed = true;
+    _renderKindCards();
     setSafeHtml(list, `<div class="load-failure" role="alert">Could not load the templates. <button type="button" class="btn sm secondary" data-action="tpl-reload">Try again</button></div>`);
     return;
   }
+  _templatesFailed = false;
   _templates = d.templates;
   _renderList();
   if (_picked) { const again = _templates.find(t => t.id === _picked.id); if (again) _picked = again; else _closeSpin(); }
@@ -225,7 +274,7 @@ export async function protectTemplate(id, on) {
 export async function resetTemplate(id) {
   const t = (_templates || []).find(x => x.id === id);
   if (!t) return;
-  const ok = await showModal({ title: 'Reset to default', message: `Reset <strong>${esc(t.name)}</strong> to the template the platform ships? Its name, description, type and settings go back to the defaults, and its challenge list is emptied. Events already made from it are not affected.`, confirmText: 'Reset' });
+  const ok = await showModal({ title: 'Reset to default', message: `Reset <strong>${esc(t.name)}</strong> to the template the platform ships? Its name, description, type and settings go back to the defaults, and its question list is emptied. Events already made from it are not affected.`, confirmText: 'Reset' });
   if (!ok) return;
   const r = await _tplPost(`/api/admin/event-templates/${encodeURIComponent(id)}/reset`);
   if (!r.ok) { showToast((r.d && r.d.error) || 'Could not reset the template.', 'error'); return; }
@@ -233,19 +282,24 @@ export async function resetTemplate(id) {
   loadTemplatesPane();
 }
 
+// "Your templates": the templates organisers made. The built-ins are each
+// kind's recommended setup, on the cards above (`_kindCards`), never listed
+// twice.
 function _renderList() {
+  _renderKindCards();
   const list = document.getElementById('tpl-list');
   const count = document.getElementById('tpl-list-count');
   if (!list) return;
-  if (count) count.textContent = _templates && _templates.length ? `${_templates.length} template${_templates.length === 1 ? '' : 's'}` : '';
-  if (!_templates || !_templates.length) {
-    setSafeHtml(list, `<p class="ws-empty">No templates yet.${!adminCan('templates.manage') ? '' : ' Choose <strong>New template</strong>, or open an event and choose <strong>Save as template</strong> from its ⋯ menu.'}</p>`);
+  const own = (_templates || []).filter(t => !t.is_builtin);
+  if (count) count.textContent = own.length ? `${own.length} template${own.length === 1 ? '' : 's'}` : '';
+  if (!own.length) {
+    setSafeHtml(list, `<p class="ws-empty" id="tpl-list-empty">No templates of your own yet.${!adminCan('templates.manage') ? '' : ' Choose <strong>New template</strong>, or open an event and choose <strong>Save as template</strong> from its ⋯ menu.'}</p>`);
     return;
   }
   // A role that may see templates but not start events from them is told so
   // once, above the list, rather than meeting rows that do nothing.
   const why = adminCan('events.clone') ? '' : '<p class="ws-empty" id="tpl-no-start">Your role can see templates, not start events from them.</p>';
-  setSafeHtml(list, why + _templates.map(_tplRow).join(''));
+  setSafeHtml(list, why + own.map(_tplRow).join(''));
 }
 
 /** Open the quick spin for one template. */
@@ -277,7 +331,7 @@ export async function pickTemplate(id) {
   // What the event WILL do: a setting the template leaves out takes the kind's
   // seed (`_tplSetting`), exactly as the spawn decides it.
   const facts = [
-    t.task_count ? `${t.task_count} challenge${t.task_count === 1 ? '' : 's'}` : 'No challenges yet: add them in the workspace',
+    t.task_count ? `${t.task_count} question${t.task_count === 1 ? '' : 's'}` : 'No questions yet: add them in the workspace',
     _tplSetting(settings, t.event_kind, 'self_enroll_enabled') ? 'Join link and QR code ready' : null,
     settings.duration_minutes ? `Runs for ${settings.duration_minutes >= 60 ? `${Math.round(settings.duration_minutes / 6) / 10} h` : `${settings.duration_minutes} min`}` : null,
     (settings.tags || []).length ? `Tags: ${(settings.tags || []).join(', ')}` : null,
@@ -340,8 +394,9 @@ function _closeSpin() {
   _renderList();
 }
 // Focus goes back to the template's own button: the row's first tpl-pick match
-// is its (unfocusable) card body, and the list re-render replaced the opener.
-export function closeTemplateSpin() { const id = _picked && _picked.id; _closeSpin(); if (id) document.querySelector(`button.card-open[data-action="tpl-pick"][data-tpl-id="${CSS.escape(id)}"]`)?.focus(); }
+// is its (unfocusable) card body, and the re-render replaced the opener.
+// A built-in's opener is its kind card's Recommended setup, also a tpl-pick button.
+export function closeTemplateSpin() { const id = _picked && _picked.id; _closeSpin(); if (id) document.querySelector(`button[data-action="tpl-pick"][data-tpl-id="${CSS.escape(id)}"]`)?.focus(); }
 
 async function _spin(t) {
   const panel = document.getElementById('tpl-spin');
@@ -375,7 +430,7 @@ async function _spin(t) {
   if (!r) { err('No answer came back from the server, so the event may or may not have been made. Check the Events list before you try again.'); return; }
   if (!r.ok || !d.competition) { err((d && d.error) || 'Could not create the event.'); return; }
   const skipped = Array.isArray(d.skipped_challenges) ? d.skipped_challenges : [];
-  showToast(`Created “${d.competition.name}” with ${d.assigned_challenges || 0} challenge${d.assigned_challenges === 1 ? '' : 's'}.${skippedSummary(skipped)}`, skipped.length ? 'info' : 'success');
+  showToast(`Created “${d.competition.name}” with ${d.assigned_challenges || 0} question${d.assigned_challenges === 1 ? '' : 's'}.${skippedSummary(skipped)}`, skipped.length ? 'info' : 'success');
   _closeSpin();
   await loadAdminCompetitions();
   openEventWorkspace(d.competition.id, d.competition.name);
@@ -428,6 +483,12 @@ function _kindOf(value) {
   return (Array.isArray(S.eventKinds) ? S.eventKinds : []).find(k => k.value === value) || null;
 }
 
+/** The kind's create-time seed for the clock-start choice (the wire's `defaults`). */
+function _kindClockSeed(kind) {
+  const k = _kindOf(kind);
+  return (k && k.defaults && k.defaults.clock_start === 'entry') ? 'entry' : 'first_open';
+}
+
 /** The kind's create-time seed for one setting (the wire's `defaults`). */
 function _kindSeed(kind, key) {
   const k = _kindOf(kind);
@@ -456,6 +517,10 @@ function _forbidReason(key, kind) {
     late_entry_enabled: () => (p.late_entry !== 'allowed' ? `Only a Booth Event takes late entries after it ends.` : ''),
     registration_fields: () => (p.registration_fields_configurable === true ? '' : `${label} always asks the short sign-up form.`),
     leaderboard_mode: () => (p.sessions === 'many' ? '' : `${label} runs in one sitting, so there is one board.`),
+    clock_start: () => (p.clock_start === 'allowed' ? '' : `${label} has no ranking, so each person's time starts when they enter.`),
+    // The one option a kind forbids by keeping it ON: "Do not create Checkmarx
+    // One accounts" stays ticked where accounts are never created.
+    cxone_disabled: () => (p.cxone_provisioning === 'allowed' ? '' : `${label} never creates Checkmarx One accounts.`),
   };
   // An unknown key has no refusal (never an exception).
   return Object.prototype.hasOwnProperty.call(reasons, key) ? reasons[key]() : '';
@@ -481,7 +546,7 @@ async function _openEditor(id, mode) {
   // towards the address's scanner block): without challenges.view the editor
   // shows the template's own challenges, read-only, and says why no picker.
   const canLib = adminCan('challenges.view');
-  const lib = canLib ? await fetchJsonList('/api/admin/tasks') : null;
+  const [lib] = canLib ? await Promise.all([fetchJsonList('/api/admin/tasks'), loadTopics()]) : [null];
   if (seq !== _edSeq) return;
   _libTasks = lib;
   const kinds = Array.isArray(S.eventKinds) ? S.eventKinds : [];
@@ -500,7 +565,15 @@ async function _openEditor(id, mode) {
     tasks: ((t && t.tasks) || []).map(x => ({ id: x.id, title: x.title, difficulty: x.difficulty })),
     // The seeded settings this template states for itself (see SEEDED_KEYS).
     explicit: new Set(SEEDED_KEYS.filter(k => Object.prototype.hasOwnProperty.call(s, k))),
+    // The clock-start choice is seeded the same way, but it is a choice of two
+    // values, not a box: shown as the kind's seed until the template states it
+    // or the organiser changes it, and only then sent.
+    clockExplicit: Object.prototype.hasOwnProperty.call(s, 'clock_start'),
   };
+  const clock0 = (s.clock_start === 'entry' || s.clock_start === 'first_open') ? s.clock_start : _kindClockSeed(kind0);
+  // The ranking (per-session question sets): "both" is the per-session mode with
+  // an overall board beside it.
+  const lbChoice0 = s.leaderboard_mode === 'global' ? 'global' : (s.leaderboard_overall ? 'both' : 'per_slot');
   document.getElementById('tpl-editor')?.remove();
   const ov = document.createElement('div');
   ov.id = 'tpl-editor';
@@ -528,7 +601,7 @@ async function _openEditor(id, mode) {
         </fieldset>
         <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Play</legend>
           <div class="form-group"><label for="tpl-ed-duration" id="tpl-ed-duration-label">Runs for (minutes)</label><input id="tpl-ed-duration" type="number" min="1" step="1" value="${esc(String(s.duration_minutes || 60))}"/></div>
-          <div class="form-group"><label for="tpl-ed-cap">Attempts per challenge <span class="t-muted">(empty: unlimited)</span></label><input id="tpl-ed-cap" type="number" min="1" max="1000" step="1" value="${s.attempt_cap ? esc(String(s.attempt_cap)) : ''}"/></div>
+          <div class="form-group"><label for="tpl-ed-cap">Attempts per question <span class="t-muted">(empty: unlimited)</span></label><input id="tpl-ed-cap" type="number" min="1" max="1000" step="1" value="${s.attempt_cap ? esc(String(s.attempt_cap)) : ''}"/></div>
           ${chk('staff_compete', 'Staff compete (their scores count)')}
           ${chk('cxone_disabled', 'Do not create Checkmarx One accounts')}
         </fieldset>
@@ -538,16 +611,20 @@ async function _openEditor(id, mode) {
           ${chk('measure_presence', 'Record time on the platform')}
           <div class="form-group tpl-ed-opt" data-opt="time_basis"><label for="tpl-ed-time_basis">Ties are broken by</label><select id="tpl-ed-time_basis"><option value="elapsed"${s.time_basis !== 'presence' ? ' selected' : ''}>Time since starting</option><option value="presence"${s.time_basis === 'presence' ? ' selected' : ''}>Time on the platform</option></select></div>
           <p class="tpl-ed-why" data-why="time_basis" hidden></p>
-          <div class="form-group tpl-ed-opt" data-opt="leaderboard_mode"><label for="tpl-ed-leaderboard_mode">With sessions, the board is</label><select id="tpl-ed-leaderboard_mode"><option value="per_slot"${s.leaderboard_mode !== 'global' ? ' selected' : ''}>One board per session</option><option value="global"${s.leaderboard_mode === 'global' ? ' selected' : ''}>One board across sessions</option></select></div>
+          <div class="form-group tpl-ed-opt" data-opt="clock_start"><label for="tpl-ed-clock_start">Each participant's clock starts</label><select id="tpl-ed-clock_start"><option value="first_open"${clock0 === 'first_open' ? ' selected' : ''}>When they open their first question</option><option value="entry"${clock0 === 'entry' ? ' selected' : ''}>When they enter the event</option></select></div>
+          <p class="tpl-ed-why" data-why="clock_start" hidden></p>
+          <div class="form-group tpl-ed-opt" data-opt="leaderboard_mode"><label for="tpl-ed-leaderboard_mode">With sessions, the ranking is</label><select id="tpl-ed-leaderboard_mode"><option value="per_slot"${lbChoice0 === 'per_slot' ? ' selected' : ''}>A winner per session</option><option value="global"${lbChoice0 === 'global' ? ' selected' : ''}>One overall winner</option><option value="both"${lbChoice0 === 'both' ? ' selected' : ''}>Both: per session and overall</option></select>
+            <label class="checkbox-row"><input type="checkbox" id="tpl-ed-leaderboard_percent"${s.leaderboard_percent && lbChoice0 !== 'per_slot' ? ' checked' : ''}/> <span>Turn scores into percentages on the overall board</span></label></div>
           <p class="tpl-ed-why" data-why="leaderboard_mode" hidden></p>
         </fieldset>
-        <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Challenges</legend>
-          <p class="t-small t-muted tpl-ed-task-order">Events number their challenges by difficulty, then title.</p>
+        <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Questions</legend>
+          <p class="t-small t-muted tpl-ed-task-order">Events number their questions by difficulty, then title.</p>
           <ul class="tpl-ed-tasks" id="tpl-ed-tasks"></ul>
-          ${canLib ? `<div class="search-wrap"><input id="tpl-ed-task-search" type="text" autocomplete="off" placeholder="Find a published challenge by title or tag…" aria-label="Find a published challenge by title or tag"/></div>
+          ${canLib ? `<div class="tpl-ed-task-find"><span class="topic-filter"><label for="tpl-ed-task-topic">Topic</label><select id="tpl-ed-task-topic"><option value="">All topics</option></select></span>
+          <div class="search-wrap"><input id="tpl-ed-task-search" type="text" autocomplete="off" placeholder="Find a published question by title or topic…" aria-label="Find a published question by title or topic"/></div></div>
           <div class="tpl-ed-task-bar"><p class="settings-help list-count" id="tpl-ed-task-count" role="status" aria-live="polite" aria-atomic="true"></p><button type="button" class="btn sm secondary" id="tpl-ed-task-addall" hidden>Add all shown</button></div>
           <ul class="tpl-ed-task-results" id="tpl-ed-task-results"></ul>`
-          : '<p class="t-small t-muted" id="tpl-ed-task-unseen">Your role cannot view the challenge library, so it cannot add challenges here. The template keeps the challenges listed above unless you remove them.</p>'}
+          : '<p class="t-small t-muted" id="tpl-ed-task-unseen">Your role cannot view the question library, so it cannot add questions here. The template keeps the questions listed above unless you remove them.</p>'}
         </fieldset>
         <fieldset class="tpl-ed-group"><legend class="t-eyebrow">Certificates</legend>
           <p class="t-small">Events made from this template use the platform's certificate design. Give one event its own design from its <strong>Certificates</strong> section; the platform design is under <strong>Settings</strong>.</p>
@@ -571,11 +648,14 @@ async function _openEditor(id, mode) {
   for (const key of SEEDED_KEYS) {
     ov.querySelector(`#tpl-ed-${key}`)?.addEventListener('change', () => state.explicit.add(key));
   }
+  ov.querySelector('#tpl-ed-clock_start')?.addEventListener('change', () => { state.clockExplicit = true; });
   ov.querySelector('#tpl-ed-kind').addEventListener('change', (e) => {
     for (const key of SEEDED_KEYS) {
       const box = ov.querySelector(`#tpl-ed-${key}`);
       if (box && !state.explicit.has(key)) box.checked = _kindSeed(e.target.value, key);
     }
+    const clock = ov.querySelector('#tpl-ed-clock_start');
+    if (clock && !state.clockExplicit) clock.value = _kindClockSeed(e.target.value);
   });
   // The save's note on a challenge row answers the form as it was saved. A
   // change the server judges the list against (the event type: whether a
@@ -588,6 +668,13 @@ async function _openEditor(id, mode) {
   form.addEventListener('change', sync);
   const _taskSearch = ov.querySelector('#tpl-ed-task-search');
   _taskSearch?.addEventListener('input', () => _renderTaskResults(ov, state));
+  // The Topic filter: the bank's own options and test (topics-admin.js), a sibling
+  // of the results it narrows, as the search box is.
+  const _taskTopic = ov.querySelector('#tpl-ed-task-topic');
+  if (_taskTopic) {
+    paintTopicFilter(_taskTopic, '');
+    _taskTopic.addEventListener('change', () => _renderTaskResults(ov, state));
+  }
   // Enter in the search box must not submit the whole form.
   _taskSearch?.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
   // Pick several at once: every challenge the search currently shows.
@@ -667,9 +754,9 @@ function _renderTasks(ov, state) {
   // the role reads the library, else the save's own refusal naming it (task_id).
   const why = (t) => _competingIn(lib(t.id)).length ? _competingWhy(lib(t.id), 'Remove it to save: ')
     : (state.refused && state.refused.id === t.id ? `${state.refused.message} Remove it to save.` : '');
-  setSafeHtml(ul, state.tasks.length ? state.tasks.map((t) => `<li class="tpl-ed-task"><span class="tpl-ed-task-title">${esc(t.title || 'Challenge')}</span><small class="t-muted">${esc(t.difficulty || '')}</small>${why(t) ? `<small class="tpl-ed-why">${esc(why(t))}</small>` : ''}
-      <button type="button" class="btn sm secondary" data-tpl-task="${esc(t.id)}" data-op="remove" aria-label="Remove ${esc(t.title || 'challenge')}">${ICO.x}</button></li>`).join('')
-    : '<li class="ws-empty">No challenges yet: events start empty and you add them in the workspace.</li>');
+  setSafeHtml(ul, state.tasks.length ? state.tasks.map((t) => `<li class="tpl-ed-task"><span class="tpl-ed-task-title">${esc(t.title || 'Question')}</span><small class="t-muted">${esc(t.difficulty || '')}</small>${why(t) ? `<small class="tpl-ed-why">${esc(why(t))}</small>` : ''}
+      <button type="button" class="btn sm secondary" data-tpl-task="${esc(t.id)}" data-op="remove" aria-label="Remove ${esc(t.title || 'question')}">${ICO.x}</button></li>`).join('')
+    : '<li class="ws-empty">No questions yet: events start empty and you add them in the workspace.</li>');
 }
 
 // How many matches the picker lists at once; the count says when there are more.
@@ -681,9 +768,12 @@ const TASK_RESULTS_SHOWN = 12;
  *  through "Add the qualifying questions", as on the create form. */
 function _taskMatches(ov, state) {
   const q = ov.querySelector('#tpl-ed-task-search')?.value || '';
-  if (!Array.isArray(_libTasks) || !q.trim()) return [];
+  const topic = ov.querySelector('#tpl-ed-task-topic')?.value || '';
+  // A topic alone lists that topic's questions; with neither, nothing is listed.
+  if (!Array.isArray(_libTasks) || (!q.trim() && !topic)) return [];
   const have = new Set(state.tasks.map(t => t.id));
-  return _libTasks.filter(t => t.status === 'published' && !have.has(t.id) && !isQualifyingTask(t) && taskMatchesQuery(t, q));
+  return _libTasks.filter(t => isBankTask(t) && t.status === 'published' && !have.has(t.id) && !isQualifyingTask(t)
+    && taskInTopic(t, topic) && (!q.trim() || taskMatchesQuery(t, q)));
 }
 /** The matches the list is showing. */
 function _taskHits(ov, state) { return _taskMatches(ov, state).slice(0, TASK_RESULTS_SHOWN); }
@@ -697,19 +787,20 @@ function _renderTaskResults(ov, state) {
     if (cnt) cnt.textContent = text;
     if (addAll) { addAll.hidden = n < 2; addAll.textContent = `Add all ${n} shown`; }
   };
-  if (!Array.isArray(_libTasks)) { setSafeHtml(ul, '<li class="ws-empty">Could not load the challenge library.</li>'); paint('', 0); return; }
+  if (!Array.isArray(_libTasks)) { setSafeHtml(ul, '<li class="ws-empty">Could not load the question library.</li>'); paint('', 0); return; }
   const q = ov.querySelector('#tpl-ed-task-search')?.value || '';
-  if (!q.trim()) { setSafeHtml(ul, ''); paint('', 0); return; }
+  const topic = ov.querySelector('#tpl-ed-task-topic')?.value || '';
+  if (!q.trim() && !topic) { setSafeHtml(ul, ''); paint('', 0); return; }
   const all = _taskMatches(ov, state);
   const hits = all.slice(0, TASK_RESULTS_SHOWN);
-  // Each result shows its tags as chips; a tag the query matched is marked, so
-  // the reason a challenge is listed is visible.
-  const chips = (t) => (t.tags || []).map(tg => `<span class="tag${taskTagHit(tg, q) ? ' is-hit' : ''}">${esc(tg)}</span>`).join('');
-  setSafeHtml(ul, hits.length ? hits.map(t => `<li><span class="tpl-ed-hit-title">${esc(t.title)}</span><small class="t-muted">${esc(t.difficulty || '')}</small><span class="tpl-ed-hit-tags">${chips(t)}</span>${_competingIn(t).length
+  // Each result names its topic (stage B: questions are organised by topic, and
+  // their tags are no longer shown to organisers), so why it is listed is visible.
+  const topicOf = (t) => (t.topic_id ? (t.topic_name || topicName(t.topic_id)) : '') || 'No topic';
+  setSafeHtml(ul, hits.length ? hits.map(t => `<li><span class="tpl-ed-hit-title">${esc(t.title)}</span><small class="t-muted">${esc(t.difficulty || '')}</small><small class="tpl-ed-hit-topic t-muted">${esc(topicOf(t))}</small>${_competingIn(t).length
       ? `<small class="tpl-ed-why">${esc(_competingWhy(t, 'Cannot be added: '))}</small>`
       : `<button type="button" class="btn sm" data-tpl-task="${esc(t.id)}" data-op="add" aria-label="Add ${esc(t.title)}">Add</button>`}</li>`).join('')
-    : '<li class="ws-empty">No published challenge matches that title or tag.</li>');
-  paint(all.length > hits.length ? `${hits.length} of ${all.length} matches shown; type more to narrow.` : `${all.length} match${all.length === 1 ? '' : 'es'}.`, hits.filter(t => !_competingIn(t).length).length);
+    : `<li class="ws-empty">${topic && !q.trim() ? 'No published question in that topic that is not already listed.' : 'No published question matches.'}</li>`);
+  paint(all.length > hits.length ? `${hits.length} of ${all.length} matches shown; type or pick a topic to narrow.` : `${all.length} match${all.length === 1 ? '' : 'es'}.`, hits.filter(t => !_competingIn(t).length).length);
 }
 
 function _syncEditor(ov, state) {
@@ -717,16 +808,38 @@ function _syncEditor(ov, state) {
   const k = _kindOf(kind);
   const p = policyOrDefault(k && k.policy);
   // Policy-forbidden options: disabled, with the reason beside them.
-  for (const key of ['reveal_answers_on_end', 'group_leaderboard_enabled', 'measure_presence', 'late_entry_enabled', 'registration_fields', 'time_basis', 'leaderboard_mode']) {
+  for (const key of ['reveal_answers_on_end', 'group_leaderboard_enabled', 'measure_presence', 'late_entry_enabled', 'registration_fields', 'time_basis', 'leaderboard_mode', 'clock_start', 'cxone_disabled']) {
     let why = _forbidReason(key, kind);
     if (!why && key === 'time_basis' && !ov.querySelector('#tpl-ed-measure_presence').checked) why = 'Turn on Record time on the platform first.';
     const box = ov.querySelector(`[data-opt="${key}"]`);
     if (box) {
       box.classList.toggle('is-disabled', !!why);
-      for (const inp of box.querySelectorAll('input,select')) inp.disabled = !!why;
+      for (const inp of box.querySelectorAll('input,select')) {
+        inp.disabled = !!why;
+        // Forbidding accounts holds "Do not create" ticked (never sent: the kind
+        // decides it); the organiser's own tick comes back with a type that
+        // allows accounts.
+        if (key === 'cxone_disabled') {
+          if (why) {
+            if (inp.dataset.held !== '1') { inp.dataset.prev = inp.checked ? '1' : '0'; inp.dataset.held = '1'; }
+            inp.checked = true;
+          } else if (inp.dataset.held === '1') {
+            // A seed the organiser never stated was re-seeded for the new type
+            // already (the kind select's own listener runs first).
+            if (state.explicit.has(key)) inp.checked = inp.dataset.prev === '1';
+            delete inp.dataset.held; delete inp.dataset.prev;
+          }
+        }
+      }
     }
     const note = ov.querySelector(`[data-why="${key}"]`);
     if (note) { note.textContent = why; note.hidden = !why; }
+  }
+  // Percentages rank an overall board: off, and unticked, with per-session winners only.
+  const lbSel = ov.querySelector('#tpl-ed-leaderboard_mode'), lbPct = ov.querySelector('#tpl-ed-leaderboard_percent');
+  if (lbSel && lbPct && !lbSel.disabled) {
+    lbPct.disabled = lbSel.value === 'per_slot';
+    if (lbPct.disabled) lbPct.checked = false;
   }
   const dl = ov.querySelector('#tpl-ed-duration-label');
   if (dl) dl.textContent = p.schedule === 'deadline' ? 'Open for (minutes from the start)' : 'Runs for (minutes)';
@@ -740,20 +853,21 @@ function _syncEditor(ov, state) {
   if (!k) {
     // Nothing the event will do can be said before its type is chosen.
     setSafeHtml(ov.querySelector('#tpl-ed-sum'), `<li>${ICO.info}<span>Choose an event type to see what events made from this template will do.</span></li>`
-      + `<li>${ICO.check}<span>${esc(`${state.tasks.length} challenge${state.tasks.length === 1 ? '' : 's'}`)}</span></li>`);
+      + `<li>${ICO.check}<span>${esc(`${state.tasks.length} question${state.tasks.length === 1 ? '' : 's'}`)}</span></li>`);
     return;
   }
   const facts = [
     `${(k && k.label) || 'This event type'}, ${p.schedule === 'deadline' ? `open for ${span}` : `runs for ${span}`}`,
     on('self_enroll_enabled') ? 'Join link and QR code' : 'By invitation only',
     on('late_entry_enabled') ? 'Late entries after the end' : null,
-    v.settings.attempt_cap ? `${v.settings.attempt_cap} attempt${v.settings.attempt_cap === 1 ? '' : 's'} per challenge` : 'Unlimited attempts',
+    v.settings.attempt_cap ? `${v.settings.attempt_cap} attempt${v.settings.attempt_cap === 1 ? '' : 's'} per question` : 'Unlimited attempts',
     p.ranking_enabled !== false ? `Ranked${v.settings.group_leaderboard_enabled ? ', with a team board' : ''}` : 'Not ranked',
     v.settings.reveal_answers_on_end ? 'Answers shown at the end' : null,
     v.settings.measure_presence ? `Time on the platform recorded${v.settings.time_basis === 'presence' ? ' and used for ties' : ''}` : null,
+    p.clock_start === 'allowed' ? (ov.querySelector('#tpl-ed-clock_start')?.value === 'entry' ? 'Each clock starts on entry' : "Each clock starts at the person's first question") : null,
     v.settings.staff_compete ? 'Staff compete' : null,
-    on('cxone_disabled') ? 'No Checkmarx One accounts' : 'Checkmarx One accounts on enrolment',
-    `${state.tasks.length} challenge${state.tasks.length === 1 ? '' : 's'}`,
+    (on('cxone_disabled') || _forbidReason('cxone_disabled', kind)) ? 'No Checkmarx One accounts' : 'Checkmarx One accounts on enrolment',
+    `${state.tasks.length} question${state.tasks.length === 1 ? '' : 's'}`,
   ].filter(Boolean);
   setSafeHtml(ov.querySelector('#tpl-ed-sum'), facts.map(f => `<li>${ICO.check}<span>${esc(f)}</span></li>`).join(''));
 }
@@ -772,7 +886,13 @@ function _readEditor(ov, state) {
     settings[key] = !!val(key).checked;
   }
   if (!_forbidReason('time_basis', kind) && settings.measure_presence) settings.time_basis = val('time_basis').value;
-  if (!_forbidReason('leaderboard_mode', kind)) settings.leaderboard_mode = val('leaderboard_mode').value;
+  if (!_forbidReason('leaderboard_mode', kind)) {
+    const choice = val('leaderboard_mode').value;
+    settings.leaderboard_mode = choice === 'both' ? 'per_slot' : choice;
+    settings.leaderboard_overall = choice === 'both';
+    settings.leaderboard_percent = choice !== 'per_slot' && !!val('leaderboard_percent').checked;
+  }
+  if (!_forbidReason('clock_start', kind) && state.clockExplicit) settings.clock_start = val('clock_start').value;
   if (!_forbidReason('registration_fields', kind)) {
     settings.registration_fields = {};
     for (const [k] of REG_FIELDS) {

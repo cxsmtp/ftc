@@ -36,10 +36,11 @@ const NAV_FIRST_READ = {
   "admin-rankings-tab": ["GET /api/admin/leaderboard"],
   "admin-submissions-tab": ["GET /api/admin/submissions"],
   "admin-analytics-tab": ["GET /api/admin/analytics/challenges"],
+  "admin-marketing-tab": ["GET /api/admin/analytics/marketing"],
   "admin-logs-tab": ["GET /api/admin/logs"],
   // Settings opens for any of its cards' first reads (operator ruling, 14 Nov 2026).
   "admin-settings-tab": ["GET /api/admin/settings", "GET /api/admin/certificate-config", "GET /api/admin/alerts",
-    "GET /api/admin/retention", "GET /api/admin/unsubscribed", "GET /api/admin/cxone/withdrawals"],
+    "GET /api/admin/retention", "GET /api/admin/unsubscribed", "GET /api/admin/cxone/withdrawals", "GET /api/admin/staff-teams"],
   "admin-users-tab": ["GET /api/admin/users"],
   "admin-audit-tab": ["GET /api/admin/audit"],
 };
@@ -50,18 +51,31 @@ const SETTINGS_CARD_ROUTES = {
   "platform-name-card": ["GET /api/admin/settings", "PATCH /api/admin/settings"],
   "account-approval-card": ["GET /api/admin/settings", "PATCH /api/admin/settings"],
   "platform-look-card": ["GET /api/admin/settings", "PUT /api/admin/platform-look"],
+  // The mail server in use is read by every Settings reader (owner decision,
+  // 27 Nov 2026); its form (PUT, DELETE and the test, ops.smtp) is drawn only
+  // where the read's own `can_edit` says so, everyone else reading "Only a
+  // superadmin can change this." (tests/smtp-settings-ui.spec.js).
+  "smtp-settings-card": ["GET /api/admin/smtp-settings"],
   "email-test-card": ["POST /api/admin/test-email"],
   "unsubscribe-card": ["GET /api/admin/unsubscribed", "DELETE /api/admin/unsubscribed/:email"],
   "cxone-card": ["GET /api/admin/settings", "PUT /api/admin/default-cxone", "DELETE /api/admin/default-cxone"],
   "cxone-withdrawals-card": ["GET /api/admin/cxone/withdrawals", "POST /api/admin/cxone/withdrawals/retry", "POST /api/admin/cxone/withdrawals/dismiss"],
   "retention-card": ["GET /api/admin/retention"],
   "alerts-card": ["GET /api/admin/alerts"],
+  "system-health-card": ["GET /api/admin/system-health"],
+  // The Checkmarx One API activity table: the audit trail's own read, narrowed
+  // to the Checkmarx One activity.
+  "cxone-audit-card": ["GET /api/admin/audit"],
+  // The staff-teams directory: its read; its writes (teams.manage) are drawn only
+  // where the read's own `can_manage` says so (tests/staff-teams-ui.spec.js).
+  "staff-teams-card": ["GET /api/admin/staff-teams"],
 };
 const SELF_GATED_CARDS = {
   "cert-config-card": "certificateDesignOffered (certificates.design)",
   "team-domains-card": "features/event-team.js (settings.view)",
   "breakglass-account-card": "the break-glass session itself",
   "settings-load-failure": "the pane's own failure state",
+  "release-notes-card": "docs/release-notes.md, offered by releaseNotesVisible (an admin-shaped session), as the server's docs gate serves it",
 };
 
 // The route each workspace SECTION reads first (Settings renders the event's

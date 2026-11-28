@@ -129,10 +129,10 @@ async function makeFixture(api, csrf, { taskSpecs = [], people = 2 } = {}) {
     // title suffix matches a task an EARLIER test in this file created).
     const { id: tid } = await tr.json();
     expect(tid, "the create returns the new challenge's id").toBeTruthy();
-    const t = { id: tid, title };
-    tasks.push(t);
-    const asg = await api.post(`/api/admin/tasks/${t.id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+    const asg = await api.post(`/api/admin/tasks/${tid}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign task ${i}: ${await asg.text()}`).toBeTruthy();
+    const t = { id: (await asg.json()).copies[0].task_id, bankId: tid, title };   // the event's own copy (lib/event-copies.js): what its participants open and answer
+    tasks.push(t);
   }
   const users = [];
   for (let i = 0; i < people; i++) users.push(await makeParticipant(api, csrf, uniq()));

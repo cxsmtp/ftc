@@ -1,7 +1,7 @@
 "use strict";
 
 import { S } from "../core/state.js";
-import { setListCount, countText, renderLoadFailure, colspanFor, paginationHtml, segmentParams, segmentExact, segmentAbsorb, segmentStepTarget, segmentLastTarget, segmentGoTo, segmentBarOptions, syncPageJump } from "../ui/list-controls.js"; // v7.20.10 — shared match count; v7.25.0 — Logs joins the shared pager; the segment pager, shared with the Audit page
+import { setListCount, countText, renderLoadFailure, colspanFor, paginationHtml, newSegmentPager, segmentParams, segmentExact, segmentAbsorb, segmentStepTarget, segmentLastTarget, segmentGoTo, segmentBarOptions, syncPageJump } from "../ui/list-controls.js"; // v7.20.10 — shared match count; v7.25.0 — Logs joins the shared pager; the segment pager, shared with the Audit page and the CxOne API audit
 import { csrfHeaders, loadCsrfToken, fetchJsonList, fetchJsonObject } from "../core/api.js";
 import { html, setSafeHtml } from "../core/trusted-types.js";
 import { _sessionMon } from "./session-monitor.js";
@@ -16,6 +16,9 @@ import { refreshAdminBanners, _showIpBanAlert } from "./admin-alerts.js"; // v8.
 import { registerHelpTips } from "../ui/help-tips.js"; // the Settings rows' "?" texts
 import { renderPlatformLookCard } from "./look-admin.js"; // the platform look card (superadmin)
 import { adminCan, settingsCardOffered } from "../ui/nav.js"; // RBAC — the one permission predicate; each Settings card's own (read inside functions only)
+import { renderDocMarkdown } from "./help-drawer.js"; // About & health: the newest release notes, through the drawer's own pipeline
+import { releaseNotesVisible, RELEASE_NOTES_DOC } from "./release-notes.js"; // About & health: the release notes, where they are offered
+import { AUDIT_ACTIVITY_LABELS, auditActivityLabel } from "./audit-admin.js"; // CxOne API audit: the Audit page's own wording and keys
 
 export function applyPlatformName(name){
   S.currentPlatformName=name;
@@ -24,11 +27,21 @@ export function applyPlatformName(name){
   document.title=`${name} | Checkmarx`;
 }
 
+/** The admin sidebar's foot: "Version 9.2.18", and "v9.2" while it is collapsed. */
+export function showSidebarVersion(v){
+  const el=document.getElementById('admin-sidebar-version');
+  if(!el||!v)return;
+  const long=el.querySelector('.asv-long'), short=el.querySelector('.asv-short');
+  if(long)long.textContent=`Version ${v}`;
+  if(short)short.textContent=`v${v.split('.').slice(0,2).join('.')}`;
+  el.hidden=false;
+}
+
 export async function loadPlatformName(){
   const d=await fetch('/api/config').then(r=>r.json()).catch(()=>null);
   if(d?.platform_name)applyPlatformName(d.platform_name);
   else if(d?.competition_name)applyPlatformName(d.competition_name);
-  if(d?.version){const ve=document.getElementById('platform-version');if(ve)ve.textContent='v.'+d.version;}
+  if(d?.version){const ve=document.getElementById('platform-version');if(ve)ve.textContent='v.'+d.version; showSidebarVersion(String(d.version));}
   if(d?.server_started_at)_sessionMon.serverStartedAt=d.server_started_at;
   // The emailed sign-in code's lifetime (features/auth.js reads it): unknown
   // until this answer arrives, never a copy of the server's default.
@@ -780,7 +793,7 @@ export async function loadAdminSettings(){
 // card loaders' own show/hide decides what is offered and a card another module
 // adds to a section needs no list edit. A card dropped straight into
 // `.settings-bento` is adopted into the section its `data-settings-section`
-// names, else Platform. The CHOSEN section is a preference (remembered per
+// names, else General. The CHOSEN section is a preference (remembered per
 // browser): while it has nothing to show the first listed one is shown, and it
 // comes back the moment its card appears (the break-glass card loads late).
 
@@ -789,21 +802,194 @@ export async function loadAdminSettings(){
 // each loaded by its own loader. Every one is gated by SETTINGS_CARD_PERMISSIONS
 // (ui/nav.js). Hoisted: function bodies read them at call time.
 const _SETTINGS_READ_CARDS=['platform-name-card','account-approval-card','cxone-card'];
-const _OWN_ROUTE_CARDS=['email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card'];
+// The staff-teams card (features/staff-teams.js) is hidden here with them and
+// loads on the 'admin:settings-loaded' signal, as the team-report domains card does.
+const _OWN_ROUTE_CARDS=['smtp-settings-card','email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card','system-health-card','cxone-audit-card','release-notes-card','staff-teams-card'];
 function _loadOwnRouteCards(){
   for(const id of _OWN_ROUTE_CARDS){
     const el=document.getElementById(id);
     if(el&&!settingsCardOffered(id))el.style.display='none';
   }
   if(!settingsCardOffered('cxone-withdrawals-card'))_wdFocusPending=false;
-  if(settingsCardOffered('email-test-card')){ document.getElementById('email-test-card').style.display=''; loadEmailCard(); }
+  if(settingsCardOffered('smtp-settings-card')){ document.getElementById('smtp-settings-card').style.display=''; loadSmtpCard(); }
+  // Outbound email (its relay status and test send) only for a role that cannot
+  // read the Mail server card, which carries both for everyone else: one test
+  // send and one relay status on the page (owner decision, 27 Nov 2026).
+  if(settingsCardOffered('email-test-card')&&!settingsCardOffered('smtp-settings-card')){ document.getElementById('email-test-card').style.display=''; loadEmailCard(); }
+  else { const c=document.getElementById('email-test-card'); if(c)c.style.display='none'; }
   if(settingsCardOffered('unsubscribe-card')){ document.getElementById('unsubscribe-card').style.display=''; loadUnsubscribeList(); }
   if(settingsCardOffered('retention-card')){ document.getElementById('retention-card').style.display=''; loadRetentionCard(); }
   if(settingsCardOffered('alerts-card')){ document.getElementById('alerts-card').style.display=''; loadAlertsCard(); }
+  if(settingsCardOffered('system-health-card')){ document.getElementById('system-health-card').style.display=''; loadSystemHealthCard(); }
+  if(settingsCardOffered('cxone-audit-card')){ document.getElementById('cxone-audit-card').style.display=''; loadCxoneAuditCard(1); }
+  loadReleaseNotesCard();   // admins only (releaseNotesVisible), as the document is
   loadCxoneWithdrawals();   // shows itself only while Checkmarx One is in use or a removal is listed
 }
+
+// ─── About & health ──────────────────────────────────────────────────────────
+//
+// "This server": every figure from GET /api/admin/system-health (settings.view):
+// what is running (version, build commit and time, release channel), how long
+// it has run, whether its database passed its checks, the mail relay's last
+// check, free disk, the backups the app can see, and how long history is kept.
+// A superadmin also gets the database size, the Node.js version, when the server
+// started and the newest backup's size. Nothing here is typed in the client.
+let _healthSeq=0;
+// The mail relay is null until its first probe (never under test); the boot's
+// database checks run before the server listens, so they are always booleans.
+const _yesNo=(ok,yes,no)=>ok===true?yes:ok===false?no:'Not checked yet';
+function _uptimeText(sec){
+  const up=Number(sec)||0;
+  return up>=86400?`${Math.floor(up/86400)} d ${Math.floor(up%86400/3600)} h`:up>=3600?`${Math.floor(up/3600)} h ${Math.floor(up%3600/60)} min`:`${Math.floor(up/60)} min`;
+}
+function _backupRows(b,su){
+  if(!b||b.visible!==true){
+    return [['Backups',b&&b.reason==='unreadable'
+      ?'The backups folder is mounted but cannot be read by the app.'
+      :'Not visible to the app. The server’s operator mounts the backups folder read-only and names it in BACKUP_DIR (the Podman installer does).']];
+  }
+  if(!b.count)return [['Backups','None yet in the backups folder']];
+  const rows=[['Backups',`${b.count} in the backups folder`],
+    ['Newest backup',`${b.newest_at?fmtDt(b.newest_at,'long'):'Unknown time'}${b.newest_complete===true?'':b.newest_complete===false?' — not finished (no BACKUP_COMPLETE)':' — cannot be looked into'}`]];
+  if(su&&'newest_size_mib' in b)rows.push(['Newest backup size',typeof b.newest_size_mib==='number'?`${b.newest_size_exact===false?'At least ':''}${b.newest_size_mib} MiB`:'Could not be read']);
+  return rows;
+}
+/** This server: GET /api/admin/system-health (settings.view). */
+export async function loadSystemHealthCard(){
+  const body=document.getElementById('system-health-body');
+  if(!body)return;
+  const seq=++_healthSeq;
+  const d=await fetchJsonObject('/api/admin/system-health');
+  if(seq!==_healthSeq)return;
+  if(!d){ renderLoadFailure('system-health-body',{noun:'the server’s details',retryAction:'settings-health-retry'}); return; }
+  const gib=(n)=>typeof n==='number'?`${n} GiB free`:'Could not be read';
+  const b=d.build||{};
+  const su='database_size_mib' in d;
+  const groups=[
+    ['Running',[
+      ['Version',String(d.version||'unknown')],
+      ['Build',b.commit?`${String(b.commit).slice(0,12)}${b.built_at?`, built ${fmtDt(b.built_at,'long')}`:''}`:'Unknown (not a release image)'],
+      ['Release channel',b.channel?String(b.channel):'Unknown (not a release image)'],
+      ...(d.started_at?[['Server started',fmtDt(d.started_at,'long')]]:[]),
+      ['Running for',_uptimeText(d.uptime_seconds)],
+      ...(d.node_version?[['Node.js',String(d.node_version)]]:[]),
+    ]],
+    ['Health',[
+      ['Database check',d.database_integrity_ok===true?'Passed at start-up':'Failed at start-up — restore from a backup'],
+      ['Database tables',d.database_schema_ok===true?'Complete':'Incomplete — see the server log'],
+      ...(su?[['Database size',typeof d.database_size_mib==='number'?`${d.database_size_mib} MiB (with its write-ahead log)`:'Could not be read']]:[]),
+      ['Maintenance mode',d.maintenance===true?'On':'Off'],
+      ['Mail relay',`${_yesNo(d.smtp_healthy,'Answering','Not answering')}${d.smtp_checked_at?` (checked ${fmtDt(d.smtp_checked_at,'long')})`:''}`],
+    ]],
+    ['Storage and backups',[
+      ['Data volume',gib(d.data_free_gib)],
+      ['Uploads volume',gib(d.uploads_free_gib)],
+      ..._backupRows(d.backups,su),
+      ['Event history kept',`${Number(d.event_retention_days)||0} days`],
+    ]],
+  ];
+  setSafeHtml(body,groups.map(([title,rows])=>`<h4 class="settings-facts-title">${esc(title)}</h4><dl class="settings-facts-list">${rows.map(([k,v])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`).join('')
+    +'<p class="settings-hint">A server set up with the Podman installer checks daily for a new signed release on its channel and restarts on it, after backing up its database. Certificates are set in the open-source Inter and Noto typefaces (SIL Open Font License 1.1).</p>');
+}
+
+// Release notes: the newest version of docs/release-notes.md, rendered by
+// the help drawer's own pipeline (the document is admins' only, as the drawer's
+// door is: releaseNotesVisible); All release notes opens the drawer.
+let _notesSeq=0;
+const _NOTES_SHOWN=1;
+export async function loadReleaseNotesCard(){
+  const card=document.getElementById('release-notes-card');
+  const body=document.getElementById('release-notes-body');
+  if(!card||!body)return;
+  if(!releaseNotesVisible()){ card.style.display='none'; return; }
+  card.style.display='';
+  const seq=++_notesSeq;
+  let md=null;
+  try{ const r=await fetch(RELEASE_NOTES_DOC); if(r.ok)md=await r.text(); }
+  catch(e){ md=null; }
+  if(seq!==_notesSeq)return;
+  if(md===null){ renderLoadFailure('release-notes-body',{noun:'the release notes',retryAction:'settings-notes-retry'}); return; }
+  // The newest versions only: each starts at a "## " heading.
+  // Their headings move under the card's own (h3): a version is h4, its parts h5.
+  const parts=md.split(/^(?=## )/m).filter(p=>/^## /.test(p)).slice(0,_NOTES_SHOWN)
+    .map(p=>p.replace(/^### /gm,'##### ').replace(/^## /gm,'#### '));
+  setSafeHtml(body,parts.length?renderDocMarkdown(parts.join('\n'),RELEASE_NOTES_DOC):'<p class="settings-help">No release notes yet.</p>');
+}
+
+// ─── CxOne API audit: every Checkmarx One call the platform made ─────────────
+//
+// The audit trail's own read (GET /api/admin/audit, audit.view), narrowed to the
+// Checkmarx One activity by `event_type`, so each row is scoped exactly as the
+// Audit page scopes it (a person's set-up as their History, a removal of a
+// deleted participant as a logged event) and nothing is re-derived here. Paged
+// by the shared segment pager (ui/list-controls.js), filtered and sorted on the
+// page by the table component (PLAIN_TABLES['cxone-audit']). The activity keys
+// are the Audit page's own Checkmarx One wording, less the settings change
+// (`cxone_config_changed`, not a call to Checkmarx One).
+export const CXONE_AUDIT_EVENT_TYPES=Object.freeze(Object.keys(AUDIT_ACTIVITY_LABELS).filter(k=>k.startsWith('cxone_')&&k!=='cxone_config_changed').sort());
+const _cx={pager:newSegmentPager(30),seq:0};
+function _cxResult(r){
+  const d=r.details&&typeof r.details==='object'?r.details:{};
+  if(r.event_type==='cxone_provisioned'){
+    if(d.deferred)return 'Deferred';
+    if(d.success===true){
+      let t=d.already_existed===true?'Linked to an existing account':'Account created';
+      if(typeof d.group_name==='string'&&d.group_name)t+=d.group_assigned===true?`, added to group ${d.group_name}`:`, not added to group ${d.group_name}`;
+      return t;
+    }
+    return 'Failed';
+  }
+  return r.outcome==='success'?'Done':r.outcome==='failure'?'Failed':'Recorded';
+}
+function _cxDetail(r){
+  const d=r.details&&typeof r.details==='object'?r.details:{};
+  const bits=[];
+  for(const k of ['error','deferred','held_reason','reason','code','matched_by','stopped']){
+    if(typeof d[k]==='string'&&d[k])bits.push(k==='matched_by'?`matched by ${d[k]}`:d[k]);
+  }
+  if(d.retry_scheduled===true)bits.push(Number.isInteger(d.retry_attempt)?`retry ${d.retry_attempt} scheduled`:'retry scheduled');
+  if(d.details_unreadable===true)bits.push('details could not be read');
+  return bits.join('; ')||'—';
+}
+export async function loadCxoneAuditCard(pageN=1){
+  const body=document.getElementById('cxone-audit-body');
+  if(!body)return;
+  const st=_cx.pager;
+  const pos=segmentParams(st,pageN);
+  if(pageN>1&&!pos)return;
+  const seq=++_cx.seq;
+  const qs=new URLSearchParams({event_type:CXONE_AUDIT_EVENT_TYPES.join(','),limit:String(st.pageSize),...(pos||{})});
+  const d=await fetchJsonObject(`/api/admin/audit?${qs}`);
+  if(seq!==_cx.seq)return;
+  const bar=document.getElementById('cxone-audit-pagination-bar');
+  if(!d||!Array.isArray(d.rows)){
+    renderLoadFailure('cxone-audit-body',{noun:'the Checkmarx One activity',retryAction:'cxone-audit-retry',colspan:colspanFor('cxone-audit-body')});
+    if(bar)setSafeHtml(bar,'');
+    return;
+  }
+  segmentAbsorb(st,pageN,{total:d.total,totalExact:d.total_exact,anchor:d.anchor,nextCursor:d.next_cursor,hasMore:d.has_more,searchedTo:d.searched_to,offsetMax:d.offset_max});
+  setSafeHtml(body,d.rows.length?d.rows.map(r=>{
+    const who=r.subject&&r.subject.label?String(r.subject.label):r.subject&&r.subject.id?'Deleted participant':'—';
+    return `<tr><td data-sort-value="${esc(String(r.at||''))}">${esc(r.at?fmtDt(r.at,'full'):'')}</td><td>${esc(auditActivityLabel(r.event_type,r.details))}</td><td>${esc(r.competition_name?String(r.competition_name):'—')}</td><td>${esc(who)}</td><td>${esc(_cxResult(r))}</td><td>${esc(_cxDetail(r))}</td></tr>`;
+  }).join(''):`<tr><td colspan="${colspanFor('cxone-audit-body')}" class="table-empty-row">No Checkmarx One activity is recorded${pageN>1?' on this page.':' yet.'}</td></tr>`);
+  const o=segmentBarOptions(st);
+  if(bar)setSafeHtml(bar,paginationHtml('cxone-audit',{page:o.page,totalPages:o.totalPages,pagesLabel:o.pagesLabel,totalLabel:o.totalLabel,
+    hasPrev:o.hasPrev,hasNext:o.hasNext,lastEnabled:o.lastEnabled,pageSize:st.pageSize}));
+}
+export function cxoneAuditPage(how){
+  const st=_cx.pager;
+  const to=how==='first'?1:how==='last'?segmentLastTarget(st):segmentStepTarget(st,how==='next'?1:-1);
+  if(to)loadCxoneAuditCard(to);
+}
+export function cxoneAuditPageSize(v){
+  const n=parseInt(v,10);
+  if(!Number.isInteger(n)||n<1)return;
+  _cx.pager=newSegmentPager(n);
+  loadCxoneAuditCard(1);
+}
+
 const _SECTION_KEY='ha:settings-section';
-const _DEFAULT_SECTION='platform';
+const _DEFAULT_SECTION='general';
 let _settingsPref=null;
 let _settingsObserver=null;
 
@@ -816,7 +1002,7 @@ function _readSectionPref(){
 
 function _cardShown(card){ return card.style.display!=='none'; }
 
-/** Move any card sitting outside a section into its named section (else Platform). */
+/** Move any card sitting outside a section into its named section (else General). */
 function _adoptOrphanCards(){
   const bento=document.querySelector('#admin-settings-tab .settings-bento');
   if(!bento)return;
@@ -834,9 +1020,25 @@ export function settingsSections(){
   return [...document.querySelectorAll('#admin-settings-tab .settings-section[data-settings-section]')].map(sec=>({
     key:sec.getAttribute('data-settings-section'),
     label:sec.getAttribute('data-settings-label')||sec.getAttribute('data-settings-section'),
+    group:sec.getAttribute('data-settings-group')||'system',
     el:sec,
     available:[...sec.querySelectorAll('.settings-card')].some(_cardShown),
   }));
+}
+
+// The list's group captions (each section's `data-settings-group`), in the
+// order the markup first names them. The pages the sidebar opens (People,
+// Teams, Roles & permissions, Audit, the guides) are the sidebar's, never
+// repeated here (owner decision, 27 Nov 2026).
+const _GROUP_LABELS={people:'People',records:'Records',system:'System'};
+
+/** Every list item (a section), in markup order. */
+function _navItems(){
+  return settingsSections().map(s=>({kind:'section',...s}));
+}
+
+function _itemHtml(it){
+  return `<li data-settings-item="${esc(it.key)}"><button type="button" class="settings-nav-item" data-action="settings-section" data-section="${esc(it.key)}">${esc(it.label)}</button></li>`;
 }
 
 /** Repaint the list, the phone picker and which section shows. Idempotent. */
@@ -845,7 +1047,8 @@ export function syncSettingsNav(){
   const pick=document.getElementById('settings-section-pick');
   if(!list||!pick)return;
   _adoptOrphanCards();
-  const all=settingsSections();
+  const items=_navItems();
+  const all=items.filter(i=>i.kind==='section');
   const avail=all.filter(s=>s.available);
   const pref=_readSectionPref();
   const shown=(avail.find(s=>s.key===pref)||avail[0]||null);
@@ -854,30 +1057,58 @@ export function syncSettingsNav(){
     const hide=s.key!==shownKey;
     if(s.el.hidden!==hide)s.el.hidden=hide;
   }
-  // The list holds one item per section in the MARKUP, built only when that set
-  // changes; availability only toggles each item's `hidden`. Rebuilding on every
-  // card show/hide replaced the buttons while the loaders were still landing, so
-  // a press arriving in that window hit a detached button and did nothing.
-  const allSig=all.map(s=>`${s.key}:${s.label}`).join('|');
+  // The list holds one item per section in the MARKUP, grouped under
+  // its caption, built only when that set changes; availability only toggles
+  // each item's `hidden` (and a group's, when none of its items is listed).
+  // Rebuilding on every card show/hide replaced the buttons while the loaders
+  // were still landing, so a press arriving in that window hit a detached
+  // button and did nothing.
+  const groups=[];
+  for(const it of items){
+    let g=groups.find(x=>x.key===it.group);
+    if(!g){ g={key:it.group,label:_GROUP_LABELS[it.group]||it.group,items:[]}; groups.push(g); }
+    g.items.push(it);
+  }
+  const allSig=items.map(i=>`${i.kind}:${i.group}:${i.key}:${i.label}`).join('|');
   if(list.dataset.sig!==allSig){
     list.dataset.sig=allSig;
-    setSafeHtml(list,all.map(s=>`<li data-settings-item="${esc(s.key)}"><button type="button" class="settings-nav-item" data-action="settings-section" data-section="${esc(s.key)}">${esc(s.label)}</button></li>`).join(''));
+    setSafeHtml(list,groups.map(g=>{
+      const cid=`settings-group-${g.key}`;
+      return `<div class="settings-nav-group" data-settings-group="${esc(g.key)}"><h3 class="settings-nav-caption" id="${esc(cid)}">${esc(g.label)}</h3><ul class="settings-nav-items" aria-labelledby="${esc(cid)}">${g.items.map(_itemHtml).join('')}</ul></div>`;
+    }).join(''));
   }
   for(const li of list.querySelectorAll('li[data-settings-item]')){
-    const hide=!avail.some(s=>s.key===li.dataset.settingsItem);
+    const k=li.dataset.settingsItem;
+    const it=items.find(i=>i.key===k);
+    const hide=!(it&&it.available);
     if(li.hidden!==hide)li.hidden=hide;
   }
-  const availSig=avail.map(s=>s.key).join('|');
+  for(const grp of list.querySelectorAll('.settings-nav-group')){
+    const hide=!grp.querySelector('li[data-settings-item]:not([hidden])');
+    if(grp.hidden!==hide)grp.hidden=hide;
+  }
+  // The phone picker: the same groups as <optgroup>s.
+  const availItems=items.filter(i=>i.available);
+  const availSig=availItems.map(i=>`${i.kind}:${i.group}:${i.key}`).join('|');
   if(pick.dataset.sig!==availSig){
     pick.dataset.sig=availSig;
-    setSafeHtml(pick,avail.map(s=>`<option value="${esc(s.key)}">${esc(s.label)}</option>`).join(''));
+    setSafeHtml(pick,groups.map(g=>{
+      const opts=g.items.filter(i=>i.available).map(i=>`<option value="${esc(i.key)}">${esc(i.label)}</option>`).join('');
+      return opts?`<optgroup label="${esc(g.label)}">${opts}</optgroup>`:'';
+    }).join(''));
   }
-  for(const b of list.querySelectorAll('.settings-nav-item')){
+  for(const b of list.querySelectorAll('.settings-nav-item[data-section]')){
     const cur=b.dataset.section===shownKey;
     if(cur){ if(b.getAttribute('aria-current')!=='true')b.setAttribute('aria-current','true'); }
     else if(b.hasAttribute('aria-current'))b.removeAttribute('aria-current');
   }
   if(shownKey&&pick.value!==shownKey)pick.value=shownKey;
+}
+
+/** The phone picker's change: a section. */
+export function settingsPick(value){
+  if(typeof value!=='string')return;
+  selectSettingsSection(value);
 }
 
 /** Choose a section (a list press, the phone picker, or a deep link). */
@@ -926,7 +1157,8 @@ export function installSettingsShell(){
 }
 
 export const SETTINGS_HELP_TIPS={
-  'settings.platform-name':'Appears in the header and help, in every email subject, and as the sender name on all email. The sender address is fixed by the operator (EMAIL_FROM). Takes effect at once.',
+  'settings.platform-name':'Appears in the header and help, in every email subject, and as the sender name on all email. The sender address is set with the mail server, under Email (SMTP). Takes effect at once.',
+  'settings.smtp':'Every email the platform sends goes through this server. Each value says whether it was set here in the app or comes from the server’s environment; settings saved here replace the environment’s as a whole. Send test email tries the server in use; Test with these values, in the form, tries values before they are saved. Only a superadmin can change the server, and the password is never shown.',
   'settings.approval':'A new account is created only after its first emailed code confirms the address. With this on, a new account waits for an administrator, except one made through the join link, QR code or event code of an open event. Invited people are always approved.',
   'settings.test-email':'Sends one plain message through the mail relay so you can see that email arrives and what the sender looks like. The relay status comes from the platform’s own check, run every few minutes.',
   'settings.unsubscribe':'Opt-outs cover invitations, reminders and assignment notices. Remove an address when its owner agrees to receive these again.',
@@ -937,8 +1169,145 @@ export const SETTINGS_HELP_TIPS={
   'settings.cxone-removals':'When a participant is deleted, the platform removes the Checkmarx One accounts it created for them. Anything it could not remove, or will not remove without your say-so, is listed with what to do.',
   'settings.retention':'Audit and activity history older than this is deleted by a daily sweep. Submissions, scores and certificates are not affected.',
   'settings.alerts':'When a blocked address could be a busy shared network such as a venue, every superadmin is emailed and an alert opens here until the block lapses or someone dismisses it. An unmistakable scanner is blocked without an alert; every block is recorded in Audit.',
+  'settings.cxone-audit':'Every call the platform made to Checkmarx One, newest first: an account set up or linked to an existing one, a set-up refused, deferred or given up, a group grant, and each removal of a deleted participant’s account with its outcome. A row shows only where your role may see that person’s or event’s history.',
+  'settings.health':'What is running (the version, and the commit, build time and release channel a release image was built with) and how the server is: its start-up database checks, the mail relay’s last check, free disk and the backups it can see. Superadmins also see the database and backup sizes, the Node.js version and when the server started.',
+  'settings.release-notes':'What changed in the newest versions, for the people who run events. All release notes opens every version.',
   'settings.breakglass':'The boot-generated password is in the data folder. Changing the username keeps you signed in; the new one is needed from the next sign-in, and the old one then signs nobody in.',
 };
+
+// ─── Email (SMTP): the mail server in use ─────────────────────────────────────
+//
+// GET /api/admin/smtp-settings (settings.view) shows every reader the relay in
+// force and where each value comes from; a superadmin (ops.smtp, never
+// grantable) also gets the form: Test with these values sends through the
+// UNSAVED values, Save swaps the relay live, Remove saved settings returns to
+// the server's environment. The password is never sent to the browser: the form
+// says only whether one is set, and an empty box keeps it (for the same host and
+// username; the server refuses otherwise and says why).
+let _smtpSeq=0;
+let _smtpView=null;
+const _SMTP_SOURCE={app:'Set in the app',environment:'From the server’s environment',default:'Built-in default'};
+const _SMTP_SECURITY={starttls:'STARTTLS (upgrade required)',tls:'TLS from the start (implicit TLS)'};
+function _smtpSourceTag(src){ return `<span class="settings-source">${esc(_SMTP_SOURCE[src]||'')}</span>`; }
+function _smtpHealthText(h){
+  if(!h||h.state===null||h.state===undefined)return 'Not checked yet since the server started or the settings changed.';
+  const at=h.checked_at?` (${fmtDt(h.checked_at,'long')})`:'';
+  return h.state===true?`Answered its last check${at}.`:`Did not answer its last check${at} — sign-in codes and invitations may not arrive.`;
+}
+export async function loadSmtpCard(){
+  const body=document.getElementById('smtp-settings-body');
+  if(!body)return;
+  const seq=++_smtpSeq;
+  const d=await fetchJsonObject('/api/admin/smtp-settings');
+  if(seq!==_smtpSeq)return;
+  if(!d){ _smtpView=null; renderLoadFailure('smtp-settings-body',{noun:'the mail server settings',retryAction:'smtp-reload'}); return; }
+  _renderSmtpCard(d);
+}
+function _renderSmtpCard(d){
+  const body=document.getElementById('smtp-settings-body');
+  if(!body)return;
+  _smtpView=d;
+  const u=d.in_use;
+  const rows=[];
+  if(u){
+    const src=u.source;
+    // Plain text, escaped once where the list is drawn.
+    rows.push(['Server',`${u.host}:${u.port}`,src]);
+    rows.push(['Security',(_SMTP_SECURITY[u.security]||String(u.security))+(u.security==='starttls'&&d.plaintext_allowed?' — not required on this server (SMTP_ALLOW_PLAINTEXT)':''),src]);
+    rows.push(['Username',u.username?String(u.username):'None (no sign-in to the server)',src]);
+    rows.push(['Password',u.password_set?'Set (never shown)':'Not set',src]);
+    rows.push(['Sender address',String(u.sender),u.sender_source]);
+  }
+  const health=d.health&&d.health.state===false?'settings-relay-bad':d.health&&d.health.state===true?'settings-relay-ok':'';
+  let h='';
+  if(d.password_unreadable){
+    h+=`<p class="settings-warning" role="alert">The password saved in the app cannot be read on this server (its key file is not part of backups, so a restore or a move to another server loses it). ${d.in_use&&d.in_use.source==='environment'?'Email is going through the server’s environment settings meanwhile.':'Email is being sent without it and will likely fail.'} ${d.can_edit?'Enter the password again below and save.':'Ask a superadmin to enter it again.'}</p>`;
+  }
+  h+=u?`<dl class="settings-facts-list smtp-facts">${rows.map(([k,v,s])=>`<div><dt>${esc(k)}</dt><dd>${esc(v)} ${_smtpSourceTag(s)}</dd></div>`).join('')}<div><dt>Last check</dt><dd class="${health}">${esc(_smtpHealthText(d.health))}</dd></div></dl>`
+       :'<p class="settings-warning">No mail server is configured.</p>';
+  // ONE test send for the server in use (POST /api/admin/test-email, ops.email),
+  // under its facts and its one relay status (Last check above). The form below
+  // keeps "Test with these values" for values not saved yet. The address typed
+  // here survives the card's own re-renders.
+  const typed=document.getElementById('smtp-current-test-to')?.value||'';
+  if(u&&adminCan('ops.email')){
+    h+=`<div class="settings-row smtp-current-test"><label for="smtp-current-test-to">Send a test to</label><input type="email" id="smtp-current-test-to" placeholder="you@company.com" autocomplete="off" maxlength="254" aria-describedby="smtp-current-test-hint"/><button class="btn secondary" data-action="send-test-email" data-input="smtp-current-test-to">Send test email</button><p class="settings-hint" id="smtp-current-test-hint">One plain message through the mail server in use, with the sender above.</p></div>`;
+  }
+  if(!d.can_edit){
+    h+='<p class="settings-hint">Only a superadmin can change this.</p>';
+    setSafeHtml(body,h);
+    _restoreTyped(typed);
+    return;
+  }
+  // The form starts from the SAVED relay when there is one (so re-entering a
+  // lost password is one field), else from the one in force.
+  const f=d.saved||u||{host:'',port:587,security:'starttls',username:'',sender:''};
+  const savedPw=d.saved?d.saved.password_set&&!d.password_unreadable:(u&&u.password_set);
+  const pwHint=savedPw?'Leave empty to keep the current password (same host and username only).':'Needed when the server asks for a username.';
+  // The form sits behind a disclosure (the facts above are what most visits
+  // need), open while a saved password must be entered again.
+  h+=`<details class="comp-form-advanced smtp-change" id="smtp-change"${d.password_unreadable?' open':''}>
+  <summary class="comp-form-advanced-summary"><span class="comp-form-advanced-title">Change the mail server</span><span class="comp-form-advanced-sub">Test new values, then save them</span></summary>
+  <div class="comp-form-advanced-body">
+  <p class="settings-help">Saved settings replace the server’s environment settings for all email, at once and without a restart. ${d.saved?'Remove them to go back to the environment.':''}</p>
+  <div class="settings-row"><label for="smtp-host">Host</label><input type="text" id="smtp-host" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="253" value="${esc(f.host)}" placeholder="smtp.example.com"/></div>
+  <div class="settings-row"><label for="smtp-port">Port</label><input type="text" id="smtp-port" inputmode="numeric" autocomplete="off" maxlength="5" value="${esc(String(f.port||''))}"/></div>
+  <div class="settings-row"><label for="smtp-security">Security</label><select id="smtp-security" autocomplete="off">${Object.entries(_SMTP_SECURITY).map(([k,l])=>`<option value="${esc(k)}"${f.security===k?' selected':''}>${esc(l)}</option>`).join('')}</select><p class="settings-hint">Port 587 normally uses STARTTLS, port 465 TLS from the start.</p></div>
+  <div class="settings-row"><label for="smtp-username">Username</label><input type="text" id="smtp-username" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="254" value="${esc(f.username||'')}"/><p class="settings-hint">Leave empty for a server that takes mail without signing in.</p></div>
+  <div class="settings-row"><label for="smtp-password">Password</label><input type="password" id="smtp-password" autocomplete="new-password" maxlength="512" aria-describedby="smtp-password-hint"/><p class="settings-hint" id="smtp-password-hint">${esc(pwHint)} Stored encrypted; never shown again.</p></div>
+  <div class="settings-row"><label for="smtp-sender">Sender address</label><input type="email" id="smtp-sender" autocomplete="off" maxlength="254" value="${esc(f.sender||'')}" placeholder="no-reply@example.com"/><p class="settings-hint">The address mail comes from. The name shown is the platform name.</p></div>
+  <div class="settings-row"><label for="smtp-test-to">Send a test to</label><input type="email" id="smtp-test-to" autocomplete="off" maxlength="254" placeholder="you@company.com"/><button class="btn secondary" data-action="smtp-test">Test with these values</button></div>
+  <div class="settings-actions"><button class="btn" data-action="smtp-save">Save</button>${d.saved&&d.environment_relay?'<button class="btn danger sm" data-action="smtp-remove">Remove saved settings</button>':''}</div>
+  </div></details>`;
+  setSafeHtml(body,h);
+  _restoreTyped(typed);
+}
+function _restoreTyped(v){ const el=document.getElementById('smtp-current-test-to'); if(el&&v)el.value=v; }
+function _smtpFormValues(){
+  const g=(id)=>document.getElementById(id)?.value??'';
+  const out={host:g('smtp-host').trim(),port:g('smtp-port').trim(),security:g('smtp-security'),username:g('smtp-username').trim(),sender:g('smtp-sender').trim()};
+  const pw=g('smtp-password');
+  if(pw)out.password=pw;
+  return out;
+}
+function _smtpRefused(d,status,what){
+  const msg=d&&d.error?d.error:`${what} (${status}).`;
+  showToast(msg,'error');
+  if(d&&d.field){ const el=document.getElementById(d.field==='to'?'smtp-test-to':`smtp-${d.field}`); el?.focus(); }
+}
+async function _smtpSend(method,url,payload){
+  let r=null;
+  try{ r=await fetch(url,{method,headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify(payload)}); }
+  catch(e){ showToast('Could not reach the server — check your connection.','error'); return null; }
+  const d=await r.json().catch(()=>null);
+  return {r,d};
+}
+export async function smtpTest(){
+  const to=(document.getElementById('smtp-test-to')?.value||'').trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){ showToast('Enter the address to send the test to.','error'); document.getElementById('smtp-test-to')?.focus(); return; }
+  const out=await _smtpSend('POST','/api/admin/smtp-settings/test',{..._smtpFormValues(),to});
+  if(!out)return;
+  if(out.r.ok&&out.d&&out.d.ok){ showToast(`Test email sent to ${to} with these settings. They are not saved yet.`,'success'); return; }
+  if(out.r.status===502&&out.d&&out.d.error){ showToast(`The server did not take the test email: ${out.d.error}`,'error'); return; }
+  _smtpRefused(out.d,out.r.status,'The test email was not sent');
+}
+export async function smtpSave(){
+  const v=_smtpFormValues();
+  const ok=await showModal({title:'Save the mail server?',message:`All email the platform sends will go through <strong>${esc(v.host)}:${esc(v.port)}</strong> from now on. Test these values first if you have not.`,confirmText:'Save',confirmClass:''});
+  if(!ok)return;
+  const out=await _smtpSend('PUT','/api/admin/smtp-settings',{...v,expectedVersion:_smtpView?_smtpView.version:null});
+  if(!out)return;
+  if(out.r.ok&&out.d&&out.d.ok){ showToast('Mail server saved. Email now goes through it.','success'); _renderSmtpCard(out.d); return; }
+  _smtpRefused(out.d,out.r.status,'The mail server was not saved');
+}
+export async function smtpRemove(){
+  const ok=await showModal({title:'Remove the saved mail server?',message:'Email will go through the mail server set in the server’s environment again, at once. The saved password is deleted.',confirmText:'Remove',confirmClass:'danger'});
+  if(!ok)return;
+  const out=await _smtpSend('DELETE','/api/admin/smtp-settings',{expectedVersion:_smtpView?_smtpView.version:null});
+  if(!out)return;
+  if(out.r.ok&&out.d&&out.d.ok){ showToast('Saved mail server removed. Email goes through the environment’s settings.','success'); _renderSmtpCard(out.d); return; }
+  _smtpRefused(out.d,out.r.status,'The saved mail server was not removed');
+}
 
 // ─── Email: relay status + test send ──────────────────────────────────────────
 let _emailSeq=0;
@@ -957,19 +1326,24 @@ export async function loadEmailCard(){
   else { setSafeHtml(status,'The mail relay has not been checked since the last restart.'); status.className='settings-help'; }
 }
 
-export async function sendTestEmail(){
-  const input=document.getElementById('settings-test-email-to');
+// The test send of the server in use: the Mail server card's row (its input
+// named by the button's data-input), or, for a role that may send a test but
+// not read the mail server (ops.email without settings.view), the Outbound
+// email card. A send re-reads that door's relay status.
+export async function sendTestEmail(btn){
+  const fromCard=!!(btn&&btn.dataset&&btn.dataset.input==='smtp-current-test-to');
+  const input=document.getElementById(fromCard?'smtp-current-test-to':'settings-test-email-to');
   const to=(input?.value||'').trim();
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){ showToast('Enter the address to send the test to.','error'); input?.focus(); return; }
   let r=null;
   try{ r=await fetch('/api/admin/test-email',{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({to})}); }
   catch(e){ showToast('Could not reach the server — check your connection.','error'); return; }
   const d=await r.json().catch(()=>({}));
-  if(r.ok&&d.ok){ showToast(`Test email sent to ${to}.`,'success'); loadEmailCard(); return; }
+  if(r.ok&&d.ok){ showToast(`Test email sent to ${to}.`,'success'); if(fromCard)loadSmtpCard(); else loadEmailCard(); return; }
   showToast(d.error?`The test email was not sent: ${d.error}`:`The test email was not sent (${r.status}).`,'error');
 }
 
-// ─── Data & retention (read-only) ─────────────────────────────────────────────
+// ─── Event history retention (read-only) ─────────────────────────────────────────────
 let _retSeq=0;
 export async function loadRetentionCard(){
   const body=document.getElementById('retention-body');
@@ -1275,7 +1649,7 @@ function _wdFocusIfPending(){
   const card=document.getElementById('cxone-withdrawals-card');
   // The card's section must be the one on screen before its heading can take
   // focus (focus on a hidden element is a silent no-op).
-  if(h&&card&&card.style.display!=='none'){ selectSettingsSection('cxone'); h.focus(); }
+  if(h&&card&&card.style.display!=='none'){ selectSettingsSection('cxone-audit'); h.focus(); }
 }
 
 // The header banner's "Review removals". It routes through the Settings nav item
@@ -1288,7 +1662,7 @@ export function openCxoneWithdrawalsReview(){
   // The click dispatches synchronously (dispatcher → adminTab → the synchronous
   // prefix of loadAdminSettings, which reads this), so the flag is scoped to
   // this one entry and cannot survive it — not even if the handler throws.
-  selectSettingsSection('cxone');   // the removals card's section, before the pane opens
+  selectSettingsSection('cxone-audit');   // the removals card's section, before the pane opens
   _wdReviewEntry=true;
   try{ btn.click(); }finally{ _wdReviewEntry=false; }
 }

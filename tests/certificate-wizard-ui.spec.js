@@ -17,7 +17,7 @@ test.use({ baseURL: BASE });
 test("platform designer: [hidden] panels, Save never disabled, the Email section's fields", async ({ page }) => {
   await adminLogin(page);
   await clickTab(page, "Settings");
-  await require("./ui-admin-helpers").openSettingsSection(page, "certificates");
+  await require("./ui-admin-helpers").openSettingsSection(page, "branding");
   const open = page.locator("[data-cw-open]");
   await expect(open).toBeVisible({ timeout: 15000 });
   await open.click();
@@ -79,7 +79,7 @@ test("clickTab presses a sidebar item only once the admin page shows: a Settings
   try {
     await page.reload();
     await clickTab(page, "Settings");
-    await require("./ui-admin-helpers").openSettingsSection(page, "certificates");
+    await require("./ui-admin-helpers").openSettingsSection(page, "branding");
     await expect(page.locator("#cert-config-card"), "the designer card is offered once the role is known").toBeVisible();
   } finally { await page.unroute("**/api/admin/me"); }
 });
@@ -87,7 +87,7 @@ test("clickTab presses a sidebar item only once the admin page shows: a Settings
 test("the Verification QR box is disabled, with its reason, while Certificate ID is off (live and on load)", async ({ page }) => {
   const openShow = async () => {
     await clickTab(page, "Settings");
-    await require("./ui-admin-helpers").openSettingsSection(page, "certificates");
+    await require("./ui-admin-helpers").openSettingsSection(page, "branding");
     const open = page.locator("[data-cw-open]");
     await expect(open).toBeVisible({ timeout: 15000 });
     await open.click();
@@ -178,7 +178,7 @@ test("the Settings designer spans the whole content column beside the section li
   await page.setViewportSize({ width: 1440, height: 900 });
   await adminLogin(page);
   await clickTab(page, "Settings");
-  await require("./ui-admin-helpers").openSettingsSection(page, "certificates");
+  await require("./ui-admin-helpers").openSettingsSection(page, "branding");
   const open = page.locator("[data-cw-open]");
   await expect(open).toBeVisible({ timeout: 15000 });
   await open.click();

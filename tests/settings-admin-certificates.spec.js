@@ -10,7 +10,7 @@
 // (ui/nav.js settingsOffered), and each card shows to a role holding what its
 // own routes check (SETTINGS_CARD_PERMISSIONS; operator ruling, 14 Nov 2026:
 // a regular admin, who may read them, sees Retention and Alerts). Locked here:
-//   1. a regular admin opens Settings → Certificates design, saves a design and
+//   1. a regular admin opens Settings → Branding (the certificate design), saves a design and
 //      the server reads it back; the cards they see are exactly the ones their
 //      routes allow (by heading text), with a SUPERADMIN control that sees the
 //      superadmin-only cards;
@@ -35,10 +35,10 @@ const shownCardHeadings = (page) => page.evaluate(() =>
 
 // Every card heading only a superadmin may see among the built-in roles (its
 // route is settings.edit, ops.email, ops.cxone or the built-in session).
-const SUPERADMIN_ONLY = ["Platform name", "New accounts", "Outbound email", "Unsubscribe List",
-  "Global Default CheckmarxOne Integration"];
-// The cards a regular admin may read (ops.retention_view, ops.alerts).
-const ADMIN_READS = ["Event history retention", "Blocked-address alerts"];
+const SUPERADMIN_ONLY = ["Platform name", "New accounts", "Outbound email", "Unsubscribe list",
+  "Default Checkmarx One integration"];
+// The cards a regular admin may read (ops.retention_view, ops.alerts, settings.view).
+const ADMIN_READS = ["Event history retention", "Blocked-address alerts", "Mail server (SMTP)", "This server"];
 
 async function panelLogin(page, email) {
   await loginViaApi(page, email, PARTICIPANT_PASS);
@@ -93,12 +93,12 @@ test("a REGULAR admin opens the platform certificate designer from Settings, sav
     for (const h of SUPERADMIN_ONLY) expect(txt, `section ${key} shows no "${h}"`).not.toContain(h);
     expect(await page.locator("#settings-platform-name").isVisible(), `section ${key}: the platform name input is not on screen`).toBe(false);
   }
-  expect(listed, "only the sections this admin may use are listed").toEqual(["email", "certificates", "data", "alerts"]);
+  expect(listed, "only the sections this admin may use are listed").toEqual(["staff-teams", "cxone-audit", "general", "branding", "email", "health"]);
 
   // Open the designer and save a design.
   const title = `ADMIN DESIGN ${Date.now() % 100000}`;
   try {
-    await openSettingsSection(page, "certificates");
+    await openSettingsSection(page, "branding");
     await page.locator("[data-cw-open]").click();
     const box = page.locator("#cert-config-body");
     const field = box.locator("#cw-t-title");
@@ -130,9 +130,9 @@ test("a REGULAR admin opens the platform certificate designer from Settings, sav
 test("CONTROL — a SUPERADMIN is shown the superadmin-only cards", async ({ page }) => {
   await adminLogin(page);
   await openSettings(page);
-  await expect.poll(() => shownCardHeadings(page), { timeout: 15000 }).toEqual(expect.arrayContaining(["Platform name", "Global Default CheckmarxOne Integration", "Unsubscribe List", "Certificate design"]));
+  await expect.poll(() => shownCardHeadings(page), { timeout: 15000 }).toEqual(expect.arrayContaining(["Platform name", "Default Checkmarx One integration", "Unsubscribe list", "Certificate design"]));
   const listed = await page.locator("#settings-section-list li:not([hidden]) [data-section]").evaluateAll((els) => els.map((e) => e.getAttribute("data-section")));
-  expect(listed, "a superadmin's list holds the superadmin sections").toEqual(expect.arrayContaining(["platform", "accounts", "cxone", "certificates"]));
+  expect(listed, "a superadmin's list holds the superadmin sections").toEqual(expect.arrayContaining(["general", "signin", "cxone-audit", "branding"]));
 });
 
 test("an EVENT admin gets no Settings item and no platform designer; the route refuses them too", async ({ page }) => {

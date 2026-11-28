@@ -49,6 +49,8 @@ test.describe("v8.3.34 — absence login_time is portable", () => {
           name: `AbsAnchor-${tag}`,
           start_time: new Date(Date.now() - 10 * 60_000).toISOString(),
           duration_minutes: 300,
+          // The anchor this arm exports is the one ENTERING stamps.
+          clock_start: "entry",
         },
       })).json()).competition.id;
 

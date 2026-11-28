@@ -27,6 +27,7 @@ import { registerHelpTips } from "../ui/help-tips.js";
 import { downloadBlob } from "../ui/download.js";
 import { adminPaneLoaders, adminCan, workspaceHooks } from "../ui/nav.js";
 import { openEventWorkspace } from "./event-workspace.js";
+import { openStaffTeamToEvent } from "./staff-teams.js";
 
 const PANE = 'admin-event-team-tab';
 const PERSONAS = [
@@ -79,6 +80,7 @@ export function initEventTeam({ registerAction, registerChange }) {
   registerHelpTips(TIPS);
   adminPaneLoaders.set(PANE, () => loadEventTeam());
   registerAction('team-add', () => teamAdd());
+  registerAction('team-add-staff-team', () => openStaffTeamToEvent({ compId: _wsComp(), roles: _team && _team.roles, onDone: () => loadEventTeam() }));
   registerAction('team-remove', (e, el) => teamRemove(el.dataset.memberId, el.dataset.memberName));
   registerAction('team-targets-save', () => teamTargetsSave());
   registerAction('team-persona', (e, el) => _pickPersona(el.dataset.persona));
@@ -209,7 +211,16 @@ function _addFormHtml() {
     <button type="button" class="btn" data-action="team-add">Add to team</button>
   </div>
   ${roleNotes}
-  <p class="settings-help">${doms.length ? `Addresses at ${esc(doms.join(', '))} only.` : 'No email domain is allowed yet: a superadmin adds them under Settings, Email.'}</p>`;
+  <p class="settings-help">${doms.length ? `Addresses at ${esc(doms.join(', '))} only.` : 'No email domain is allowed yet: a superadmin adds them under Settings, Email.'}</p>
+  ${_staffTeamDoorHtml()}`;
+}
+
+// A whole staff team (Settings → People → Staff teams) at once: offered with the
+// single add's own predicates (this form is drawn only where those hold) and
+// `teams.view`, which reading the directory takes.
+function _staffTeamDoorHtml() {
+  if (!adminCan('teams.view')) return '';
+  return `<div class="team-staff-door help-label-row"><button type="button" class="btn secondary" data-action="team-add-staff-team">Add a staff team</button><span data-help="team.staff-team" data-help-label="Add a staff team"></span></div>`;
 }
 
 const KIND_LABEL = { wrapup: 'Wrap-up', delta: 'New leads update', nudge: 'Reminder to SDRs', weekly: 'Weekly digest', manual: 'Sent now' };
@@ -332,7 +343,7 @@ function _seHtml(r) {
   const s = r.summary, c = r.certificates;
   const tiles = [{ label: 'Joined', num: s.joined }, { label: 'Played', num: s.played, sub: s.joined ? `${_pct(s.played / s.joined)} of those who joined` : '' }];
   if (s.avg_solve_rate != null) tiles.push({ label: 'Average solve rate', num: _pct(s.avg_solve_rate) });
-  if (s.avg_rating != null) tiles.push({ label: 'Challenge rating', num: `${s.avg_rating.toFixed(1)} of 5` });
+  if (s.avg_rating != null) tiles.push({ label: 'Question rating', num: `${s.avg_rating.toFixed(1)} of 5` });
   tiles.push({ label: 'Certificates', num: c.issued, sub: `${c.delivered} delivered${c.bounced ? `, ${c.bounced} not delivered` : ''}` });
   const flag = (x) => (x.flag === 'too_easy' ? _pill('warm', 'Too easy') : x.flag === 'too_hard' ? _pill('hot', 'Too hard') : '');
   const rows = r.challenges.map(x => `<tr><td>${esc(x.title)}</td><td>${_n(x.attempters)}</td><td>${_n(x.solvers)}</td><td>${esc(_pct(x.solve_rate))}</td><td>${_n(x.wrong)}</td><td>${flag(x)}</td><td>${x.ratings ? `${esc(x.avg_rating.toFixed(1))} (${_n(x.low_ratings)} low)` : '—'}</td></tr>`).join('');
@@ -340,8 +351,8 @@ function _seHtml(r) {
   // mode, the late entrants' once their window closes); its headings are
   // lib/team-report-mail.js `podiumHeading`'s words, mirrored by hand (browser ESM).
   return `${_focusHtml(r.focus && r.focus.se)}${_tiles(tiles)}
-    ${_subhead('Every challenge')}
-    <div class="table-card"><table class="dense" data-tcols="team-challenges" data-tcols-scope="${esc(_compId || '')}"><thead><tr><th scope="col">Challenge</th><th scope="col">Tried</th><th scope="col">Solved</th><th scope="col">Rate</th><th scope="col">Wrong</th><th scope="col">Flag</th><th scope="col">Rating</th></tr></thead><tbody>${rows || '<tr><td colspan="7">No scoring challenges yet.</td></tr>'}</tbody></table></div>
+    ${_subhead('Every question')}
+    <div class="table-card"><table class="dense" data-tcols="team-challenges" data-tcols-scope="${esc(_compId || '')}"><thead><tr><th scope="col" data-tcol="challenge">Question</th><th scope="col">Tried</th><th scope="col">Solved</th><th scope="col">Rate</th><th scope="col">Wrong</th><th scope="col">Flag</th><th scope="col">Rating</th></tr></thead><tbody>${rows || '<tr><td colspan="7">No scoring questions yet.</td></tr>'}</tbody></table></div>
     ${r.podium.map(g => `<p class="team-note">${g.session ? `Podium, ${esc(g.session)}` : (g.late ? 'Podium, late entrants' : 'Podium')}: ${g.places.map(x => `${_n(x.rank)}. ${esc(x.name)} (${_n(x.score)})`).join('; ')}</p>`).join('')}`;
 }
 

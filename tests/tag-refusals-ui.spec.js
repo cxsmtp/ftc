@@ -17,7 +17,7 @@
 // why) and v7.16.7 (a list emptied by a filter, reported as an empty list):
 // **gate the affordance and the explanation together.**
 const { test, expect } = require("./isolated-test");
-const { narrowChallengesTable, narrowPeopleTable } = require("./ui-admin-helpers"); // v9.2.5 — the one way to type into the admin search boxes
+const { narrowPeopleTable } = require("./ui-admin-helpers"); // v9.2.5 — the one way to type into the admin search boxes
 // The tag and group cells are outside the Participants table's default six columns.
 test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").showAllParticipantColumns(page); });
 const { registerPost } = require("./helpers");
@@ -32,13 +32,9 @@ const h = csrf => ({ "x-csrf-token": csrf, "content-type": "application/json" })
 // wait for the kind=all reload) before searching. It must be offered to every
 // global admin, so its absence fails rather than skips.
 async function showAdminAccounts(page) {
-  const inc = page.locator("#p-include-admins");
-  await expect(inc, "People offers Show admin accounts to a global admin").toBeVisible({ timeout: 10000 });
-  if (!(await inc.isChecked())) {
-    const reload = page.waitForResponse((r) => r.url().includes("/api/admin/participants?") && r.url().includes("kind=all"));
-    await inc.check();
-    await reload;
-  }
+  // People has no "Show admin accounts" (admin accounts live on Roles &
+  // permissions); a link to one lists them, which the helper takes.
+  await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
 }
 
 async function loginSuperadmin(page) {
@@ -112,34 +108,42 @@ test.describe("v7.21.14 — a refused tag change is reported", () => {
     await sa2.dispose();
   });
 
-  test("a challenge tag the server rejects surfaces the reason instead of closing", async ({ page }) => {
-    // The task-tag route validates through validateBody with max:50, so an
-    // over-long tag is a clean, deterministic 400 with a message naming the
-    // field. Pre-fix the dialog closed on it and the admin saw nothing.
+  // Stage B — a question has no tag box any more; the markers an organiser sets
+  // (needs, shared) are the editor's Topic and sharing row, written through the
+  // same tag routes after the save. A refusal there must be REPORTED, not
+  // swallowed by the editor closing: a needs marker on a Booth Event's own
+  // question is refused (a visitor's phone cannot do what it needs).
+  test("a question marker the server rejects surfaces the reason, and nothing is written", async ({ page }) => {
     const stamp = Date.now();
     const { api: sa, csrf: saCsrf } = await apiLogin("superadmin");
+    const ev = await sa.post("/api/admin/competitions", { headers: h(saCsrf), data: {
+      name: `TagRefusal Booth ${stamp}`, event_kind: "booth",
+      start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 600 } });
+    expect(ev.ok(), `booth event: ${await ev.text()}`).toBeTruthy();
+    const compId = (await ev.json()).competition.id;
     const mk = await sa.post("/api/admin/tasks", {
       headers: h(saCsrf),
-      data: { title: `TagRefusal ${stamp}`, description: "d", difficulty: "easy", answer_type: "text", correct_answer: "a" },
+      data: { title: `TagRefusal ${stamp}`, description: "d", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published", competitionId: compId },
     });
-    expect(mk.ok(), "fixture challenge created").toBeTruthy();
+    expect(mk.ok(), `fixture question made in the booth: ${await mk.text()}`).toBeTruthy();
+    const qid = (await mk.json()).id;
     await sa.dispose();
+    const stored = async () => ((await (await page.request.get("/api/admin/tasks")).json()).find(t => t.id === qid) || {}).tags;
 
     await loginSuperadmin(page);
     await page.click('[data-tab-id="admin-tasks-tab"]');
-    await narrowChallengesTable(page, `TagRefusal ${stamp}`);
-    const row = page.locator("#admin-tasks-tab tr", { hasText: `TagRefusal ${stamp}` }).first();
-    await expect(row).toBeVisible({ timeout: 20000 });
-    await row.locator('[data-action="task-tag-add"]').first().click();
+    await expect.poll(() => page.evaluate((id) => !!(window.adminTasksData || []).find(t => t.id === id), qid), { timeout: 20000 }).toBe(true);
+    await page.evaluate((id) => window.editTask(id), qid);
+    await page.locator('[aria-controls="tf-org-body"]').click();
+    await page.locator('#tf-needs-list input[data-need="desktop"]').check();
+    await page.locator("#save-task-btn").click();
+    // The question is live in the event, so the save asks first.
+    await page.locator("#modal-confirm-btn").click();
 
-    const input = page.locator("#task-tag-input");
-    await expect(input).toBeVisible({ timeout: 10000 });
-    await input.fill("x".repeat(80));
-    await page.click("#task-tag-save-btn");
-
-    await expect(page.locator(".toast").first(),
-      "a rejected challenge tag must report the reason, not close silently"
+    await expect(page.locator(".toast").filter({ hasText: /Booth/i }).first(),
+      "a refused marker must report the reason, not close silently"
     ).toBeVisible({ timeout: 10000 });
+    expect(await stored(), "the refusal was a refusal: no marker written").toEqual([]);
   });
 });
 

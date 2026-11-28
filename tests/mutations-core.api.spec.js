@@ -17,11 +17,14 @@ async function ensureState() {
   S.upcomingComp = comps.find(c => c.name === "Test Upcoming");
   S.endedComp = comps.find(c => c.name === "Test Ended");
   const tasks = await (await api.get("/api/admin/tasks")).json();
+  // The seeded challenges the Live event HOLDS: its own copies (lib/event-copies.js),
+  // what its participants answer, rate and download; draft1 is in no event (the library row).
+  const inLive = (title) => tasks.find(t => t.title === title && t.owner_competition_id === S.liveComp.id);
   S.tasks = tasks;
-  S.easy1 = tasks.find(t => t.title === "Challenge easy1");
-  S.med1 = tasks.find(t => t.title === "Challenge med1");
-  S.hard1 = tasks.find(t => t.title === "Challenge hard1");
-  S.draft1 = tasks.find(t => t.title === "Challenge draft1");
+  S.easy1 = inLive("Challenge easy1");
+  S.med1 = inLive("Challenge med1");
+  S.hard1 = inLive("Challenge hard1");
+  S.draft1 = tasks.find(t => t.title === "Challenge draft1" && !t.owner_competition_id);
   // v7.24.0 — ASSERT THE FIXTURE, so a bad precondition reports as a bad
   // precondition. `expectSubmitOk` has three times reported "Already solved" for
   // hard1 in a file whose submits never solve it, and v7.23.11's recorded
@@ -1453,8 +1456,11 @@ test.describe("Submission answer types", () => {
     const { api, csrf } = await apiLogin("superadmin");
     const hdr = h(csrf);
     const r = await api.post("/api/admin/tasks", { headers: hdr, data: opts });
-    const tid = (await r.json()).id;
-    await api.post(`/api/admin/tasks/${tid}/competitions`, { headers: hdr, data: { competitionIds: [T.compId] } });
+    const bankId = (await r.json()).id;
+    const a = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: hdr, data: { competitionIds: [T.compId] } });
+    expect(a.ok(), `assign: ${a.status()} ${await a.text()}`).toBeTruthy();
+    // The event's own copy (lib/event-copies.js): what alice answers and an admin locks.
+    const tid = (await a.json()).copies[0].task_id;
     await api.dispose();
     return tid;
   }
@@ -2411,19 +2417,22 @@ test.describe("Submit dedup keys on the canonical selection (ext-audit v7.21.1)"
       status: "published",
     }});
     expect(choiceR.ok(), `choice task: ${choiceR.status()} ${await choiceR.text()}`).toBeTruthy();
-    const choiceId = (await choiceR.json()).id;
+    const choiceBank = (await choiceR.json()).id;
     const textR = await sa.post("/api/admin/tasks", { headers: saH, data: {
       title: `Dedup text ${uniq}`, description: "<p>x</p>", difficulty: "easy",
       answer_type: "text", correct_answer: "right-answer", status: "published",
     }});
-    const textId = (await textR.json()).id;
-    for (const tid of [choiceId, textId]) {
+    const textBank = (await textR.json()).id;
+    // The event's own copies (lib/event-copies.js): the rows its answers are stored under.
+    const held = [];
+    for (const tid of [choiceBank, textBank]) {
       const a = await sa.post(`/api/admin/tasks/${tid}/competitions`, { headers: saH, data: { competitionIds: [compId] } });
       expect(a.ok(), `assign ${tid}: ${a.status()} ${await a.text()}`).toBeTruthy();
+      held.push((await a.json()).copies[0].task_id);
     }
     await sa.post("/api/admin/competitions/assign", { headers: saH, data: { userIds: [S.alice.id], competitionIds: [compId] } });
     await sa.dispose();
-    return { compId, choiceId, textId };
+    return { compId, choiceId: held[0], textId: held[1] };
   }
 
   test("two DIFFERENT selections that render identically are both recorded", async () => {

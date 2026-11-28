@@ -76,7 +76,9 @@ async function eventWith(label, specs, extra = {}) {
         try { for (const t of olderTags) db.prepare("INSERT INTO task_tags (task_id, tag) VALUES (?,?)").run(ids[key], t); } finally { db.close(); }
       }
       const a = await sa.post(`/api/admin/tasks/${ids[key]}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
-      expect((await a.json()).assigned, `assign ${key}`).toBe(1);
+      const ab = await a.json();
+      expect(ab.assigned, `assign ${key}`).toBe(1);
+      ids[key] = ab.copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
       for (const t of tags) {
         const tg = await sa.post(`/api/admin/tasks/${ids[key]}/tags`, { headers: H(csrf), data: { tag: t } });
         expect(tg.ok(), `tag ${key} ${t}: ${await tg.text()}`).toBeTruthy();

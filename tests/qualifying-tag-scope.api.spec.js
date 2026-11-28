@@ -12,7 +12,7 @@
 
 const { test, expect } = require("./isolated-test");
 const { BASE, apiLogin, TEST_DB_PATH } = require("./helpers");
-const { H, makeParticipant, makeCompetition, makeTask, assignTask, grantEventAdmin } = require("./event-admin-helpers");
+const { H, makeParticipant, makeCompetition, makeTask, assignTask, grantEventAdmin, eventCopyOf } = require("./event-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -38,8 +38,13 @@ test.describe("Qualifying tag — the strict scoring gate at both tag doors", ()
     tShared = await makeTask(ea.api, ea.csrf, "qtagShared", PICK);
     await assignTask(ea.api, ea.csrf, tShared.id, [A.id]);
     await assignTask(sa, saCsrf, tShared.id, [B.id]);
+    // Each event holds its OWN copy, authored by the writer (lib/event-copies.js):
+    // the one another organiser's event holds is the challenge "another organiser's
+    // event uses"; the copy in A is the writer's own event's.
+    tShared = { ...tShared, id: eventCopyOf(tShared.id, B.id) };
     tOwn = await makeTask(ea.api, ea.csrf, "qtagOwn", PICK);
     await assignTask(ea.api, ea.csrf, tOwn.id, [A.id]);
+    tOwn = { ...tOwn, id: eventCopyOf(tOwn.id, A.id) };
   });
 
   test.afterAll(async () => { if (ea) await ea.api.dispose(); });

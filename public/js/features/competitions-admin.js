@@ -5,16 +5,14 @@ import { wireTagDialog } from "../ui/tag-dialog.js";
 import { csrfHeaders, fetchJsonList, fetchTransientRetry, readBody } from "../core/api.js";
 import { setSafeHtml } from "../core/trusted-types.js";
 import { _buildTzInput, _isValidTz, wallClockToUtc, wallClockToUtcChecked, dstGapMessage, utcToWallClock} from "../data/country-tz.js";
-import { loadAdminTasks, openTaskPickerForCompetition, showAssignmentRefusalModal } from "./challenges-admin.js";
+import { loadAdminTasks } from "./challenges-admin.js";
 import { computeCompStatus, compDisplayCategory, COMP_CATEGORY_LABEL, isLateEntryOpen } from "./competition-picker.js";
 import { loadAdminParticipants, resyncParticipantsWithFocus } from "./participants-admin.js";
 import { loadAdminRankingsTab } from "./rankings-admin.js";
 import { _sessionGetDurMinutes, _sessionGetStartUtc, sessionFormUpdateEnd } from "./sessions-admin.js";
 import { loadAdminSubmissions } from "./submissions-admin.js";
-import { paginationHtml, setListCount, renderLoadFailure, colspanFor, countText, patchTableRows, setHtmlIfChanged } from "../ui/list-controls.js";
-import { esc, fmtDt, formatCountdown, formatDuration, _syncSortAria, DRY_RUN_TAG, PUBLIC_DOMAIN_TAG, eventKindChipHtml, eventKindLabel, eventCollectiveSingular, policyOrDefault, NO_FIXED_DEADLINE, eventEndText } from "../ui/format.js";
-import { taskMatchesQuery, isQualifyingTag, isQualifyingTask } from "../ui/task-search.js";   // the one challenge search; the one qualifying test
-import { addTasksToCompetition } from "./task-assign.js";   // the one add-to-event path
+import { paginationHtml, setListCount, renderLoadFailure, colspanFor, patchTableRows, setHtmlIfChanged } from "../ui/list-controls.js";
+import { esc, fmtDt, formatCountdown, formatDuration, _syncSortAria, DRY_RUN_TAG, eventKindChipHtml, eventKindLabel, eventCollectiveSingular, policyOrDefault, NO_FIXED_DEADLINE, eventEndText } from "../ui/format.js";
 import { ICO } from "../ui/icons.js";
 import { applyColumnFilters, hasColumnFilters } from "../ui/table-columns.js"; // v8.17.0 — heading filters
 import { hideLoading, showLoading } from "../ui/loading.js";
@@ -191,7 +189,7 @@ export async function closeLateEntriesNow(compId){
   const ok=await showModal({
     title:'Close late entries now',
     message:`Stop taking late entries for <strong>${esc(comp.name)}</strong> now${dl?`, instead of at <strong>${esc(dl)}</strong>`:''}?<br><br>`
-      +`From this moment its join link, QR code and short code stop admitting anyone, organisers can no longer add or remove people, and late entrants can no longer answer challenges or reveal hints. `
+      +`From this moment its join link, QR code and short code stop admitting anyone, organisers can no longer add or remove people, and late entrants can no longer answer questions or reveal hints. `
       +`The late-entrant leaderboard becomes final, so its top three can collect a placing certificate — unless they already collected a participation certificate during the window. `
       +`Emails already sent still name the old deadline, and invitations or sign-ups not yet completed no longer let anyone take part. `
       +`Only a superadmin can reopen it.`,
@@ -799,112 +797,28 @@ export function _compEffectiveBounds(c){
 // the same for the same event and viewer, which tests/menu-door-parity.spec.js
 // locks across a matrix of states. Change a shared predicate in both.
 export function compMenuItemsHtml(c){
-  const status=computeCompStatus(c);
-  let km='';
-  // v8.12.7 — in practice always false, and NOT "closed early, still editable
-  // until the original end": `competitionEffectiveEnd` clamps an ended event to
-  // MIN(ended_at, scheduled end), so the effective end of anything the server
-  // calls `ended` has already passed when the list is built (End Now included —
-  // its `ended_at` is the moment it ran). It reads true only while this
-  // browser's clock lags the server's. The PUT's matching allowance (a regular
-  // admin may edit an ended event whose effective end is still ahead) is just as
-  // unreachable. Kept so this gate, the Join Link dialog and that 403 agree.
-  const endedButFuture=status==='ended'&&c.effective_end&&new Date(c.effective_end)>new Date();
-  // v8.12.0 — THE ACTOR COMPETES IN THIS EVENT. Every mutating door on it
-  // refuses them (server: `competitorEditDenied`, all tiers), so the controls
-  // that reach those doors are withheld WITH THE REASON (v7.14.2) rather than
-  // offered and refused. The read-only items — Focus, History, Organisers,
-  // Email Delivery, Export Activity — stay; viewing is not editing. The
-  // server sends `competing` per row, computed from the same predicate the
-  // routes enforce, so the menu and the refusal cannot disagree.
-  const competing=!!c.competing;
-  if(competing)km+=`<div class="kebab-note" role="presentation">${ICO.lock} You are competing in this event — you can view it, not change it</div>`;
-  // RBAC — every door also asks the permission of the route it ends at (ui/nav.js
-  // adminCan; the built-in roles answer exactly as before). The workspace's ⋯
-  // menu (wsMenuItemsHtml) asks the same, door for door.
-  const canEdit=!competing&&(status!=='ended'||S.isSuperAdmin||endedButFuture)&&adminCan('events.edit');
-  const isLive=status==='live';
-  // Severity: live competitions make Edit/Assign Challenges elevated (warning); normal otherwise
-  const editCls=isLive?'km-warning':'';
-  const assignChallengesCls=isLive?'km-warning':'';
-  // Every button's onclick= has been migrated to data-action + data-comp-id.
-  // The dispatcher auto-calls closeKebab() for any click inside .kebab-menu.
-  // The compName values go through esc() once (HTML escape only) — no more
-  // nested-quote escaping like '${esc(c.name).replace(/'/g,"\\'")}' that
-  // used to fight two escape contexts at once.
-  if(canEdit){
-    km+=`<button class="${editCls}" data-action="comp-edit" data-comp-id="${esc(c.id)}">${ICO.edit} Edit</button>`;
-  }
-  km+=`<button data-action="comp-history" data-comp-id="${esc(c.id)}">${ICO.clock} History</button>`;
-  // v8.7.0 — WHO ELSE ORGANISES THIS EVENT. Offered to every admin tier: an
-  // event admin sharing a stand needs to know who their colleagues are, and
-  // the route is scope-checked, so on their own event it answers and anywhere
-  // else it refuses. Read-only from here — granting is admin-and-above and
-  // lives on the participant's row, where the person being granted is.
-  km+=`<button data-action="comp-organisers" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.users} Organisers</button>`;
-  // v8.1.0 — the delivery panel (see showCompetitionDelivery). A read-only
-  // diagnostic, so it sits with History and the activity export rather than
-  // among the state-changing actions.
+  // THE EVENTS-LIST ROW MENU HOLDS ONLY WHAT THE LIST ITSELF NEEDS (owner's
+  // decision, 27 Nov 2026: "remove only true duplication"). Every event is run
+  // from its workspace (Open, or the name cell), whose header and ⋯ menu
+  // (event-workspace.js `wsMenuItemsHtml`) hold every door the event has: Edit
+  // settings, History, Email delivery, Export activity, Add challenges, the
+  // Participants section, Join-link settings, Start now, End now and Close late
+  // entries now. Repeating them here gave two menus of the same doors whose
+  // labels had already drifted apart. What stays is housekeeping done FROM the
+  // list without opening each event: Delete event (the workspace's own door,
+  // same predicate and the same label; tests/menu-door-parity.spec.js holds the
+  // two equal). Top 3 and Open are the row's own buttons.
   //
-  // Deliberately NOT gated on `status`, unlike the export below. The moment an
-  // organiser most wants these numbers is the night before, while people are
-  // still registering through the join link — a live/ended gate would hide it
-  // exactly then, and it would also make the menu's shape depend on lifecycle
-  // for a request that has no lifecycle rule behind it.
-  km+=`<button data-action="comp-delivery" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.mailCheck} Email Delivery</button>`;
-  // v7.23.0 — challenge-activity CSV. Live or ended only: nothing has happened
-  // in a competition that has not started, so the file would be all-No by
-  // construction. Gated on the EXISTING `status` local (line ~622), which
-  // prefers the server-computed, timeslot-aware `c.status` — the same value
-  // the endpoint re-checks, so the menu and the refusal cannot disagree.
-  if((status==='live'||status==='ended')&&adminCan('export.data')){
-    km+=`<button data-action="comp-export-activity" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.download} Export Activity (CSV)</button>`;
-  }
-  // v8.12.6 — an ended Booth Event still taking LATE ENTRIES is open to new
-  // members at every admin door (the server's `competitionAdmission`), so its
-  // Manage Participants entry point stays. Assign Challenges does NOT follow it:
-  // a challenge list freezes once the event has ended (FROZEN_REMEDY), whatever
-  // the late window says — only the ROSTER is open, which is the whole point.
-  const _lateOpen=isLateEntryOpen(c);
-  if(status!=='ended'&&!competing&&adminCan('challenges.assign')&&adminCan('challenges.view')){
-    km+=`<button class="${assignChallengesCls}" data-action="comp-assign-challenges" data-comp-id="${esc(c.id)}">${ICO.clipboardCheck} Assign Challenges</button>`;
-  }
-  if((status!=='ended'||_lateOpen)&&!competing&&adminCan('participants.view')){
-    km+=`<button data-action="comp-manage-participants" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.users} Manage Participants</button>`;
-  }
-  // v8.12.0 — the Join Link is a READ (the reveal route is `requireAdmin` and
-  // changes nothing), so a competitor keeps it: the dialog opens READ-ONLY for
-  // them — link, QR and code shown, the toggle and Regenerate withheld
-  // with the reason (the operator's ruling, 19 Sep 2026). An organiser
-  // competing in their own event still needs the link on the signage.
-  // v8.12.6 — and it stays offered through the late-entry window, because the
-  // link, QR and code keep WORKING until the late-entry deadline and the
-  // organiser needs them for the signage then too. The dialog says which of its
-  // settings can still be changed on a finished event (openSelfEnrollOverlay).
-  if((status!=='ended'||_lateOpen)&&adminCan('events.join_link')){
-    km+=`<button data-action="comp-self-enroll" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.link} Join Link</button>`;
-  }
-  // v8.12.8 — close a finished Booth Event's late-entry window NOW, to the
-  // second, without a superadmin. Gated on the SERVER's flag ONLY — the route's
-  // own predicate (`lateEntryCloseState`) plus the competitor lock — and never
-  // on `_lateOpen && !competing`: a client re-derivation would outlive the next
-  // server-side condition and offer a control the route refuses (v7.14.2). A
-  // competitor is withheld it with the reason the note at the top already gives.
-  // The hourglass, not End Now's stop icon (a different act) and not the lock
-  // (which means "cannot change" in every note on this screen).
-  if(c.can_close_late_entries&&adminCan('events.run')){
-    km+=`<button class="km-danger" data-action="comp-close-late-entries" data-comp-id="${esc(c.id)}">${ICO.hourglass} Close late entries now</button>`;
-  }
-  const isUpcomingSingle=status==='upcoming'&&(c.timeslots||[]).length===0;
-  if(isUpcomingSingle&&!competing&&adminCan('events.edit')){
-    // Start Now is elevated (warning) — user explicitly requested
-    km+=`<button class="km-warning" data-action="comp-start-now" data-comp-id="${esc(c.id)}">${ICO.play} Start Now</button>`;
-  }
-  if(isLive&&!competing&&adminCan('events.run')){
-    km+=`<button class="km-danger" data-action="comp-end-now" data-comp-id="${esc(c.id)}">${ICO.stop} End Now</button>`;
-  }
+  // THE ACTOR COMPETES IN THIS EVENT: every mutating door refuses them (server:
+  // `competitorEditDenied`, all tiers), so Delete is withheld WITH THE REASON
+  // (v7.14.2) rather than offered and refused. The server sends `competing` per
+  // row, from the predicate the routes enforce.
+  const competing=!!c.competing;
+  let km='';
+  if(competing)km+=`<div class="kebab-note" role="presentation">${ICO.lock} You are competing in this event — you can view it, not change it</div>`;
+  // RBAC — the door asks the permission of the route it ends at (ui/nav.js adminCan).
   if(adminCan('events.delete')&&!competing){
-    km+=`<button class="km-danger" data-action="comp-delete" data-comp-id="${esc(c.id)}">${ICO.trash} Delete</button>`;
+    km+=`<button class="km-danger" data-action="comp-delete" data-comp-id="${esc(c.id)}" data-comp-name="${esc(c.name)}">${ICO.trash} Delete event</button>`;
   }
   return km;
 }
@@ -1094,7 +1008,8 @@ export function renderAdminCompetitions(){
     const km=compMenuItemsHtml(c);
     const competing=!!c.competing;
     // Primary action: OPEN the event's workspace. The whole name cell opens it
-    // too; every state-dependent door (Edit, End Now, Delete, ...) is in the menu.
+    // too; every door of the event is in its workspace (the row menu keeps only
+    // Delete event: see compMenuItemsHtml).
     // An ENDED, ranked event offers its top three certificates in one click
     // (event-workspace.js `downloadTop3`; the one predicate, `top3Offered`, which
     // also asks the role for `certificates.view`). Secondary, never gold: one row
@@ -1113,9 +1028,9 @@ export function renderAdminCompetitions(){
       <td>${participants}</td>
       <td>${tasks}</td>
       <td>${sessionInfo}</td>
-      <td><div class="action-cell comp-actions" style="gap:4px">${primaryBtn}</div>
+      <td><div class="action-cell comp-actions" style="gap:4px">${primaryBtn}</div>${km?`
         <button class="kebab-btn kebab-always" aria-label="More actions" data-action="kebab-toggle">⋮</button>
-        <div class="kebab-menu">${km}</div>
+        <div class="kebab-menu">${km}</div>`:''}
       </td>
     </tr>`;
   }).join(''));
@@ -1169,7 +1084,7 @@ export async function compKindSelect(el){
     const label=eventKindLabel(kind)||eventCollectiveSingular();
     const ok=await showModal({
       title:`Change type to ${label}?`,
-      message:`The name, the start, the template and the ticked challenges are kept. <strong>Every other setting you changed</strong> (duration or deadline, sessions, attempts, Advanced settings) goes back to the defaults for ${esc(label)}.`,
+      message:`The name, the start, the template and the ticked questions are kept. <strong>Every other setting you changed</strong> (duration or deadline, sessions, attempts, Advanced settings) goes back to the defaults for ${esc(label)}.`,
       confirmText:'Change type',
     });
     if(!ok||!document.body.contains(ov))return;
@@ -1179,7 +1094,6 @@ export async function compKindSelect(el){
     date:document.getElementById('comp-date')?.value||'',
     time:document.getElementById('comp-time')?.value||'',
     tz:document.getElementById('comp-tz')?.value||'',
-    chPicked:ov&&ov._chPicked?[...ov._chPicked]:[],
     // The event a refused first save already made from the template: the
     // re-rendered form still finishes it (`_markSpawnedForm`), with what this
     // form knows of its token (`saveCompetition`).
@@ -1190,7 +1104,20 @@ export async function compKindSelect(el){
   const template=ov?ov._template||null:null;
   ov?.remove();
   openCompetitionForm(null,{kind,carry,template});
-  setTimeout(()=>document.querySelector(`input[name="comp-kind-seg"][value="${CSS.escape(kind)}"]`)?.focus(),0);
+  // Focus returns to the control that changed it (the choice closes again on
+  // the re-rendered form).
+  setTimeout(()=>document.querySelector('#comp-form-overlay .comp-kind-change')?.focus(),0);
+}
+
+// "Change type": open (or close) the choice of type under the chip. Picking one
+// goes through `compKindSelect`, today's confirms included.
+export function compKindChangeToggle(el){
+  const box=document.getElementById('comp-kind-seg-box');
+  if(!box||!el)return;
+  const open=box.hidden;
+  box.hidden=!open;
+  el.setAttribute('aria-expanded',open?'true':'false');
+  if(open)(box.querySelector('input[name="comp-kind-seg"]:checked')||box.querySelector('input[name="comp-kind-seg"]'))?.focus();
 }
 
 // The type change on an EDIT: confirmed, naming the settings the new type
@@ -1245,6 +1172,7 @@ export async function compKindPick(kind,editId){
     // `#comp-dur-box` alive on a Program.
     document.getElementById('comp-form-overlay')?.remove();
     openCompetitionForm(editId,{kind});
+    setTimeout(()=>document.querySelector('#comp-form-overlay .comp-kind-change')?.focus(),0);
     return;
   }
   document.getElementById('comp-form-overlay')?.remove();
@@ -1359,7 +1287,22 @@ export function openCompetitionForm(editId,opts){
   // two settings the platform accepts-and-ignores — so hiding it is what turns a
   // control that appears to work into one that is simply absent.
   const showTieBreak=showPresence&&pol.ranking_enabled!==false;
+  // When each participant's solve clock starts (clock_start_forbidden): offered
+  // only where the kind may start it at the first open, i.e. never on a Program.
+  const showClockStart=pol.clock_start==='allowed';
+  // The value shown: the event's own on an edit (or a template's), else the
+  // kind's create seed — never a client literal, so the server's
+  // `=== undefined` branch stays reachable.
+  const _clockStartInit=(src&&(src.clock_start==='first_open'||src.clock_start==='entry'))?src.clock_start
+    :(((_kinds.find(k=>k.value===kind)||{}).defaults||{}).clock_start==='entry'?'entry':'first_open');
+  // Withheld, with its reason, exactly where the PUT refuses `clock_start_locked`
+  // (`clock_start_locked` rides the admin row from the same predicate).
+  const _csLocked=comp?(comp.clock_start_locked||null):null;
   const showTrusted=pol.trusted_networks!=='never';        // trusted_networks_forbidden
+  // Checkmarx One accounts: a kind that never creates them (a Booth Event) shows
+  // no section at all, so the save sends no `cxone_disabled` and the server
+  // stores them off (`cxone_provisioning_forbidden` for anything else).
+  const showCxone=pol.cxone_provisioning==='allowed';
   // The kind's own CREATE-time default for the CxOne opt-out. Until v8.2.0 the
   // form sent this field unconditionally, so `cxoneDisabledDefault` was dead for
   // every event made in a browser and a Booth Event arrived provisioning an
@@ -1392,14 +1335,19 @@ export function openCompetitionForm(editId,opts){
         ? `Changing to <strong>${esc(_kindLabel)}</strong> — not saved until you press Save.`
         : (_lockReason?_lockNote:'The type can be changed until the event starts.'))
     : 'You can change the type until the event starts.';
-  // THE TYPE IS A FIELD: one radio per kind, from the shell's vocabulary (never
-  // a client list). Disabled with the reason where the server would refuse a
-  // change. The selected kind's blurb says what it means in a sentence.
+  // THE TYPE IS A FIELD, SHOWN AS WHAT WAS CHOSEN (owner's decision, 27 Nov
+  // 2026): the New event page's kind card already asked, so the form names the
+  // type as a chip and does not ask again. "Change type" opens the choice (one
+  // radio per kind, from the shell's vocabulary, never a client list), whose
+  // pick goes through today's confirms (`compKindSelect`, `compKindPick`). Where
+  // the server would refuse a change, no Change type is offered and the note
+  // says why. The selected kind's blurb says what it means in a sentence.
   const _kindLocked=!!(comp&&_lockReason&&!_kindChanged);
   const _kindEntry=_kinds.find(k=>k.value===kind)||null;
   const kindChooserHtml=`<div class="form-group comp-kind-field">
-         <span class="comp-field-label" id="comp-kind-label">Event type</span><span data-help="event.kind" data-help-label="Event type"></span>
-         <div class="kind-seg" role="radiogroup" aria-labelledby="comp-kind-label" aria-describedby="comp-kind-note">${
+         <div class="help-label-row comp-kind-head"><span class="comp-field-label" id="comp-kind-label">Event type</span><span data-help="event.kind" data-help-label="Event type"></span></div>
+         <div class="comp-kind-current">${eventKindChipHtml(kind)}${_kindLocked?'':`<button type="button" class="link-btn comp-kind-change" data-action="comp-kind-change" aria-expanded="false" aria-controls="comp-kind-seg-box">Change type</button>`}</div>
+         <div class="kind-seg" id="comp-kind-seg-box" role="radiogroup" aria-labelledby="comp-kind-label" aria-describedby="comp-kind-note" hidden>${
            _kinds.map(k=>`<label class="kind-seg-opt"><input type="radio" name="comp-kind-seg" value="${esc(k.value)}" data-change-action="comp-kind-select" ${k.value===kind?'checked':''} ${_kindLocked?'disabled':''}/><span>${esc(k.label)}</span></label>`).join('')
          }</div>
          <p class="comp-kind-blurb" id="comp-kind-blurb">${_kindEntry&&_kindEntry.blurb?esc(_kindEntry.blurb):''}</p>
@@ -1447,7 +1395,12 @@ export function openCompetitionForm(editId,opts){
   // create from one, else the server's create default (per session). Both
   // options test it alone, so a template's "one board across sessions" is the
   // one selected and the PUT after its spawn keeps it.
-  const lbMode=src?.leaderboard_mode==='global'?'global':'per_slot';
+  // Per-session question sets (owner decision, 27 Nov 2026): the RANKING is three
+  // choices on one control. "Both" is stored as the per-session mode plus an
+  // overall board beside it (`leaderboard_overall`), so the select's other two
+  // values stay the stored ones.
+  const lbMode=src?.leaderboard_mode==='global'?'global':(src?.leaderboard_overall?'both':'per_slot');
+  const lbPercent=!!src?.leaderboard_percent&&lbMode!=='per_slot';
   const lbLocked=hasAnySlotStarted;
   // Can't switch modes once slots have started or if editing with existing timeslots that have activity
   const modeLocked=comp&&hasAnySlotStarted;
@@ -1460,7 +1413,7 @@ export function openCompetitionForm(editId,opts){
   // server intentionally never sends (see GET /api/admin/competitions).
   const cxConfigured=!!comp?.cxone_configured;
   const cxGroup=comp?.cxone_group_name||'';
-  let cxoneSection=`
+  let cxoneSection=!showCxone?'':`
       <div class="help-label-row comp-form-head-row"><h3 class="comp-form-cxone-heading">CxOne Integration</h3><span data-help="event.cxone" data-help-label="Checkmarx One"></span></div>
       <div class="form-group">
         <label class="checkbox-row" style="cursor:pointer">
@@ -1639,8 +1592,8 @@ export function openCompetitionForm(editId,opts){
         is), and event admins &mdash; are never on an event&rsquo;s leaderboard. When on, a staff member
         <strong>enrolled</strong> in this event competes like any other participant &mdash; on the board,
         in the all-solved rule, eligible for a certificate &mdash; and <strong>cannot edit this event or
-        any challenge assigned to it</strong> while enrolled, whatever their admin tier. Only
-        <strong>sealed</strong> challenges can be assigned (a competing admin would otherwise read the
+        any question assigned to it</strong> while enrolled, whatever their admin tier. Only
+        <strong>sealed</strong> questions can be assigned (a competing admin would otherwise read the
         answer key off the admin screen), never one whose author competes here, and anyone tagged
         <strong>staff</strong> can only be added to an event with this switch on.
       </p>
@@ -1737,7 +1690,7 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
   setSafeHtml(overlay, `<div class="card comp-form-card" role="dialog" aria-modal="true" aria-labelledby="comp-form-title">
     <h3 class="modal-title" id="comp-form-title">${esc(title)}</h3>
     ${tpl?`<p class="comp-form-from" id="comp-form-from">${ICO.copy} Starting from the template <strong>${esc(tpl.name)}</strong>${
-      tpl.task_count?` &middot; its ${tpl.task_count} challenge${tpl.task_count===1?'':'s'} and join-link settings come with it`:' &middot; its join-link settings come with it'
+      tpl.task_count?` &middot; its ${tpl.task_count} question${tpl.task_count===1?'':'s'} and join-link settings come with it`:' &middot; its join-link settings come with it'
     }. Change anything below.</p>`:''}
     <input type="hidden" id="comp-edit-id" value="${esc(editId||'')}"/>
     ${lockName?'<p class="comp-form-lock-note">This event has ended. Name and start time cannot be changed.</p>'
@@ -1804,13 +1757,20 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
     ${showSessions?`<div id="comp-multi-section" style="${isMulti?'':'display:none'}">
       <div id="comp-sessions-list"></div>
       <button class="btn sm secondary" style="margin-top:8px" data-action="comp-add-form-session">+ Add Session</button>
-      <div class="form-group" style="margin-top:12px">
-        <label for="comp-lb-mode">Leaderboard Mode</label><span data-help="event.lbmode" data-help-label="Leaderboard mode"></span>
-        <select id="comp-lb-mode" ${lbLocked?'disabled':''} style="max-width:200px">
-          <option value="per_slot" ${lbMode!=='global'?'selected':''}>Per Session</option>
-          <option value="global" ${lbMode==='global'?'selected':''}>Global (all sessions)</option>
+      <div class="form-group comp-form-ranking" style="margin-top:12px">
+        <div class="help-label-row"><label for="comp-lb-mode">Ranking</label><span data-help="event.lbmode" data-help-label="Ranking"></span></div>
+        <select id="comp-lb-mode" data-change-action="comp-lb-mode-changed" ${lbLocked?'disabled':''} aria-describedby="comp-lb-mode-note">
+          <option value="per_slot" ${lbMode==='per_slot'?'selected':''}>A winner per session</option>
+          <option value="global" ${lbMode==='global'?'selected':''}>One overall winner</option>
+          <option value="both" ${lbMode==='both'?'selected':''}>Both: a winner per session and overall</option>
         </select>
-        ${lbLocked?'<span style="font-size:var(--fs-12);color:var(--muted);margin-left:8px">Locked</span>':''}
+        <div class="help-label-row comp-form-percent-row">
+          <label class="checkbox-row" style="cursor:pointer">
+            <input type="checkbox" id="comp-lb-percent" ${lbPercent?'checked':''} ${lbLocked||lbMode==='per_slot'?'disabled':''} aria-describedby="comp-lb-mode-note"/>
+            <span>Turn scores into percentages on the overall board</span>
+          </label><span data-help="event.lbpercent" data-help-label="Percentages"></span>
+        </div>
+        <p class="comp-form-cxone-note" id="comp-lb-mode-note">${esc(_rankingNote(lbMode,lbLocked))}</p>
       </div>
     </div>`:''}
 
@@ -1834,41 +1794,27 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
          limit, and it is a plain number input for the same reason the challenge
          one is: uncapped is the normal answer and must be the easiest to leave. -->
     <div class="form-group" style="margin-top:12px">
-      <label for="comp-attempt-cap">Attempt limit per challenge</label><span data-help="event.attempts" data-help-label="Attempt limit"></span>
+      <label for="comp-attempt-cap">Attempt limit per question</label><span data-help="event.attempts" data-help-label="Attempt limit"></span>
       <input id="comp-attempt-cap" type="number" min="1" max="1000" step="1" inputmode="numeric"
              placeholder="No limit" value="${(Number.isInteger(src?.attempt_cap)&&src.attempt_cap>0)?src.attempt_cap:''}"
              aria-describedby="comp-attempt-cap-hint"/>
       <p class="comp-form-reveal-hint" id="comp-attempt-cap-hint">
-        Submissions each participant may make on each challenge in this event. Leave blank
-        for no limit. A challenge with its own limit overrides this one. Once a participant
+        Submissions each participant may make on each question in this event. Leave blank
+        for no limit. A question with its own limit overrides this one. Once a participant
         runs out, an admin can grant them more.
       </p>
     </div>
 
-    ${comp?'':`<div class="help-label-row comp-form-section-row"><h4 class="comp-form-section">Challenges</h4><span data-help="event.challenges" data-help-label="Challenges"></span></div>
-    <!-- CREATE ONLY: pick the challenges the event starts with. The search box,
-         the tag chips and the count are SIBLINGS of #comp-ch-list, the only box
-         a keystroke or a chip re-renders (the sibling rule). The picks are
-         assigned after the event exists, through the Add challenges dialog's
-         own per-challenge path (task-assign.js). -->
-    <div class="comp-ch" id="comp-ch">
-      <p class="comp-form-reveal-hint" id="comp-ch-hint">${tpl&&tpl.task_count?'The template&rsquo;s challenges are ticked and come with it. ':''}Search, or press tags to narrow the list, then tick the challenges to add. You can change them later.</p>
-      <input id="comp-ch-search" class="picker-search comp-ch-search" aria-label="Search challenges by title, difficulty or tag" placeholder="Search by title, difficulty or tag…" autocomplete="off"/>
-      <div class="comp-ch-tags" id="comp-ch-tags" role="group" aria-label="Narrow by tag"></div>
-      <div class="comp-ch-bar">
-        <span class="comp-ch-count" id="comp-ch-count" aria-live="polite">Loading the challenge library…</span>
-        <button type="button" class="btn sm secondary" id="comp-ch-all">Tick all shown</button>
-        <button type="button" class="btn sm secondary" id="comp-ch-none">Clear ticks</button>
-      </div>
-      <div class="picker-rows comp-ch-list" id="comp-ch-list"></div>
-    </div>`}
+    <!-- Stage B (owner ruling, 27 Nov 2026): the form picks no questions. A
+         blank event gets them from its Questions section's one door, + Add from
+         bank; a template's questions come with its spawn. -->
 
-    <!-- ADVANCED: the rarely changed settings, collapsed on a create (open on an
-         edit, where an organiser came to change something specific). Nothing in
-         here is hidden from the save: the collector reads every control whether
-         the section is open or not. -->
-    <details class="comp-form-advanced" id="comp-advanced"${comp?' open':''}>
-      <summary class="comp-form-advanced-summary"><span class="comp-form-advanced-title">Advanced settings</span><span class="comp-form-advanced-sub">Team board, staff, time on platform, test runs${showRegFields?', sign-up form':''}${showLateEntry?', late entries':''}${showTrusted?', venue network':''}, <span id="comp-advanced-cxone"></span></span></summary>
+    <!-- ADVANCED: the rarely changed settings, collapsed on a create AND on an
+         edit (owner's decision, 27 Nov 2026: rarely changed either way). Nothing
+         in here is hidden from the save: the collector reads every control
+         whether the section is open or not. -->
+    <details class="comp-form-advanced" id="comp-advanced">
+      <summary class="comp-form-advanced-summary"><span class="comp-form-advanced-title">Advanced settings</span><span class="comp-form-advanced-sub">Team board, staff, time on platform, dry runs${showRegFields?', sign-up form':''}${showLateEntry?', late entries':''}${showTrusted?', venue network':''}${showCxone?', <span id="comp-advanced-cxone"></span>':''}</span></summary>
       <div class="comp-form-advanced-body">
 
     <!-- v7.11.7 — enable the group/team leaderboard. Off by default. Even when on,
@@ -1920,6 +1866,25 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
       </p>`:''}
     </div>`:''}
 
+    <!-- WHEN EACH PARTICIPANT'S CLOCK STARTS (owner decision, 27 Nov 2026).
+         Rendered only where the kind may start it at the first challenge (never
+         a Program, which does not rank). Locked once the event has started
+         (server: clock_start_locked), shown disabled with the reason so an
+         admin reading a running event still sees what it was set to. -->
+    ${showClockStart?`<div class="form-group" style="margin-top:12px">
+      <div class="help-label-row"><label for="comp-clock-start">Start each participant&rsquo;s clock</label><span data-help="event.clock" data-help-label="Clock start"></span></div>
+      <select id="comp-clock-start" ${_csLocked?'disabled':''} aria-describedby="comp-clock-start-hint">
+        <option value="first_open" ${_clockStartInit==='first_open'?'selected':''}>When they open their first question</option>
+        <option value="entry" ${_clockStartInit==='entry'?'selected':''}>When they enter the event</option>
+      </select>
+      <p class="comp-form-reveal-hint" id="comp-clock-start-hint">
+        Time to solve breaks score ties. With <strong>When they open their first question</strong>,
+        each participant&rsquo;s time starts when they first open a scoring question (or answer or
+        ask for a hint, if that comes first), so arriving late or reading the list is not counted.
+        Quick questions do not start it. Until it starts, a participant is not on the leaderboard.
+      </p>
+      ${_csLocked?`<p class="comp-form-cxone-note" id="comp-clock-start-lock-note" style="margin:6px 0 0 0">${ICO.lock} Locked: the event has started, so every participant&rsquo;s time is already being measured this way.</p>`:''}
+    </div>`:''}
 
     <!-- v7.8.1 — mark event as internal (dry run / testing). Backed by
          the permanent internal event tag: create seeds it via
@@ -1937,10 +1902,10 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
     <div class="form-group" style="margin-top:12px">
       <label class="checkbox-row" style="cursor:pointer">
         <input type="checkbox" id="comp-internal" ${(src?.tags||[]).includes(DRY_RUN_TAG)?'checked':''}/>
-        <span>Mark as test / dry run</span>
-      </label><span data-help="event.dryrun" data-help-label="Test / dry run"></span>
+        <span>Dry run</span>
+      </label><span data-help="event.dryrun" data-help-label="Dry run"></span>
       <p class="comp-form-reveal-hint">
-        Events marked as a test / dry run are excluded from Analytics by default and flagged in the admin list. Use for rehearsals and test runs.
+        The same as the event's <strong>${esc(DRY_RUN_TAG)}</strong> tag: ticking it adds the tag, and removing the tag anywhere unticks it. Dry runs are left out of Analytics by default and flagged in the admin list. Use for rehearsals and test runs.
       </p>
     </div>
 
@@ -1952,12 +1917,10 @@ ${_regEnded?'      <p class="comp-form-reveal-hint"><strong>This event has ended
     </details>
     <div class="comp-form-actions">
       <button class="btn secondary" data-action="overlay-close" data-overlay-id="comp-form-overlay">Cancel</button>
-      ${(!comp&&!tpl)?'<button class="btn secondary" data-action="comp-save-and-pick-tasks">Create and pick challenges</button>':''}
       <button class="btn" data-action="comp-save">${comp?'Update':'Create event'}</button>
     </div>
    </div>`);
   document.body.appendChild(overlay);
-  if(!comp)_initCompChallengePicker(overlay,tpl,carry&&carry.chPicked);   // the create form's Challenges section
   if(carry&&carry.spawned){
     _markSpawnedForm(carry.spawned);
     overlay._spawnedLost=carry.spawnedLost||null;
@@ -2776,6 +2739,9 @@ function _collectSharedCompFields(){
     staff_compete:_optCheck('comp-staff-compete'),
     // Not a checkbox pair but the same rule: absent control, absent field.
     time_basis:tb?(tb.checked?'presence':'elapsed'):undefined,
+    // Absent control, absent field. A DISABLED (locked) select still reports the
+    // stored value, which the server treats as an echo, never a change.
+    clock_start:document.getElementById('comp-clock-start')?.value||undefined,
     trusted_network_ips:_collectTrustedIps(),
     // v8.4.0 — both `undefined` when the section is not rendered for this kind.
     registration_fields:_collectRegistrationFields(),
@@ -2836,6 +2802,43 @@ function _collectLateDeadline(){
   return d?d.toISOString():undefined;
 }
 
+// THE RANKING CHOICE (per-session question sets, owner decision 27 Nov 2026):
+// the select's three values to the stored three fields. Nothing is sent while the
+// control is locked (a session has started) or not rendered, so a save never
+// writes a ranking nobody chose.
+function _collectRanking(lbSelect){
+  if(!lbSelect||lbSelect.disabled)return {leaderboard_mode:null};
+  const v=lbSelect.value;
+  const pct=document.getElementById('comp-lb-percent');
+  return {
+    leaderboard_mode:v==='both'?'per_slot':(v||null),
+    leaderboard_overall:v==='both',
+    leaderboard_percent:v!=='per_slot'&&!!pct&&!pct.disabled&&pct.checked,
+  };
+}
+// The sentence under the ranking control: what the choice does, and why the
+// percentages box is off when it is.
+function _rankingNote(v,locked){
+  const what=v==='global'?'Everyone is ranked on one overall board, whichever session they play.'
+    :v==='both'?'Each session has its own winners, and everyone is also ranked on one overall board.'
+    :'Each session has its own winners.';
+  if(locked)return `${what} The ranking is fixed once a session has started.`;
+  return v==='per_slot'?`${what} Percentages rank an overall board, so choose an overall winner (or both) to turn them on.`
+    :`${what} Percentages make sessions with different questions compare fairly; time breaks a tie.`;
+}
+/** The ranking control changed: the percentages box follows it, and so does the note. */
+export function compLbModeChanged(){
+  const sel=document.getElementById('comp-lb-mode');
+  const pct=document.getElementById('comp-lb-percent');
+  const note=document.getElementById('comp-lb-mode-note');
+  if(!sel)return;
+  if(pct){
+    pct.disabled=sel.disabled||sel.value==='per_slot';
+    if(sel.value==='per_slot')pct.checked=false;
+  }
+  if(note)note.textContent=_rankingNote(sel.value,sel.disabled);
+}
+
 export function _collectCompFormData(){
   const nameEl=document.getElementById('comp-name');
   const name=nameEl.value.trim();
@@ -2890,7 +2893,7 @@ export function _collectCompFormData(){
       _highlightField(document.getElementById('comp-time'));
       return null;
     }
-    return {name,start_time,duration_minutes:duration,mode,sessions:[],leaderboard_mode:lbSelect?.disabled?null:lbSelect?.value||null,event_kind:eventKind,deadline_at:deadlineIso,..._collectSharedCompFields()};
+    return {name,start_time,duration_minutes:duration,mode,sessions:[],..._collectRanking(lbSelect),event_kind:eventKind,deadline_at:deadlineIso,..._collectSharedCompFields()};
   }
 
   // Multi mode — collect sessions from inline form rows
@@ -2944,7 +2947,7 @@ export function _collectCompFormData(){
   }):null;
   const compStart=earliest?earliest.start_time:null;
   const totalDur=compStart&&latest?Math.ceil((new Date(latest.start_time).getTime()+latest.duration_minutes*60000-new Date(compStart).getTime())/60000):null;
-  return {name,start_time:compStart,duration_minutes:totalDur,mode,sessions,leaderboard_mode:lbSelect?.disabled?null:lbSelect?.value||null,event_kind:eventKind,deadline_at:deadlineIso,..._collectSharedCompFields()};
+  return {name,start_time:compStart,duration_minutes:totalDur,mode,sessions,..._collectRanking(lbSelect),event_kind:eventKind,deadline_at:deadlineIso,..._collectSharedCompFields()};
 }
 
 // v8.2.0 — the kind's own label for the save confirmations. A Program admin
@@ -2967,8 +2970,8 @@ export function showStaffCompeteRefusalModal(d,extra=''){
   if(d.code==='staff_compete_unsealed_challenges'){
     const rows=Array.isArray(d.challenges)?d.challenges:[];
     showModal({
-      title:'Seal these challenges first',
-      message:`${esc(d.error||'')}${extra?` ${esc(extra)}`:''}<ul style="margin:8px 0 0 18px">${rows.map(t=>`<li>${esc(t.title)}</li>`).join('')}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">A sealed challenge's answer is hidden from every admin but its author. Seal a new copy of each one, or take it out of the event, then turn the switch on.</p>`,
+      title:'Seal these questions first',
+      message:`${esc(d.error||'')}${extra?` ${esc(extra)}`:''}<ul style="margin:8px 0 0 18px">${rows.map(t=>`<li>${esc(t.title)}</li>`).join('')}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">A sealed question's answer is hidden from every admin but its author. Seal a new copy of each one, or take it out of the event, then turn the switch on.</p>`,
       confirmText:'OK',cancelText:null,
     });
     return true;
@@ -2977,7 +2980,7 @@ export function showStaffCompeteRefusalModal(d,extra=''){
     const rows=Array.isArray(d.participants)?d.participants:[];
     showModal({
       title:'Remove these authors first',
-      message:`${esc(d.error||'')}${extra?` ${esc(extra)}`:''}<ul style="margin:8px 0 0 18px">${rows.map(u=>`<li><strong>${esc(u.nickname||u.id)}</strong> — ${(u.tasks||[]).map(t=>`“${esc(t.title)}”`).join(', ')}</li>`).join('')}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">A challenge's answer is known to whoever wrote it, so its author cannot compete in an event that holds it. Remove them from the event (Manage Participants) or take their challenges out of it, then turn the switch on.</p>`,
+      message:`${esc(d.error||'')}${extra?` ${esc(extra)}`:''}<ul style="margin:8px 0 0 18px">${rows.map(u=>`<li><strong>${esc(u.nickname||u.id)}</strong> — ${(u.tasks||[]).map(t=>`“${esc(t.title)}”`).join(', ')}</li>`).join('')}</ul><p style="margin-top:8px;color:var(--muted);font-size:var(--fs-14)">A question's answer is known to whoever wrote it, so its author cannot compete in an event that holds it. Remove them from the event (Manage Participants) or take their questions out of it, then turn the switch on.</p>`,
       confirmText:'OK',cancelText:null,
     });
     return true;
@@ -3024,155 +3027,18 @@ export function certificatesKeptOnReviveNote(comp){
   return `${comp.name} has already issued ${n} certificate${n===1?'':'s'}. They stay as issued: if the new results change someone's placing, a superadmin can revoke that certificate and issue it again from the new results.`;
 }
 
-// ── THE CREATE FORM'S CHALLENGES SECTION ─────────────────────────────────────
-//
-// Search the library (`taskMatchesQuery`: title, difficulty, tags — the one
-// organiser challenge search) and narrow it with tag chips (a challenge carrying
-// ANY pressed tag is shown). Only PUBLISHED challenges are listed, from
-// `GET /api/admin/tasks`, which already holds only what this actor may view.
-// Qualifying challenges are per-event copies ("Add the qualifying questions"
-// makes this event's own), so they are not offered. Fit for the kind is the
-// server's: a Booth Event's refusal of a file answer or a `needs:` tag comes back
-// from the assignment and is named, rather than re-derived from a kind literal.
-//
-// State lives on the overlay, so it ends with the form: `_chPicked` (ids to add
-// after the create), `_chTpl` (the template's own challenges, which its spawn
-// assigns: ticked, disabled, never sent twice).
-const _CH_HIDDEN_CHIP=t=>{const s=String(t||'').toLowerCase();return !s||s.startsWith('needs:')||isQualifyingTag(s)||s===PUBLIC_DOMAIN_TAG||s===DRY_RUN_TAG;};
-const _chIsQualifying=isQualifyingTask;
-const _chTagLabel=tg=>String(tg).startsWith('category:')?String(tg).slice(9):String(tg);
-
-async function _initCompChallengePicker(overlay,tpl,picked){
-  // The ticks a change of type carried over (`compKindSelect`), else none.
-  overlay._chPicked=new Set(Array.isArray(picked)?picked.map(String):[]);
-  overlay._chTpl=new Set(tpl&&Array.isArray(tpl.task_ids)?tpl.task_ids.map(String):[]);
-  overlay._chTags=new Set();
-  overlay._chLib=null;
-  const q=sel=>overlay.querySelector(sel);
-  const search=q('#comp-ch-search');
-  if(!search)return;
-  // RBAC — the section reads the library (challenges.view) and its ticks are
-  // assigned to the new event (challenges.assign): a role missing either is told
-  // so in the section's place, and nothing is read.
-  if(!(adminCan('challenges.view')&&adminCan('challenges.assign'))){
-    const n=overlay._chTpl.size;
-    setSafeHtml(q('#comp-ch'),`<p class="comp-form-reveal-hint" id="comp-ch-unseen">${n?'The template&rsquo;s challenges come with it. ':''}Your role cannot add challenges to an event, so it starts with ${n?'only those':'none'}.</p>`);
-    return;
-  }
-  // Enter in the search box must not submit anything.
-  search.addEventListener('keydown',e=>{if(e.key==='Enter')e.preventDefault();});
-  search.addEventListener('input',()=>_renderCompChallenges(overlay));
-  q('#comp-ch-tags').addEventListener('click',e=>{
-    const b=e.target.closest('[data-ch-tag]');
-    if(!b)return;
-    const tg=b.dataset.chTag;
-    if(overlay._chTags.has(tg))overlay._chTags.delete(tg);else overlay._chTags.add(tg);
-    b.setAttribute('aria-pressed',overlay._chTags.has(tg)?'true':'false');
-    b.classList.toggle('active',overlay._chTags.has(tg));
-    _renderCompChallenges(overlay);
-  });
-  q('#comp-ch-list').addEventListener('change',e=>{
-    const cb=e.target;
-    if(!cb||cb.type!=='checkbox'||cb.disabled)return;
-    if(cb.checked)overlay._chPicked.add(cb.value);else overlay._chPicked.delete(cb.value);
-    _paintCompChallengeCount(overlay);
-  });
-  q('#comp-ch-all').addEventListener('click',()=>{
-    for(const t of _compChallengesShown(overlay))if(!overlay._chTpl.has(String(t.id)))overlay._chPicked.add(String(t.id));
-    _renderCompChallenges(overlay);
-  });
-  q('#comp-ch-none').addEventListener('click',()=>{overlay._chPicked.clear();_renderCompChallenges(overlay);});
-  const lib=await fetchJsonList('/api/admin/tasks');
-  if(!document.body.contains(overlay))return;   // the form closed meanwhile
-  overlay._chLib=Array.isArray(lib)?lib.filter(t=>t&&t.status==='published'&&!_chIsQualifying(t)):null;
-  // The chips: every tag the listed challenges carry, categories first, minus
-  // the platform's own markers. Rendered once; pressing one only flips it.
-  const tags=new Map();
-  for(const t of overlay._chLib||[])for(const tg of t.tags||[])if(!_CH_HIDDEN_CHIP(tg))tags.set(String(tg),(tags.get(String(tg))||0)+1);
-  const order=[...tags.keys()].sort((a,b)=>{
-    const ca=a.startsWith('category:')?0:1,cb=b.startsWith('category:')?0:1;
-    return ca-cb||_chTagLabel(a).localeCompare(_chTagLabel(b));
-  });
-  setSafeHtml(q('#comp-ch-tags'),order.map(tg=>{
-    const n=Number(tags.get(tg))||0;
-    return `<button type="button" class="filter-btn comp-ch-tag" data-ch-tag="${esc(tg)}" aria-pressed="false">${esc(_chTagLabel(tg))}<span class="sr-only">, ${esc(String(n))} challenge${n===1?'':'s'}</span></button>`;
-  }).join(''));
-  _renderCompChallenges(overlay);
-}
-
-/** The library challenges the search and the pressed chips leave on screen. */
-function _compChallengesShown(overlay){
-  const lib=overlay._chLib||[];
-  const qv=overlay.querySelector('#comp-ch-search')?.value||'';
-  const chips=overlay._chTags||new Set();
-  return lib.filter(t=>taskMatchesQuery(t,qv)&&(!chips.size||(t.tags||[]).some(tg=>chips.has(String(tg)))));
-}
-
-function _renderCompChallenges(overlay){
-  const list=overlay.querySelector('#comp-ch-list');
-  if(!list)return;
-  if(!Array.isArray(overlay._chLib)){
-    setSafeHtml(list,'<p class="picker-note">Could not load the challenge library. You can still create the event and add challenges afterwards.</p>');
-    _paintCompChallengeCount(overlay);return;
-  }
-  if(!overlay._chLib.length){
-    setSafeHtml(list,'<p class="picker-note">No published challenges exist yet.</p>');
-    _paintCompChallengeCount(overlay);return;
-  }
-  const shown=_compChallengesShown(overlay);
-  setSafeHtml(list,shown.length?shown.map(t=>{
-    const id=String(t.id);
-    const fromTpl=overlay._chTpl.has(id);
-    // Operator ruling, 23 Nov 2026 (sweep #63): the spawn leaves out a template
-    // challenge held by an event you compete in, so the form does not promise it.
-    const leftOut=fromTpl&&_tplChallengeLeftOut(t);
-    const on=(fromTpl&&!leftOut)||overlay._chPicked.has(id);
-    const tags=(t.tags||[]).map(tg=>`<span class="tag">${esc(tg)}</span>`).join('');
-    return `<label class="picker-row${fromTpl?' is-disabled':''}">
-      <input type="checkbox" class="picker-row-check" value="${esc(id)}" ${on?'checked':''} ${fromTpl?'disabled':''}/>
-      <span class="picker-row-body"><strong>${esc(t.title)}</strong> <span class="badge ${esc(t.difficulty)}">${esc(t.difficulty)}</span>${tags}${t.active?'':'<span class="picker-row-flag">Hidden</span>'}${leftOut?'<span class="picker-row-flag">Left out: you compete in an event that holds it</span>':(fromTpl?'<span class="picker-row-flag is-on">From the template</span>':'')}</span>
-    </label>`;
-  }).join(''):'<p class="picker-note">No challenge matches that search and those tags.</p>');
-  _paintCompChallengeCount(overlay);
-}
-
-// A template challenge the spawn will leave out: held by an event you compete in.
-function _tplChallengeLeftOut(t){ return !!t&&Array.isArray(t.competing_in)&&t.competing_in.length>0; }
-
-function _paintCompChallengeCount(overlay){
-  const el=overlay.querySelector('#comp-ch-count');
-  if(!el)return;
-  let text;
-  if(!Array.isArray(overlay._chLib))text='';
-  else{
-    const qv=(overlay.querySelector('#comp-ch-search')?.value||'').trim();
-    const filtered=!!qv||(overlay._chTags&&overlay._chTags.size>0);
-    const shown=_compChallengesShown(overlay).length;
-    // The template's challenges the spawn will carry; one it will leave out is
-    // counted apart, as its row says (a challenge not in the library is counted).
-    const lib=new Map(overlay._chLib.map(t=>[String(t.id),t]));
-    const out=[...overlay._chTpl].filter(id=>_tplChallengeLeftOut(lib.get(id))).length;
-    const n=overlay._chPicked.size,tn=overlay._chTpl.size-out;
-    const tplPart=[tn?`plus ${tn} from the template`:'',out?`${out} left out`:''].filter(Boolean).join('; ');
-    text=`${n} ticked${tplPart?` (${tplPart})`:''} · `
-      +countText({matched:shown,total:overlay._chLib.length,filtered,queried:!!qv,noun:'challenge'});
-  }
-  if(el.textContent!==text)el.textContent=text;
-}
-
 // A create that started from a template is made by the template's own door
 // (spawn: its challenges, join-link settings, tags and provenance), and the
 // form is then applied to that new event as an ordinary edit. Spawning needs a
 // start in the future; the real start rides the edit that follows.
 // The form a refused first save left behind: its event exists, so the button
-// finishes it, the save-and-pick door goes (it would create), and "Add the
+// finishes it, and "Add the
 // qualifying questions", which rode the spawn, can no longer change.
 function _markSpawnedForm(spawned){
   const ov=document.getElementById('comp-form-overlay');
   if(!ov)return;
   ov._spawned=spawned;
   const save=ov.querySelector('[data-action="comp-save"]');if(save)save.textContent='Finish creating';
-  ov.querySelector('[data-action="comp-save-and-pick-tasks"]')?.remove();
   const q=ov.querySelector('#comp-add-qualifying');if(q)q.disabled=true;
 }
 
@@ -3183,7 +3049,7 @@ function _markSpawnedForm(spawned){
 // one that did not, or that someone else's change followed (`saveCompetition`).
 // A field it cannot judge counts as different, so the answer errs toward "not
 // this form's write", which leaves the server's own conflict check standing.
-const _ROW_FLAG_KEYS=new Set(['reveal_answers_on_end','group_leaderboard_enabled','cxone_disabled','measure_presence','staff_compete','late_entry_enabled']);
+const _ROW_FLAG_KEYS=new Set(['reveal_answers_on_end','group_leaderboard_enabled','cxone_disabled','measure_presence','staff_compete','late_entry_enabled','leaderboard_overall','leaderboard_percent']);
 const _ROW_DATE_KEYS=new Set(['start_time','deadline_at','late_entry_deadline_at']);
 const _ipSet=v=>String(v||'').toLowerCase().split(',').map(s=>s.trim()).filter(Boolean).sort().join(',');
 function _compRowHolds(row,body){
@@ -3195,6 +3061,7 @@ function _compRowHolds(row,body){
     if(_ROW_FLAG_KEYS.has(k))return !!v===!!row[k];
     if(k==='name')return String(v).trim()===row.name;
     if(k==='time_basis')return (v||'elapsed')===(row.time_basis||'elapsed');
+    if(k==='clock_start')return (v||'entry')===(row.clock_start||'entry');
     if(k==='trusted_network_ips')return _ipSet(v)===_ipSet(row.trusted_network_ips);
     if(k==='registration_fields'){
       const st=(row.policy&&row.policy.registration_fields)||{};
@@ -3243,15 +3110,11 @@ export async function saveCompetition(){
   // "No fixed deadline" ticked: the deadline is the one the platform filled in
   // (_noFixedDeadlineTicked says what the confirmations below do with it).
   const noFixedDeadline=!!fd.deadline_at&&_noFixedDeadlineTicked();
-  // The Challenges section's ticks (create only), minus the template's own,
-  // which its spawn assigns.
-  const _chPicks=creating&&_formOv&&_formOv._chPicked?[..._formOv._chPicked].filter(x=>!(_formOv._chTpl&&_formOv._chTpl.has(x))):[];
-  const _chNames=new Map(((_formOv&&_formOv._chLib)||[]).map(t=>[String(t.id),t.title]));
   // Staff compete holds sealed challenges only, and a qualifying question can
   // never be sealed, so the qualifying questions cannot join it: said here,
   // before a template spawn makes the event, rather than by the PUT that follows.
   if(tpl&&!(_formOv&&_formOv._spawned)&&fd.add_qualifying&&fd.staff_compete){
-    showToast('An event where staff compete holds sealed challenges only, and a qualifying question can never be sealed, so such an event cannot ask qualifying questions. Untick one of the two.','error');
+    showToast('An event where staff compete holds sealed questions only, and a qualifying question can never be sealed, so such an event cannot ask qualifying questions. Untick one of the two.','error');
     return;
   }
   const body={name:fd.name};
@@ -3275,6 +3138,8 @@ export async function saveCompetition(){
     body.duration_minutes=fd.duration_minutes;
   }
   if(fd.leaderboard_mode)body.leaderboard_mode=fd.leaderboard_mode;
+  if(fd.leaderboard_overall!==undefined)body.leaderboard_overall=fd.leaderboard_overall;
+  if(fd.leaderboard_percent!==undefined)body.leaderboard_percent=fd.leaderboard_percent;
   // v6.16.0 / v7.11.7 / v7.13.1 — these three used to be sent UNCONDITIONALLY,
   // on the reasoning that an explicit boolean is what lets unticking reset a flag.
   // That is still true, and it is still what happens whenever the control is on
@@ -3295,6 +3160,7 @@ export async function saveCompetition(){
   // is about — so they are wired up here rather than left for later.
   if(fd.measure_presence!==undefined)body.measure_presence=fd.measure_presence;
   if(fd.time_basis!==undefined)body.time_basis=fd.time_basis;
+  if(fd.clock_start!==undefined)body.clock_start=fd.clock_start;
   // v8.12.0 — the same class, caught by the feature's own browser lock before it
   // shipped: `_collectSharedCompFields` read the box and this block never sent
   // it, so "Staff can compete" was a control that appeared to work. A DISABLED
@@ -3411,7 +3277,7 @@ export async function saveCompetition(){
             ?`, with ${esc(_noFixedDeadlineWords(newEnd,undefined,true))}`
             :` — its deadline is being moved to ${esc(fmtDt(newEnd,'long'))}`;
           if(comp.ended_manually){_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> was closed early and will become <strong>live</strong> again${reopens}.`);}
-          else if(comp.ended_at&&_autoEndKeepsEnded(comp)) revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended because every participant had already finished every challenge — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
+          else if(comp.ended_at&&_autoEndKeepsEnded(comp)) revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended because every participant had already finished every question — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
           else if(comp.ended_at){_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended before its deadline and will become <strong>live</strong> again${reopens}.`);}
           else{_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> ended when its deadline passed. ${noFixedDeadline?`Saving it with ${esc(_noFixedDeadlineWords(newEnd,undefined,true))}`:`Moving the deadline to ${esc(fmtDt(newEnd,'long'))}`} will make it <strong>live</strong> again.`);}
         }
@@ -3446,7 +3312,7 @@ export async function saveCompetition(){
             //                                  time-derived, so a later end makes it live again.
             if(comp.ended_manually){_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> was manually ended and will become <strong>live</strong> again.`);}
             else if(comp.ended_at&&!_autoEndKeepsEnded(comp)){_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended before its scheduled time and will become <strong>live</strong> again.`);}
-            else if(comp.ended_at) revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended because every participant had already finished every challenge — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
+            else if(comp.ended_at) revivalWarnings.push(`<strong>${esc(comp.name)}</strong> auto-ended because every participant had already finished every question — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
             else{_revives=true;revivalWarnings.push(`<strong>${esc(comp.name)}</strong> ended automatically when its scheduled time elapsed. Saving a later end time will make it <strong>live</strong> again.`);}
           }
         }
@@ -3467,7 +3333,7 @@ export async function saveCompetition(){
             // The session gate reads its COMPETITION's two columns (routes/sessions.js).
             if(ts.ended_manually){_revives=true;revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> was manually ended and will become <strong>live</strong> again.`);}
             else if(ts.ended_at&&!_autoEndKeepsEnded(comp)){_revives=true;revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> auto-ended before its scheduled time and will become <strong>live</strong> again.`);}
-            else if(ts.ended_at) revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> auto-ended because every participant had already finished every challenge — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
+            else if(ts.ended_at) revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> auto-ended because every participant had already finished every question — solved it, or run out of attempts. Saving keeps it <strong>ended</strong> — add new participants, or grant an exhausted participant more attempts, to revive it.`);
             else{_revives=true;revivalWarnings.push(`Session <strong>${esc(ts.name)}</strong> ended automatically when its scheduled time elapsed. Saving a later end time will make it <strong>live</strong> again.`);}
           }
         }
@@ -3525,8 +3391,7 @@ export async function saveCompetition(){
       }
       summary+=`</ul>`;
     }
-    if(tpl)summary+=`<br><br>From the template <strong>${esc(tpl.name)}</strong>${tpl.task_count?`, with its ${tpl.task_count} challenge${tpl.task_count===1?'':'s'}`:''}.`;
-    if(_chPicks.length)summary+=`<br><br>${tpl?'Plus ':''}${_chPicks.length} challenge${_chPicks.length===1?'':'s'} you ticked, added once the event exists.`;
+    if(tpl)summary+=`<br><br>From the template <strong>${esc(tpl.name)}</strong>${tpl.task_count?`, with its ${tpl.task_count} question${tpl.task_count===1?'':'s'}`:''}.`;
     // The opt-out sits in the folded Advanced section: the confirmation says
     // what it will do (ON creates an account for everyone who joins).
     if(fd.cxone_disabled!==undefined)summary+=`<br><br><span id="comp-confirm-cxone">${esc(_cxoneAccountsLine(fd.cxone_disabled))}${fd.cxone_disabled?'.':' — one is created for everyone who joins.'}</span>`;
@@ -3724,7 +3589,7 @@ export async function saveCompetition(){
       // A conflict is not this form's to fix: someone else changed the event
       // after it was made, and pressing again would only be refused again.
       if(r.status===409&&d.conflict){
-        showToast(`Created “${spawned.competition.name}” from the template, but these settings were not saved: the event was changed after it was created, by another admin or in another tab. Open it from the Events list to see what it holds now; the challenges you ticked and the Checkmarx One settings were not added either.`,'error');
+        showToast(`Created “${spawned.competition.name}” from the template, but these settings were not saved: the event was changed after it was created, by another admin or in another tab. Open it from the Events list to see what it holds now; the questions you ticked and the Checkmarx One settings were not added either.`,'error');
         loadAdminCompetitions({keepPage:true});
         return;
       }
@@ -3847,22 +3712,8 @@ export async function saveCompetition(){
     }
   }
 
-  // The Challenges section's ticks, now that the event exists: the Add
-  // challenges dialog's own per-challenge path, so a refusal (a Booth Event and a
-  // file answer, a locked challenge) comes back naming the challenge.
-  let _chResult=null;
-  if(creating&&compId&&_chPicks.length){
-    showLoading();
-    try{_chResult=await addTasksToCompetition(compId,_chPicks,tid=>_chNames.get(String(tid))||String(tid));}
-    finally{hideLoading();}
-  }
 
   document.getElementById('comp-form-overlay')?.remove();
-  if(_chResult&&(_chResult.failures.length||_chResult.refused.length)){
-    const _bad=_chResult.failures.length+_chResult.refused.length;
-    showToast(`Event created with ${_chResult.added} of ${_chPicks.length} ticked challenge${_chPicks.length===1?'':'s'}. ${_bad} could not be added${_chResult.failures.length?`: ${_chResult.failures.join('; ')}`:'.'}`,'error');
-    if(_chResult.refused.length)showAssignmentRefusalModal(_chResult.refused);
-  }
   if(cxoneFailed)showToast(`Event created, but CxOne config was NOT saved: ${cxoneFailed}. Open the event and re-enter it under CxOne settings.`,'error');
   else{
     // Report the ACTUAL revive outcome from the server, not a pre-save guess.
@@ -3872,9 +3723,8 @@ export async function saveCompetition(){
     if(spawned){
       const _sk=Array.isArray(spawned.skipped_challenges)?spawned.skipped_challenges:[];
       const _n=spawned.assigned_challenges||0;
-      _msg=`Created “${spawned.competition.name}” from the template with ${_n} challenge${_n===1?'':'s'}.${skippedSummary(_sk)}`;
+      _msg=`Created “${spawned.competition.name}” from the template with ${_n} question${_n===1?'':'s'}.${skippedSummary(_sk)}`;
     }
-    if(_chResult&&_chResult.added)_msg+=` ${_chResult.added} ticked challenge${_chResult.added===1?'':'s'} added.`;
     if(!creating){
       const _allSolved=(fd.mode==='single')?!!d.allSolved:_anyTsStaysEndedAllSolved;
       const _revived=(fd.mode==='single')?(!!d.statusChanged&&d.oldStatus==='ended'&&d.newStatus==='live'):_anyTsRevived;
@@ -3883,7 +3733,7 @@ export async function saveCompetition(){
       // short by the one that applies to an exhausted participant: Grant Attempts
       // (Challenges tab kebab) un-finishes them, which is what lets this very
       // save revive the event on the next attempt.
-      else if(_allSolved)_msg='Saved. The event stays ended — every participant had already finished every challenge (solved it, or run out of attempts). Add new participants, or grant an exhausted participant more attempts, to revive it.';
+      else if(_allSolved)_msg='Saved. The event stays ended — every participant had already finished every question (solved it, or run out of attempts). Add new participants, or grant an exhausted participant more attempts, to revive it.';
     }
     showToast(_msg);
   }
@@ -3900,16 +3750,9 @@ export async function saveCompetition(){
   return compId;
 }
 
-export async function saveCompetitionAndPickTasks(){
-  const compId=await saveCompetition();
-  if(!compId)return;
-  showToast('Event created. Now pick challenges.','success');
-  openTaskPickerForCompetition(compId);
-}
-
 export async function deleteCompetition(id){
   const comp=S.adminCompetitionsData.find(c=>c.id===id);
-  const ok=await showModal({title:'Delete Event',message:`Permanently delete <strong>${esc(comp?.name||'')}</strong>?<br><br>All associated submissions, assignments, and challenge links will be removed. This cannot be undone.`,confirmText:'Delete',confirmClass:'danger'});
+  const ok=await showModal({title:'Delete Event',message:`Permanently delete <strong>${esc(comp?.name||'')}</strong>?<br><br>All associated submissions, assignments, and question links will be removed. This cannot be undone.`,confirmText:'Delete',confirmClass:'danger'});
   if(!ok)return;
   const r=await fetch(`/api/admin/competitions/${id}`,{method:'DELETE',headers:csrfHeaders()});
   if(r.ok){
@@ -4036,59 +3879,6 @@ function _deliveryPanelHtml(d){
       with no email at all.</p>`;
 }
 
-// The event's organiser list (the Events-row menu's Organisers). Read-only:
-// organisers are added and removed in the event workspace's Overview, on its
-// Organisers card (and from a participant's row), both behind the route's
-// requireGlobalAdmin.
-export async function showCompetitionOrganisers(compId,compName){
-  if(!compId)return;
-  let body;
-  showLoading();
-  // The showCompetitionDelivery shape below, for its reasons: own the error path
-  // (the dispatcher's try/catch is synchronous-only, so a rejection would escape
-  // unlogged AND strand the reference-counted overlay), and let the deadline
-  // cover the BODY read, not just the headers (v7.15.15).
-  const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),20000);
-  try{
-    const r=await fetch(`/api/admin/competitions/${encodeURIComponent(compId)}/admins`,{signal:ctrl.signal});
-    if(!r.ok){
-      const d=await r.json().catch(()=>({}));
-      body=`<p class="muted">${esc(d.error||'Could not load the organisers for this event.')}</p>`;
-    }else{
-      const d=await r.json();
-      const admins=Array.isArray(d.admins)?d.admins:null;
-      if(!admins){
-        // A 200 whose shape we do not recognise is a FAILURE, not an empty list
-        // — rendering "none" would be the same lie as the error branch.
-        body=`<p class="muted">Could not read the organiser list for this event.</p>`;
-      }else if(!admins.length){
-        body=`<p class="muted">No event admins organise this event. Administrators and superadmins can always manage it.${S.isEventAdmin?'':' Add one from the Organisers card on the Overview of this event.'}</p>`;
-      }else{
-        body=`<ul style="margin:0;padding-left:18px">`+admins.map(a=>{
-          const who=[a.first_name,a.last_name].filter(Boolean).join(' ')||a.nickname||a.email||a.id;
-          return `<li style="margin-bottom:6px"><strong>${esc(who)}</strong>`
-            +(a.email?`<br><span class="sub">${esc(a.email)}</span>`:'')
-            +(a.granted_at?`<br><span class="sub">added ${esc(fmtDt(a.granted_at))}${a.granted_by?` by ${esc(a.granted_by)}`:''}</span>`:'')
-            +`</li>`;
-        }).join('')+`</ul>`
-        +`<p class="muted" style="margin-top:10px">${S.isEventAdmin?'Only an administrator can add or remove an organiser.':'To add or remove an organiser, open this event and use the Organisers card on its Overview.'}</p>`;
-      }
-    }
-  }catch(e){
-    body=`<p class="muted">${e&&e.name==='AbortError'?'The request timed out.':'Could not load the organisers for this event.'}</p>`;
-  }finally{
-    clearTimeout(timer);
-    hideLoading();
-  }
-  await showModal({
-    title:compName?`Organisers: ${compName}`:'Organisers',
-    message:body,
-    confirmText:'Close',
-    confirmClass:'',
-    cancelText:'',
-  });
-}
 
 export async function showCompetitionDelivery(compId,compName){
   if(!compId)return;

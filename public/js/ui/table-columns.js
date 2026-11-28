@@ -877,7 +877,9 @@ export const PLAIN_TABLES = {
   // Users & roles (features/users-admin.js): every platform user is on screen.
   // Last sign-in carries the instant as data-sort-value, so it sorts in time
   // order and filters by a date range.
-  users: { noun: 'user', paged: false, cols: { name: { grow: true }, role: { filter: 'enum' }, status: { filter: 'enum' }, last_sign_in: { filter: 'date' } } },
+  // The address takes the spare width (not the name, which is short): at a
+  // desktop width it stays on one line.
+  users: { noun: 'user', paged: false, cols: { email: { grow: true }, role: { filter: 'enum' }, status: { filter: 'enum' }, last_sign_in: { filter: 'date' } } },
   // Rankings (both boards) and Analytics filter their whole data set, which
   // their exports share: features/rankings-admin.js RANKINGS_TABLE_COLUMNS,
   // features/analytics-admin.js ANALYTICS_TABLE_COLUMNS.
@@ -889,14 +891,22 @@ export const PLAIN_TABLES = {
   // bar; these sort and filter the page shown ("on this page"). Its When
   // cells carry the instant as data-sort-value (ISO 8601), so When sorts in time
   // order and filters by a date range. Details is a row's only door, so fixed.
+  // Settings → CxOne API audit (features/settings-admin.js loadCxoneAuditCard):
+  // the audit trail narrowed to Checkmarx One; Time carries the instant as
+  // data-sort-value. Sorts and filters the page shown, as the Audit pane does.
+  'cxone-audit': { noun: 'record', cols: { at: { filter: 'date' }, activity: { grow: true, filter: 'enum' }, event: { filter: 'enum' }, result: { filter: 'enum' }, detail: { grow: true } } },
   audit: { noun: 'record', cols: { when: { filter: 'date' }, activity: { grow: true }, type: { filter: 'enum' }, outcome: { filter: 'enum' }, details: { sort: false, filter: null, fixed: true } } },
   // An event's Team & reports section (features/event-team.js): every row is on
   // screen. Where a lead came from and whether they are new are under Columns,
   // so the lead list's default set fits a 1024 px window.
   'team-members': { noun: 'member', paged: false, cols: { member: { grow: true }, actions: { sort: false, filter: null } } },
-  'team-challenges': { noun: 'challenge', paged: false, cols: { challenge: { grow: true }, flag: { filter: 'enum' } } },
+  'team-challenges': { noun: 'question', paged: false, cols: { challenge: { grow: true }, flag: { filter: 'enum' } } },
   'team-accounts': { noun: 'account', paged: false, cols: { company: { grow: true }, signal: { filter: 'enum' } } },
   'team-scorecard': { noun: 'measure', paged: false, cols: { measure: { grow: true }, status: { sort: false, filter: null } } },
+  // Settings → People → Staff teams (features/staff-teams.js): every team, and
+  // the chosen team's members, are on screen.
+  'staff-teams': { noun: 'team', paged: false, cols: { team: { grow: true }, actions: { sort: false, filter: null } } },
+  'staff-team-members': { noun: 'member', paged: false, cols: { member: { grow: true }, default_role: { filter: 'enum' }, account: { filter: 'enum' }, actions: { sort: false, filter: null } } },
   'team-leads': { noun: 'lead', paged: false, hidden: ['new_or_returning', 'where_from'], cols: { lead: { grow: true }, signal: { filter: 'enum' }, owner: { filter: 'enum' }, contacted: { sort: false, filter: null } } },
 };
 

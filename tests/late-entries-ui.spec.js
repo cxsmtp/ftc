@@ -32,7 +32,7 @@
 const { test, expect } = require("./isolated-test");
 const { registerPost } = require("./helpers");
 const { freshCtx, getSuperadminPass, PARTICIPANT_PASS, BASE, TEST_DB_PATH, codeLogin } = require("./helpers");
-const { adminLogin, awaitCompModel, clickTab, openCompCreateForm } = require("./ui-admin-helpers");
+const { adminLogin, awaitCompModel, clickTab, openCompCreateForm, openCompAdvanced } = require("./ui-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -147,6 +147,9 @@ test.describe("v8.6.0 — the admin can find and use the Late entries controls",
     await page.waitForFunction((id) => (window.S?.adminCompetitionsData || []).some(c => c.id === id), compId, { timeout: 20000 });
     await page.evaluate((id) => window.editCompetition(id), compId);
     await expect(page.locator("#comp-form-overlay")).toBeVisible({ timeout: 15000 });
+    // Late entries are under Advanced settings, folded on an edit too (owner's
+    // decision, 27 Nov 2026): opened as a person would.
+    await openCompAdvanced(page);
   }
 
   /** Close and WAIT for detachment — a merely-dispatched close stacks overlays. */
@@ -496,6 +499,7 @@ test.describe("v8.6.0 — the admin can find and use the Late entries controls",
       }, comp.id);
       await page.evaluate((id) => window.editCompetition(id), comp.id);
       await expect(page.locator("#comp-form-overlay")).toBeVisible({ timeout: 15000 });
+      await openCompAdvanced(page);
       await expect(page.locator("#comp-late-entry"),
         "an ABSENT key falls back to the kind and still renders the section").toBeVisible();
       await closeForm(page);

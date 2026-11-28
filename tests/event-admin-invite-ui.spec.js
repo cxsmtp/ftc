@@ -58,7 +58,7 @@ const { test, expect } = require("./isolated-test");
 const { BASE, PARTICIPANT_PASS, apiLogin } = require("./helpers");
 const {
   loginViaApi, clickTab, viewComp, awaitCompModel, AxeBuilder, AXE_GATED_IMPACTS,
-  textContrast, rowMarking,
+  textContrast, rowMarking, inviteDoor,
 } = require("./ui-admin-helpers");
 const {
   H, uniq, buildWorld, makeParticipant, makeCompetition, enrol, grantEventAdmin,
@@ -97,12 +97,17 @@ async function panel(page, email) {
   return me;
 }
 
-/** Participants tab → Invite → the dialog. */
+/** Participants tab → Invite → the dialog. Inside an event's workspace the one
+ *  Invite is the header's menu (owner's decision, 27 Nov 2026: the Participants
+ *  toolbar keeps no Invite there); People keeps its toolbar's. */
 async function openInvite(page, { tab = true } = {}) {
   if (tab) await clickTab(page, "Participants");
-  const btn = page.locator("#invite-participants-btn");
-  await expect(btn, "the Invite button is on the Participants tab").toBeVisible({ timeout: 10000 });
-  await btn.click();
+  const inWs = await page.locator("#admin-workspace:not([hidden]) #ws-record").isVisible().catch(() => false);
+  if (!inWs) {
+    const btn = page.locator("#invite-participants-btn");
+    await expect(btn, "the Invite button is on the Participants tab").toBeVisible({ timeout: 10000 });
+  }
+  await inviteDoor(page, "invite");
   const overlay = page.locator("#invite-overlay");
   await expect(overlay, "the invite dialog opened").toBeVisible({ timeout: 15000 });
   await expect(overlay, "exactly one invite dialog").toHaveCount(1);

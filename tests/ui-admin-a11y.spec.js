@@ -10,9 +10,7 @@
 // Shared helpers live in ./ui-admin-helpers so the copies cannot drift.
 const { test, expect } = require("./isolated-test");
 const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, PORT_BASE, gradingHashFor } = require("./helpers");
-const {
-  login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin,
-  clickTab, openKebab, findSeededTaskRow, viewComp, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, openAnalyticsTab, openCompCreateForm, narrowPeopleTable } = require("./ui-admin-helpers");
+const { login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin, clickTab, openKebab, findSeededTaskRow, viewComp, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, openAnalyticsTab, openCompCreateForm, narrowPeopleTable, openRowEventEdit, openRowEventMenu } = require("./ui-admin-helpers");
 
 // Route every page.goto() + page.request.* to THIS worker's server.
 test.use({ baseURL: BASE });
@@ -144,10 +142,7 @@ test.describe("Admin accessibility — axe-core scan", () => {
 
   test("v6.9.22: competition-edit modal: no moderate+ axe violations", async ({ page }) => {
     await adminLogin(page);
-    await page.locator("#admin-comp-body .kebab-btn").first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator("#admin-comp-body .kebab-btn").first().click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, page.locator("#admin-comp-body tr").first());
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     await scanOverlay(page, "#comp-form-overlay", "comp-form-overlay");
   });
@@ -289,8 +284,8 @@ test.describe("v7.9.0 — self-enroll QR download", () => {
     // EMPTY portal from a closed one, so the failure surfaces later as a missing
     // item. openKebab (v7.21.25) closes first, retries, and requires a populated
     // portal — this file already imported it and this test simply predated it.
-    await openKebab(page, row);
-    await page.locator("#kebab-portal button:has-text('Join Link')").first().click();
+    await openRowEventMenu(page, row);
+    await page.locator('#kebab-portal [data-action="comp-self-enroll"]').click();
     await page.locator("#self-enroll-overlay").waitFor({ state: "visible", timeout: 5000 });
     // The QR preview is lazy-rendered from a vendor lib — wait for the <svg> so the
     // lib is loaded before we download (the download re-derives from the same lib).

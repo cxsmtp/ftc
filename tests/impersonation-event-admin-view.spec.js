@@ -326,7 +326,7 @@ test.describe("The sealed answer through the seat (v8.12.2)", () => {
     expect(res.status(), `the reveal POST answered ${res.status()}`).toBe(200);
     await expect.poll(() => page.evaluate(() => (window.__revealToasts || []).join(" | ")),
       { message: "the toast reports the reveal and that it was recorded", timeout: 10000 })
-      .toContain("Sealed answer and hint revealed — recorded in the challenge's history.");
+      .toContain("Sealed answer and hint revealed — recorded in the question's history.");
     await expect.poll(() => page.evaluate(id => {
       const t = (window.adminTasksData || []).find(x => x.id === id);
       return t ? `${t.answer_revealed === true}/${t.can_edit !== false}/${typeof t.correct_answer}` : "absent";

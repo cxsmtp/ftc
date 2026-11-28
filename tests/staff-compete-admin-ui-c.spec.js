@@ -63,7 +63,7 @@ test.describe("v8.12.0 — the assign ledger is rendered", () => {
     }
     await expect.poll(() => page.evaluate(() => (window.S?.selectedParticipants || new Set()).size),
       { message: "every ticked row is in the selection model" }).toBe(emails.length);
-    const top = page.locator("#assign-to-comp-btn");
+    const top = page.locator("#selection-bar-assign-btn");
     await expect(top, "the selection bar's button is offered with no event focused").toBeVisible();
     await expect(top).toHaveText(/Assign to Events/);
     await top.click();
@@ -109,8 +109,8 @@ test.describe("v8.12.0 — the assign ledger is rendered", () => {
   test("an AUTHOR assigned to the compete event holding their challenge gets the 'they wrote a challenge' modal, naming both", async ({ page }) => {
     await adminLogin(page);
     await bulkAssign(page, [author.id], [author.email], competeLive.name);
-    await expect(page.locator("#toast-stack")).toContainText(/1 skipped because they created a challenge in the event/, { timeout: 15000 });
-    await expect(page.locator("#modal-title")).toHaveText(/Not enrolled — they wrote a challenge in this event/, { timeout: 15000 });
+    await expect(page.locator("#toast-stack")).toContainText(/1 skipped because they created a question in the event/, { timeout: 15000 });
+    await expect(page.locator("#modal-title")).toHaveText(/Not enrolled — they wrote a question in this event/, { timeout: 15000 });
     await expect(page.locator("#modal-body"), "the person is named").toContainText(author.nickname);
     await expect(page.locator("#modal-body"), "…and the challenge").toContainText(sealedHinted.title);
     await expect(page.locator("#modal-body"), "…and the event").toContainText(competeLive.name);
@@ -145,7 +145,7 @@ test.describe("v8.12.0 — the assign ledger is rendered", () => {
     await clickTab(page, "Participants");
     const row = await participantRow(page, plainP.email);
     await row.locator("td.cb-cell input[type=checkbox]").check();
-    const top = page.locator("#assign-to-comp-btn");
+    const top = page.locator("#selection-bar-assign-btn");
     await expect(top).toBeVisible();
     await top.click();
     const overlay = page.locator("#bulk-assign-overlay");
@@ -175,10 +175,14 @@ test.describe("v8.12.0 — the challenge-side bulk picker, Remove from Event, an
 
   test("the challenge-side bulk picker disables the event the actor competes in as 'You compete here', flags a compete event as 'Sealed challenges only', and offers a plain one (CONTROL)", async ({ page }) => {
     await adminPanel(page, competitor.email);
-    const row = await challengeRow(page, plainHinted.title);
-    await row.locator('td.cb-cell input[type="checkbox"]').check();
-    const btn = page.locator("#assign-challenges-to-comp-btn");
-    await expect(btn, "the bulk button renders once a challenge is ticked").toBeVisible({ timeout: 15000 });
+    // Stage B — the bank's one door: two ticked questions open the bulk picker.
+    // (The second is found by narrowing, not by re-entering the tab: a reload of
+    // the list clears the selection.)
+    await (await challengeRow(page, plainHinted.title)).locator('td.cb-cell input[type="checkbox"]').check();
+    await (await findSeededTaskRow(page, cTask.title)).first().locator('td.cb-cell input[type="checkbox"]').check();
+    await expect(page.locator("#challenge-selection-count")).toHaveText("2 selected");
+    const btn = page.locator("#challenge-selection-bar-assign-btn");
+    await expect(btn, "the bar's door renders once questions are ticked").toBeVisible({ timeout: 15000 });
     await btn.click();
     const overlay = page.locator("#challenge-bulk-assign-overlay");
     await expect(overlay, "the bulk picker opened").toBeVisible({ timeout: 15000 });
@@ -188,61 +192,40 @@ test.describe("v8.12.0 — the challenge-side bulk picker, Remove from Event, an
     await expect(mine.locator(".picker-row-flag"), "the competitor reason").toContainText("You compete here");
     const sealedOnly = overlay.locator(`#challenge-bulk-comp-list label.picker-row:has-text("${gOn.name}")`);
     await expect(sealedOnly.locator("input"), "a compete event they do not compete in is OFFERED…").toBeEnabled();
-    await expect(sealedOnly.locator(".picker-row-flag"), "…with a reminder that unsealed challenges will be skipped there").toContainText("Sealed challenges only");
+    await expect(sealedOnly.locator(".picker-row-flag"), "…with a reminder that unsealed challenges will be skipped there").toContainText("Sealed questions only");
     const plain = overlay.locator(`#challenge-bulk-comp-list label.picker-row:has-text("${plainLive.name}")`);
     await expect(plain.locator("input"), "CONTROL: a plain event is offered with no flag").toBeEnabled();
     await expect(plain.locator(".picker-row-flag")).toHaveCount(0);
     // v8.13.7 — the disabled row is MARKED (dashed, muted, full strength), the live one is not.
-    await expectInactiveRow(mine, plain, { site: "Challenges' bulk Assign Challenges to Events picker (challenge-bulk-comp-list), 'You compete here' row" });
+    await expectInactiveRow(mine, plain, { site: "Challenges' bulk Assign Questions to Events picker (challenge-bulk-comp-list), 'You compete here' row" });
     await overlay.locator('[data-action="overlay-close"]').first().click();
     await expect(overlay).toBeHidden();
   });
 
-  test("with the event they compete in FOCUSED, the selection bar reads 'Assign to Events', opens the PICKER rather than posting into it, and the direct-add button is withheld", async ({ page }) => {
-    // Round 3: the label and the handler derive from ONE predicate. The label
-    // already read "Assign to Events" for a competitor while the handler
-    // re-derived direct-add without `competing` and posted straight into the
-    // refusal (two copies of one rule, one drifted). And `+ Add Challenges` is
-    // the other direct door into the focused event.
+  // Stage B (owner ruling, 27 Nov 2026) — inside an event the one door into it
+  // is + Add from bank; rows carry no selection box there, so no second door can
+  // post into the event they compete in.
+  test("with the event they compete in FOCUSED, no row carries a box and the direct-add button is withheld", async ({ page }) => {
     await adminPanel(page, competitor.email);
     await focus(page, competeLive.name);
     await clickTab(page, "Challenges");
     await expect.poll(() => page.evaluate(() => (window.adminTasksData || []).length), { timeout: 20000 }).toBeGreaterThan(0);
     await expect(page.locator("#add-tasks-to-comp-btn"), "no direct-add into the event they compete in").toBeHidden();
-    /** @type {string[]} */ const posts = [];
-    await page.route("**/api/admin/tasks/assign-competitions", async (route, req) => {
-      if (req.method() === "POST") posts.push(req.postData() || "");
-      await route.continue();
-    });
     const row = await challengeRow(page, plainHinted.title);
-    await row.locator('td.cb-cell input[type="checkbox"]').check();
-    const btn = page.locator("#assign-challenges-to-comp-btn");
-    await expect(btn).toBeVisible({ timeout: 15000 });
-    await expect(btn, "the label does not name the event they compete in").toHaveText(/Assign to Events/);
-    await expect(btn).not.toContainText(competeLive.name);
-    await btn.click();
-    const overlay = page.locator("#challenge-bulk-assign-overlay");
-    await expect(overlay, "the PICKER opens instead of a direct add").toBeVisible({ timeout: 15000 });
-    const mine = overlay.locator(`#challenge-bulk-comp-list label.picker-row:has-text("${competeLive.name}")`);
-    await expect(mine.locator("input")).toBeDisabled();
-    await expect(mine.locator(".picker-row-flag")).toContainText("You compete here");
-    expect(posts.length, "nothing was posted on the click").toBe(0);
-    await overlay.locator('[data-action="overlay-close"]').first().click();
-    await expect(overlay).toBeHidden();
+    await expect(row, "PRECONDITION: the bank question is listed").toBeVisible();
+    await expect(row.locator('td.cb-cell input[type="checkbox"]'), "no selection box inside an event").toHaveCount(0);
+    await expect(page.locator("#assign-challenges-to-comp-btn"), "and no second door").toHaveCount(0);
   });
 
-  test("CONTROL — with the same event focused, the built-in's selection bar reads 'Assign to \"<event>\"' and the direct-add button is offered", async ({ page }) => {
+  test("CONTROL — with the same event focused, the built-in is offered the direct-add button, and still no row box", async ({ page }) => {
     await adminLogin(page);
     await focus(page, competeLive.name);
     await clickTab(page, "Challenges");
     await expect.poll(() => page.evaluate(() => (window.adminTasksData || []).length), { timeout: 20000 }).toBeGreaterThan(0);
     await expect(page.locator("#add-tasks-to-comp-btn"), "the direct-add button is offered to an actor who competes nowhere").toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#add-tasks-to-comp-btn")).toHaveText("+ Add from bank");
     const row = await challengeRow(page, plainHinted.title);
-    await row.locator('td.cb-cell input[type="checkbox"]').check();
-    const btn = page.locator("#assign-challenges-to-comp-btn");
-    await expect(btn).toBeVisible({ timeout: 15000 });
-    await expect(btn, "the label names the focused event").toHaveText(`Assign to "${competeLive.name}"`);
-    await expect(page.locator("#add-tasks-to-comp-btn"), "…and the picker button yields to it while something is ticked").toBeHidden();
+    await expect(row.locator('td.cb-cell input[type="checkbox"]'), "the one door is the button, not a selection").toHaveCount(0);
   });
 
   test("with the event they compete in focused, 'Remove from Event' is withheld on its challenge row (can_unassign:false)", async ({ page }) => {
@@ -447,7 +430,7 @@ test.describe("v8.12.0 — the invite dialog renders the skip ledger", () => {
     const toast = page.locator("#toast-stack");
     await expect(toast, "the staff skips are named").toContainText(/2 staff enrolment\(s\) skipped — staff can only be added to events that let staff compete/, { timeout: 15000 });
     await expect(toast, "…the peer-admin skips").toContainText(/1 admin account\(s\) skipped — only a superadmin can enrol an admin/);
-    await expect(toast, "…the author skips").toContainText(/3 skipped because they created a challenge in the event/);
+    await expect(toast, "…the author skips").toContainText(/3 skipped because they created a question in the event/);
     await expect(toast, "…the blocked skips").toContainText(/1 blocked account\(s\) not enrolled/);
     await expect(toast, "…and the unapproved skips").toContainText(/1 unapproved account\(s\) not enrolled/);
     await expect(overlay, "nothing was left to fix, so the dialog closed").toBeHidden({ timeout: 10000 });
@@ -477,11 +460,10 @@ test.describe("v8.12.0 — the invite dialog renders the skip ledger", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("v8.12.0 — the Join Link dialog for a competitor is read-only", () => {
 
-  /** Open the Join Link dialog of a named event through the row kebab. */
+  /** Open the Join Link dialog of a named event through its workspace ⋯ menu
+   *  (the event's doors; the Events-row menu keeps only Delete event). */
   async function openJoinLink(page, name) {
-    const row = await eventRow(page, name);
-    await openKebab(page, row);
-    const item = page.locator('#kebab-portal [data-action="comp-self-enroll"]');
+    const item = (await require("./ui-admin-helpers").openEventMenu(page, name)).locator('[data-action="comp-self-enroll"]');
     await expect(item, `Join Link is offered on "${name}"`).toHaveCount(1);
     await item.click();
     await page.locator("#self-enroll-overlay").waitFor({ state: "visible", timeout: 15000 });
@@ -591,14 +573,16 @@ test.describe("v8.12.0 — a RIVAL's row in the Participants pane withholds the 
     const portal = page.locator("#kebab-portal");
     let row = await participantRow(page, mateP.email);
     await openKebab(page, row);
-    for (const action of ["participant-role", "participant-delete", "participant-block", "participant-email-code", "participant-impersonate"]) {
+    // The role link (role changes live on Roles & permissions) is a rival door
+    // as the role route is, so it is withheld with the rest.
+    for (const action of ["participant-open-roles", "participant-delete", "participant-block", "participant-email-code", "participant-impersonate"]) {
       await expect(portal.locator(`[data-action="${action}"]`), `${action} is withheld on a rival`).toHaveCount(0);
     }
     await expect(portal.locator(".kebab-note").filter({ hasText: /alongside/ })).toContainText(competeLive.name);
     await closeKebab(page);
     row = await participantRow(page, plainP.email);
     await openKebab(page, row);
-    await expect(portal.locator('[data-action="participant-role"]'), "CONTROL: the role menu is offered on a non-rival").not.toHaveCount(0);
+    await expect(portal.locator('[data-action="participant-open-roles"]'), "CONTROL: the role link is offered on a non-rival").toHaveCount(1);
     await expect(portal.locator('[data-action="participant-delete"]'), "CONTROL: Delete is offered on a non-rival").toHaveCount(1);
     await expect(portal.locator(".kebab-note").filter({ hasText: /alongside/ })).toHaveCount(0);
   });

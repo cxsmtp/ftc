@@ -61,6 +61,8 @@ async function makePublishedTask(api, H, title, answer, compId) {
   if (compId) {
     const a = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H, data: { competitionIds: [compId] } });
     if (!a.ok()) throw new Error(`could not assign task ${title}: ${a.status()} ${await a.text()}`);
+    // The question the event holds: its own copy (lib/event-copies.js).
+    return (await a.json()).copies[0].task_id;
   }
   return id;
 }

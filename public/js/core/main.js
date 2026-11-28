@@ -13,19 +13,19 @@ import { COUNTRY_TZ, autoDetectCountryTz, updateTimezones, autoFillDialCode } fr
 import { _ackAdminAlert, _ackAdminAlertGlobal, startAdminAlertPoll } from "./../features/admin-alerts.js";
 import { _analyticsClosePicker, _analyticsParseLocalDate, _analyticsRowCharts, _analyticsScheduleRefetch, _analyticsState, _anEffectiveSort, _anSyncSortHeaders, _tagClearHandler, _tagModeHandler, _tagToggleHandler, exportAnalyticsCsv, renderAnalyticsFilterBar, renderAnalyticsTable } from "./../features/analytics-admin.js";
 import { _autoFillCityFromTz, leaveJoinedEvent, checkInvitation, confirmParticipantViewProfile, doLogin, doLogout, doRegister, openProfileCompletionGate, openProfileEditor, saveProfile, selectAvatar, toggleJobFunctionOther, updateProfileTimezones, signinCodeRedeem, signinCodeRestart, signinCodeResend, syncLoginEmailHint, loginCodeInstead, openSignInMethodDialog, saveSignInMethod, savePasswordPrompt, keepCodesPrompt, registerCancel, paintRegLocation, regLocationChange, paintCsrfBusy, _paintCodeCells } from "./../features/auth.js";
-import { _renderTaskFormAttachments, tfAddChoice, tfRemoveChoice, tfSetChoiceText, tfSetChoiceCorrect, tfSyncAnswerType, tfAddExtraAnswer, tfRemoveExtraAnswer, tfSetExtraAnswer, _closeAttachPicker, _deleteSavedAttachment, _deleteStagingAttachment, _openAttachPicker, _renameSavedAttachment, _renameStagingAttachment, _uploadAttachmentNow, addTaskTag, fixPublicDomainTag, assignPickedTasks, challengeBulkAssignExecute, challengesBulkAssign, toggleAllChallenges, toggleChallengeSelection, closeTaskForm, closeTaskPreview, deleteAllFeedback, deleteFeedback, deleteTask, editTask, loadAdminTasks, openAddTasksToCompetition, openAssignTaskToComps, openAttemptGrant, openTaskForm, openTaskPickerForCompetition, publishTask, recalculateTaskScores, revealSealedAnswer, removeTaskFromComp, removeTaskTag, renderAdminTasks, restoreTaskVersion, saveTask, saveTaskCompAssignments, sortAdminTasks, toggleTaskDiffFilter, toggleTaskLock, toggleTaskStateFilter, toggleTaskStatusFilter, toggleTaskVisibility, updateAssignSaveBtn, updateTaskPickerCount, viewTaskAsParticipant } from "./../features/challenges-admin.js";
+import { _renderTaskFormAttachments, tfAddChoice, tfRemoveChoice, tfSetChoiceText, tfSetChoiceCorrect, tfSyncAnswerType, tfAddExtraAnswer, tfRemoveExtraAnswer, tfSetExtraAnswer, _closeAttachPicker, _deleteSavedAttachment, _deleteStagingAttachment, _openAttachPicker, _renameSavedAttachment, _renameStagingAttachment, _uploadAttachmentNow,  assignPickedTasks, challengeBulkAssignExecute, challengesBulkAssign, toggleAllChallenges, toggleChallengeSelection, closeTaskForm, closeTaskPreview, deleteAllFeedback, deleteFeedback, deleteTask, editTask, loadAdminTasks, openAddTasksToCompetition, openAssignTaskToComps, openAttemptGrant, openTaskForm, openTaskPickerForCompetition, publishTask, recalculateTaskScores, revealSealedAnswer, removeTaskFromComp, renderAdminTasks, restoreTaskVersion, saveTask, saveTaskCompAssignments, sortAdminTasks, toggleTaskDiffFilter, toggleTaskLock, toggleTaskStateFilter, toggleTaskStatusFilter, toggleTaskVisibility, updateAssignSaveBtn, updateTaskPickerCount, viewTaskAsParticipant } from "./../features/challenges-admin.js";
 import { chooseTimeslot, COMP_CATEGORY_LABEL, compDisplayCategory, handleCompetitionsNav, loadMyCompetitions, pickCompetition, renderCompetitionPicker, requestReminder, selectCompetition, setCompFilter, setCompOtherFilter, showCompetitionsPage, showPendingPageForCompetition, showTimeslotPicker, startCompDataPoll, leaveCompetition } from "./../features/competition-picker.js";
-import { closeLateEntriesNow, compareCompsForPicker, compKindSelect, openNewEventPage, openCompetitionForm, compFormDeadlineChanged, toggleNoDeadline, toggleLateEntry, toggleLateAuto, compFormLateDeadlineChanged, addCompFormSession, addCompTag, compFormDurChanged, compFormUpdateEndTime, compRegFieldChanged, deleteCompetition, editCompetition, endNow, loadAdminCompetitions, removeCompCxOne, removeCompTag, renderAdminCompetitions, renderScopeBanner, saveCompCxOne, saveCompetition, saveCompetitionAndPickTasks, setAdminTimeslotScope, showCompetitionDelivery, showCompetitionOrganisers, sortCompetitions, startAdminCompPoll, startNow, toggleCompFilter, toggleCompKindFilter, toggleCompFormMode, toggleCxoneDisabled, updateSessionRemoveBtns } from "./../features/competitions-admin.js";
+import { closeLateEntriesNow, compareCompsForPicker, compKindSelect, openNewEventPage, openCompetitionForm, compFormDeadlineChanged, compLbModeChanged, toggleNoDeadline, toggleLateEntry, toggleLateAuto, compFormLateDeadlineChanged, addCompFormSession, addCompTag, compFormDurChanged, compFormUpdateEndTime, compRegFieldChanged, deleteCompetition, editCompetition, endNow, loadAdminCompetitions, removeCompCxOne, removeCompTag, renderAdminCompetitions, renderScopeBanner, saveCompCxOne, saveCompetition, setAdminTimeslotScope, showCompetitionDelivery, sortCompetitions, startAdminCompPoll, startNow, toggleCompFilter, toggleCompKindFilter, toggleCompFormMode, toggleCxoneDisabled, updateSessionRemoveBtns } from "./../features/competitions-admin.js";
 import { executeConflictImport, exportCompetitionActivityCsv, exportParticipants, exportParticipantsCSV, exportTasks, importParticipantsFile, importTasksFile, onConflictResChange, proceedToConflictCheck, renderImportParticipantRows, setAllConflictResolutions, toggleAllImportParticipants, toggleImportParticipant } from "./../features/export-import.js";
 import { bulkAddToGroup, createGroupDialog, deleteGroup, loadAdminGroups, manageGroupCompetitions, manageGroupMembers, renameGroupDialog, renderAdminGroups } from "./../features/groups-admin.js";
 import { _helpLoadDoc, closeHelpDrawer, openHelpDrawer } from "./../features/help-drawer.js";
 import { openReleaseNotes } from "./../features/release-notes.js";
 import { _histSort, closeHistoryDialog, loadMoreHistory, renderHistoryDialog, showCompetitionHistory, showTaskHistory, showUserHistory } from "./../features/history.js";
-import { loadLeaderboard, sortLeaderboard, sortLeaderboardGroup, sortLeaderboardLate, forgetCertHeld } from "./../features/leaderboard.js";
-import { openBadgeShare, copyBadgeLink, copyPostAndOpenLinkedIn } from "./../features/badge-share.js";
+import { loadLeaderboard, sortLeaderboard, sortLeaderboardGroup, sortLeaderboardLate, sortLeaderboardOverall, forgetCertHeld } from "./../features/leaderboard.js";
+import { openBadgeShare, copyBadgeLink, copyPostAndOpenLinkedIn, startProgramRetakeFlow } from "./../features/badge-share.js";
 import { exitImpersonation, impersonateParticipant, renderImpersonationBanner } from "./../features/impersonation.js";
 import { _endedPopupChannel, filterTasks, fireNavigatedAway, fitAnswerArea, handleStarKeydown, hoverStars, loadTasks, openTask, rearmOpenTask, refreshScore, renderTasks, resetStars, revealHint, setSolveFilter, submitAnswer, submitFeedback, tapChoice, tapChoiceToggled } from "./../features/participant-tasks.js";
-import { addGroup, addTag, adminEditProfile, approveUser, grantEventAdmin, revokeEventAdmin, blockUser, bulkApproveUsers, closeKebab, deleteParticipant, denyUser, inviteParticipantsForCompetition, loadAdminParticipants, openInviteDialog, quickInviteToCompetition, removeGroup, removeTag, renderParticipants, emailSignInCodeForUser, saveAdminProfile, setPStatusFilter, setUserRole, sortParticipants, submitInvitations, toggleAllParticipants, toggleKebab, toggleParticipantSelection, uninviteFromCompetition, unlockUser, updateAdpTimezones, verifyUser, showParticipantCode, deskInvite } from "./../features/participants-admin.js";
+import { addGroup, addTag, adminEditProfile, approveUser, grantEventAdmin, revokeEventAdmin, blockUser, bulkApproveUsers, closeKebab, deleteParticipant, denyUser, inviteParticipantsForCompetition, loadAdminParticipants, openInviteDialog, quickInviteToCompetition, removeGroup, removeTag, renderParticipants, emailSignInCodeForUser, saveAdminProfile, setPStatusFilter, openRolesFor, sortParticipants, submitInvitations, toggleAllParticipants, toggleKebab, toggleParticipantSelection, uninviteFromCompetition, unlockUser, updateAdpTimezones, verifyUser, showParticipantCode, deskInvite } from "./../features/participants-admin.js";
 import { loadAdminLeaderboard, loadAdminRankingsTab, selectAdminRankingsComp, sortRankings, rankingsCopy, exportRankingsCsv, setRankingsHideIdentity, _rkToggleExpanded, _rkRerenderFromCache } from "./../features/rankings-admin.js";
 import { adminShowParticipant, adminShowChallenge, adminShowGroup } from "./../features/admin-crossnav.js";
 import { _copySelfEnrollLink, _copySelfEnrollCode, joinWithCode, openEventCodeDialog, eventCodeApply, eventCodeSignin, _downloadSelfEnrollQr, _renderJoinBanner, clearStoredJoin, enterAfterJoin, joinViaPendingToken, openSelfEnrollOverlay, regenerateSelfEnroll, rehydratePendingJoin, storePendingJoin } from "./../features/self-enroll.js";
@@ -96,6 +96,10 @@ import * as _ns65 from "./../features/command-palette.js";  // app chrome: the h
 import * as _ns72 from "./../features/users-admin.js";     // RBAC — Users & roles
 import * as _ns83 from "./../features/event-team.js";      // event team + persona reports (workspace Team & reports)
 import * as _ns84 from "./../features/task-assign.js";     // the one add-challenges-to-an-event path
+import * as _ns85 from "./../features/topics-admin.js";    // stage B — the Question bank's topics
+import * as _ns86 from "./../features/staff-teams.js";     // the staff-teams directory (Settings → People) and its two event doors
+import * as _ns87 from "./../features/marketing-admin.js"; // the Marketing page (GET /api/admin/analytics/marketing)
+import * as _ns88 from "./../features/task-sessions.js";   // per-session question sets: the workspace Questions section's Sessions choice
 import * as _ns41 from "./../features/choice-tap.js"; // v8.13.0 — the booth tap-to-answer view (CHOICE_TAP_MQ on window for tests)
 import { wirePickerFilter } from "./../ui/list-controls.js"; // v7.20.11 — the analytics pickers filter through it (it mounts its own count node)
 
@@ -120,7 +124,7 @@ function boot() {
   // showing the name and hiding it.
   initPlatformNameFit();
   // Restore the classic-script global namespace (tests + window.* handoffs).
-  Object.assign(window, _ns0, _ns1, _ns2, _ns3, _ns4, _ns5, _ns6, _ns7, _ns8, _ns9, _ns10, _ns11, _ns12, _ns13, _ns14, _ns16, _ns17, _ns18, _ns19, _ns20, _ns21, _ns22, _ns23, _ns24, _ns25, _ns26, _ns27, _ns28, _ns29, _ns30, _ns31, _ns32, _ns33, _ns35, _ns34, _ns36, _ns37, _ns38, _ns39, _ns40, _ns41, _ns42, _ns50, _ns51, _ns52, _ns53, _ns60, _ns61, _ns62, _ns63, _ns64, _ns65, _ns70, _ns72, _ns81, _ns66, _ns83, _ns84);
+  Object.assign(window, _ns0, _ns1, _ns2, _ns3, _ns4, _ns5, _ns6, _ns7, _ns8, _ns9, _ns10, _ns11, _ns12, _ns13, _ns14, _ns16, _ns17, _ns18, _ns19, _ns20, _ns21, _ns22, _ns23, _ns24, _ns25, _ns26, _ns27, _ns28, _ns29, _ns30, _ns31, _ns32, _ns33, _ns35, _ns34, _ns36, _ns37, _ns38, _ns39, _ns40, _ns41, _ns42, _ns50, _ns51, _ns52, _ns53, _ns60, _ns61, _ns62, _ns63, _ns64, _ns65, _ns70, _ns72, _ns81, _ns66, _ns83, _ns84, _ns85, _ns86, _ns87, _ns88);
   // Live getters/setters mirroring the S state object onto window.
   for (const _k of Object.keys(S)) {
     if (!(_k in window)) { try { Object.defineProperty(window, _k, { get: () => S[_k], set: (v) => { S[_k] = v; }, configurable: true }); } catch (e) { console.warn('Could not expose state key on window', _k, e); } }
@@ -374,7 +378,6 @@ function boot() {
   registerAction('comp-export-activity',     (e, el) => exportCompetitionActivityCsv(el.dataset.compId, el.dataset.compName));
 
   registerAction('comp-delivery',            (e, el) => showCompetitionDelivery(el.dataset.compId, el.dataset.compName));
-  registerAction('comp-organisers',          (e, el) => showCompetitionOrganisers(el.dataset.compId, el.dataset.compName)); // v8.7.0
 
   registerAction('task-view',                  (e, el) => viewTaskAsParticipant(el.dataset.taskId));
 
@@ -382,7 +385,6 @@ function boot() {
 
   registerAction('task-toggle-visibility',     (e, el) => toggleTaskVisibility(el.dataset.taskId));
 
-  registerAction('task-assign-to-comps',       (e, el) => openAssignTaskToComps(el.dataset.taskId));
 
   registerAction('task-remove-from-comp',      (e, el) => removeTaskFromComp(el.dataset.taskId, el.dataset.compId));
 
@@ -398,11 +400,14 @@ function boot() {
   registerAction('task-reveal-sealed',         (e, el) => revealSealedAnswer(el.dataset.taskId)); // v8.12.2
 
   registerAction('task-delete',                (e, el) => deleteTask(el.dataset.taskId));
+  // Stage B — topics, the editor's topic-and-sharing row, Save to bank.
+  registerAction('open-topics-dialog',         () => _ns85.openTopicsDialog());
+  registerAction('task-topic-new',             async () => { await _ns85.newTopicFromEditor(); _ns7.tfOrgSync(); });
+  registerChange('task-topic-filter',          (e, el) => { S.tTopicFilter = el.value || ''; S.tPage = 1; _ns7.renderAdminTasks(); });
+  registerChange('task-org-sync',              () => _ns7.tfOrgSync());
+  registerAction('task-save-to-bank',          (e, el) => _ns7.saveTaskToBank(el.dataset.taskId));
 
-  registerAction('task-tag-remove',            (e, el) => removeTaskTag(el.dataset.taskId, el.dataset.tag));
 
-  registerAction('task-tag-add',               (e, el) => addTaskTag(el.dataset.taskId));
-  registerAction('task-tag-fix-public-domain', (e, el) => fixPublicDomainTag(el.dataset.taskId, el.dataset.tag));
 
   // v7.12.0 — bulk assign challenges to competitions (mirrors participant-select-*).
   registerChange('challenge-select-toggle',    (e, el) => toggleChallengeSelection(el.value, el.checked));
@@ -438,7 +443,7 @@ function boot() {
 
   registerAction('participant-deny',            (e, el) => denyUser(el.dataset.userId));
 
-  registerAction('participant-role',           (e, el) => setUserRole(el.dataset.userId, el.dataset.newRole, el.dataset.prevRole));
+  registerAction('participant-open-roles',     (e, el) => openRolesFor(el.dataset.email||''));   // role changes live on Roles & permissions
   // v8.7.0 — the per-event organiser grant. Both carry the competition on the
   // element, because the grant is per EVENT and the focused one is what the
   // kebab item named.
@@ -522,6 +527,8 @@ function boot() {
     if (document.getElementById('leaderboard-page')?.classList.contains('active')) loadLeaderboard({ silent: true });
   }));
   registerAction('badge-copy-link',            () => copyBadgeLink());
+  // Program grades (27 Nov 2026): Try again, then the challenge list afresh.
+  registerAction('program-retake',             () => startProgramRetakeFlow(S.currentCompetitionId).then((ok) => { if (ok) return loadTasks(); }));
   registerAction('badge-copy-post',            () => copyPostAndOpenLinkedIn());
 
   registerAction('save-profile',               () => saveProfile());
@@ -591,7 +598,6 @@ function boot() {
 
   registerAction('comp-save',                  () => saveCompetition());
 
-  registerAction('comp-save-and-pick-tasks',   () => saveCompetitionAndPickTasks());
 
   registerAction('comp-add-form-session',      () => addCompFormSession());
 
@@ -846,6 +852,7 @@ function boot() {
   registerAction('open-competition-form',      () => openNewEventPage());
   registerAction('new-event-start',            (e, el) => openCompetitionForm(null, { kind: el.dataset.kind }));
   registerChange('comp-kind-select',           (e, el) => compKindSelect(el));
+  registerAction('comp-kind-change',           (e, el) => _ns9.compKindChangeToggle(el));   // the form's "Change type"
 
   registerAction('open-invite-dialog',         () => openInviteDialog());
 
@@ -867,10 +874,22 @@ function boot() {
   registerAction('cxone-withdrawal-override',  (e, el) => retryCxoneWithdrawal(el.dataset.id, true));
   registerAction('cxone-withdrawal-dismiss',   (e, el) => dismissCxoneWithdrawal(el.dataset.id));
   // The Settings two-pane shell: the section list, its phone picker, and the
-  // Email / Data & retention / Alerts sections' own controls.
+  // sections' own controls (Email, retention, alerts, CxOne API audit, health).
   registerAction('settings-section',           (e, el) => _ns22.selectSettingsSection(el.dataset.section, { focus: true }));
-  registerChange('settings-section-pick',      (e, el) => _ns22.selectSettingsSection(el.value));
-  registerAction('send-test-email',            () => _ns22.sendTestEmail());
+  registerChange('settings-section-pick',      (e, el) => _ns22.settingsPick(el.value));
+  registerAction('cxone-audit-retry',          () => _ns22.loadCxoneAuditCard(1));   // one caller, no poll
+  registerAction('cxone-audit-page-first',     () => _ns22.cxoneAuditPage('first'));
+  registerAction('cxone-audit-page-prev',      () => _ns22.cxoneAuditPage('prev'));
+  registerAction('cxone-audit-page-next',      () => _ns22.cxoneAuditPage('next'));
+  registerAction('cxone-audit-page-last',      () => _ns22.cxoneAuditPage('last'));
+  registerChange('cxone-audit-page-size',      (e, el) => _ns22.cxoneAuditPageSize(el.value));
+  registerAction('settings-notes-retry',       () => _ns22.loadReleaseNotesCard()); // one caller, no poll
+  registerAction('settings-health-retry',      () => _ns22.loadSystemHealthCard());
+  registerAction('send-test-email',            (e, el) => _ns22.sendTestEmail(el));
+  registerAction('smtp-reload',                () => _ns22.loadSmtpCard());        // one caller, no poll
+  registerAction('smtp-test',                  () => _ns22.smtpTest());
+  registerAction('smtp-save',                  () => _ns22.smtpSave());
+  registerAction('smtp-remove',                () => _ns22.smtpRemove());
   registerAction('settings-retention-reload',  () => _ns22.loadRetentionCard());   // one caller, no poll
   registerAction('settings-alerts-reload',     () => _ns22.loadAlertsCard());      // one caller, no poll
   registerAction('settings-alert-open',        (e, el) => _ns22.openSettingsAlert(el.dataset.id));
@@ -896,6 +915,7 @@ function boot() {
 
   registerAction('sort-leaderboard-group',     (e, el) => sortLeaderboardGroup(el.dataset.col));
   registerAction('sort-leaderboard-late',      (e, el) => sortLeaderboardLate(el.dataset.col));
+  registerAction('sort-leaderboard-overall',   (e, el) => sortLeaderboardOverall(el.dataset.col));
 
   registerAction('sort-rankings',              (e, el) => sortRankings(el.dataset.key, el.dataset.col));
 
@@ -1024,6 +1044,9 @@ function boot() {
 
   registerChange('comp-form-deadline-changed', () => compFormDeadlineChanged());
   registerChange('toggle-no-deadline',         () => toggleNoDeadline());
+  // Per-session question sets — the ranking control drives the percentages box.
+  registerChange('comp-lb-mode-changed',       () => compLbModeChanged());
+  registerAction('task-sessions',              (e, el) => _ns88.openTaskSessions(el.dataset.taskId));
   // v8.6.0 — late entries: the feature toggle shows/hides the deadline block, and
   // the Automatic toggle fills-and-disables the pair rather than blanking it.
   registerChange('toggle-late-entry',          () => toggleLateEntry());
@@ -1631,15 +1654,15 @@ function boot() {
     setSafeHtml(ov, `
       <div class="picker-modal picker-modal-wide">
         <div class="picker-modal-head">
-          <h3>Pick challenges</h3>
-          <input type="search" placeholder="Search by title, difficulty or tag…" aria-label="Search challenges by title, difficulty or tag" id="analytics-task-search" class="filter-select" style="max-width:240px"/>
+          <h3>Pick questions</h3>
+          <input type="search" placeholder="Search by title, difficulty or tag…" aria-label="Search questions by title, difficulty or tag" id="analytics-task-search" class="filter-select" style="max-width:240px"/>
           <div style="display:flex;gap:8px">
             ${_analyticsState.taskIds.length ? `<button type="button" class="btn sm secondary" data-action="analytics-clear-tasks-and-close">Clear (${_analyticsState.taskIds.length})</button>` : ''}
             <button type="button" class="btn sm" data-action="analytics-close-picker">Done</button>
           </div>
         </div>
         <div class="picker-grid picker-grid-narrow" id="analytics-task-grid">
-          ${cards || '<p style="color:var(--muted)">No challenges exist yet.</p>'}
+          ${cards || '<p style="color:var(--muted)">No questions exist yet.</p>'}
         </div>
       </div>`);
     document.body.appendChild(ov);
@@ -1650,8 +1673,8 @@ function boot() {
     // that the card renders right there were both unsearchable, and it reported
     // no count and showed nothing at all when a query matched none.
     wirePickerFilter(ov, 'analytics-task-search', '#analytics-task-grid .picker-card', {
-      emptyText: 'No challenges match that search.',
-      noun: 'challenge',
+      emptyText: 'No questions match that search.',
+      noun: 'question',
     });
     document.getElementById('analytics-task-search')?.focus();
   });
@@ -1714,6 +1737,17 @@ function boot() {
 
   registerChange('analytics-set-timeslot', (e, el) => {
     _analyticsState.timeslotId = el.value || null;
+    _analyticsScheduleRefetch();
+  });
+
+  // Inside an event's workspace the scope is that event: the one choice left
+  // is the whole event or one of its sessions.
+  registerChange('analytics-ws-set-timeslot', (e, el) => {
+    if (!S.adminSelectedCompetitionId) return;
+    _analyticsState.competitionId = S.adminSelectedCompetitionId;
+    _analyticsState.scope = el.value ? 'timeslot' : 'competition';
+    _analyticsState.timeslotId = el.value || null;
+    renderAnalyticsFilterBar();
     _analyticsScheduleRefetch();
   });
 
@@ -1802,7 +1836,7 @@ function boot() {
   registerAction("open-profile-menu",      () => _ns28.openProfileMenu());
   registerAction("nav-locked",             () => _ns28.navLockedPressed());
   registerAction("open-builtin-account",   () => {
-    _ns22.selectSettingsSection('breakglass');   // shown as soon as its card loads
+    _ns22.selectSettingsSection('signin');   // Sign-in holds the break-glass card, shown as soon as it loads
     _ns28.adminTab(document.querySelector('.admin-nav-item[data-tab-id="admin-settings-tab"]'), 'admin-settings-tab');
   });
   registerAction("open-appearance",        () => _ns60.openAppearancePage());
@@ -1837,6 +1871,8 @@ function boot() {
   // reaches them without nav importing either module.
   _ns50.initEventWorkspace();
   _ns83.initEventTeam({ registerAction, registerChange });   // after the workspace: wraps its adminNavBuilt hook
+  _ns86.initStaffTeams({ registerAction });
+  _ns87.initMarketingAdmin({ registerAction, registerChange }); // the Marketing page: its loader, actions and "?" tips
   _ns62.initFiltersPanels();
   registerAction("filters-toggle",          (e, el) => _ns62.toggleFiltersPanel(el.dataset.panel));
   registerAction("filters-clear",           (e, el) => _ns62.clearFiltersPanel(el.dataset.panel));
@@ -1850,6 +1886,7 @@ function boot() {
   _ns63.defineTable("rankings", _ns18.RANKINGS_TABLE_COLUMNS);
   _ns63.defineTable("rankings-group", _ns18.RANKINGS_GROUP_TABLE_COLUMNS);
   _ns63.defineTable("analytics", _ns5.ANALYTICS_TABLE_COLUMNS);
+  _ns63.defineTable("marketing", _ns87.MARKETING_TABLE_COLUMNS);
   for (const [k, c] of Object.entries(_ns63.PLAIN_TABLES)) _ns63.defineTable(k, c);
   _ns63.installTableColumns();
   _ns28.adminPaneLoaders.set('admin-templates-tab', () => _ns51.loadTemplatesPane());
@@ -1880,6 +1917,9 @@ function boot() {
   registerAction("comp-open",               (e, el) => _ns50.openEventWorkspace(el.dataset.compId, el.dataset.compName));
   registerAction("comp-open-ts",            (e, el) => _ns50.openEventWorkspaceSession(el.dataset.compId, el.dataset.compName, el.dataset.tsId, el.dataset.tsName));
   registerAction("ws-tab",                  (e, el) => _ns50.wsTab(el.dataset.section));
+  // Stage B — the Overview checklist's Add from bank is the Questions section's
+  // own door (owner ruling, 27 Nov 2026): open the section, then its picker.
+  registerAction("ws-add-from-bank",        () => { _ns50.wsTab("admin-tasks-tab"); _ns7.openAddTasksToCompetition(); });
   registerAction("ws-section-pick",         () => _ns50.openSectionSheet());
   registerAction("ws-section-sheet-close",  () => _ns50.closeSectionSheet());
   registerAction("ws-join-reveal",          () => _ns50.wsJoinReveal());
@@ -1889,6 +1929,7 @@ function boot() {
   registerAction("ws-ov-expand",            (e, el) => _ns50.wsOverviewExpand(el.dataset.part));
   registerAction("ws-task-facts",           (e, el) => _ns50.wsTaskFacts(el));
   registerAction("ws-org-add",              (e, el) => _ns50.wsOrgAdd(el));
+  registerAction("ws-org-add-team",         () => _ns50.wsOrgAddTeam());
   registerAction("ws-org-remove",           (e, el) => _ns50.wsOrgRemove(el));
   registerAction("ws-pulse-retry",          () => _ns50.wsPulseRetry());
   registerAction("ws-certs-retry",          () => _ns50.wsCertsRetry());
@@ -1900,7 +1941,6 @@ function boot() {
   registerAction("ws-join-copy",            () => _ns50.wsJoinCopy());
   registerAction("ws-join-toggle",          () => _ns50.wsJoinToggle());
   registerAction("p-columns",               (e, el) => _ns17.openParticipantColumns(el));
-  registerChange("p-include-admins",        (e, el) => { S.pIncludeAdmins = !!el.checked; _ns17.loadAdminParticipants(); });   // RBAC — People: show admin accounts too
   registerChange("p-ws-everyone",          (e, el) => _ns50.setParticipantWsScope(el.checked ? 'all' : 'event'));
   registerAction("comp-top3",               (e, el) => _ns50.downloadTop3(el.dataset.compId, el));
   registerAction("ws-join-full",            () => _ns50.wsJoinFull());

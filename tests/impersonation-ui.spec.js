@@ -50,14 +50,9 @@ async function findParticipantRow(page, email) {
   await btn.waitFor({ state: "attached" });
   await btn.evaluate((el) => el.click());
   await page.locator("#admin-participants-tab").waitFor({ state: "visible", timeout: 5000 });
-  // RBAC — People lists admin accounts only with "Show admin accounts" ticked;
-  // the privileged-row arm below needs one.
-  const inc = page.locator("#p-include-admins");
-  if (await inc.isVisible().catch(() => false) && !(await inc.isChecked())) {
-    const reload = page.waitForResponse((r) => r.url().includes("/api/admin/participants?") && r.url().includes("kind=all"));
-    await inc.check();
-    await reload;
-  }
+  // RBAC — People lists admin accounts only after a link to one (they live on
+  // Roles & permissions); the privileged-row arm below needs one.
+  await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
   await narrowPeopleTable(page, email);
   // v8.1.0 — POLL for the filter to settle rather than taking the first visible
   // match. The search is DEBOUNCED, so `.fill()` returns while the table still
@@ -137,11 +132,11 @@ async function ensureCertFixture() {
     const compId = (await (await api.post("/api/admin/competitions", { headers: H, data: {
       name: `ImpUI Cert ${stamp}`, start_time: new Date(Date.now() - 20 * 60_000).toISOString(), duration_minutes: 300,
     }})).json()).competition.id;
-    const taskId = (await (await api.post("/api/admin/tasks", { headers: H, data: {
+    const bankId = (await (await api.post("/api/admin/tasks", { headers: H, data: {
       title: `ImpUI Cert Task ${stamp}`, description: "<p>solve me</p>", difficulty: "easy",
       answer_type: "text", correct_answer: "cert-answer", explanation: "<p>e</p>", status: "published",
     }})).json()).id;
-    await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H, data: { competitionIds: [compId] } });
+    const taskId = (await (await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
     const tgtEmail = `impui-cert-${stamp}@acme.com`;
     const tgtId = await mkParticipant(api, H, tgtEmail, `impui_cert_${stamp}`.slice(0, 30));
     const asg = await api.post("/api/admin/competitions/assign", { headers: H, data: { userIds: [tgtId], competitionIds: [compId] } });
@@ -206,8 +201,7 @@ test.beforeAll(async () => {
       title: `ImpUI ${slug} ${stamp}`, description: "<p>solve me</p>", difficulty: "easy",
       answer_type: "text", correct_answer: "impui-answer", explanation: "<p>e</p>", hint: "a hint", status: "published",
     }})).json()).id;
-    await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H, data: { competitionIds: [compId] } });
-    return id;
+    return (await (await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
   };
   const taskSubmit = await mkTask("Submit");
   const taskCancel = await mkTask("Cancel");

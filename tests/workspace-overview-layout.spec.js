@@ -199,7 +199,7 @@ test("upcoming: the Ready to start? checklist, each open item with its fix; no b
   await expect(page.locator("#ws-ov-chart"), "the chart is not on the face").toBeHidden();
   await expect(page.locator('#ws-kpis .ws-kpi-hero .eyebrow')).toContainText("Starts in");
   await todo.locator('[data-action="ws-point"]').click();
-  await expect(page.locator('#ws-quick [data-action="ws-invite"]'), "Show me focuses Invite").toBeFocused();
+  await expect(page.locator('#ws-quick .ws-invite-btn'), "Show me focuses Invite").toBeFocused();
 });
 
 test("live program (unranked): progress and solve rates on the face; no board, no Answers figure", async ({ page }) => {
@@ -207,7 +207,7 @@ test("live program (unranked): progress and solve rates on the face; no board, n
   await openOverview(page, "prog", "live");
   await expect(page.locator("#ws-overview")).toHaveAttribute("data-ov-ranked", "false");
   const prog = page.locator("#ws-ov-progress");
-  await expect(prog).toContainText("of 1 solved every challenge", { timeout: 15000 });
+  await expect(prog).toContainText("of 1 solved every question", { timeout: 15000 });
   await expect(prog).toContainText("1 of 1 have solved at least one");
   await expect(page.locator("#ws-ov-rates"), "the solve rates are on the face").toBeVisible();
   await expect(page.locator("#ws-ov-rates")).toContainText("1 of 1");
@@ -219,7 +219,7 @@ test("live program (unranked): progress and solve rates on the face; no board, n
 test("ended: final progress and the certificates card with Download top 3; no board, no checklist", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openOverview(page, "end", "ended");
-  await expect(page.locator("#ws-ov-progress"), "the final progress").toContainText("solved every challenge", { timeout: 15000 });
+  await expect(page.locator("#ws-ov-progress"), "the final progress").toContainText("solved every question", { timeout: 15000 });
   await expect(page.locator("#ws-ov-board"), "no leaderboard on the organiser's Overview").toHaveCount(0);
   await expect(page.locator("#ws-ov-certs"), "were the certificates sent?").toBeVisible();
   await expect(page.locator(".ws-certs-card .ws-top3-btn"), "Download top 3 sits on the certificates card").toBeVisible();

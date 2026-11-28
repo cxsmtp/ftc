@@ -191,9 +191,12 @@ test.beforeAll(async () => {
   const { api, csrf } = await apiLogin("superadmin");
   const H = h(csrf);
   const stamp = `${Date.now()}-${Math.floor(process.hrtime()[1] / 1000)}`;
+  // `entry`: dave and gwen are members ON THE BOARD who never attempted, which on
+  // these events is what entering makes them (a first-open clock would leave them
+  // off it, and the mint would refuse them for a different reason).
   const mkComp = async (name, mins) => {
     const r = await api.post("/api/admin/competitions", { headers: H, data: {
-      name, start_time: new Date(Date.now() - 10 * 60_000).toISOString(), duration_minutes: mins,
+      name, start_time: new Date(Date.now() - 10 * 60_000).toISOString(), duration_minutes: mins, clock_start: "entry",
     }});
     return (await r.json()).competition.id;
   };
@@ -1395,7 +1398,8 @@ test.describe("No certificate without an attempt, placement included", () => {
       const ids = [];
       for (const [e, n] of [[scorer, "p1s"], [idle1, "p1a"], [idle2, "p1b"]]) ids.push(await ensureParticipant(api, H, e, `${n}_${stamp}`));
       const comp = (await (await api.post("/api/admin/competitions", { headers: H, data: {
-        name: `P1 NoAttempt ${stamp}`, start_time: new Date(Date.now() - 10 * 60_000).toISOString(), duration_minutes: 180,
+        // `entry`: the no-shows reach the podium by entering, the state under test.
+        name: `P1 NoAttempt ${stamp}`, start_time: new Date(Date.now() - 10 * 60_000).toISOString(), duration_minutes: 180, clock_start: "entry",
       }})).json()).competition.id;
       const t1 = await makeTask(api, H, comp, `${stamp}-a`);
       await makeTask(api, H, comp, `${stamp}-b`); // a second challenge: one solve must not finish the event

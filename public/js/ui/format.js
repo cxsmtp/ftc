@@ -75,6 +75,11 @@ export function formatCountdown(ms){
 
 export function esc(str){return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');}
 
+/** An email address as HTML that may break only where an address reads well:
+ *  after a "." or "-" and before the "@" (`<wbr>`), never inside a word. Every
+ *  piece is escaped; the text, and so a search or copy, is the address as typed. */
+export function addrBreakHtml(addr){return String(addr||'').split(/(?<=[.-])|(?=@)/).map(p=>esc(p)).join('<wbr>');}
+
 export function toggleSearchClear(input){const btn=document.getElementById(input.id+'-clear');if(btn)btn.classList.toggle('hidden',!input.value);const wrap=input.closest&&input.closest('.search-wrap');if(wrap)wrap.classList.toggle('has-value',!!input.value);}
 
 export function clearSearch(inputId,cb){const el=document.getElementById(inputId);if(el){el.value='';const wrap=el.closest&&el.closest('.search-wrap');if(wrap)wrap.classList.remove('has-value');}const btn=document.getElementById(inputId+'-clear');if(btn)btn.classList.add('hidden');if(cb)cb();}
@@ -426,7 +431,14 @@ const _DEFAULT_POLICY = { sessions: "many", schedule: "window", ranking_enabled:
   // event has always had, and the tap layout (public/js/features/choice-tap.js)
   // appears only where the server SAYS "tap". The reader tests `=== "tap"`, so an
   // unknown value lands here too.
-  choice_layout: "standard" };
+  choice_layout: "standard",
+  // "never" is the restrictive value: a stale payload hides the clock-start choice
+  // rather than offer one the save refuses (`clock_start_forbidden`).
+  clock_start: "never",
+  // "allowed" is what every kind did before the key existed, so a payload that
+  // predates it keeps the event form's Checkmarx One section (the server refuses
+  // a Booth Event's accounts either way).
+  cxone_provisioning: "allowed" };
 // v8.12.0 — STAFF CAN COMPETE, and the one predicate the participant surfaces
 // read. A staff-tagged user is a SPECTATOR of an event unless they hold a row on
 // it and its "Staff can compete" switch is on — the server puts that answer on
@@ -536,4 +548,19 @@ export function compareTaskNumbers(a, b) {
     } else if (xa !== xb) return xa < xb ? -1 : 1;
   }
   return 0;
+}
+
+// PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026) — the ranking of a
+// Competition with sessions, in the words the event form uses: "per_session",
+// "overall" or "both" from the stored `leaderboard_mode` + `leaderboard_overall`,
+// with " · overall board by percentages" where the overall board ranks by them.
+export function rankingChoiceOf(c){
+  if(!c)return 'per_session';
+  if(c.leaderboard_mode==='global')return 'overall';
+  return c.leaderboard_overall?'both':'per_session';
+}
+export function rankingWords(c){
+  const ch=rankingChoiceOf(c);
+  const what=ch==='overall'?'One overall winner':ch==='both'?'A winner per session and overall':'A winner per session';
+  return ch!=='per_session'&&c&&c.leaderboard_percent?`${what} · overall board by percentages`:what;
 }

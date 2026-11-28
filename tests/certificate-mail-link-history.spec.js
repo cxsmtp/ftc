@@ -23,7 +23,7 @@ const fs = require("fs");
 const { test, expect } = require("./isolated-test");
 const { BASE, TEST_DB_PATH, apiLogin, freshCtx, gradingHashFor } = require("./helpers");
 const { H, makeParticipant, makeCompetition, makeTask, assignTask, enrol } = require("./event-admin-helpers");
-const { adminLogin, clickTab, filterComps, openKebab } = require("./ui-admin-helpers");
+const { adminLogin, clickTab, filterComps, openKebab, openEventMenu } = require("./ui-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -92,11 +92,8 @@ test.describe("sweep #402 — a download through the email's link says it may be
   test("the event's History words each download: the email link's with the caveat, the holder's without it, a plain one as it was", async ({ page }) => {
     test.setTimeout(120_000);
     await adminLogin(page);
-    await clickTab(page, "Events");
-    await filterComps(page, W.comp.name);
-    const row = page.locator("#admin-comp-body tr", { hasText: W.comp.name }).first();
-    await openKebab(page, row);
-    await page.locator('#kebab-portal [data-action="comp-history"]').click();
+    // The event's History is its workspace ⋯ menu's (the row menu keeps only Delete event).
+    await (await openEventMenu(page, W.comp.name)).locator('[data-action="comp-history"]').click();
     const ov = page.locator("#hist-overlay");
     await expect(ov).toBeVisible({ timeout: 15000 });
     const lines = ov.locator("#hist-body tr", { hasText: "Certificate PDF downloaded" });

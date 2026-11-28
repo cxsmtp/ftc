@@ -282,16 +282,35 @@ export function renderAnalyticsFilterBar(){
     </button>`;
   // Challenges picker shows "All challenges" or "3 selected" + a chevron.
   const tasksLabel=s.taskIds.length
-    ? `<span class="picker-btn-name">${s.taskIds.length} challenge${s.taskIds.length===1?'':'s'} selected</span>`
-    : `<span class="picker-btn-placeholder">All challenges</span>`;
+    ? `<span class="picker-btn-name">${s.taskIds.length} question${s.taskIds.length===1?'':'s'} selected</span>`
+    : `<span class="picker-btn-placeholder">All questions</span>`;
   const tasksPickerBtn=`
     <button type="button" class="picker-btn" data-action="analytics-open-task-picker">
       ${tasksLabel}<span class="picker-btn-chev">${ICO.chevronDown}</span>
     </button>`;
 
+  // INSIDE AN EVENT'S WORKSPACE, ANALYTICS IS THAT EVENT (owner's decision, 27
+  // Nov 2026): no Global/Event switch and no event picker, which would only
+  // lead out of the event the workspace is about. The scope card names the
+  // event and, where it has sessions, narrows to one. The sidebar's Analytics
+  // is the cross-event page and keeps the switch.
+  const wsComp=S.adminSelectedCompetitionId?comps.find(c=>c.id===S.adminSelectedCompetitionId):null;
+  const wsScopeHtml=S.adminSelectedCompetitionId?`
+      <section class="filter-card" id="analytics-ws-scope">
+        <div class="help-label-row"><div class="filter-card-title">Scope</div><span data-help="analytics.wsScope" data-help-label="Scope"></span></div>
+        <p class="analytics-ws-event"><span class="picker-btn-name">${esc(wsComp?wsComp.name:(S.adminSelectedCompetitionName||'This event'))}</span>${compStatusBadge(wsComp)}${compIntBadge}</p>
+        ${slots.length?`
+        <div class="filter-card-section">
+          <label class="mini-label" for="analytics-ws-slot">Session</label>
+          <select id="analytics-ws-slot" class="filter-select" data-change-action="analytics-ws-set-timeslot">
+            <option value="" ${s.scope!=='timeslot'?'selected':''}>Whole event</option>${slots.map(t=>`<option value="${esc(t.id)}" ${s.scope==='timeslot'&&s.timeslotId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
+        </div>`:''}
+      </section>`:'';
+
   setSafeHtml(el, `
     <div class="analytics-filterbar-grid">
-      <section class="filter-card">
+      ${wsScopeHtml||`<section class="filter-card">
         <div class="help-label-row"><div class="filter-card-title">Scope</div><span data-help="analytics.scope" data-help-label="Scope"></span></div>
         <div class="seg-control">
           ${S.isEventAdmin?'':`<button type="button" class="seg ${s.scope==='global'?'seg-active':''}" data-action="analytics-set-scope" data-value="global">Global</button>`}
@@ -333,10 +352,10 @@ export function renderAnalyticsFilterBar(){
           <label class="mini-label">Event tags</label>
           ${_renderTagFilter('comp', s.compTagFilter, S._availableCompTags)}
         </div>`:''}
-      </section>
+      </section>`}
 
       <section class="filter-card">
-        <div class="filter-card-title">Challenges</div>
+        <div class="filter-card-title">Questions</div>
         ${tasksPickerBtn}
         ${s.taskIds.length?`<button type="button" class="link-btn" data-action="analytics-clear-tasks">Clear selection</button>`:''}
         <div class="filter-card-section">
@@ -349,7 +368,7 @@ export function renderAnalyticsFilterBar(){
         </div>
         ${s.availableTags.length?`
         <div class="filter-card-section">
-          <label class="mini-label">Challenge tags</label>
+          <label class="mini-label">Question tags</label>
           ${_renderTagFilter('challenge', s.challengeTagFilter, s.availableTags)}
         </div>`:''}
       </section>
@@ -625,7 +644,7 @@ export function renderAnalyticsSummary(data){
           <div class="analytics-stat-value">${(sum.unique_participants||0).toLocaleString()}</div>
         </div>
         <div class="analytics-stat" style="border-left:3px solid var(--accent2)">
-          <div class="analytics-stat-label">Challenges with activity</div>
+          <div class="analytics-stat-label">Questions with activity</div>
           <div class="analytics-stat-value">${(sum.unique_challenges||0).toLocaleString()}</div>
         </div>
       </div>
@@ -677,7 +696,7 @@ function _anChallengeCell(title){
   if(!v)return '—';
   if(!crossNavOffered('challenge'))return esc(v);   // RBAC — no Challenges page for this role: a plain name
   return `<button type="button" class="sub-link" data-action="analytics-open-challenge" data-title="${esc(v)}"
-    title="Show ${esc(v)} in Challenges" aria-label="${esc(v)} — show in the Challenges tab">${esc(v)}</button>`;
+    title="Find ${esc(v)} among the questions" aria-label="${esc(v)} — find it among the questions">${esc(v)}</button>`;
 }
 
 const _anTotalOf=r=>(r.solved||0)+(r.incorrect||0)+(r.hint_revealed||0)+(r.navigated_away||0);
@@ -770,7 +789,7 @@ export function _anRowsInView(data){
 // choice: the file always carries every column (its header is a contract).
 // The table writes its own aria-sort (_anSyncSortHeaders), the effective sort.
 export const ANALYTICS_TABLE_COLUMNS={
-  noun:'challenge',
+  noun:'question',
   hidden:['difficulty','tags','total','incorrect','hint_revealed','navigated_away'],
   ariaSortOwner:true,
   cols:{title:{grow:true},difficulty:{filter:'enum'},tags:{sort:false},breakdown:{sort:false,filter:null}},
@@ -851,8 +870,8 @@ export function renderAnalyticsTable(data){
   const visible=matched.slice((page-1)*PAGE,page*PAGE);
 
   document.getElementById('analytics-table-meta').textContent = narrowed
-    ? `${matched.length} of ${rows.length} challenges match`
-    : `${rows.length} challenge${rows.length===1?'':'s'} with activity`;
+    ? `${matched.length} of ${rows.length} questions match`
+    : `${rows.length} question${rows.length===1?'':'s'} with activity`;
   const _pag=document.getElementById('analytics-pagination');
   if(_pag){
     setSafeHtml(_pag, matched.length>PAGE||page>1
@@ -871,7 +890,7 @@ export function renderAnalyticsTable(data){
     // next column added cannot reintroduce the mismatch.
     const _cols=document.querySelectorAll('#analytics-table thead th').length||11;
     setSafeHtml(document.getElementById('analytics-table-body'),
-      `<tr><td colspan="${_cols}" class="table-empty-row">${q?`No challenges match "${esc(q)}"${hasColumnFilters('analytics')?' and the column filters':''}.`:'No challenges match the column filters.'}</td></tr>`);
+      `<tr><td colspan="${_cols}" class="table-empty-row">${q?`No questions match "${esc(q)}"${hasColumnFilters('analytics')?' and the column filters':''}.`:'No questions match the column filters.'}</td></tr>`);
     _analyticsDisposeRowCharts();
     return;
   }
@@ -962,7 +981,7 @@ export function _analyticsDisposeRowCharts(){
 // start out unguarded. (The participants download is the one caller that opts
 // OUT, and says why at its call site.)
 export const ANALYTICS_CSV_HEADERS = [
-  'Challenge ID', 'Title', 'Difficulty', 'Tags', 'Total Activity',
+  'Question ID', 'Title', 'Difficulty', 'Tags', 'Total Activity',
   'Solved', 'Incorrect', 'Hints Revealed', 'Navigated Away',
   'Unique Attempters', 'Solve Rate (%)',
 ];
@@ -973,7 +992,7 @@ export function exportAnalyticsCsv(){
   // so rather than saving an empty file the admin would take as an answer.
   if(!data){ showToast('Nothing to export yet — the analytics data has not loaded.','error'); return; }
   const {matched}=_anRowsInView(data);
-  if(!matched.length){ showToast('Nothing to export — no challenges match the current filters.','error'); return; }
+  if(!matched.length){ showToast('Nothing to export — no questions match the current filters.','error'); return; }
 
   const rows=matched.map(r=>[
     // The number is empty in global scope by design (it belongs to a

@@ -178,7 +178,7 @@ export function clearFiltersPanel(id) {
 export function initFiltersPanels() {
   registerHelpTips({
     "lists.filters": "Filters narrows this list. The active filters show beside the button; press one to remove it, or Clear all in the panel.",
-    "templates.list": "A template keeps an event's type, settings and challenges, never people or dates. Spin one up in a minute, or change it from its ⋯ menu.",
+    "templates.list": "Templates your organisers saved. A template keeps an event's type, settings and questions, never people or dates. Start an event from one in a minute, or change it from its ⋮ menu.",
   });
   const phone = _sheetWidth();
   for (const id of PANELS) {

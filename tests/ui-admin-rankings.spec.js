@@ -55,14 +55,15 @@ test.describe("Admin sidebar isolation (v6.17.0)", () => {
     await expect(page.locator("#admin-mobile-menu-btn")).not.toBeVisible();
   });
 
-  test("admin logged-in view: sidebar IS visible with all 10 nav items", async ({ page }) => {
+  test("admin logged-in view: sidebar IS visible with all 11 nav items", async ({ page }) => {
     await adminLogin(page);
     await expect(page.locator("#admin-page")).toBeVisible();
     await expect(page.locator("#admin-sidebar")).toBeVisible();
-    // All 10 nav items present: Manage 6 (Events, New event, Challenge library,
-    // Live rankings, Analytics, Audit), Participants 2, Admin 2 (Users & roles,
-    // Settings). Submissions and Logs are reached through Audit.
-    await expect(page.locator(".admin-nav-item")).toHaveCount(10);
+    // All 11 nav items present: Manage 7 (Events, New event, Question bank,
+    // Live rankings, Analytics, Marketing, Audit), Participants 2 (People,
+    // Groups), Admin 2 (Roles & permissions, Settings). Submissions and Logs are
+    // reached through Audit.
+    await expect(page.locator(".admin-nav-item")).toHaveCount(11);
     // Exactly one item is marked active with aria-current
     await expect(page.locator(".admin-nav-item[aria-current='page']")).toHaveCount(1);
   });

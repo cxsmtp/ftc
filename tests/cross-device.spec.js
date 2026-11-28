@@ -135,7 +135,7 @@ async function liveFixture() {
     const { id } = await tr.json();
     const asg = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign challenge: ${await asg.text()}`).toBeTruthy();
-    tasks.push({ id });
+    tasks.push({ id: (await asg.json()).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what its participants open and answer
   }
   const users = [await makeParticipant(api, csrf, uniq()), await makeParticipant(api, csrf, uniq())];
   const en = await api.post("/api/admin/competitions/assign", { headers: H(csrf), data: { userIds: users.map((u) => u.id), competitionIds: [comp.id] } });
@@ -560,7 +560,7 @@ test.describe("cross-device journeys (v8.12.4)", () => {
     await expect(page.locator("#ws-title"), `${P} focus is on the event's name`).toBeFocused();
     const vp = await visibleArea(page);
     const top = await page.evaluate(() => document.getElementById("app-header").getBoundingClientRect().bottom);
-    for (const [sel, label] of [["#ws-title", "the event's name"], ['#ws-quick [data-action="ws-invite"]', "Invite"], ["#ws-quick .ws-more-btn", "the ⋯ menu"]]) {
+    for (const [sel, label] of [["#ws-title", "the event's name"], ['#ws-quick .ws-invite-btn', "Invite"], ["#ws-quick .ws-more-btn", "the ⋯ menu"]]) {
       const b = await page.locator(sel).boundingBox();
       expect(!!b && b.y >= top - 2 && b.y + b.height <= vp.height + 2 && b.x >= -2 && b.x + b.width <= vp.width + 2,
         `${P} ${label} is on screen below the header: box=${JSON.stringify(b)} header bottom=${top} visible=${vp.width}x${vp.height}`).toBe(true);

@@ -111,9 +111,10 @@ test("what a superadmin answers while viewing as a participant is in no live fig
   // A live Booth Event: it never auto-ends on all-solved (fixture item 1), so
   // two people finishing keep it live; no qualifying questions.
   const ev = await mk("PulseImp", { event_kind: "booth", start_time: new Date(Date.now() - 5 * 60_000).toISOString(), duration_minutes: 120, add_qualifying: false });
-  const t1 = await makeTask(sa, saCsrf, "pi1", { correct_answer: KEY });
-  const t2 = await makeTask(sa, saCsrf, "pi2", { correct_answer: KEY });
-  for (const t of [t1, t2]) await assignTask(sa, saCsrf, t.id, [ev.id]);
+  // The event's own copies (lib/event-copies.js): what is played and what the pulse lists.
+  const own = async (t) => ({ ...t, id: (await assignTask(sa, saCsrf, t.id, [ev.id])).copies[0].task_id });
+  const t1 = await own(await makeTask(sa, saCsrf, "pi1", { correct_answer: KEY }));
+  const t2 = await own(await makeTask(sa, saCsrf, "pi2", { correct_answer: KEY }));
   const real = await makeParticipant(sa, saCsrf, "pireal");
   const viewed = await makeParticipant(sa, saCsrf, "piviewed");
   const bench = await makeParticipant(sa, saCsrf, "pibench");

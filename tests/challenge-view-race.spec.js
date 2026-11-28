@@ -97,7 +97,7 @@ async function world({ capA } = {}) {
       const id = (await r.json()).id;
       const a = await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [compId] } });
       expect(a.status(), await a.text()).toBe(200);
-      return { id, title, hint };
+      return { id: (await a.json()).copies[0].task_id, bankId: id, title, hint };   // the event's own copy (lib/event-copies.js): what its participants open and answer
     };
     const A = await mkTask(`Alpha ${t}`, `HINT-OF-A-${t}`, capA);
     const B = await mkTask(`Bravo ${t}`, `HINT-OF-B-${t}`);
@@ -844,9 +844,10 @@ async function pendingWorld() {
     const tr = await sa.post("/api/admin/tasks", { headers: H(csrf), data: {
       title: `Live task ${t}`, description: "<p>b</p>", difficulty: "easy", answer_type: "text", correct_answer: "right", status: "published" } });
     expect(tr.status(), await tr.text()).toBe(200);
-    const task = { id: (await tr.json()).id };
-    const a = await sa.post(`/api/admin/tasks/${task.id}/competitions`, { headers: H(csrf), data: { competitionIds: [B.id] } });
+    const bankId = (await tr.json()).id;
+    const a = await sa.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(csrf), data: { competitionIds: [B.id] } });
     expect(a.status(), await a.text()).toBe(200);
+    const task = { id: (await a.json()).copies[0].task_id };   // B's own copy (lib/event-copies.js)
     const p = await mkUser(sa, csrf, `pw${t}`);
     const idle = await mkUser(sa, csrf, `pwi${t}`);
     for (const c of [A, B, C]) {

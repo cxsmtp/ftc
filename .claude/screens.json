@@ -850,6 +850,29 @@
       }
     },
     {
+      "screen": "admin-marketing",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-marketing-tab",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab marketing ; waitFor #mk-body .mk-section",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "#admin-marketing-tab|mk-filterbar|mk-table"
+        },
+        "behaviour": {
+          "path": "public/js/features/marketing-admin.js",
+          "grep": "renderMarketing|_renderTable|_kpi|_bars|_section"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.mk-|#mk-|#admin-marketing-tab"
+        }
+      },
+      "note": "The Marketing page: the platform's success figures across events (Reach, Engagement, Outcomes, Pipeline) and the per-event table. The fixture's events need activity for the sections to carry numbers; with none it shows its empty state."
+    },
+    {
       "screen": "admin-challenges",
       "status": "pending",
       "route": "/",
@@ -859,7 +882,7 @@
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "#admin-tasks-tab|admin-task-body|admin-task-table-card|task-search"
+          "grep": "#admin-tasks-tab|admin-task-body|admin-task-table-card|task-search|task-topic-filter|task-topics-btn"
         },
         "behaviour": {
           "path": "public/js/features/challenges-admin.js",
@@ -867,7 +890,7 @@
         },
         "styles": {
           "path": "public/styles.css",
-          "grep": "#admin-task-table-card|#admin-tasks-tab|\\.tag-add"
+          "grep": "#admin-task-table-card|#admin-tasks-tab|\\.tag-add|\\.topic-chip|\\.topic-filter"
         }
       }
     },
@@ -1031,9 +1054,8 @@
         "markup": null,
         "behaviour": {
           "path": "public/js/features/participants-admin.js",
-          "grep": "Add Tag|tag-input|task-tag-input|wireTagDialog",
+          "grep": "Add Tag|tag-input|wireTagDialog",
           "also": [
-            "public/js/features/challenges-admin.js",
             "public/js/features/competitions-admin.js",
             "public/js/ui/tag-dialog.js"
           ]
@@ -1043,7 +1065,27 @@
           "grep": "\\.tag\\{|\\.tag:focus-visible|\\.tag-add"
         }
       },
-      "note": "Add Tag: the one dialog a person's, a challenge's and an event's \"+ tag\" chip opens (participants-admin.js addTag, challenges-admin.js addTaskTag, competitions-admin.js addCompTag), each building its own body and saving through ui/tag-dialog.js wireTagDialog; the challenge's adds the category hint and the shared-pool chip. Opened on alice's row in People; fixture adPeopleColumns shows the Tags column, which the default six leave out. Nothing is saved. The card is inline-styled in each builder; .tag is the chip every table shares."
+      "note": "Add Tag: the one dialog a person's and an event's \"+ tag\" chip opens (participants-admin.js addTag, competitions-admin.js addCompTag), each building its own body and saving through ui/tag-dialog.js wireTagDialog. Questions have no tag box (stage B: the editor's Topic and sharing row replaces it). Opened on alice's row in People; fixture adPeopleColumns shows the Tags column, which the default six leave out. Nothing is saved. The card is inline-styled in each builder; .tag is the chip every table shares."
+    },
+    {
+      "screen": "topics-dialog",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#topics-overlay .topics-card",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab tasks ; waitFor #admin-tasks-tab ; click #task-topics-btn ; waitFor #topics-list .topics-row, #topics-list .topics-empty",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/topics-admin.js",
+          "grep": null
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.topics-"
+        }
+      },
+      "note": "Stage B: the Question bank's Topics dialog (Topics button beside Export) — add, rename and delete topics; a held topic's delete opens the move step (#topic-move-overlay, same module), which asks where its questions go. Both overlays are built in features/topics-admin.js."
     },
     {
       "screen": "add-to-group-dialog",
@@ -1213,7 +1255,7 @@
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "challenges-selection-bar|assign-challenges-to-comp-btn"
+          "grep": "challenges-selection-bar|challenge-selection-bar-assign-btn"
         },
         "behaviour": {
           "path": "public/js/features/challenges-admin.js",
@@ -1274,7 +1316,7 @@
       "route": "/",
       "visual_anchor": "#hist-overlay",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; click #admin-comp-body tr:first-child .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-history] ; waitFor #hist-overlay",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-history] ; waitFor #hist-overlay",
       "files": {
         "markup": {
           "path": "public/js/features/history.js",
@@ -1382,7 +1424,8 @@
           "path": "public/styles.css",
           "grep": "\\.kebab-|\\.km-danger|\\.km-warning|#kebab-portal"
         }
-      }
+      },
+      "note": "The Events-row menu holds only Delete event (owner's decision, 27 Nov 2026); the event's other doors are its workspace's ⋯ menu (ws-more-menu)."
     },
     {
       "screen": "participant-picker-dialog",
@@ -1391,7 +1434,7 @@
       "route": "/",
       "visual_anchor": "#admin-participants-tab",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-competitions-tab ; waitFor #admin-comp-body tr ; fill #comp-search Test Upcoming ; click #admin-comp-body tr:has-text('Test Upcoming') .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-manage-participants] ; waitFor #admin-participants-tab",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Upcoming ; click #admin-comp-body tr:has-text('Test Upcoming') td:nth-child(1) ; waitFor #ws-record ; section admin-participants-tab ; waitFor #admin-participants-tab",
       "files": {
         "markup": null,
         "behaviour": {
@@ -1453,7 +1496,7 @@
       "route": "/",
       "visual_anchor": "#self-enroll-overlay",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-competitions-tab ; waitFor #admin-comp-body tr ; click #admin-comp-body tr:first-child .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-self-enroll] ; waitFor #self-enroll-overlay",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-self-enroll] ; waitFor #self-enroll-overlay",
       "files": {
         "markup": null,
         "behaviour": {
@@ -1493,7 +1536,7 @@
       "route": "/",
       "visual_anchor": ".picker-modal",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-competitions-tab ; waitFor #admin-comp-body tr ; fill #comp-search Test Upcoming ; click #admin-comp-body tr:has-text('Test Upcoming') .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-assign-challenges] ; waitFor .picker-modal",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Upcoming ; click #admin-comp-body tr:has-text('Test Upcoming') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-assign-challenges] ; waitFor .picker-modal",
       "files": {
         "markup": {
           "path": "public/js/features/challenges-admin.js",
@@ -1699,9 +1742,9 @@
       "screen": "settings-platform",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=platform]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=branding]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings platform ; waitFor #platform-name-card",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings branding ; waitFor #platform-name-card",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1716,15 +1759,15 @@
           "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help|row)\\b"
         }
       },
-      "note": "Settings → Platform: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings platform` step."
+      "note": "Settings → Branding (platform name card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings branding` step."
     },
     {
       "screen": "settings-look",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=look]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=branding]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings look ; waitFor #pl-look",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings branding ; waitFor #pl-look",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1739,15 +1782,15 @@
           "grep": "\\.pl-grid|\\.settings-help-inline|#admin-settings-tab \\.settings-(card|heading|help|actions)\\b"
         }
       },
-      "note": "Settings → Look & appearance: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings look` step. The platform look card (superadmin)."
+      "note": "Settings → Branding (platform look card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings branding` step. The platform look card (superadmin)."
     },
     {
       "screen": "settings-accounts",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=accounts]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=signin]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings accounts ; waitFor #settings-require-approval",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings signin ; waitFor #settings-require-approval",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1762,7 +1805,7 @@
           "grep": "#admin-settings-tab \\.settings-(card|card-head|help|row-check|row)\\b"
         }
       },
-      "note": "Settings → Sign-in & accounts: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings accounts` step."
+      "note": "Settings → Sign-in (new accounts card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings signin` step."
     },
     {
       "screen": "settings-email",
@@ -1770,33 +1813,30 @@
       "route": "/",
       "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=email]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings email ; waitFor #unsubscribe-card",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings email ; waitFor #smtp-settings-body .smtp-facts",
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "email-test-card|email-relay-status|unsubscribe-card|unsubscribe-list-body|team-domains-card"
+          "grep": "smtp-settings-(card|body)|email-test-card|email-relay-status|unsubscribe-card|unsubscribe-list-body"
         },
         "behaviour": {
           "path": "public/js/features/settings-admin.js",
-          "grep": "function (loadEmailCard|sendTestEmail|loadUnsubscribeList|removeUnsubscribedEmail)\\b|email-relay-status|unsubscribe-list-body",
-          "also": [
-            "public/js/features/event-team.js"
-          ]
+          "grep": "function (loadSmtpCard|_renderSmtpCard|smtpTest|smtpSave|smtpRemove|loadEmailCard|sendTestEmail|loadUnsubscribeList|removeUnsubscribedEmail)\\b|email-relay-status|unsubscribe-list-body"
         },
         "styles": {
           "path": "public/styles.css",
-          "grep": "#admin-settings-tab \\.settings-(card|row|relay-ok|relay-bad|scroll|help)\\b"
+          "grep": "#admin-settings-tab \\.(settings-(card|row|relay-ok|relay-bad|scroll|help|facts-list|source|warning)|smtp-change)\\b"
         }
       },
-      "note": "Settings → Email: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings email` step. Three cards: outbound email (relay status, test send), the unsubscribe list and the event-team report domains (event-team.js). The relay status reads 'not been checked since the last restart' on a test server (the SMTP probe never runs under NODE_ENV=test)."
+      "note": "Settings → Email (SMTP): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings email` step. The mail server card (its facts with where each comes from and its one relay status, Last check; Send test email for the server in use; a superadmin's form behind Change the mail server) and the unsubscribe list. The Outbound email card shows only to a role holding ops.email without settings.view, never beside the mail server card. The relay is never checked on a test server (no SMTP probe under NODE_ENV=test)."
     },
     {
       "screen": "settings-certificates",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=certificates]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=branding]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings certificates ; waitFor #cert-config-body [data-cw-open] ; click #cert-config-body [data-cw-open] ; waitFor #cw-img",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings branding ; waitFor #cert-config-body [data-cw-open] ; click #cert-config-body [data-cw-open] ; waitFor #cw-img",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1811,38 +1851,150 @@
           "grep": "\\.cw-|\\.cert-wiz"
         }
       },
-      "note": "Settings → Certificates design: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings certificates` step. The card opens the platform certificate designer on demand (the server renders a full-size preview); the capture opens it and waits for the preview image."
+      "note": "Settings → Branding (certificate design card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings branding` step. The card opens the platform certificate designer on demand (the server renders a full-size preview); the capture opens it and waits for the preview image."
     },
     {
       "screen": "settings-cxone",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=cxone]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=general]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings cxone ; waitFor #cxone-card",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings general ; waitFor #cxone-card",
       "files": {
         "markup": {
           "path": "public/index.html",
-          "grep": "cxone-card|cxone-api-key|cxone-group-name|cxone-withdrawals-card"
+          "grep": "cxone-card|cxone-api-key|cxone-group-name|cxone-withdrawals-card|team-domains-card"
         },
         "behaviour": {
           "path": "public/js/features/settings-admin.js",
-          "grep": "function (loadCxOneSettings|saveCxOneSettings|removeCxOneSettings|loadCxoneWithdrawals)\\b|cxone-status"
+          "grep": "function (loadCxOneSettings|saveCxOneSettings|removeCxOneSettings|loadCxoneWithdrawals)\\b|cxone-status",
+          "also": [
+            "public/js/features/event-team.js"
+          ]
         },
         "styles": {
           "path": "public/styles.css",
           "grep": "#admin-settings-tab \\.settings-(card|row|status|hint|actions)\\b|\\.cxone-wd"
         }
       },
-      "note": "Settings → Checkmarx One: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings cxone` step. The global default Checkmarx One integration (no key on a test server). The removals card beside it stays hidden while nothing is listed, which on a test server is always (see cxone-withdrawal-banner)."
+      "note": "Settings → General (Checkmarx One integration card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step. The global default Checkmarx One integration (no key on a test server). The removals card beside it stays hidden while nothing is listed, which on a test server is always (see cxone-withdrawal-banner). The event team report domains card (event-team.js) is in the same section."
+    },
+    {
+      "screen": "settings-staff-teams",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=staff-teams]",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings staff-teams ; waitFor #staff-teams-body .st-members table",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "staff-teams-card|staff-teams-body"
+        },
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "export async function loadStaffTeamsCard|function _render\\(\\)|function _membersHtml"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#staff-teams-body"
+        }
+      },
+      "note": "Settings → People → Staff teams (fixture staffTeams: one team of four). The teams table and the chosen team's members, with New team, Rename, Delete, Add member, Edit and Remove for a role holding teams.manage."
+    },
+    {
+      "screen": "staff-team-dialog",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#st-team",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings staff-teams ; waitFor #staff-teams-body [data-action=st-new] ; click #staff-teams-body [data-action=st-new] ; waitFor #st-team-name",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "function (_stDialog|openTeamDialog)\\b"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.st-dialog|\\.ws-dialog"
+        }
+      },
+      "note": "New staff team (a .ws-dialog-overlay built by _stDialog); Rename team is the same dialog."
+    },
+    {
+      "screen": "staff-member-dialog",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#st-member",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings staff-teams ; waitFor #staff-teams-body [data-action=st-member-add] ; click #staff-teams-body [data-action=st-member-add] ; waitFor #st-member-email",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "function (_stDialog|openMemberDialog|_roleOptions)\\b"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.st-dialog|\\.ws-dialog"
+        }
+      },
+      "note": "Add a member to a staff team (name, email, default event-team role); Edit member is the same dialog."
+    },
+    {
+      "screen": "ws-team-staff-team",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#st-to-event",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture wsTeam ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search {{wsTeam.name}} ; click #admin-comp-body tr:has-text('{{wsTeam.name}}') td:nth-child(1) ; waitFor #ws-record ; section admin-event-team-tab ; waitFor #ws-team [data-action=team-add-staff-team] ; click #ws-team [data-action=team-add-staff-team] ; waitFor #st-ev-team",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "function (_stDialog|_teamSelect|_outcomeHtml)\\b|export async function openStaffTeamToEvent",
+          "also": [
+            "public/js/features/event-team.js"
+          ]
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.st-dialog|\\.ws-dialog|\\.team-staff-door"
+        }
+      },
+      "note": "Team & reports → Add a staff team (fixtures wsTeam and staffTeams): the team picker, the role, and who would be added in which role. After Add team the same dialog lists who was added and who was skipped, with the reason."
+    },
+    {
+      "screen": "ws-org-staff-team",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#st-organisers",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture wsLive ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search {{wsLive.name}} ; click #admin-comp-body tr:has-text('{{wsLive.name}}') td:nth-child(1) ; waitFor #ws-record ; waitFor #ws-ov-progress .ws-prog-fig ; click #ws-ov-detail-more ; waitFor #ws-ov-detail ; waitFor #ws-ov-orgs-add [data-action=ws-org-add-team] ; click #ws-ov-orgs-add [data-action=ws-org-add-team] ; waitFor #st-org-team",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "function (_stDialog|_teamSelect|_outcomeHtml)\\b|export async function openStaffTeamAsOrganisers",
+          "also": [
+            "public/js/features/event-workspace.js"
+          ]
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.st-dialog|\\.ws-dialog|\\.ws-org-team"
+        }
+      },
+      "note": "Overview → Organisers → Add a staff team as organisers (fixtures wsLive and staffTeams): the team picker, who has an account, and the warning that a participant account becomes an event admin. After Make organisers the same dialog lists who was made an organiser and who was skipped, with the reason."
     },
     {
       "screen": "settings-data",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=data]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=general]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings data ; waitFor #retention-body .settings-facts",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings general ; waitFor #retention-body .settings-facts",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1857,15 +2009,15 @@
           "grep": "#admin-settings-tab \\.settings-(card|facts|hint)\\b"
         }
       },
-      "note": "Settings → Data & retention: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings data` step."
+      "note": "Settings → General (event history retention card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step."
     },
     {
       "screen": "settings-alerts",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=alerts]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=general]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings alerts ; waitFor #alerts-body .list-count",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings general ; waitFor #alerts-body .list-count",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1880,15 +2032,15 @@
           "grep": "#admin-settings-tab \\.settings-(card|alert-row|help)\\b"
         }
       },
-      "note": "Settings → Alerts: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings alerts` step. Shows 'No open alerts', its resting state: an open alert also opens its dialog over the page (the alerts poll), and dismissing that dialog takes the alert off this list for the admin who dismissed it."
+      "note": "Settings → General (blocked-address alerts card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step. Shows 'No open alerts', its resting state: an open alert also opens its dialog over the page (the alerts poll), and dismissing that dialog takes the alert off this list for the admin who dismissed it."
     },
     {
       "screen": "settings-breakglass",
       "status": "pending",
       "route": "/",
-      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=breakglass]",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=signin]",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings breakglass ; waitFor #settings-breakglass-username",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings signin ; waitFor #settings-breakglass-username",
       "files": {
         "markup": {
           "path": "public/index.html",
@@ -1903,7 +2055,53 @@
           "grep": "#admin-settings-tab \\.settings-(card|card-head|help|row|hint)\\b"
         }
       },
-      "note": "Settings → Break-glass: one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings breakglass` step. Listed only in the break-glass session itself, which is how the harness signs in."
+      "note": "Settings → Sign-in (break-glass account card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings signin` step. Listed only in the break-glass session itself, which is how the harness signs in."
+    },
+    {
+      "screen": "settings-cxone-audit",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=cxone-audit]",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings cxone-audit ; waitFor #cxone-audit-body tr",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "cxone-audit-(card|body|pagination)"
+        },
+        "behaviour": {
+          "path": "public/js/features/settings-admin.js",
+          "grep": "function (loadCxoneAuditCard|cxoneAuditPage|cxoneAuditPageSize|_cxResult|_cxDetail)\\b|cxone-audit-"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#admin-settings-tab \\.settings-(card|card-head|heading|help)\\b"
+        }
+      },
+      "note": "Settings → CxOne API audit: the Checkmarx One API activity table (the audit trail narrowed to the Checkmarx One activity, scoped as the Audit page). Empty on a fresh test server ('No Checkmarx One activity is recorded yet.')."
+    },
+    {
+      "screen": "settings-health",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=health]",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings health ; waitFor #system-health-body .settings-facts-list",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "system-health-(card|body)|release-notes-(card|body)|admin-sidebar-version"
+        },
+        "behaviour": {
+          "path": "public/js/features/settings-admin.js",
+          "grep": "function (loadSystemHealthCard|loadReleaseNotesCard|showSidebarVersion|_backupRows|_uptimeText)\\b|system-health-|release-notes-"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#admin-settings-tab \\.(settings-(card|card-head|heading|help|facts-list|facts-title|actions)|release-notes-inline)\\b|\\.admin-sidebar-version"
+        }
+      },
+      "note": "Settings → About & health: This server (GET /api/admin/system-health: what is running, the start-up checks, the mail relay, disk, the backups it can see) and the newest release notes; the version at the sidebar's foot."
     },
     {
       "screen": "analytics-scope-picker",
@@ -1957,7 +2155,7 @@
       "route": "/",
       "visual_anchor": "#assign-task-overlay",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab tasks ; waitFor #admin-task-body tr ; fill #task-search Challenge easy1 ; click #admin-task-body tr:has-text('Challenge easy1') .kebab-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=task-assign-to-comps] ; waitFor #assign-task-comp-list label",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab tasks ; waitFor #admin-task-body tr ; fill #task-search Challenge easy1 ; click #admin-task-body tr:has-text('Challenge easy1') input[data-change-action=challenge-select-toggle] ; click #challenge-selection-bar-assign-btn ; waitFor #assign-task-comp-list label",
       "files": {
         "markup": null,
         "behaviour": {
@@ -1969,7 +2167,7 @@
           "grep": "#assign-task-comp-list"
         }
       },
-      "note": "Challenge library → a row's ⋯ → Assign to Events, opened on the seeded 'Challenge easy1' (assigned to Test Live and Test Upcoming); nothing is saved. Its card is inline-styled in challenges-admin.js."
+      "note": "Question bank → tick one question → Add to events on the selection bar (the bank's one door into events), opened on the seeded 'Challenge easy1' (assigned to Test Live and Test Upcoming); nothing is saved. Its card is inline-styled in challenges-admin.js."
     },
     {
       "screen": "attempt-grant-dialog",
@@ -1990,6 +2188,26 @@
         }
       },
       "note": "Challenge library → a row's ⋯ → Grant Attempts. Fixture adCapped: a live event holding a challenge with an attempt limit of 3 and two enrolled participants."
+    },
+    {
+      "screen": "task-sessions-dialog",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#task-sessions-overlay",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture wsSessions ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search {{wsSessions.name}} ; click #admin-comp-body tr:has-text('{{wsSessions.name}}') td:nth-child(1) ; waitFor #ws-record ; section admin-tasks-tab ; waitFor #admin-task-body .session-chip.is-narrowed ; click #admin-task-body .session-chip.is-narrowed ; waitFor #task-sessions-overlay .tsq-box",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/task-sessions.js",
+          "grep": null
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.session-chip|\\.tsq-|\\.picker-(overlay|modal|modal-flow|modal-head|modal-foot|rows|row|note)\\b"
+        }
+      },
+      "note": "Per-session question sets: an event workspace's Questions section → a question's Sessions chip → the Sessions dialog. Fixture wsSessions: an upcoming Competition with two sessions, one of its three questions in the evening session only."
     },
     {
       "screen": "table-insert-dialog",
@@ -2506,7 +2724,7 @@
       "route": "/",
       "visual_anchor": "div:has(> .card #prompt-input)",
       "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=desk-invite] ; waitFor #prompt-input",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-invite-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=desk-invite] ; waitFor #prompt-input",
       "files": {
         "behaviour": {
           "path": "public/js/features/participants-admin.js",
@@ -2520,7 +2738,7 @@
           "grep": "\\.desk-code"
         }
       },
-      "note": "Sign up at the desk, from the ⋯ menu: the address prompt (ui/toast.js showPrompt, an overlay with no id, styled inline). Pressing \"Create and show code\" leads to the Sign-in code dialog (#modal-overlay, .desk-code), not captured here because it creates an account."
+      "note": "Sign up at the desk, from the workspace header's Invite menu (its second choice beside Email invitation): the address prompt (ui/toast.js showPrompt, an overlay with no id, styled inline). Pressing \"Create and show code\" leads to the Sign-in code dialog (#modal-overlay, .desk-code), not captured here because it creates an account."
     },
     {
       "screen": "ws-email-delivery",
@@ -2540,25 +2758,6 @@
         }
       },
       "note": "Email delivery, from the ⋯ menu: enrolled, verified and email-failed counts for the seeded live event, in the shared modal. The panel is styled inline in competitions-admin.js."
-    },
-    {
-      "screen": "ws-organisers",
-      "status": "pending",
-      "route": "/",
-      "visual_anchor": "#modal-overlay",
-      "auth": "superadmin",
-      "route_script": "apiLogin superadmin ; fixture wsLive ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search {{wsLive.name}} ; click #admin-comp-body tr:has-text('{{wsLive.name}}') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-more-btn ; waitFor #kebab-portal.open ; click #kebab-portal [data-action=comp-organisers] ; waitFor #modal-overlay.open ; waitFor #modal-body li",
-      "files": {
-        "behaviour": {
-          "path": "public/js/features/competitions-admin.js",
-          "grep": "export async function showCompetitionOrganisers"
-        },
-        "styles": {
-          "path": "public/styles.css",
-          "grep": "#modal-overlay|#modal-box"
-        }
-      },
-      "note": "Organisers, from the ⋯ menu: the read-only list of the event's organisers (fixture wsLive grants two), in the shared modal. Styled inline in competitions-admin.js."
     },
     {
       "screen": "ws-certificates",
@@ -2835,6 +3034,69 @@
         }
       },
       "note": "The admin sidebar. On a phone it is a drawer behind the section bar: the `drawer` step opens it there (and does nothing on a wide screen). The anchor's :not([inert]) keeps a closed drawer, off-canvas but still a box, from passing as the sidebar."
+    },
+    {
+      "screen": "ws-analytics",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-analytics-tab",
+      "auth": "superadmin",
+      "note": "Analytics inside an event's workspace: that event only, no Global/Event switch and no event picker; a session select where the event has sessions.",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; section admin-analytics-tab ; waitFor #analytics-filterbar .filter-card",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "#admin-analytics-tab|analytics-filterbar"
+        },
+        "behaviour": {
+          "path": "public/js/features/analytics-admin.js",
+          "grep": "renderAnalyticsFilterBar|_analyticsAdoptFocusedScope"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.analytics-|\\.filter-card"
+        }
+      }
+    },
+    {
+      "screen": "competition-form-booth",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#comp-form-overlay",
+      "auth": "superadmin",
+      "note": "The create form for a Booth Event with Advanced settings open: the type as a chip with Change type, and no Checkmarx One section (a Booth Event never creates Checkmarx One accounts).",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; click [data-action=open-competition-form] ; waitFor #admin-templates-tab ; click #tpl-kind-cards [data-action=new-event-start][data-kind=\"booth\"] ; waitFor #comp-form-overlay ; waitFor #comp-name ; click #comp-advanced summary",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/competitions-admin.js",
+          "grep": "openCompetitionForm|comp-kind-change|comp-advanced"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.comp-form-|\\.comp-kind-"
+        }
+      }
+    },
+    {
+      "screen": "ws-invite-menu",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#kebab-portal",
+      "auth": "superadmin",
+      "note": "The workspace header's Invite: one control for adding people, its menu offering Email invitation and Sign up at the desk (owner's decision, 27 Nov 2026).",
+      "route_script": "apiLogin superadmin ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search Test Live ; click #admin-comp-body tr:has-text('Test Live') td:nth-child(1) ; waitFor #ws-record ; click #ws-quick .ws-invite-btn ; waitFor #kebab-portal.open",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/event-workspace.js",
+          "grep": "wsInviteItemsHtml|ws-invite-btn"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#ws-quick|\\.ws-more-btn"
+        }
+      }
     }
   ],
   "_module_graph_note": "public/app.js DOES NOT EXIST — the SPA was split into public/js/** ES modules in v7.0.0. Module bodies are side-effect-free; all boot wiring lives in core/main.js boot(). public/help.js, public/help-renderer.js, public/theme-boot.js and public/asset-versions.js are standalone CLASSIC scripts, outside the module graph.",

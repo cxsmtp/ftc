@@ -107,6 +107,7 @@ test.describe("the Settings tab: offered to a regular admin, its superadmin-only
 
     await expect(settingsNavItem(page), "Settings IS shown for a superadmin").toBeVisible();
     await page.locator("[data-action='admin-tab'][data-tab-id='admin-settings-tab']").first().click();
+    await openSettingsSection(page, "branding");   // the platform name is under Branding (owner decision, 27 Nov 2026)
     await expect(page.locator("#platform-name-card")).toBeVisible();
     await expect(page.locator("#settings-platform-name")).toBeVisible();
     // v7.14.2 — gate the affordance and the EXPLANATION together. The card had
@@ -123,7 +124,7 @@ test.describe("the Settings tab: offered to a regular admin, its superadmin-only
     // every account signs in with an emailed code is false.
     await adminLogin(page);
     await page.locator("[data-action='admin-tab'][data-tab-id='admin-settings-tab']").first().click();
-    await openSettingsSection(page, "accounts");
+    await openSettingsSection(page, "signin");
     const help = page.locator("#account-approval-card .settings-help");
     await expect(help).toBeVisible();
     await expect(help).toHaveText("A new account is made once its owner confirms the address with an emailed code. Hold new accounts for approval, or let them play straight away.");

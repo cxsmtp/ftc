@@ -67,11 +67,11 @@ non-grantable gives nothing and was removed at boot).
 | `events.delete` | Delete events |  |  | ✓ | superadmin only |
 | `templates.view` | See event templates | ✓ | ✓ | ✓ | yes |
 | `templates.manage` | Create, edit and delete event templates |  | ✓ | ✓ | yes |
-| `challenges.view` | See challenges, versions, attachments and feedback | ✓ | ✓ | ✓ | yes |
-| `challenges.edit` | Create and edit challenges | ✓ | ✓ | ✓ | yes |
-| `challenges.assign` | Assign challenges to events | ✓ | ✓ | ✓ | yes |
-| `challenges.delete` | Delete challenges and feedback |  |  | ✓ | superadmin only |
-| `challenges.lock` | Lock challenges and recalculate scores |  |  | ✓ | superadmin only |
+| `challenges.view` | See questions, versions, attachments and feedback | ✓ | ✓ | ✓ | yes |
+| `challenges.edit` | Create and edit questions | ✓ | ✓ | ✓ | yes |
+| `challenges.assign` | Add questions to events | ✓ | ✓ | ✓ | yes |
+| `challenges.delete` | Delete questions and feedback |  |  | ✓ | superadmin only |
+| `challenges.lock` | Lock questions and recalculate scores |  |  | ✓ | superadmin only |
 | `challenges.sealed_reveal` | Reveal a sealed answer |  |  | ✓ | no |
 | `participants.view` | See participants and their history | ✓ | ✓ | ✓ | yes |
 | `participants.edit` | Edit participant profiles, tags and group membership | ✓ | ✓ | ✓ | yes |
@@ -84,6 +84,8 @@ non-grantable gives nothing and was removed at boot).
 | `participants.delete` | Delete accounts. Deleting a person also removes the Checkmarx One account the platform created for them; the delete confirmation says so to anyone holding this (operator ruling, 24 Nov 2026), and the message afterwards tells a holder without `ops.cxone` that a superadmin follows the removal up under **Checkmarx One account removals**, removes by hand an account the platform created but holds no record of, and checks the tenant for an account of theirs when a Checkmarx One set-up record of theirs could not be read |  |  | ✓ | superadmin only |
 | `groups.view` | See groups | ✓ | ✓ | ✓ | yes |
 | `groups.manage` | Create, edit and delete groups | ✓ | ✓ | ✓ | yes |
+| `teams.view` | See the staff teams (Settings → People → Staff teams) and add a whole team to an event's Team & reports or as its organisers, each under that door's own rules |  | ✓ | ✓ | yes (a role of scope `all` only: platform-wide) |
+| `teams.manage` | Create, edit and delete staff teams and their members |  | ✓ | ✓ | yes (a role of scope `all` only: platform-wide) |
 | `certificates.view` | See and download certificates, preview designs | ✓ | ✓ | ✓ | yes |
 | `certificates.send` | Resend certificate emails | ✓ | ✓ | ✓ | yes |
 | `certificates.design` | Edit certificate designs |  | ✓ | ✓ | yes |
@@ -91,12 +93,13 @@ non-grantable gives nothing and was removed at boot).
 | `certificates.lookup` | Look up a certificate by its code, see each certificate's code in an event's certificate list, and see a participant's certificate code, link and downloads while viewing as them |  |  | ✓ | superadmin only |
 | `leaderboard.view` | See live rankings | ✓ | ✓ | ✓ | yes |
 | `analytics.view` | See analytics | ✓ | ✓ | ✓ | yes |
+| `analytics.marketing` | See marketing analytics across every event: the **Marketing** page (`GET /api/admin/analytics/marketing`), which adds up every event's people, certificates and leads (owner request, 28 Nov 2026). Platform-wide, so a role scoped to its events cannot hold it |  | ✓ | ✓ | yes (a role acting on every event only) |
 | `audit.view` | See the audit trail (each kind of row also needs the permission that guards it elsewhere: see §1b) | ✓ | ✓ | ✓ | yes |
 | `audit.raw_logs` | See the raw request and application logs |  | ✓ | ✓ | yes |
-| `export.data` | Export event, participant and challenge data | ✓ | ✓ | ✓ | yes |
+| `export.data` | Export event, participant and question data | ✓ | ✓ | ✓ | yes |
 | `export.platform` | Export every event on the platform |  | ✓ | ✓ | yes |
 | `export.settings` | Export platform settings |  |  | ✓ | superadmin only |
-| `data.import` | Import challenges and participants |  |  | ✓ | superadmin only |
+| `data.import` | Import questions and participants |  |  | ✓ | superadmin only |
 | `settings.view` | See platform settings |  | ✓ | ✓ | yes |
 | `settings.edit` | Change platform settings |  |  | ✓ | superadmin only |
 | `ops.alerts` | See and acknowledge operational alerts |  | ✓ | ✓ | yes |
@@ -105,16 +108,17 @@ non-grantable gives nothing and was removed at boot).
 | `ops.retention_purge` | Purge old event data |  |  | ✓ | superadmin only |
 | `ops.cxone` | Manage Checkmarx One defaults and account removals |  |  | ✓ | no (operator ruling, 14 Nov 2026: the platform's key is a tenant credential covering every event) |
 | `ops.email` | Send test email, manage unsubscribed addresses |  |  | ✓ | superadmin only |
+| `ops.smtp` | Change the mail server (SMTP) the platform sends through |  |  | ✓ | no (owner decision, 27 Nov 2026: its password sends as the platform). Reading the mail server in use needs only `settings.view` |
 | `ops.perf_seed` | Seed performance data |  |  | ✓ | no |
 | `breakglass.self` | Manage the break-glass account (the built-in account only) |  |  |  | no |
 | `users.view` | See platform users and roles |  | ✓ | ✓ | yes |
 | `users.manage` | Add platform users and change roles |  |  | ✓ | superadmin only |
 | `roles.manage` | Create, edit and delete custom roles |  |  | ✓ | superadmin only |
 
-### 1b. Custom roles and Users & roles
+### 1b. Custom roles and Roles & permissions
 
 A superadmin (or a custom role holding `roles.manage`) creates CUSTOM roles on
-**Users & roles** (`routes/users.js`; `roles` / `role_permissions` tables). A
+**Roles & permissions** (`routes/users.js`; `roles` / `role_permissions` tables). A
 custom role has a label, a description, a scope mode — `granted` (acts on the
 events its holders have `competition_admins` rows for, bound by every §4
 predicate exactly as an event admin) or `all` (unscoped) — fixed at creation,
@@ -136,7 +140,12 @@ role holding `data.import` reaches it: an importer who is not a superadmin has a
 row skipped and counted (`privileged_skipped`) when it would give a role beyond
 their own, or overwrite an account that is a privileged target for them (§9.6). The role change itself is ONE handler behind two
 doors: `POST /api/admin/participants/:id/role` (superadmin tier, unchanged) and
-`PATCH /api/admin/users/:id/role` (`users.manage`). `POST /api/admin/users` creates
+`PATCH /api/admin/users/:id/role` (`users.manage`). In the app the role is
+changed in one place, Roles & permissions (operator decision, 27 Nov 2026): a
+People row offers no role control, only **Change role on Roles & permissions**,
+a link that opens that page searched to the person (offered to a superadmin,
+never on their own row or a rival's, and only while the page is one they may
+open); the participants route stays for API callers. `POST /api/admin/users` creates
 a new account holding a role (verified, approved, no password: it signs in by its
 role's default method, §1, so an account given an unscoped role signs in first
 with an emailed code and is asked to set a password) and re-asks `users.manage`
@@ -151,17 +160,23 @@ account off its role: `GET /api/admin/roles` carries both answers per role
 (`can_give`, `can_take`), computed by `roleAssignDenied` itself. They never offer
 the built-in Event admin (its scope is granted per event), and before a change
 that leaves a role scoped to its events they say that every organiser grant goes
-with it, and afterwards how many did.
+with it, and afterwards how many did. Each user row also offers the account's own doors People offers a participant's
+row (Edit or View profile, History, Block or Unblock, Unlock, Email sign-in code;
+owner decision, 27 Nov 2026: admin accounts are not on People), with People's
+predicates over People's own rows for those accounts (`GET
+/api/admin/participants?kind=admins`, `participants.view`), so a regular admin
+gets a privileged account's note, profile and History only, as on People.
 
 **A platform-wide permission needs a role that acts on every event.** Its routes
 reach beyond any one event, so nothing narrows them to a role's events: some read
-about EVERY event (`audit.raw_logs`, `ops.alerts`, `export.platform`,
+about EVERY event (`audit.raw_logs`, `ops.alerts`, `export.platform`, `analytics.marketing`,
 `export.settings`, `settings.view`, `ops.metrics`, `ops.retention_view`,
 `ops.email`), some change what every event shares (`settings.edit`,
 `templates.manage`, `certificates.design` — both design layers are global admins'
 by operator ruling — `data.import`, `ops.retention_purge`), some act on a person
 or a role no event bounds (`participants.delete`, `users.view`, `users.manage`,
-`roles.manage`), and two put an event in someone's hands (`events.organisers`, the
+`roles.manage`, and the staff-teams directory, `teams.view` and `teams.manage`: a
+list of people no event bounds), and two put an event in someone's hands (`events.organisers`, the
 organiser grant, which stays a global admin's; `events.create`, whose blank event
 would sit outside the creator's scope: a scoped role creates by clone or
 template, as an event admin does). A `granted` role is bound exactly as an event
@@ -183,16 +198,17 @@ and deleting, locking or recalculating a challenge or purging its feedback
 (`taskScoringEditDenied`). The scoped-handler scanner in
 `tests/functional-core-b.api.spec.js` holds every such route to a row predicate
 (lock: `tests/rbac-scoped-role-reach.api.spec.js`).
-Users & roles also marks a RIVAL (`rival_in`, as the People rows do) and
+Roles & permissions also marks a RIVAL (`rival_in`, as the People rows do) and
 withholds **Change role** on that row with the reason: the role change is a rival
 door (§9.8).
 
 **People and the sidebar.** `GET /api/admin/participants` (no `competitionId`)
-leaves out the unscoped (class `all`) admin accounts unless `?kind=all` (People's
-**Show admin accounts**, and every event workspace); participants and
-grant-scoped organisers stay. For an event admin `?kind=all` is still narrowed to
-their events, and the box shows only while a "show me this person" link has
-ticked it (an administrator competing in one of their events). The admin sidebar shows an item only when the
+leaves out the unscoped (class `all`) admin accounts unless `?kind=all` (every
+event workspace, and People for one visit after a "show me this person" link,
+with a note above the table saying so; People has no switch of its own: admin
+accounts are managed on Roles & permissions, operator decision 27 Nov 2026);
+participants and grant-scoped organisers stay. For an event admin `?kind=all` is
+still narrowed to their events. The admin sidebar shows an item only when the
 role holds the permission its pane reads (`public/js/ui/nav.js`
 `ADMIN_NAV_PERMISSIONS`), so a custom role sees exactly the pages it may use.
 The panel opens on Events only for a role holding `events.view`, any other on
@@ -210,8 +226,8 @@ opens read-only with the reason (a group's Members and Events, the join-link
 toggles, a template the role may not start an event from, Add user when the
 role may give no role). While **Require admin approval for new accounts** is on,
 a role that may invite but not approve keeps People's **At the desk** in its
-place, its tooltip and press giving the reason, sees the reason in place of the
-event ⋯ menu's **Sign up at the desk**, finds no desk action in the command
+place, its tooltip and press giving the reason, sees the reason in place of
+**Sign up at the desk** in the event header's **Invite** menu, finds no desk action in the command
 palette, and is told in the **Invite** dialog that someone new it invites waits
 for an administrator's approval. A name on a board or in a list links into another page
 only when the role may open that page. These are held door by door
@@ -226,13 +242,20 @@ answer, `GET /api/me` and `GET /api/admin/me`).
 **each card shows to a role holding every permission its routes check**
 (`SETTINGS_CARD_PERMISSIONS`, `ui/nav.js`; operator ruling, 14 Nov 2026): the
 platform name, sign-in and platform look cards need `settings.view` and
-`settings.edit`, outbound email and the unsubscribe list `ops.email`, the
-Checkmarx One cards `ops.cxone` (superadmin only), retention
-`ops.retention_view`, alerts `ops.alerts`, the team-report domains
-`settings.view` (its Save `settings.edit`), and the break-glass card its own
-session. So a built-in admin sees the certificate designer, the team-report
-domains, retention and alerts, and a custom role sees the cards for the
-permissions it holds. The Appearance page's Organisation default section,
+`settings.edit`, the mail server in use `settings.view` (its form `ops.smtp`,
+superadmin only; everyone else reads "Only a superadmin can change this."),
+the test send of the server in use and the unsubscribe list `ops.email` (the
+test send is a row on the mail server card; a role holding `ops.email` without
+`settings.view` gets it on its own Outbound email card instead), the
+Checkmarx One key and removals cards `ops.cxone` (superadmin only), the
+CxOne API audit table `audit.view` (its rows scoped as the Audit page scopes
+them), retention `ops.retention_view`, alerts `ops.alerts`, the team-report
+domains `settings.view` (its Save `settings.edit`), About & health's server card
+`settings.view` and its release notes any admin-shaped session (as the document
+is served), and the break-glass card its own session. So a built-in admin sees
+the certificate designer, the mail server, the team-report domains, retention,
+alerts, the CxOne API audit and About & health, and a custom role sees the cards
+for the permissions it holds. The Appearance page's Organisation default section,
 which writes the same platform look, follows the platform look card's
 permissions. The designer's Save is offered on `certificates.design`
 (`certificateDesignOffered`), the predicate its routes enforce; an event admin
@@ -296,7 +319,7 @@ drift directions are safe:
 | `requireAdmin` | `lib/middleware.js` | `admin`, `superadmin`, `event_admin` — and every custom role: any role whose class (`lib/rbac.js` `roleClass`) is not `none`. An unknown role key is `none` and refused. |
 | `requireGlobalAdmin` | `lib/middleware.js` | `admin`, `superadmin` — **not** `event_admin`. One of the two independent gates on the grant/revoke pair (§8). A custom role passes only by holding, live, the route's permission, and a role scoped to its events then meets the handler's §4 predicate (§1). |
 | `requireSuperAdmin` | `lib/middleware.js` | `superadmin` only — or a custom role holding, live, the route's permission (only a superadmin can grant one); a role scoped to its events then meets the handler's §4 predicate (§1) |
-| `requirePermission(perm)` | `lib/middleware.js` | any role holding `perm`, read live (the Users & roles routes); never through an impersonation seat |
+| `requirePermission(perm)` | `lib/middleware.js` | any role holding `perm`, read live (the Roles & permissions routes); never through an impersonation seat |
 | `eventAdminGuard` | `lib/rbac.js` `permissionGuard` (exported under its historical name by `lib/event-admin.js`), mounted globally in `server.js` | see §3 |
 
 Every one of them **re-reads the user row per request**, so a demotion, a block or
@@ -467,6 +490,7 @@ route's own tier guard.
 | `GET /api/admin/alerts` | **forbidden** | Operational alerts cover the whole platform. To allow a venue's network, edit Trusted network IPs on your own event. |
 | `POST /api/admin/alerts/:id/ack` | **forbidden** | Operational alerts cover the whole platform, so they are not available to event admins. |
 | `GET /api/admin/analytics/challenges` | **scoped** |  |
+| `GET /api/admin/analytics/marketing` | **forbidden** | Marketing analytics cover every event on the platform, so only an administrator can open them. Analytics for your own events are on each event's Analytics tab. |
 | `POST /api/admin/attachment-staging` | open |  |
 | `DELETE /api/admin/attachment-staging/:id` | open |  |
 | `PATCH /api/admin/attachment-staging/:id` | open |  |
@@ -486,6 +510,7 @@ route's own tier guard.
 | `GET /api/admin/competitions/:id/admins` | **scoped** |  |
 | `GET /api/admin/competitions/:id/team` | **scoped** | The event team (report recipients), targets and scheduled reports, for their own events. |
 | `POST /api/admin/competitions/:id/team` | **scoped** | Their own events; refused to a competitor in the event. The address must be at a domain a superadmin allowed. A member is mailed what reading the reports takes, so the actor also needs `participants.view` (and `export.data` for the Marketing and SDR roles, whose reports attach a lead file: the CRM file, each SDR's own leads); a custom role without them is refused `permission_denied`. |
+| `POST /api/admin/competitions/:id/team/staff-team` | **scoped** (refused inline) | A whole staff team at once, each member under the single add's rules (skipped with its reason where one fails). Reading the team takes `teams.view`, which an event admin does not hold, so it is refused `permission_denied` naming it; the single add stays open to them. |
 | `DELETE /api/admin/competitions/:id/team/:memberId` | **scoped** | Their own events; refused to a competitor in the event. |
 | `PUT /api/admin/competitions/:id/team-targets` | **scoped** | The lead and hot-lead targets (a save over somebody else's newer targets is refused); refused to a competitor in the event. |
 | `GET /api/admin/competitions/:id/team-report` | **scoped** | The persona views and lead list; refused to anyone competing in the event. |
@@ -495,11 +520,14 @@ route's own tier guard.
 | `POST /api/admin/competitions/:id/leads/:userId/contacted` | **scoped** | Marks a lead contacted (SDRs have no login); refused to a competitor in the event. Its answer says whether the lead may still be reached (`contactable`) only to an actor holding `participants.view`, since it tells whether the person opted out of email. |
 | `GET /api/admin/team-report-domains` | **forbidden** | Only an administrator can open the list of email domains in Settings. The domains your event's team may use are shown under its Team & reports. |
 | `PUT /api/admin/team-report-domains` | superadmin | The allowed-domain list. |
+| `GET /api/admin/staff-teams`, `GET /api/admin/staff-teams/:id` | **forbidden** | Your role does not allow you to see staff teams and add them to events. Ask an administrator to change your role. (`teams.view`, platform-wide: Settings → People → Staff teams.) |
+| `POST`/`PUT`/`DELETE /api/admin/staff-teams…` (the team, its members) | **forbidden** | Your role does not allow you to create, edit and delete staff teams. Ask an administrator to change your role. (`teams.manage`, platform-wide.) |
 | `GET /api/admin/competitions/:id/overview-pulse` | **scoped** | The workspace Overview's live figures; refused to anyone competing in the event, whose Overview then says the live figures are kept off the page while they compete and still shows **Joined** (the roster, never read from this route) and the certificate counts (their other reads stay open: operator ruling, 14 Nov 2026). |
 | `POST /api/admin/competitions/:id/clone` | **scoped** | v8.15.0 — an event they organise; the copy grants them its organiser row. |
 | `GET /api/admin/competitions/:id/export/full` | **scoped** | v8.15.0 — refused to anyone competing in the event. |
 | `POST /api/admin/competitions/:id/save-as-template` | **forbidden** | Only an administrator can save an event as a template. You can clone your own event instead. |
 | `POST /api/admin/competitions/:id/admins` | **forbidden** | Only an administrator can add an event organiser. Ask one to make this change. |
+| `POST /api/admin/competitions/:id/admins/staff-team` | **forbidden** | Only an administrator can add event organisers. Ask one to make this change. |
 | `DELETE /api/admin/competitions/:id/admins/:uid` | **forbidden** | Only an administrator can remove an event organiser. Ask one to make this change. |
 | `DELETE /api/admin/competitions/:id/certificate-config` | **forbidden** | Only an administrator can reset an event's certificate design. You can preview and download certificates. |
 | `GET /api/admin/competitions/:id/certificate-config` | **scoped** |  |
@@ -609,6 +637,7 @@ route's own tier guard.
 | `PUT /api/admin/platform-look` | superadmin |  |
 | `GET /api/admin/settings/events` | **forbidden** | Platform settings apply to every event, so they are not available to event admins. |
 | `GET /api/admin/submissions` | **scoped** |  |
+| `GET /api/admin/system-health` | **forbidden** | The platform's health covers every event, so it is not available to event admins. |
 | `GET /api/admin/tags` | **scoped** |  |
 | `GET /api/admin/task-tags` | **scoped** |  |
 | `GET /api/admin/tasks` | **scoped** |  |
@@ -651,13 +680,14 @@ route's own tier guard.
 
 | Surface | Event admin |
 |---|---|
-| **Events** | Sees only granted events, at any status. Full per-event control equal to a normal admin: edit, sessions, tags, CxOne override, join link, end now, **close late entries now** (a Booth Event whose late-entry window is open — §9.9), export activity — **unless they compete in it** (v8.12.0): an organiser enrolled in an event whose **Staff can compete** switch is on can view that event and not change it, whatever their tier — the reads stay (Open, History, Organisers, Email Delivery, Export Activity, a rival's person export, and the **Join Link** dialog, which opens read-only: link, QR and code shown, the toggle and Regenerate withheld), only the mutating controls go — until they remove themselves, which they can do while the event has not ended (§9.8). **Cannot create an event from scratch**, and cannot delete one (superadmin). Since v8.15.0 they can **clone** an event they organise and **spawn** an event template; either makes them the new event's organiser, and neither copies participants, answers or the join link. Templates themselves are managed by administrators only. The **full event export** and the **person export** are scoped like every other read: their own events only, and a person's export narrowed to rows about those events. |
-| **Challenges** | **Creates** freely. **Sees** challenges they created, challenges used by one of their events, and `public-domain` ones. The per-row events column shows only their events (v8.8.8), with a count of any others holding it. **Edits / publishes / hides / tags** only their own — and on a **sealed** challenge those four are its author's alone whatever the tier (a superadmin who has revealed it aside), because the seal names an account rather than a tier (§9.7). **Assigns** any challenge they can see to any event they manage — but an event where staff compete admits only a **sealed** challenge, and never one its author competes in (§9.8). **Unassigns** only what they themselves assigned. Cannot hard-delete (superadmin), lock, or recalculate. A challenge held by an event they compete in is read-only for them, hint included (§9.8). |
+| **Events** | Sees only granted events, at any status. Full per-event control equal to a normal admin: edit, sessions, tags, CxOne override, join link, end now, **close late entries now** (a Booth Event whose late-entry window is open — §9.9), export activity — **unless they compete in it** (v8.12.0): an organiser enrolled in an event whose **Staff can compete** switch is on can view that event and not change it, whatever their tier — the reads stay (Open, History, the Overview's Organisers card, Email delivery, Export activity, a rival's person export, and the **Join Link** dialog, which opens read-only: link, QR and code shown, the toggle and Regenerate withheld), only the mutating controls go — until they remove themselves, which they can do while the event has not ended (§9.8). **Cannot create an event from scratch**, and cannot delete one (superadmin). Since v8.15.0 they can **clone** an event they organise and **spawn** an event template; either makes them the new event's organiser, and neither copies participants, answers or the join link. Templates themselves are managed by administrators only. The **full event export** and the **person export** are scoped like every other read: their own events only, and a person's export narrowed to rows about those events. |
+| **Challenges** | **Creates** freely, topics too (renames or deletes only the topics they made, §9.5b); **Save to bank** copies their events' own questions into the bank. **Sees** challenges they created, challenges used by one of their events, and `public-domain` ones. The per-row events column shows only their events (v8.8.8), with a count of any others holding it. **Edits / publishes / hides / tags** only their own — and on a **sealed** challenge those four are its author's alone whatever the tier (a superadmin who has revealed it aside), because the seal names an account rather than a tier (§9.7). **Assigns** any challenge they can see to any event they manage — but an event where staff compete admits only a **sealed** challenge, and never one its author competes in (§9.8). **Unassigns** only what they themselves assigned. Cannot hard-delete (superadmin), lock, or recalculate. A challenge held by an event they compete in is read-only for them, hint included (§9.8). |
 | **Participants** | Sees only people enrolled in one of their events, plus an account waiting for an administrator's approval whose live invitation names one of their events (signed up through an invitation whose inviter cannot approve accounts, §1): its row names only those of their events it was invited to, so they can ask an administrator to approve it, and they can view it but neither approve it nor take any other row action on it, as it is in none of their events (operator ruling, 23 Nov 2026; their pending count still counts members only). The per-row events column shows only their events, and so does a participant's History (v8.8.4). Invites (including at the desk) only into their events, and an invitation must name at least one of them that is live, upcoming or taking late entries — one naming none is refused. The **Invite Participants** dialog lists exactly those events (one they compete in is listed, marked **You compete here**, and cannot be ticked) and will not send with none ticked; when only one can be ticked it is ticked for them, marked **Always included**, and cannot be unticked; when none can be, the dialog says why — in place of the list when it has no events to show, under the events they compete in otherwise — and **Send Invitations** is disabled. CSV export covers only what they can see. A Booth Event of theirs that has ended but is still inside its **late-entry window** stays open to every door that adds people — invite, assign, **At the desk**, a bound group — and whoever is added joins as a late entrant; only late entrants can then be removed from it (§9.9). Per-participant actions as a normal admin — approve, deny, block, unlock, email or show a sign-in code, tags, impersonate (participants only, in their participant view — read-only, narrowed to your events — §9.5b; viewing a fellow organiser's panel is an administrator's door, §9.5d). An invitation of theirs approves an existing account waiting for approval only as **Approve** would: when the invitation puts it into one of their events as a participant (an organiser's or administrator's waiting account never). One whose every enrolment was skipped stays waiting, and the **Invite Participants** dialog says so and keeps those addresses in the box. **Cannot** change a role, verify or delete. |
 | **Groups** | Creates freely. Sees groups they created or that are bound to one of their events. **Deletes only groups they created.** Cannot edit a group that is also bound to somebody else's event (§9.2), nor change the membership of one bound to an event they **compete in** — a group change reconciles onto that board (§9.8; any tier, and a rename stays open). |
 | **Submissions** | An event's **Activity** section: that event's. Across all their events, the **Audit** page (its submission and hint rows). |
 | **Rankings** | An event's **Rankings** section: that event, or the session picked. **Live rankings**: the live events they can see. |
 | **Analytics** | Their events and sessions, their challenges, their groups, their participants. **No platform-wide scope.** Tag vocabularies list only tags on participants they can see. |
+| **Marketing** | Hidden: it adds up every event on the platform (`analytics.marketing`, which an event admin never holds; 403 `event_admin_forbidden`). |
 | **Logs** | Hidden. |
 | **Settings** | Hidden. |
 | **Participant view** | The events they are **enrolled** in — which is unrelated to the events they administer. Being an event admin grants no participant membership anywhere. The switch is **two-way**, as it is for every other admin tier: **Admin View** returns them to the panel, and the admin session is unaffected. **One section, not two (v8.12.0).** A `staff`-**tagged** user's picker is split into *Your Events* — the events they hold a row on — and *All other events*, everything they may merely enter as staff, because the tag admits them to every event without a row and the two lists mean different things (§9.8). An event admin is not tagged and is admitted nowhere without a row, so their picker keeps a **single enrolment-only section**. When they are enrolled in an event whose **Staff can compete** switch is on, they compete on it like anybody else — but the **Competing** badge is rendered only on a `staff`-**tagged** user's own rows (the picker keys it on the tag, `S.isUserStaff`), so an event admin's card carries no marker: the row is on the board and the wire says `competing: true`, and the picker does not say so. The same tag gate covers the *Compete in this event?* confirmation the join link shows a staff member before enrolling them — an untagged event admin never sees it. |
@@ -737,6 +767,7 @@ of the new event):
 | Action | Route | Tier | Effect |
 |---|---|---|---|
 | **Grant** | `POST /api/admin/competitions/:id/admins` | `EVENT_ADMIN_FORBIDDEN` **+** `requireGlobalAdmin` | Promotes a `participant` to `event_admin` (compare-and-swap on the role that was read) and inserts one `competition_admins` row. Refuses an existing admin or superadmin target — narrowing a full admin is a demotion and belongs on the role route. |
+| **Grant a staff team** | `POST /api/admin/competitions/:id/admins/staff-team` | `EVENT_ADMIN_FORBIDDEN` **+** `requireGlobalAdmin`, and `teams.view` | Each member whose address is the PRIMARY address of an account is granted exactly as **Grant** grants (one shared function, `_grantOrganiser`; recorded with `via: staff_team`). A member with no account, already an organiser, an administrator, or whose role changed meanwhile is skipped and listed with the reason. |
 | **Revoke one event** | `DELETE /api/admin/competitions/:id/admins/:uid` | `EVENT_ADMIN_FORBIDDEN` **+** `requireGlobalAdmin` | Deletes the row. **Does not change the role**, even when it was the last one. |
 | **Demote altogether** | `POST /api/admin/participants/:id/role` `{role:'participant'}` | `requireSuperAdmin` | Sets the role and **cascades every `competition_admins` row away in the same transaction**, reporting the count on the `role_changed` event. |
 
@@ -802,7 +833,7 @@ role badge alone.
 **The states still DIFFER in the payload** — `event_admin_for` is empty for a
 zero-grant organiser and non-empty for one whose events have all finished — so
 nothing is lost, only unrendered. A reader who wants that difference on screen
-should reach for the participant's History or the event's Organisers list, not
+should reach for the participant's History or the Organisers card on the event's Overview, not
 for a label in this cell. Locked, with each empty state as the other's control
 and a badged row as the anti-vacuity control, in
 `tests/event-admin-role-badges.spec.js`.
@@ -838,10 +869,18 @@ reconciler either.
 
 ### 9.3 Two event admins on one event
 
-A can see B's challenge (rule b) but cannot edit it, and cannot unassign B's
-assignment. Accepted: the remedy is to ask an administrator. Per-event
-co-ownership of a challenge is a second permission dimension the brief does not
-describe.
+A can see B's LIBRARY challenge (rule b) but cannot edit it, and cannot unassign
+B's assignment. Accepted: the remedy is to ask an administrator.
+
+**An event's own question is its organisers'** (owner decision, Nov 2026;
+`lib/event-copies.js`). A challenge added to an event is the event's own copy
+(`tasks.owner_competition_id`), so A and B may both edit the copy their event
+holds, scoring fields included (it is in no other event, so
+`taskScoringEditDenied` finds no event outside their scope). `taskEditDenied`
+and `taskViewDenied` grant on an owning event in scope what authorship grants;
+nothing else widens. A bank challenge is "used by one of their events" (rule b)
+while an event in scope holds an assigned copy of it. The unassign rule (only
+what they added) is unchanged.
 
 ### 9.4 Ownership is a user id, never an email
 
@@ -870,9 +909,10 @@ ordinary task tag with a reserved meaning, declared once in `lib/event-admin.js`
 Anyone who may edit the challenge may apply it, which for an event admin means
 their own challenges only.
 
-**It HAS a client mirror** (`public/js/ui/format.js`), and this section used to say
-it did not — v8.8.2 added one so the Add Tag dialog could apply the exact value
-without anybody typing it, and the sentence denying a mirror survived that release.
+**It HAS a client mirror** (`public/js/ui/format.js`): the question editor's
+**Shared with all organisers** switch (stage B: questions have no tag box any more)
+applies the exact value through the tag route without anybody typing it, and names
+a stored look-alike beside the switch, which removes it when turned on.
 Both the constant and the near-miss predicate beside it are diffed against the
 server by a Docs-hygiene scanner.
 
@@ -887,7 +927,32 @@ platform-wide visibility to a challenge somebody labelled descriptively. The cos
 is stated rather than hidden — `public domain` is no longer available as an
 ordinary descriptive label. The importer and version restore are deliberately NOT
 guarded (a migration must not be sunk, and a snapshot must stay restorable); the
-challenge row marks any near-miss that arrives that way and offers a one-click fix.
+editor names any near-miss that arrives that way beside the shared switch.
+
+### 9.5b Topics and Save to bank (stage B)
+
+**Topics** (`routes/topics.js`, `lib/topics.js`) organise the Question bank: a
+question names at most one topic (`tasks.topic_id`). Topic NAMES are
+platform-wide, not narrowed by scope: any role holding `challenges.edit` may make a
+topic (`POST /api/admin/topics`) and file a question it may edit under any topic.
+The list (`GET /api/admin/topics`, `challenges.view`) shows every topic, with
+`question_count` counting only the bank questions the reader can see
+(`taskVisibilitySql`). **Renaming and deleting are a global admin's, or the topic's
+creator's** (`topics.created_by_id`): any other caller gets 403 `topic_not_yours`,
+and the list's `can_manage` / `manage_refusal` say so per topic. A topic still
+named by any question (bank or event copy) is deleted only after its questions are
+moved (`move_to`), which only an unscoped caller may do (`can_move`); a scoped
+creator deletes only an empty topic. All four routes are `open` in
+`ADMIN_ROUTE_PERMISSIONS` (no event to narrow) and decide in the handler.
+
+**Save to bank** (`POST /api/admin/tasks/:id/save-to-bank`, `challenges.edit`,
+`scoped`) copies an event's own question into the bank as a NEW bank question,
+asked in order: 404; not an event's question (400 `save_to_bank_not_event`); the
+competitor lock (seat and hand); `taskViewDenied` (an event admin: a question of an
+event they organise); the seal (`sealedEditDenied`: a key the caller may not read
+is not theirs to copy); a quick question (400 `save_to_bank_qualifying`). The new
+question belongs to the caller (`created_by_id`), or to the source's author when
+the answer is sealed, so the seal still names that person.
 
 ### 9.5a Scoping the ENTITY is not scoping the ROWS (v8.8.4)
 

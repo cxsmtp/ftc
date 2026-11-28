@@ -4,11 +4,14 @@
 // and the per-competition CxOne override. allParticipantsSolvedAll stays in
 // server.js (test-pinned) and is injected. (v7.0.0 refactor: route split.)
 
+const fs = require("fs");
+const path = require("path");
+const { DATA_DIR } = require("../lib/config");   // an event DELETE unlinks the attachment files of the questions it owned
 const { v4: uuid } = require("uuid");
 const db = require("../db");
 const { validateBody, allOptional } = require("../lib/validate");
 const { destructiveAdminLimit, requireAdmin, requireGlobalAdmin, requireSuperAdmin, csrfProtection } = require("../lib/middleware");
-const { EVENT_KINDS, eventPolicy, eventPolicyForWire, eventKindPhrase, autoEndOnAllSolvedApplies, lateEntryDefaultForKind } = require("../lib/event-policy");
+const { EVENT_KINDS, eventPolicy, eventPolicyForWire, eventKindPhrase, autoEndOnAllSolvedApplies, lateEntryDefaultForKind, clockStartDefaultForKind } = require("../lib/event-policy");
 // v8.6.0 — the late-entry window. PURE (it requires only lib/event-policy), which
 // is what lets lib/competitions.js import it without a cycle; see its header.
 const { LATE_ENTRY_MAX_SPAN_MS, lateEntryDeadline, lateEntryWindowOpen, lateEntryForbiddenMessage, lateEntryCloseInstantMs } = require("../lib/late-entry");
@@ -20,7 +23,7 @@ const { LATE_ENTRY_MAX_SPAN_MS, lateEntryDeadline, lateEntryWindowOpen, lateEntr
 const { REGISTRATION_FIELD_KEYS, FIELD_STATES, REGISTRATION_FIELDS, CONFIGURABLE_KINDS,
         registrationFieldStates, registrationFieldDefaultsForKind,
         serialiseRegistrationFieldPolicy } = require("../lib/registration-fields"); // v7.29.0
-const { scheduledEnd, getCompetition, _compWire, _invalidateCompetitionCache, getCompetitionTimeslots, timeslotStatus, timeslotEffectiveEnd, _singleSlotStatus, competitionStatus, competitionEffectiveEnd, competitionFullyEnded, competitionAnySlotStarted, publishedTaskCount, scoringParticipantIds, resolveSchedule, eventKindChangeLock, startTimeChangeLock, eventParticipantFootprint, DRY_RUN_TAG, staffCompeteFlags, lateEntrySwitchLock, lateEntryCloseState, lateEntryCloseOffered, isOpenEnded } = require("../lib/competitions");
+const { scheduledEnd, getCompetition, _compWire, _invalidateCompetitionCache, getCompetitionTimeslots, timeslotStatus, timeslotEffectiveEnd, _singleSlotStatus, competitionStatus, competitionEffectiveEnd, competitionFullyEnded, competitionAnySlotStarted, publishedTaskCount, scoringParticipantIds, resolveSchedule, eventKindChangeLock, startTimeChangeLock, eventParticipantFootprint, DRY_RUN_TAG, staffCompeteFlags, clockStartLock, lateEntrySwitchLock, lateEntryCloseState, lateEntryCloseOffered, isOpenEnded } = require("../lib/competitions");
 const { challengeFitError, eventConstrainsChallenges } = require("../lib/challenge-fit"); // v8.3.0 — a kind change is the seventh door into an unfit assignment
 const { validateTrustedIps, invalidateCompAllowlist, clearScannerBlocksFor, GRACE_MS: TRUSTED_IP_GRACE_MS } = require("../lib/comp-allowlist");
 const { getAdminIdentity, recordCompetitionEvent, recordTimeslotEvent, recordOrphanedAuditEvent, runTxnWithMirrorBuffer, invalidateAdminCompEventsCache, reqContext } = require("../lib/audit");
@@ -106,7 +109,7 @@ const COMPETITION_FIELD_SCHEMA = {
   // `int` rather than a hand-rolled parse so the strict-whole-number rule is the
   // validator's, not a fourth copy of it. NULL/absent means uncapped; the min of 1
   // is why zero is refused rather than stored — see lib/attempts.js.
-  attempt_cap: { type: "int", min: ATTEMPT_CAP_MIN, max: ATTEMPT_CAP_MAX, label: "Attempts per challenge" },
+  attempt_cap: { type: "int", min: ATTEMPT_CAP_MIN, max: ATTEMPT_CAP_MAX, label: "Attempts per question" },
   // v8.1.0 (PR 30) — the SELF-ENROLMENT ceiling: how many people may add
   // themselves through the join link. NULL/absent means unlimited, which is what
   // every event has had until now, so an omitted field cannot change behaviour.
@@ -127,6 +130,21 @@ const COMPETITION_FIELD_SCHEMA = {
   // `measure_presence` on, which the leaderboard checks — setting it alone
   // changes nothing rather than silently ranking on a column full of zeros.
   time_basis: { type: "enum", values: ["elapsed", "presence"], label: "Tie-break basis" },
+  // WHEN EACH PARTICIPANT'S SOLVE CLOCK STARTS (owner decision, 27 Nov 2026):
+  // `first_open` (their first open of a scoring challenge) or `entry` (entering
+  // the live event, the rule every event before this setting ran on). Absent at
+  // create means the KIND's seed (`clockStartDefault`); refused for a kind whose
+  // policy says "never" (a Program); locked once the event starts, as
+  // `time_basis` is, because it is the ranking basis.
+  clock_start: { type: "enum", values: ["first_open", "entry"], label: "Clock start" },
+  // THE RANKING OF A COMPETITION WITH SESSIONS (owner decision, 27 Nov 2026):
+  // `leaderboard_overall` adds an overall board beside the per-session boards
+  // ("both"; with `leaderboard_mode` per_slot only), and `leaderboard_percent`
+  // ranks the overall board by each participant's share of their own session's
+  // maximum points. Refused, never ignored, where they cannot apply
+  // (`_rankingRefusal`); locked once a session starts, as `leaderboard_mode` is.
+  leaderboard_overall: { type: "bool", label: "Overall winner beside the session winners" },
+  leaderboard_percent: { type: "bool", label: "Rank the overall board by percentages" },
   // v7.13.0 — per-competition opt-OUT of CxOne account creation (default OFF).
   cxone_disabled:            { type: "bool", label: "CxOne account creation disabled" },
   // v8.4.0 — the Booth Event sign-up matrix. `enumMap` is strict about both keys
@@ -189,7 +207,7 @@ const COMPETITION_FIELD_SCHEMA = {
 // meet the underlying need, so the refusal is not a dead end.
 const _REVEAL_REFUSED =
   "This event type does not reveal answers when it ends — a published answer key would let anyone " +
-  "complete it after the deadline is extended. Participants still see the explanation on any challenge " +
+  "complete it after the deadline is extended. Participants still see the explanation on any question " +
   "they have solved.";
 const _GROUP_BOARD_REFUSED =
   "This event type has no leaderboard, so there is no team board to enable.";
@@ -200,6 +218,30 @@ const _GROUP_BOARD_REFUSED =
 // at create there is no row yet, so the caller passes an `{event_kind}` stand-in.
 const _presenceRefused = (row) =>
   `Recording time on platform is not available for ${eventKindPhrase(row)} — its window is too short for the measurement to mean anything.`;
+// The ranking choice of a Competition with sessions, refused where it cannot
+// apply (a refusal names the remedy). `mode` / `overall` / `percent` are the
+// RESOLVED values (sent, else stored), so a save is judged on what it leaves.
+function _rankingRefusal(row, { mode, overall, percent }) {
+  if ((overall || percent) && eventPolicy(row).sessions !== "many") {
+    return { error: `Ranking per session or overall is only for an event that runs sessions; ${eventKindPhrase(row)} has one board.`, code: "leaderboard_ranking_forbidden" };
+  }
+  if (overall && mode === "global") {
+    return { error: "\"Both\" keeps a winner per session beside the overall winner, so it needs the per-session mode (leaderboard_mode per_slot). For an overall winner alone, leave leaderboard_overall off.", code: "leaderboard_overall_needs_per_session" };
+  }
+  if (percent && mode !== "global" && !overall) {
+    return { error: "Percentages rank the overall board, and this event ranks per session only. Choose an overall winner (or both) first, or leave percentages off.", code: "leaderboard_percent_needs_overall" };
+  }
+  return null;
+}
+const _RANKING_LOCKED = "How this event ranks cannot be changed once a session has started: the boards participants are playing on would change under them.";
+const _clockStartRefused = (row) =>
+  `Starting each participant's clock at their first question is not available for ${eventKindPhrase(row)}: it has no ranking for a clock to decide. Leave it on "When they enter the event".`;
+const _CLOCK_START_LOCKED = "When each participant's clock starts cannot be changed once the event has started — solve times already measured would no longer compare with the rest.";
+// Checkmarx One accounts on a kind that never creates them (a Booth Event; owner's
+// decision, 27 Nov 2026), refused by create, the PUT, the key override and the
+// template doors in one sentence.
+const _cxoneRefused = (row) =>
+  `${eventKindPhrase(row).replace(/^./, (c) => c.toUpperCase())} never creates Checkmarx One accounts: its walk-ups do not use the product. Leave Checkmarx One accounts off.`;
 const _timeBasisRefused = (row) =>
   `Ranking a score tie on time spent is not available for ${eventKindPhrase(row)}, because it cannot record time on platform. Leave the tie-break on elapsed time.`;
 
@@ -413,7 +455,7 @@ app.get("/api/admin/competitions", requireAdmin, (req, res) => {
   // carries the clause because it always opens with " AND " — and an event admin
   // with no grants gets " AND 1=0", so they see nothing rather than everything.
   const _listScope = scopeFilterSql(req, "id");
-  const comps = db.prepare("SELECT id,name,event_kind,start_time,duration_minutes,deadline_at,auto_end_on_all_solved,attempt_cap,ended_at,ended_manually,leaderboard_mode,reveal_answers_on_end,self_enroll_enabled,measure_presence,time_basis,join_code,group_leaderboard_enabled,cxone_disabled,cxone_api_key,cxone_group_name,created_at,updated_at,trusted_network_ips,registration_field_policy,late_entry_enabled,late_entry_deadline_at,staff_compete,certificate_config,event_look,event_look_locked FROM competitions WHERE 1=1" + _listScope.clause + " ORDER BY start_time DESC").all(..._listScope.params);
+  const comps = db.prepare("SELECT id,name,event_kind,start_time,duration_minutes,deadline_at,auto_end_on_all_solved,attempt_cap,ended_at,ended_manually,leaderboard_mode,leaderboard_overall,leaderboard_percent,reveal_answers_on_end,self_enroll_enabled,measure_presence,time_basis,clock_start,join_code,group_leaderboard_enabled,cxone_disabled,cxone_api_key,cxone_group_name,created_at,updated_at,trusted_network_ips,registration_field_policy,late_entry_enabled,late_entry_deadline_at,staff_compete,certificate_config,event_look,event_look_locked FROM competitions WHERE 1=1" + _listScope.clause + " ORDER BY start_time DESC").all(..._listScope.params);
   // Batch counts for all competitions in 2 queries instead of 2*N
   const compIds = comps.map(c => c.id);
   const participantCounts = {};
@@ -548,6 +590,8 @@ app.get("/api/admin/competitions", requireAdmin, (req, res) => {
       // both sites, the `staffCompeteFlags` rule. Scope is implicit: this list is
       // `scopeFilterSql`-narrowed, so every row is one the actor may act on.
       can_close_late_entries: lateEntryCloseOffered(c, { slots, nowMs: _listNowMs, competing: _sc.competing }),
+      // Why the clock-start choice is not offered (`"started"`) or null — the PUT's own predicate.
+      clock_start_locked: clockStartLock(c, slots),
       participant_count: participantCounts[c.id] || 0,
       certificates_issued: certificatesIssued[c.id] || 0,
       // v8.1.0 — only for events that record, so the client can tell "nobody has
@@ -572,7 +616,7 @@ app.post("/api/admin/competitions", requireAdmin, csrfProtection, (req, res) => 
   // F2/F3 — reveal_* AND the self-enroll flag are REAL booleans (or undefined)
   // from validateBody; create now HONORS the self-enroll flag (it was validated
   // but discarded before — F3).
-  const { name, start_time, duration_minutes, deadline_at, reveal_answers_on_end, self_enroll_enabled, measure_presence, time_basis, group_leaderboard_enabled, cxone_disabled, trusted_network_ips, attempt_cap, registration_fields, late_entry_enabled, late_entry_deadline_at, staff_compete } = _v.values;
+  const { name, start_time, duration_minutes, deadline_at, reveal_answers_on_end, self_enroll_enabled, measure_presence, time_basis, group_leaderboard_enabled, cxone_disabled, trusted_network_ips, attempt_cap, registration_fields, late_entry_enabled, late_entry_deadline_at, staff_compete, clock_start, leaderboard_overall, leaderboard_percent } = _v.values;
   const { leaderboard_mode, tags: reqTags } = req.body;
   if (req.body?.self_enroll_allow_instant !== undefined) return res.status(400).json(_SELF_ENROLL_INSTANT_REMOVED);
   // v7.16.0 — trusted networks. A brand-new competition has no sessions yet, so
@@ -635,6 +679,14 @@ app.post("/api/admin/competitions", requireAdmin, csrfProtection, (req, res) => 
   // requires superadmin intervention if the creator was a regular
   // admin. SPA layer should warn before submit if start < now().
   const lbMode = (leaderboard_mode === "global") ? "global" : "per_slot";
+  // The ranking choice (per session / overall / both, and percentages): refused
+  // where it cannot apply, never stored and ignored.
+  {
+    const _rr = _rankingRefusal({ event_kind: _kindForSchedule }, { mode: lbMode, overall: !!leaderboard_overall, percent: !!leaderboard_percent });
+    if (_rr) return res.status(400).json(_rr);
+  }
+  const lbOverall = leaderboard_overall ? 1 : 0;
+  const lbPercent = leaderboard_percent ? 1 : 0;
   // reveal_answers_on_end is now a validated REAL boolean (or undefined) from
   // validateBody (F2) — undefined/false → 0, true → 1. Default is "do not reveal"
   // so a freshly-created competition behaves safely for repeating events; admins
@@ -674,6 +726,12 @@ app.post("/api/admin/competitions", requireAdmin, csrfProtection, (req, res) => 
   if (time_basis === "presence" && _kindPol.measurePresence === "forbidden") {
     return res.status(400).json({ error: _timeBasisRefused({ event_kind: kind }), code: "time_basis_forbidden" });
   }
+  // The clock-start choice: refused where the kind may not start at the first
+  // open (a Program), never stored and ignored; absent means the kind's seed.
+  if (clock_start === "first_open" && _kindPol.clockStart === "never") {
+    return res.status(400).json({ error: _clockStartRefused({ event_kind: kind }), code: "clock_start_forbidden" });
+  }
+  const clockStart = clock_start === undefined ? clockStartDefaultForKind(kind) : clock_start;
   const measurePresence = measure_presence ? 1 : 0;
   // v8.12.0 — no per-kind seed and no policy question: the switch is a plain
   // DEFAULT 0 column, so the plain ternary is the right shape (the
@@ -684,7 +742,13 @@ app.post("/api/admin/competitions", requireAdmin, csrfProtection, (req, res) => 
   const groupLbEnabled = group_leaderboard_enabled ? 1 : 0;
   // v7.13.0 — CxOne account-creation opt-out; default OFF (accounts ARE created).
   // v8.1.0 (PR 30) — that default is now the KIND's, per the note above.
-  const cxoneDisabled = (cxone_disabled === undefined ? _kindPol.cxoneDisabledDefault : (cxone_disabled ? 1 : 0));
+  // A kind that never creates accounts (a Booth Event) refuses them ON, by name,
+  // and stores them off whatever the default says (the gate asks the kind too).
+  if (cxone_disabled === false && _kindPol.cxoneProvisioning !== "allowed") {
+    return res.status(400).json({ error: _cxoneRefused({ event_kind: kind }), code: "cxone_provisioning_forbidden" });
+  }
+  const cxoneDisabled = _kindPol.cxoneProvisioning !== "allowed" ? 1
+    : (cxone_disabled === undefined ? _kindPol.cxoneDisabledDefault : (cxone_disabled ? 1 : 0));
   // ── v8.4.0 — the sign-up matrix and the LinkedIn sign-up door ───────────────
   //
   // REFUSED for a kind that does not configure them, rather than stored and
@@ -788,8 +852,10 @@ app.post("/api/admin/competitions", requireAdmin, csrfProtection, (req, res) => 
     // column is nullable with no default, so an omitted bind would answer 201 with
     // the event silently uncapped — an exam whose whole point is the ceiling,
     // shipped without one, with nothing erroring.
-    db.prepare("INSERT INTO competitions (id, name, event_kind, start_time, duration_minutes, deadline_at, auto_end_on_all_solved, leaderboard_mode, reveal_answers_on_end, self_enroll_enabled, measure_presence, time_basis, group_leaderboard_enabled, cxone_disabled, attempt_cap, trusted_network_ips, registration_field_policy, late_entry_enabled, late_entry_deadline_at, staff_compete, self_enroll_token, join_code, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-      .run(id, trimmedName, kind, startDate.toISOString(), dur, deadlineIso, _autoEndDefault, lbMode, revealOnEnd, selfEnrollEnabled, measurePresence, (time_basis || "elapsed"), groupLbEnabled, cxoneDisabled, (attempt_cap ?? null), trustedIps, regFieldPolicy, lateEntryEnabled, lateEntryDeadlineIso, staffCompete, _genSelfEnrollToken(), _genJoinCode(), _createdNow, _createdNow);
+    // `clock_start` is bound EXPLICITLY: the column DEFAULT is `entry`, which is
+    // every pre-existing row's backfill, not a new event's seed.
+    db.prepare("INSERT INTO competitions (id, name, event_kind, start_time, duration_minutes, deadline_at, auto_end_on_all_solved, leaderboard_mode, reveal_answers_on_end, self_enroll_enabled, measure_presence, time_basis, group_leaderboard_enabled, cxone_disabled, attempt_cap, trusted_network_ips, registration_field_policy, late_entry_enabled, late_entry_deadline_at, staff_compete, clock_start, leaderboard_overall, leaderboard_percent, self_enroll_token, join_code, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(id, trimmedName, kind, startDate.toISOString(), dur, deadlineIso, _autoEndDefault, lbMode, revealOnEnd, selfEnrollEnabled, measurePresence, (time_basis || "elapsed"), groupLbEnabled, cxoneDisabled, (attempt_cap ?? null), trustedIps, regFieldPolicy, lateEntryEnabled, lateEntryDeadlineIso, staffCompete, clockStart, lbOverall, lbPercent, _genSelfEnrollToken(), _genJoinCode(), _createdNow, _createdNow);
     // Apply initial tags if provided (e.g. the dry-run tag).
     // v7.7.5 (ext-audit F6) — enforce the same ≤50-char cap as POST .../tags so the
     // create path can't seed oversized tags that the dedicated route would reject.
@@ -809,7 +875,7 @@ app.post("/api/admin/competitions", requireAdmin, csrfProtection, (req, res) => 
     // label. Audit details are retained for EVENT_RETENTION_DAYS (730) and a label
     // is renameable, so writing "Competition" here would freeze a display string
     // into two years of forensic rows. History maps it to the label at render time.
-    recordCompetitionEvent(id, "created", adminId, { name: trimmedName, event_kind: kind, start_time: startDate.toISOString(), duration_minutes: dur, deadline_at: deadlineIso, auto_end_on_all_solved: _autoEndDefault, leaderboard_mode: lbMode, reveal_answers_on_end: !!revealOnEnd, group_leaderboard_enabled: !!groupLbEnabled, cxone_disabled: !!cxoneDisabled, self_enroll_enabled: !!selfEnrollEnabled, measure_presence: !!measurePresence, time_basis: (time_basis || "elapsed"), attempt_cap: (attempt_cap ?? null), tags: appliedTags, ...reqContext(req) , trusted_network_ips: trustedIps || null, registration_fields: { ...registrationFieldStates({ event_kind: kind, registration_field_policy: regFieldPolicy }) }, late_entry_enabled: !!lateEntryEnabled, late_entry_deadline_at: lateEntryDeadlineIso, staff_compete: !!staffCompete, ...(_qualifyingIds.length ? { qualifying_questions: _qualifyingIds.length } : {})});
+    recordCompetitionEvent(id, "created", adminId, { name: trimmedName, event_kind: kind, start_time: startDate.toISOString(), duration_minutes: dur, deadline_at: deadlineIso, auto_end_on_all_solved: _autoEndDefault, leaderboard_mode: lbMode, reveal_answers_on_end: !!revealOnEnd, group_leaderboard_enabled: !!groupLbEnabled, cxone_disabled: !!cxoneDisabled, self_enroll_enabled: !!selfEnrollEnabled, measure_presence: !!measurePresence, time_basis: (time_basis || "elapsed"), attempt_cap: (attempt_cap ?? null), tags: appliedTags, ...reqContext(req) , trusted_network_ips: trustedIps || null, registration_fields: { ...registrationFieldStates({ event_kind: kind, registration_field_policy: regFieldPolicy }) }, late_entry_enabled: !!lateEntryEnabled, late_entry_deadline_at: lateEntryDeadlineIso, staff_compete: !!staffCompete, clock_start: clockStart, leaderboard_overall: !!lbOverall, leaderboard_percent: !!lbPercent, ...(_qualifyingIds.length ? { qualifying_questions: _qualifyingIds.length } : {})});
   });
   runTxnWithMirrorBuffer(() => createTxn());
   // The built-in qualifying challenges get their creation version (History,
@@ -980,7 +1046,7 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   }
   // F2 — the three security-sensitive flags come from _v.values as REAL booleans
   // (or undefined when absent), so the string "false" can no longer enable them.
-  const { name, start_time, duration_minutes, deadline_at, reveal_answers_on_end, self_enroll_enabled, measure_presence, time_basis, group_leaderboard_enabled, cxone_disabled, trusted_network_ips, attempt_cap: _capNew, registration_fields, late_entry_enabled, late_entry_deadline_at, staff_compete } = _v.values;
+  const { name, start_time, duration_minutes, deadline_at, reveal_answers_on_end, self_enroll_enabled, measure_presence, time_basis, group_leaderboard_enabled, cxone_disabled, trusted_network_ips, attempt_cap: _capNew, registration_fields, late_entry_enabled, late_entry_deadline_at, staff_compete, clock_start, leaderboard_overall, leaderboard_percent } = _v.values;
   const { leaderboard_mode } = req.body;
   // v7.16.0 — trusted networks are a SINGLE-SESSION-only setting. A multi-session
   // competition spans days and cohorts, so "the venue's IP" is not a property of
@@ -1097,6 +1163,12 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   if (_presenceChanged && measure_presence && _polPut.measurePresence === "forbidden") {
     return res.status(400).json({ error: _presenceRefused(comp), code: "measure_presence_forbidden" });
   }
+  // Checkmarx One accounts ON for a kind that never creates them, against the
+  // kind this save produces. An explicit `false` only: the form sends nothing
+  // for such a kind (it shows no section), and `true` is what is stored.
+  if (cxone_disabled === false && _polPut.cxoneProvisioning !== "allowed") {
+    return res.status(400).json({ error: _cxoneRefused(_targetComp), code: "cxone_provisioning_forbidden" });
+  }
   if (_timeBasisChanged && time_basis === "presence" && _polPut.measurePresence === "forbidden") {
     return res.status(400).json({ error: _timeBasisRefused(comp), code: "time_basis_forbidden" });
   }
@@ -1127,6 +1199,41 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
         code: "time_basis_locked",
       });
     }
+  }
+  // WHEN THE SOLVE CLOCK STARTS — compared with the STORED value first (the form
+  // echoes it on every save), refused for a kind that may not start it at the
+  // first open (asked of the TARGET kind, as the presence refusals are), and
+  // locked once the event starts: it is the anchor every solve time is measured
+  // from, so changing it mid-event would re-anchor some participants and not
+  // others. Re-asked inside the write transaction below.
+  const _clockStartChanged = clock_start !== undefined
+    && clock_start !== (comp.clock_start || "entry");
+  if (_clockStartChanged && clock_start === "first_open" && _polPut.clockStart === "never") {
+    return res.status(400).json({ error: _clockStartRefused(_targetComp), code: "clock_start_forbidden" });
+  }
+  if (_clockStartChanged && competitionAnySlotStarted(comp)) {
+    return res.status(400).json({ error: _CLOCK_START_LOCKED, code: "clock_start_locked" });
+  }
+  // THE RANKING CHOICE (per session / overall / both, and percentages) —
+  // compared with the stored values first (the form echoes them), judged on what
+  // the save LEAVES (sent, else stored) against the TARGET kind, and locked once
+  // a session starts, as `leaderboard_mode` is. A kind change to one without
+  // sessions turns both off (below, with the other prohibitions). Re-asked
+  // inside the write transaction.
+  const _lbOverallChanged = leaderboard_overall !== undefined && (leaderboard_overall ? 1 : 0) !== (comp.leaderboard_overall ? 1 : 0);
+  const _lbPercentChanged = leaderboard_percent !== undefined && (leaderboard_percent ? 1 : 0) !== (comp.leaderboard_percent ? 1 : 0);
+  const _rankingChanged = _lbOverallChanged || _lbPercentChanged;
+  if (_rankingChanged || (leaderboard_mode && leaderboard_mode !== comp.leaderboard_mode)) {
+    const _resolvedMode = (leaderboard_mode === "global" || leaderboard_mode === "per_slot") ? leaderboard_mode : (comp.leaderboard_mode || "per_slot");
+    const _rr = _rankingRefusal(_targetComp, {
+      mode: _resolvedMode,
+      overall: leaderboard_overall !== undefined ? !!leaderboard_overall : (_polPut.sessions === "many" && !!comp.leaderboard_overall),
+      percent: leaderboard_percent !== undefined ? !!leaderboard_percent : (_polPut.sessions === "many" && !!comp.leaderboard_percent),
+    });
+    if (_rr) return res.status(400).json(_rr);
+  }
+  if (_rankingChanged && competitionAnySlotStarted(comp)) {
+    return res.status(400).json({ error: _RANKING_LOCKED, code: "leaderboard_ranking_locked" });
   }
   // measure_presence stays freely editable while the event is upcoming OR LIVE —
   // it governs only whether counting happens from here on, and an organiser who
@@ -1176,7 +1283,7 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
       const _unsealed = staffCompeteUnsealedAssigned(db, comp.id);
       if (_unsealed.length) {
         return res.status(400).json({
-          error: `“${comp.name}” holds ${_unsealed.length === 1 ? "a challenge whose answer is not sealed" : `${_unsealed.length} challenges whose answers are not sealed`}, and an event where staff compete only admits sealed ones. Take ${_unsealed.length === 1 ? "it" : "them"} out of the event first, or leave the switch off.`,
+          error: `“${comp.name}” holds ${_unsealed.length === 1 ? "a question whose answer is not sealed" : `${_unsealed.length} questions whose answers are not sealed`}, and an event where staff compete only admits sealed ones. Take ${_unsealed.length === 1 ? "it" : "them"} out of the event first, or leave the switch off.`,
           code: STAFF_COMPETE_CODES.UNSEALED_ASSIGNED,
           challenges: _unsealed,
         });
@@ -1188,7 +1295,7 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
       const _authors = staffCompeteEnrolledAuthors(db, comp.id);
       if (_authors.length) {
         return res.status(400).json({
-          error: `${_authors.length === 1 ? `${_authors[0].nickname} is enrolled in “${comp.name}” and wrote` : `${_authors.length} people enrolled in “${comp.name}” wrote`} ${_authors.length === 1 && _authors[0].tasks.length === 1 ? "a challenge it holds" : "challenges it holds"}, so they cannot compete in it — a challenge's answer is known to its author. Remove ${_authors.length === 1 ? "that person" : "them"} from the event or take ${_authors.length === 1 && _authors[0].tasks.length === 1 ? "the challenge" : "their challenges"} out first, or leave the switch off.`,
+          error: `${_authors.length === 1 ? `${_authors[0].nickname} is enrolled in “${comp.name}” and wrote` : `${_authors.length} people enrolled in “${comp.name}” wrote`} ${_authors.length === 1 && _authors[0].tasks.length === 1 ? "a question it holds" : "questions it holds"}, so they cannot compete in it — a question's answer is known to its author. Remove ${_authors.length === 1 ? "that person" : "them"} from the event or take ${_authors.length === 1 && _authors[0].tasks.length === 1 ? "the question" : "their questions"} out first, or leave the switch off.`,
           code: STAFF_COMPETE_CODES.AUTHOR_ENROLLED,
           participants: _authors,
         });
@@ -1231,6 +1338,9 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   let measurePresenceCol = null;
   if (measure_presence !== undefined) measurePresenceCol = measure_presence ? 1 : 0;
   let timeBasisCol = (time_basis === undefined) ? null : time_basis;   // v8.3.0 — `let`: a kind change can force it to "elapsed"
+  let clockStartCol = (clock_start === undefined) ? null : clock_start;   // `let`: a kind change to a Program forces it to "entry"
+  let lbOverallCol = leaderboard_overall === undefined ? null : (leaderboard_overall ? 1 : 0);   // `let`: a kind change without sessions forces it off
+  let lbPercentCol = leaderboard_percent === undefined ? null : (leaderboard_percent ? 1 : 0);
   // ── v8.4.0 — the sign-up matrix and the LinkedIn sign-up door ───────────────
   //
   // `null` is the no-change sentinel, exactly as it is for every flag above —
@@ -1363,8 +1473,11 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   // admin-made one — a stored setting that changes with no record is the class
   // this codebase repeatedly treats as a defect.
   //
-  // What is deliberately NOT touched: `cxone_disabled`, `self_enroll_enabled`
-  // and `leaderboard_mode`. No policy FORBIDS any of
+  // `cxone_disabled` is forced ON (accounts off) for a kind that never creates
+  // Checkmarx One accounts (a Booth Event), as the other prohibitions are.
+  //
+  // What is deliberately NOT touched: `self_enroll_enabled` and
+  // `leaderboard_mode`. No policy FORBIDS either of
   // them for any kind — they only have per-kind CREATE defaults — and a default
   // seeds a create, it does not overwrite a choice an operator has already made.
   // `leaderboard_mode` is additionally inert on a sessionless kind, so resetting
@@ -1388,6 +1501,14 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
       // presence would rank every score tie on a column that can only hold zeros.
       if ((comp.time_basis || "elapsed") === "presence" && timeBasisCol === null) timeBasisCol = "elapsed";
     }
+    // A kind whose clock may not start at the first open (a Program) reads
+    // `entry` whatever its column holds; the column is set to say so.
+    if (_polPut.clockStart === "never" && (clockStartCol ?? comp.clock_start) === "first_open") clockStartCol = "entry";
+    // A kind without sessions has one board: the ranking choice goes off.
+    if (_polPut.sessions !== "many") {
+      if (comp.leaderboard_overall && lbOverallCol === null) lbOverallCol = 0;
+      if (comp.leaderboard_percent && lbPercentCol === null) lbPercentCol = 0;
+    }
     // A kind that does not configure the sign-up form has the stored matrix
     // CLEARED. Every kind configures it today (operator ruling, 30 Oct 2026), so
     // a kind change keeps the creator's choice; the guard stays so that a kind
@@ -1395,6 +1516,7 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
     if (!CONFIGURABLE_KINDS.has(_targetKind) && comp.registration_field_policy && !_regFieldsChanged) {
       regFieldsCol = null; _regFieldsChanged = true; _regFieldsForcedClear = true;
     }
+    if (_polPut.cxoneProvisioning !== "allowed" && !comp.cxone_disabled && cxoneDisabledCol === null) cxoneDisabledCol = 1;
     if (_polPut.trustedNetworks === "never" && comp.trusted_network_ips && !trustedIpsChanged) {
       trustedIpsCol = null; trustedIpsChanged = true; trustedIpsForcedClear = true;
     }
@@ -1635,6 +1757,15 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
     if (timeBasisCol !== null && timeBasisCol !== (comp.time_basis || "elapsed")) {
       changes.time_basis = { from: comp.time_basis || "elapsed", to: timeBasisCol };
     }
+    if (clockStartCol !== null && clockStartCol !== (comp.clock_start || "entry")) {
+      changes.clock_start = { from: comp.clock_start || "entry", to: clockStartCol };
+    }
+    if (lbOverallCol !== null && lbOverallCol !== (comp.leaderboard_overall ? 1 : 0)) {
+      changes.leaderboard_overall = { from: !!comp.leaderboard_overall, to: !!lbOverallCol };
+    }
+    if (lbPercentCol !== null && lbPercentCol !== (comp.leaderboard_percent ? 1 : 0)) {
+      changes.leaderboard_percent = { from: !!comp.leaderboard_percent, to: !!lbPercentCol };
+    }
   }
   // v8.1.0 (PR 13) — CURRENTLY UNREACHABLE, and deliberately present anyway.
   // The kind is immutable, so a change is refused with 400 `event_kind_immutable`
@@ -1808,6 +1939,8 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   }
   let _lbModeLockRace = false;
   let _timeBasisLockRace = false;
+  let _clockStartLockRace = false;
+  let _rankingLockRace = false;
   let _staffCompeteLockRace = false;
   let _startFootprintRace = null;
   const editTxn = db.transaction(() => {
@@ -1838,7 +1971,7 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
     // this commits; both settings shape the ranking, so both have to be re-asked
     // rather than only the older one.
     const _lbModeChanging = !!(leaderboard_mode && leaderboard_mode !== comp.leaderboard_mode);
-    if (_lbModeChanging || _timeBasisChanged || _staffCompeteChanged) {
+    if (_lbModeChanging || _timeBasisChanged || _staffCompeteChanged || _clockStartChanged || _rankingChanged) {
       const _freshComp = db.prepare("SELECT id,start_time,duration_minutes,ended_at,ended_manually FROM competitions WHERE id=?").get(req.params.id);
       if (_freshComp && competitionAnySlotStarted(_freshComp)) {
         // leaderboard_mode first when both are in play, so the refusal is
@@ -1852,13 +1985,21 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
           _timeBasisLockRace = true;
           throw new Error("time_basis_locked");
         }
+        if (_clockStartChanged) {
+          _clockStartLockRace = true;
+          throw new Error("clock_start_locked");
+        }
+        if (_rankingChanged) {
+          _rankingLockRace = true;
+          throw new Error("leaderboard_ranking_locked");
+        }
         // v8.12.0 — the third ranking-shape setting, re-asked for the same reason.
         _staffCompeteLockRace = true;
         throw new Error("staff_compete_locked");
       }
     }
     db.prepare(
-      `UPDATE competitions SET name=COALESCE(?,name), start_time=COALESCE(?,start_time), duration_minutes=COALESCE(?,duration_minutes), deadline_at=COALESCE(?,deadline_at), leaderboard_mode=COALESCE(?,leaderboard_mode), reveal_answers_on_end=COALESCE(?,reveal_answers_on_end), self_enroll_enabled=COALESCE(?,self_enroll_enabled), group_leaderboard_enabled=COALESCE(?,group_leaderboard_enabled), cxone_disabled=COALESCE(?,cxone_disabled), measure_presence=COALESCE(?,measure_presence), time_basis=COALESCE(?,time_basis), staff_compete=COALESCE(?,staff_compete) WHERE id=?`
+      `UPDATE competitions SET name=COALESCE(?,name), start_time=COALESCE(?,start_time), duration_minutes=COALESCE(?,duration_minutes), deadline_at=COALESCE(?,deadline_at), leaderboard_mode=COALESCE(?,leaderboard_mode), reveal_answers_on_end=COALESCE(?,reveal_answers_on_end), self_enroll_enabled=COALESCE(?,self_enroll_enabled), group_leaderboard_enabled=COALESCE(?,group_leaderboard_enabled), cxone_disabled=COALESCE(?,cxone_disabled), measure_presence=COALESCE(?,measure_presence), time_basis=COALESCE(?,time_basis), staff_compete=COALESCE(?,staff_compete), clock_start=COALESCE(?,clock_start), leaderboard_overall=COALESCE(?,leaderboard_overall), leaderboard_percent=COALESCE(?,leaderboard_percent) WHERE id=?`
     ).run(
       name ?? null,                 // validated + trimmed
       start_time ?? null,           // validated + normalized ISO
@@ -1872,6 +2013,9 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
       measurePresenceCol,      // null = no change
       timeBasisCol,            // null = no change
       staffCompeteCol,         // v8.12.0 — null = no change
+      clockStartCol,           // null = no change
+      lbOverallCol,            // null = no change
+      lbPercentCol,            // null = no change
       req.params.id
     );
     // v8.6.0 — the toggle rides the COALESCE (NOT NULL column, so NULL is
@@ -1998,6 +2142,8 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   try { runTxnWithMirrorBuffer(() => editTxn()); }
   catch (e) {
     if (_lbModeLockRace) return res.status(400).json({ error: "Cannot change leaderboard mode after a session has started" });
+    if (_clockStartLockRace) return res.status(400).json({ error: _CLOCK_START_LOCKED, code: "clock_start_locked" });
+    if (_rankingLockRace) return res.status(400).json({ error: _RANKING_LOCKED, code: "leaderboard_ranking_locked" });
     if (_timeBasisLockRace) return res.status(400).json({
       error: "Cannot change the tie-break basis after the event has started — the ranking would change under participants mid-event.",
       code: "time_basis_locked",
@@ -2032,6 +2178,11 @@ app.put("/api/admin/competitions/:id", requireAdmin, csrfProtection, (req, res) 
   // column over. The switch is locked once the event has started, so in
   // practice this clears an empty board — but the writer-lock invariant is a
   // rule, not an observation. Rowless staff spectators keep the 2 s TTL.
+  // The ranking choice decides which boards exist and how the overall one ranks
+  // (the 5 s board cache holds both): bust after the commit, gated on the change.
+  if (changes.leaderboard_mode || changes.leaderboard_overall || changes.leaderboard_percent) {
+    invalidateLeaderboardCache(req.params.id);
+  }
   if (_staffCompeteChanged) {
     invalidateLeaderboardCache(req.params.id);
     _invalidateMeCacheForComps([req.params.id]);
@@ -2379,10 +2530,28 @@ app.delete("/api/admin/competitions/:id", requireAdmin, requireSuperAdmin, destr
     // and would orphan forever. Delete them first (badge images are referenced
     // only by achievement_badges; a newer certificate names none, sweep #43).
     db.prepare("DELETE FROM images WHERE id IN (SELECT image_id FROM achievement_badges WHERE competition_id=?)").run(req.params.id);
+    // The questions this event OWNS (lib/event-copies.js) go with it, after its
+    // answers, hints and analytics above: nothing else lists them. One a template
+    // names (or another event's row still names) is released into the library.
+    deleteCompTxn._owned = removeEventOwnedQuestions(db, req.params.id);
     _invalidateCompetitionCache(req.params.id);
     db.prepare("DELETE FROM competitions WHERE id=?").run(req.params.id);
   });
   deleteCompTxn();
+  const _owned = deleteCompTxn._owned || { deleted: 0, released: 0, attachmentPaths: [] };
+  counts.owned_questions = _owned.deleted;
+  if (_owned.released) counts.owned_questions_released = _owned.released;
+  // Post-commit: the deleted questions' attachment files, each only once no row
+  // names it (a copy shares its bank question's files). Unreferenced files are
+  // also reaped by the attachment sweeps.
+  for (const rel of [...new Set(_owned.attachmentPaths)]) {
+    if (db.prepare("SELECT 1 FROM task_attachments WHERE storage_path=? LIMIT 1").get(rel)) continue;
+    // Inline path-containment guard (Checkmarx-recognized sanitizer), as at every
+    // attachment sink (lib/attachments.js): unlink only strictly inside DATA_DIR.
+    const _base = path.resolve(DATA_DIR);
+    const abs = path.resolve(path.join(DATA_DIR, String(rel || "")));
+    if (abs.startsWith(_base + path.sep)) fs.unlink(abs, (e) => { if (e && e.code !== "ENOENT") swallowed("competitions:owned-question-unlink", e); });
+  }
   // v8.13.3 — the transaction above deleted this event's competition_users rows
   // (and its organiser grants, by cascade), and the admin participants page embeds
   // both as each row's `competitions[]` / `event_admin_for`. Unbusted, the pane kept
@@ -2800,6 +2969,11 @@ app.put("/api/admin/competitions/:id/cxone", requireAdmin, csrfProtection, (req,
   { const _cmp = _competitorRefused(req, res, comp.id); if (_cmp) return _cmp; }
   const denied = competitionDenied(req, comp.id);
   if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
+  // A kind that never creates accounts has no key to override (its form shows
+  // no Checkmarx One section). Removing one (DELETE below) stays open.
+  if (eventPolicy(comp).cxoneProvisioning !== "allowed") {
+    return res.status(400).json({ error: _cxoneRefused(comp), code: "cxone_provisioning_forbidden" });
+  }
   const { cxone_api_key, cxone_group_name } = req.body;
   // batch 5 — typeof guards before the .trim() calls inside the txn (a non-string
   // api key / group name would 500).
@@ -2890,17 +3064,26 @@ app.post("/api/admin/competitions/:id/admins", requireAdmin, requireGlobalAdmin,
   if (!userId) return res.status(400).json({ error: "userId is required" });
   const target = db.prepare("SELECT id, role, nickname, email, first_name, last_name FROM users WHERE id=?").get(userId);
   if (!target) return res.status(404).json({ error: "User not found" });
+  const out = _grantOrganiser(req, comp, target);
+  if (out.refused) return res.status(out.refused.status).json(out.refused.body);
+  res.json({ ok: true, granted: out.granted, role_changed: out.role_changed });
+});
 
+// ONE GRANT, as both doors make it: the single pick above and a whole staff team
+// below. Returns { refused: { status, body } } or { granted, role_changed }. The
+// caller has asked the 404 and the competitor lock.
+function _grantOrganiser(req, comp, target, extraDetails = {}) {
+  const userId = target.id;
   // The peer-admin doctrine. Turning a full admin INTO an event admin is a
   // DEMOTION — it narrows what they can reach — and demotions belong on the
   // superadmin-only role route, where the staff tag, the group reconcile and the
   // session purge are all handled together.
   // RBAC — every unscoped (class `all`) role, built-in or custom.
   if (require("../lib/rbac").isGlobalClassRole(target.role)) {
-    return res.status(403).json({
-      error: "That account is already an administrator. Change its role from the participant's row instead.",
+    return { refused: { status: 403, body: {
+      error: "That account is already an administrator, who runs every event. Change its role on Roles & permissions instead.",
       code: "event_admin_target_privileged",
-    });
+    } } };
   }
 
   const adminId = getAdminIdentity(req);
@@ -2925,7 +3108,7 @@ app.post("/api/admin/competitions/:id/admins", requireAdmin, requireGlobalAdmin,
     const details = {
       competition_id: comp.id, competition_name: comp.name,
       user_id: userId, nickname: target.nickname || null,
-      role_changed: roleChanged, ...reqContext(req),
+      role_changed: roleChanged, ...extraDetails, ...reqContext(req),
     };
     // BOTH histories. An organiser reading the event's History and an admin
     // reading the participant's must each see this; one emit would leave a
@@ -2936,7 +3119,7 @@ app.post("/api/admin/competitions/:id/admins", requireAdmin, requireGlobalAdmin,
   try { runTxnWithMirrorBuffer(() => grantTxn()); }
   catch (e) {
     if (e && e.message === "role_race") {
-      return res.status(409).json({ error: "That account's role changed while you were working. Reload and try again." });
+      return { refused: { status: 409, body: { error: "That account's role changed while you were working. Reload and try again.", code: "event_admin_role_changed" } } };
     }
     throw e;
   }
@@ -2949,7 +3132,47 @@ app.post("/api/admin/competitions/:id/admins", requireAdmin, requireGlobalAdmin,
   // sessions so the admin flags are re-derived at their next sign-in rather than
   // a stale participant session carrying isAdmin:false for its full idle life.
   if (roleChanged) { try { invalidateOtherSessions("userId", userId, req.sessionID, SESSION_END.ended); } catch (e) { /* best-effort */ swallowed("competitions:organiser-role-session-purge", e); } }
-  res.json({ ok: true, granted: !alreadyGranted, role_changed: roleChanged });
+  return { granted: !alreadyGranted, role_changed: roleChanged };
+}
+
+// A WHOLE STAFF TEAM AS ORGANISERS (Settings → People → Staff teams). Each member
+// whose address signs in as an account (its PRIMARY address: lib/staff-teams.js
+// `accountFor`) is granted exactly as the single pick grants (`_grantOrganiser`:
+// the same refusals, role rule and records, `via: "staff_team"` added); a member
+// with no account, already an organiser, or refused is SKIPPED with its reason.
+// Held as the single grant is (requireGlobalAdmin, the competitor lock), and
+// reading the team takes `teams.view`.
+app.post("/api/admin/competitions/:id/admins/staff-team", requireAdmin, requireGlobalAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {
+  const comp = db.prepare("SELECT id, name FROM competitions WHERE id=?").get(req.params.id);
+  if (!comp) return res.status(404).json({ error: "Event not found" });
+  { const _cmp = _competitorRefused(req, res, comp.id); if (_cmp) return _cmp; }
+  if (!require("../lib/rbac").actorPermissions(req).perms.has("teams.view")) {
+    return res.status(403).json({ error: "Your role cannot read the staff teams. Add organisers one at a time, or ask an administrator.", code: "permission_denied", permission: "teams.view" });
+  }
+  const teamId = req.body?.teamId;
+  if (typeof teamId !== "string" || !teamId) return res.status(400).json({ error: "teamId must name a staff team.", code: "staff_team_required" });
+  const ST = require("../lib/staff-teams");
+  const team = ST.getTeam(db, teamId);
+  if (!team) return res.status(404).json({ error: "Staff team not found", code: "staff_team_not_found" });
+  const members = ST.listMembers(db, team.id);
+  const granted = [];
+  const skipped = [];
+  const done = new Set();
+  const skip = (m, code, reason) => skipped.push({ staff_member_id: m.id, name: m.name, email: m.email, code, reason });
+  for (const m of members) {
+    const target = ST.accountFor(db, m.email, "id, role, nickname, email, first_name, last_name");
+    if (!target) { skip(m, "staff_member_no_account", "No account signs in with this address."); continue; }
+    if (done.has(target.id) || db.prepare("SELECT 1 FROM competition_admins WHERE competition_id=? AND user_id=?").get(comp.id, target.id)) {
+      skip(m, "already_organiser", "Already an organiser of this event."); continue;
+    }
+    const out = _grantOrganiser(req, comp, target, { via: "staff_team", staff_team_id: team.id, staff_team_name: team.name });
+    // The single grant's refusal, in words for a list of skipped people (an
+    // administrator's role is not this door's to change).
+    if (out.refused) { skip(m, out.refused.body.code, out.refused.body.code === "event_admin_target_privileged" ? "An administrator, who already runs every event." : out.refused.body.error); continue; }
+    done.add(target.id);
+    granted.push({ staff_member_id: m.id, name: m.name, email: m.email, user_id: target.id, role_changed: out.role_changed });
+  }
+  res.json({ ok: true, team: { id: team.id, name: team.name, member_count: members.length }, granted, skipped });
 });
 
 app.delete("/api/admin/competitions/:id/admins/:uid", requireAdmin, requireGlobalAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {
@@ -3073,6 +3296,8 @@ const { DEADLINE_MAX_SPAN_MINUTES } = require("../lib/competitions");
 const { taskViewDenied, isEventAdmin } = require("../lib/event-admin");
 const { unsealedAssignmentDenied, competitorEventsForTask } = require("../lib/staff-compete");
 const { QUALIFYING_PREFIX, DEFAULT_QUALIFYING, qualifyingKeyFromTags } = require("../lib/qualifying");
+const { carryTaskSessions } = require("../lib/session-tasks");   // per-session question sets: a clone carries them by session order
+const { copyForNewEvent, removeEventOwnedQuestions } = require("../lib/event-copies");   // a clone or spawn gets fresh copies; an event DELETE takes its own questions
 
 // The template settings are the create form's own fields, so the SAME rules
 // validate them (`COMPETITION_FIELD_SCHEMA`, picked rather than retyped). Two
@@ -3084,7 +3309,8 @@ const { QUALIFYING_PREFIX, DEFAULT_QUALIFYING, qualifyingKeyFromTags } = require
 const BLUEPRINT_SETTING_KEYS = Object.freeze([
   "duration_minutes", "reveal_answers_on_end", "self_enroll_enabled",
   "group_leaderboard_enabled", "attempt_cap", "measure_presence", "time_basis", "cxone_disabled",
-  "registration_fields", "late_entry_enabled", "staff_compete",
+  "registration_fields", "late_entry_enabled", "staff_compete", "clock_start",
+  "leaderboard_overall", "leaderboard_percent",
 ]);
 const TEMPLATE_SETTINGS_SCHEMA = Object.freeze({
   ...Object.fromEntries(BLUEPRINT_SETTING_KEYS.map(k => [k, COMPETITION_FIELD_SCHEMA[k]])),
@@ -3219,6 +3445,15 @@ function _bpSettingsFromRow(row) {
     out.registration_fields = { ...registrationFieldStates(row) };
   }
   if (pol.lateEntry === "allowed") out.late_entry_enabled = !!row.late_entry_enabled;
+  // The clock-start choice travels only where the kind may make it: a Program
+  // reads `entry` whatever its column holds, so it carries nothing.
+  if (pol.clockStart === "allowed") out.clock_start = row.clock_start === "first_open" ? "first_open" : "entry";
+  // The ranking choice travels only where the kind runs sessions (a sessionless
+  // kind has one board, and refuses the keys).
+  if (pol.sessions === "many") {
+    out.leaderboard_overall = !!row.leaderboard_overall;
+    out.leaderboard_percent = !!row.leaderboard_percent;
+  }
   return out;
 }
 
@@ -3251,6 +3486,23 @@ function _bpResolve(settings, kind, mode, { autoEnd } = {}) {
   if (!r && s.time_basis === "presence" && pol.measurePresence === "forbidden") r = deny("time_basis", "time_basis_forbidden", _timeBasisRefused({ event_kind: kind }), "elapsed");
   if (!r && s.registration_fields !== undefined && !CONFIGURABLE_KINDS.has(kind)) r = deny("registration_fields", "registration_fields_forbidden", _regFieldsRefused(kind));
   if (!r && s.late_entry_enabled !== undefined && pol.lateEntry !== "allowed") r = deny("late_entry_enabled", "late_entry_forbidden", lateEntryForbiddenMessage({ event_kind: kind }));
+  if (!r && s.clock_start === "first_open" && pol.clockStart === "never") r = deny("clock_start", "clock_start_forbidden", _clockStartRefused({ event_kind: kind }), "entry");
+  // The ranking choice, refused (a template) or turned off (a clone changing to
+  // a kind without sessions) exactly as the create refuses it.
+  if (!r && (s.leaderboard_overall || s.leaderboard_percent)) {
+    const rr = _rankingRefusal({ event_kind: kind }, { mode: s.leaderboard_mode === "global" ? "global" : "per_slot", overall: !!s.leaderboard_overall, percent: !!s.leaderboard_percent });
+    if (rr) {
+      if (mode === "refuse") r = rr;
+      else { if (s.leaderboard_overall) forced.push("leaderboard_overall"); if (s.leaderboard_percent) forced.push("leaderboard_percent"); s.leaderboard_overall = false; s.leaderboard_percent = false; }
+    }
+  }
+  // Accounts ON for a kind that never creates them: refused for a template; for
+  // a clone changing kind, turned off and named `cxone_provisioning` (apart
+  // from the own-key reason, which names `cxone_disabled`).
+  if (!r && s.cxone_disabled === false && pol.cxoneProvisioning !== "allowed") {
+    if (mode === "refuse") r = { error: _cxoneRefused({ event_kind: kind }), code: "cxone_provisioning_forbidden" };
+    else { s.cxone_disabled = true; forced.push("cxone_provisioning"); }
+  }
   if (r) return r;
   const b = (v, seed) => (v === undefined ? (seed ? 1 : 0) : (v ? 1 : 0));
   const defaults = registrationFieldDefaultsForKind(kind);
@@ -3268,7 +3520,7 @@ function _bpResolve(settings, kind, mode, { autoEnd } = {}) {
       reveal_answers_on_end: b(s.reveal_answers_on_end, 0),
       self_enroll_enabled: b(s.self_enroll_enabled, pol.selfEnrollDefault),
       group_leaderboard_enabled: b(s.group_leaderboard_enabled, 0),
-      cxone_disabled: b(s.cxone_disabled, pol.cxoneDisabledDefault),
+      cxone_disabled: pol.cxoneProvisioning !== "allowed" ? 1 : b(s.cxone_disabled, pol.cxoneDisabledDefault),
       measure_presence: b(s.measure_presence, 0),
       time_basis: s.time_basis === "presence" ? "presence" : "elapsed",
       attempt_cap: s.attempt_cap === undefined ? null : s.attempt_cap,
@@ -3277,6 +3529,11 @@ function _bpResolve(settings, kind, mode, { autoEnd } = {}) {
         : serialiseRegistrationFieldPolicy({ ...defaults, ...s.registration_fields }, defaults),
       late_entry_enabled: b(s.late_entry_enabled, lateEntryDefaultForKind(kind)),
       staff_compete: b(s.staff_compete, 0),
+      // Absent means the kind's seed, as at create; a kind that may not start
+      // the clock at the first open stores `entry` whatever was carried.
+      clock_start: pol.clockStart === "never" ? "entry" : (s.clock_start === undefined ? pol.clockStartDefault : s.clock_start),
+      leaderboard_overall: b(s.leaderboard_overall, 0),
+      leaderboard_percent: b(s.leaderboard_percent, 0),
       auto_end_on_all_solved: autoEndCol,
     },
   };
@@ -3393,10 +3650,10 @@ function _bpTaskSkip(req, task, compStub, tags) {
 function _bpValidateTemplateTasks(req, raw, kind, settings) {
   if (raw === undefined || raw === null) return { ids: [] };
   if (!Array.isArray(raw) || raw.some(x => typeof x !== "string")) {
-    return { error: "task_ids must be an array of challenge ids.", code: "template_tasks_invalid" };
+    return { error: "task_ids must be an array of question ids.", code: "template_tasks_invalid" };
   }
   const ids = [...new Set(raw.map(x => x.trim()).filter(Boolean))];
-  if (ids.length > TEMPLATE_MAX_TASKS) return { error: `A template holds at most ${TEMPLATE_MAX_TASKS} challenges.`, code: "template_tasks_invalid" };
+  if (ids.length > TEMPLATE_MAX_TASKS) return { error: `A template holds at most ${TEMPLATE_MAX_TASKS} questions.`, code: "template_tasks_invalid" };
   if (!ids.length) return { ids };
   const rows = db.prepare(`SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed FROM tasks WHERE id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(ids));
   const byId = new Map(rows.map(t => [t.id, t]));
@@ -3409,7 +3666,7 @@ function _bpValidateTemplateTasks(req, raw, kind, settings) {
       return {
         error: skip.reason === "qualifying"
           ? `“${t.title}” is a qualifying question, which belongs to its own event. Remove it: an event made from this template gets its own through Add the qualifying questions.`
-          : skip.message || (skip.reason === "missing" ? `No challenge has the id ${id.slice(0, 64)}.` : `“${t.title}” cannot be part of this template (${skip.reason}).`),
+          : skip.message || (skip.reason === "missing" ? `No question has the id ${id.slice(0, 64)}.` : `“${t.title}” cannot be part of this template (${skip.reason}).`),
         code: "template_task_" + skip.reason, task_id: id.slice(0, 64),
         // A competitor's refusal is a 403, as every competitor refusal is.
         ...(skip.reason === "competing" ? { status: 403 } : {}),
@@ -3431,7 +3688,7 @@ function _bpDefaultStart() {
  * writes. Returns `{ status, body }`.
  */
 function _materialiseEvent(req, spec) {
-  const { name, startDate, kind, settings, mode, autoEnd, tags, taskIds, slots, latePinOffsetMs, cxoneGroupName, provenance, forcedIn, addQualifying } = spec;
+  const { name, startDate, kind, settings, mode, autoEnd, tags, taskIds, slots, latePinOffsetMs, cxoneGroupName, provenance, forcedIn, addQualifying, taskSessionsFrom } = spec;
   if (startDate.getTime() <= now().getTime()) {
     return { status: 400, body: { error: "A new event must start in the future, so it opens upcoming.", code: "start_time_not_future" } };
   }
@@ -3491,12 +3748,12 @@ function _materialiseEvent(req, spec) {
       "INSERT INTO competitions (id, name, event_kind, start_time, duration_minutes, deadline_at, auto_end_on_all_solved, leaderboard_mode, " +
       "reveal_answers_on_end, self_enroll_enabled, measure_presence, time_basis, group_leaderboard_enabled, " +
       "cxone_disabled, cxone_group_name, attempt_cap, trusted_network_ips, registration_field_policy, " +
-      "late_entry_enabled, late_entry_deadline_at, staff_compete, self_enroll_token, join_code, created_at, updated_at) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?)"
+      "late_entry_enabled, late_entry_deadline_at, staff_compete, clock_start, leaderboard_overall, leaderboard_percent, self_enroll_token, join_code, created_at, updated_at) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,?,?)"
     ).run(id, name, kind, startIso, sch.durationMinutes, sch.deadlineIso, cols.auto_end_on_all_solved, cols.leaderboard_mode,
       cols.reveal_answers_on_end, cols.self_enroll_enabled, cols.measure_presence, cols.time_basis,
       cols.group_leaderboard_enabled, cols.cxone_disabled, cxoneGroupName || null, cols.attempt_cap, cols.registration_field_policy,
-      cols.late_entry_enabled, lateDeadlineIso, cols.staff_compete,
+      cols.late_entry_enabled, lateDeadlineIso, cols.staff_compete, cols.clock_start, cols.leaderboard_overall, cols.leaderboard_percent,
       _genSelfEnrollToken(), _genJoinCode(), createdAt, createdAt);
     if (addQualifying === true) {
       qualifyingIds = require("../lib/qualifying").seedQualifyingChallenges(db, id, { actorEmail: actor, actorUserId: actingId, nowIso: createdAt });
@@ -3516,15 +3773,18 @@ function _materialiseEvent(req, spec) {
       time_basis: cols.time_basis, attempt_cap: cols.attempt_cap, tags: appliedTags,
       registration_fields: { ...registrationFieldStates({ event_kind: kind, registration_field_policy: cols.registration_field_policy }) },
       late_entry_enabled: !!cols.late_entry_enabled,
-      late_entry_deadline_at: lateDeadlineIso, staff_compete: !!cols.staff_compete,
+      late_entry_deadline_at: lateDeadlineIso, staff_compete: !!cols.staff_compete, clock_start: cols.clock_start,
+      leaderboard_overall: !!cols.leaderboard_overall, leaderboard_percent: !!cols.leaderboard_percent,
       ...(forced.length ? { forced_settings: forced } : {}),
       ...(skippedSessions.length ? { skipped_sessions: skippedSessions } : {}),
       ...(qualifyingIds.length ? { qualifying_questions: qualifyingIds.length } : {}),
       ...reqContext(req),
     });
     // Sessions, re-based: the same offset from the start, the same length.
+    const slotMap = new Map();   // source session id -> the copy's (per-session question sets)
     for (const s of keepSlots) {
       const tsId = uuid();
+      if (s.srcId) slotMap.set(s.srcId, tsId);
       const tsStart = new Date(startDate.getTime() + s.offsetMs).toISOString();
       db.prepare("INSERT INTO competition_timeslots (id, competition_id, name, start_time, duration_minutes, created_at, updated_at) VALUES (?,?,?,?,?,?,?)")
         .run(tsId, id, s.name, tsStart, s.duration_minutes, createdAt, createdAt);
@@ -3533,6 +3793,7 @@ function _materialiseEvent(req, spec) {
     }
     // Challenges. Read INSIDE the transaction, so a challenge unpublished or
     // locked a moment ago is judged as it is now.
+    const taskMap = new Map();   // source question id -> the copy's (per-session question sets)
     const ids = [...new Set((taskIds || []).filter(x => typeof x === "string" && x))];
     if (ids.length) {
       const rows = db.prepare(`SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed FROM tasks WHERE id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(ids));
@@ -3551,11 +3812,25 @@ function _materialiseEvent(req, spec) {
         // title (the template read withholds both from them).
         if (skip && skip.reason === "not_visible") { skipped.push({ reason: skip.reason }); continue; }
         if (skip) { const _why = skip.note || skip.message; skipped.push({ task_id: tid, title: t ? t.title : null, reason: skip.reason, ...(_why ? { message: _why } : {}) }); continue; }
-        if (ins.run(id, tid, actor, createdAt, actingId).changes > 0) {
-          assigned.push(tid);
-          recordCompetitionEvent(id, "task_added", actor, { task_id: tid, task_title: t.title, via: provenance.via, ...reqContext(req) });
+        // The new event's OWN question: a fresh copy of the source's (a bank
+        // question, or the source event's own as edited there), never shared.
+        const eid = copyForNewEvent(db, tid, id, { changedBy: actor, via: provenance.via, nowIso: createdAt });
+        taskMap.set(tid, eid);
+        if (ins.run(id, eid, actor, createdAt, actingId).changes > 0) {
+          assigned.push(eid);
+          recordCompetitionEvent(id, "task_added", actor, { task_id: eid, task_title: t.title, via: provenance.via, ...(eid !== tid ? { copied_from: tid } : {}), ...reqContext(req) });
         }
       }
+    }
+    // PER-SESSION QUESTION SETS — a clone carries the source's session choices
+    // BY SESSION ORDER: the copy's sessions are created in the source's order (by
+    // start time), so a question in the source's second session is in the copy's
+    // second. A choice naming a session the copy did not get keeps the others; a
+    // question left with none, or naming every session the copy has, is in every
+    // session. Recorded on the new event's History when any was carried.
+    if (taskSessionsFrom && slotMap.size >= 2) {
+      const narrowed = carryTaskSessions(db, taskSessionsFrom, id, { slotMap, taskMap, sessionCount: keepSlots.length });
+      if (narrowed) recordCompetitionEvent(id, "task_sessions_carried", actor, { cloned_from: taskSessionsFrom, questions: narrowed, via: provenance.via, ...reqContext(req) });
     }
     if (grantOrganiser) {
       db.prepare("INSERT OR IGNORE INTO competition_admins (competition_id, user_id, granted_by, granted_at) VALUES (?,?,?,?)")
@@ -3686,10 +3961,10 @@ app.post("/api/admin/competitions/:id/clone", requireAdmin, destructiveAdminLimi
   // from the event row's own start: no session route writes that column, so on a
   // multi-session event it is the create-time value and can lie before or after
   // every session (a negative offset made a copy that was already live or ended).
-  const planned = getCompetitionTimeslots(src.id).map(ts => ({ name: ts.name, ..._plannedSchedule("timeslot", ts) }));
+  const planned = getCompetitionTimeslots(src.id).map(ts => ({ srcId: ts.id, name: ts.name, ..._plannedSchedule("timeslot", ts) }));
   const firstStart = planned.length ? Math.min(...planned.map(s => Date.parse(s.start_time))) : Date.parse(src.start_time);
   const slots = planned.map(s => ({
-    name: s.name, duration_minutes: s.duration_minutes,
+    srcId: s.srcId, name: s.name, duration_minutes: s.duration_minutes,
     offsetMs: Date.parse(s.start_time) - firstStart,
   }));
   // A pinned late-entry deadline keeps its distance from the PLANNED end, the
@@ -3740,6 +4015,7 @@ app.post("/api/admin/competitions/:id/clone", requireAdmin, destructiveAdminLimi
     cxoneGroupName: src.cxone_api_key ? null : src.cxone_group_name,
     forcedIn,
     addQualifying: srcHasBuiltinQualifying && !settings.staff_compete ? true : undefined,
+    taskSessionsFrom: src.id,
     provenance: { via: "clone", details: { cloned_from: src.id, cloned_from_name: src.name } },
   });
   res.status(out.status).json(out.body);
@@ -3769,15 +4045,19 @@ app.post("/api/admin/competitions/:id/save-as-template", requireAdmin, requireGl
   const keep = [];
   const stub = { id: "", name: _v.values.name, event_kind: kind, staff_compete: settings.staff_compete ? 1 : 0 };
   const left = [];
-  for (const tid of taskIds.slice(0, TEMPLATE_MAX_TASKS)) {
-    const t = db.prepare("SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed FROM tasks WHERE id=?").get(tid);
-    const tags = db.prepare("SELECT tag FROM task_tags WHERE task_id=?").all(tid).map(x => x.tag);
+  for (const eid of taskIds.slice(0, TEMPLATE_MAX_TASKS)) {
+    // The event's own question is judged; the template names the BANK question it
+    // was copied from where that is still in the bank (a template names library
+    // questions, lib/event-copies.js), else the event's question itself.
+    const t = db.prepare("SELECT id, title, status, locked, answer_type, created_by_id, answer_sealed, owner_competition_id, copied_from_task_id FROM tasks WHERE id=?").get(eid);
+    const tid = (t && t.copied_from_task_id && db.prepare("SELECT 1 FROM tasks WHERE id=? AND owner_competition_id IS NULL").get(t.copied_from_task_id)) ? t.copied_from_task_id : eid;
+    const tags = db.prepare("SELECT tag FROM task_tags WHERE task_id=?").all(eid).map(x => x.tag);
     const skip = _bpTaskSkip(req, t, stub, tags);
     // A challenge of an event the saver competes in is refused, not left out:
     // the template would carry what the 23 Nov ruling keeps away from them.
     if (skip && skip.reason === "competing") return res.status(403).json({ error: skip.message, code: "template_task_competing", task_id: tid });
     if (skip && skip.reason !== "locked") { left.push({ task_id: tid, title: t ? t.title : null, reason: skip.reason }); continue; }
-    keep.push(tid);
+    if (!keep.includes(tid)) keep.push(tid);
   }
   { const clash = _tplNameClash(_v.values.name); if (clash) return res.status(409).json(clash); }
   // What the template does differently from its source, as a clone names it: a

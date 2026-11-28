@@ -153,7 +153,6 @@
         <div id="pending-change-session" class="pending-change-session" style="display:none"></div>
         <div class="pending-actions">
           <button class="btn secondary" id="pending-back-btn" data-action="nav-show-competitions-page">Back to Events</button>
-          <button class="btn secondary" data-action="show-page" data-page="login-page">Back to Login</button>
         </div>
         <!-- v8.1.0 — LEAVE THIS EVENT. Shown only when the server says
              `can_leave`, i.e. the participant enrolled themselves and the event
@@ -400,6 +399,9 @@
                because the recording is gated per event: a blanket notice would
                be false on every event that does not record. -->
           <p class="presence-note" id="presence-note" hidden>This event records how much time you spend on the platform.</p>
+          <!-- When the solve clock starts, said where it is true: on an event that
+               starts each participant's time at their first challenge. -->
+          <p class="presence-note" id="clock-note" hidden>Your time to solve starts when you open your first challenge, not when you arrive.</p>
         </div>
       </div>
       <!-- v8.1.0 (PR 29) — THE CERTIFICATE'S HOME. Mounted STATICALLY here, and on
@@ -465,12 +467,14 @@
       <div class="lb-page-head">
         <div>
           <p class="eyebrow ink lb-eyebrow" id="lb-eyebrow">Standings</p>
-          <h2 class="lb-page-title display" id="lb-page-title">Live Rankings</h2>
+          <div class="help-label-row lb-title-row"><h2 class="lb-page-title display" id="lb-page-title">Live Rankings</h2><span data-help="lb.board" data-help-label="How the ranking works"></span></div>
           <div id="lb-subtitle" class="lb-subtitle"></div>
         </div>
         <span id="lb-live-badge" class="lb-live-pill" style="display:none"><span class="live-dot"></span>Live</span>
       </div>
-      <p class="lb-help-row"><span data-help="lb.board" data-help-label="How the ranking works"></span></p>
+      <!-- Per-session question sets — which board this is (the participant's
+           session's, or the one overall board), filled by loadLeaderboard(). -->
+      <p id="lb-board-caption" class="lb-board-caption" hidden></p>
       <div id="podium-row" class="podium"></div>
       <div class="card">
         <table class="lb-table">
@@ -492,6 +496,10 @@
         </table>
       </div>
       <div id="lb-me-banner" style="margin-top:16px"></div>
+      <!-- Per-session question sets — the OVERALL board beside the session's, on
+           an event ranking per session and overall. Mounted static and empty, as
+           the boards below are. -->
+      <div id="lb-overall-section" style="display:none;margin-top:20px"></div>
       <!-- v7.11.0 — group / team rankings, shown only when the competition has groups. -->
       <div id="lb-group-section" style="display:none;margin-top:20px"></div>
       <!-- v8.6.0 — the LATE-ENTRANT section. Mounted statically and empty, exactly
@@ -528,7 +536,7 @@
              in its own WORKSPACE (header, KPIs, its own Participants, Challenges,
              Rankings, Certificates and Settings), opened from the Events list.
              The other items are the cross-event pages a global admin keeps
-             (People, the Challenge library, Groups, Logs, Analytics, Settings).
+             (People, the Question bank, Groups, Logs, Analytics, Settings).
              Every item is still found by `data-tab-id`, never by label.
              RBAC — three groups (Manage, Participants, Admin). ui/nav.js hides
              each item the role's permissions do not open (ADMIN_NAV_PERMISSIONS)
@@ -539,9 +547,10 @@
         <ul class="admin-nav-list" role="list" data-nav-group="manage">
           <li><button class="admin-nav-item active" data-action="admin-tab" data-tab-id="admin-competitions-tab" aria-current="page"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Events</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-templates-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">New event</span></button></li>
-          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-tasks-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Challenge library</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-tasks-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Question bank</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-rankings-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Live rankings</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-analytics-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Analytics</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-marketing-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Marketing</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-audit-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Audit</span></button></li>
         </ul>
         <p class="admin-nav-section" aria-hidden="true" data-nav-group="participants">Participants</p>
@@ -551,9 +560,14 @@
         </ul>
         <p class="admin-nav-section" aria-hidden="true" data-nav-group="admin">Admin</p>
         <ul class="admin-nav-list" role="list" data-nav-group="admin">
-          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-users-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Users &amp; roles</span></button></li>
+          <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-users-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Roles &amp; permissions</span></button></li>
           <li><button class="admin-nav-item" data-action="admin-tab" data-tab-id="admin-settings-tab"><span class="admin-nav-icon" aria-hidden="true"></span><span class="admin-nav-label">Settings</span></button></li>
         </ul>
+        <!-- The running version, at the foot of the sidebar (owner decision,
+             27 Nov 2026): in full while the sidebar is open, short while it is
+             collapsed (the full text stays for screen readers). Filled from
+             /api/config by settings-admin.js loadPlatformName. -->
+        <p id="admin-sidebar-version" class="admin-sidebar-version" hidden><span class="asv-long"></span><span class="asv-short" aria-hidden="true"></span></p>
       </nav>
       <div id="admin-sidebar-overlay" class="admin-sidebar-overlay" aria-hidden="true"></div>
       <div class="admin-content">
@@ -602,7 +616,7 @@
         <nav id="ws-tabs" class="ws-tabs" aria-label="Event sections">
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-event-overview-tab">Overview</button>
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-participants-tab">Participants <span class="ws-count" id="ws-count-participants"></span></button>
-          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-tasks-tab">Challenges <span class="ws-count" id="ws-count-tasks"></span></button>
+          <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-tasks-tab">Questions <span class="ws-count" id="ws-count-tasks"></span></button>
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-rankings-tab">Rankings</button>
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-submissions-tab">Activity</button>
           <button type="button" class="ws-tab" data-action="ws-tab" data-section="admin-analytics-tab">Analytics</button>
@@ -626,7 +640,7 @@
           <div class="ev-home-titles">
             <p class="eyebrow ink">Organise</p>
             <h2 class="admin-pane-title ev-home-title">Events</h2>
-            <p class="ev-home-lede">Every event runs as its own campaign. Open one to manage its people, challenges, rankings and certificates in one place.</p>
+            <p class="ev-home-lede">Every event runs as its own campaign. Open one to manage its people, questions, rankings and certificates in one place.</p>
           </div>
           <div class="ev-home-actions">
             <button id="new-competition-btn" class="btn" data-action="open-competition-form">+ New Event</button>
@@ -669,7 +683,7 @@
               <th scope="col" class="sortable" data-action="sort-competitions" data-col="status">Status<span id="sort-comp-status-icon"></span></th>
               <th scope="col" class="sortable" data-action="sort-competitions" data-col="tags">Tags<span id="sort-comp-tags-icon"></span></th>
               <th scope="col" class="sortable" data-action="sort-competitions" data-col="participants">Participants<span id="sort-comp-participants-icon"></span></th>
-              <th scope="col" class="sortable" data-action="sort-competitions" data-col="challenges">Challenges<span id="sort-comp-challenges-icon"></span></th>
+              <th scope="col" class="sortable" data-action="sort-competitions" data-col="challenges">Questions<span id="sort-comp-challenges-icon"></span></th>
               <th scope="col" class="sortable" data-action="sort-competitions" data-col="sessions">Sessions<span id="sort-comp-sessions-icon"></span></th>
               <th>Actions</th>
             </tr></thead>
@@ -680,23 +694,25 @@
       </div>
 
       <!-- NEW EVENT: the one place every event starts (features/templates-admin.js).
-           A blank starter per kind, or a template; both open the one create form
-           (the kind is a field there). Templates are managed here too, with a
-           Recently deleted list that restores one in a click. An event admin
-           gets templates only, through the quick-start panel (a sheet on phones). -->
+           One card per event type, each offering its recommended setup (the
+           kind's built-in template) and Start blank; both open the one create
+           form (the kind is a field there). Below, the templates organisers
+           made, managed here too, with a Recently deleted list that restores one
+           in a click. An event admin gets the recommended setups and templates
+           only, through the quick-start panel (a sheet on phones). -->
       <div id="admin-templates-tab" class="admin-tab-pane" style="display:none">
         <div class="ev-home-head">
           <div class="ev-home-titles">
             <p class="eyebrow ink">Create</p>
             <h2 class="admin-pane-title ev-home-title">New event</h2>
-            <p class="ev-home-lede">Start blank or from a template. Either way you get one form with everything in it, and you can change any of it later.</p>
+            <p class="ev-home-lede">Pick the type of event. Start from its recommended setup or blank; either way you get one form with everything in it, and you can change any of it later.</p>
           </div>
         </div>
         <div class="tpl-layout">
           <div class="tpl-main">
-            <div class="tpl-list-head" id="tpl-blank-head"><h3 class="tpl-list-title">Start blank</h3><span data-help="newevent.blank" data-help-label="Start blank"></span></div>
-            <div id="tpl-kind-cards" class="tpl-kinds" role="group" aria-label="Start a blank event"></div>
-            <div class="tpl-list-head"><h3 class="tpl-list-title">Start from a template</h3><span data-help="templates.list" data-help-label="Templates"></span><span id="tpl-list-count" class="list-count" role="status" aria-live="polite"></span><span class="p-toolbar-gap" aria-hidden="true"></span><button type="button" class="btn sm secondary" id="tpl-new-btn" data-action="tpl-new" hidden>+ New template</button></div>
+            <div class="tpl-list-head" id="tpl-blank-head"><h3 class="tpl-list-title">Choose a type</h3><span data-help="newevent.types" data-help-label="Event types"></span></div>
+            <div id="tpl-kind-cards" class="tpl-kinds" role="group" aria-label="Event types"></div>
+            <div class="tpl-list-head"><h3 class="tpl-list-title">Your templates</h3><span data-help="templates.list" data-help-label="Templates"></span><span id="tpl-list-count" class="list-count" role="status" aria-live="polite"></span><span class="p-toolbar-gap" aria-hidden="true"></span><button type="button" class="btn sm secondary" id="tpl-new-btn" data-action="tpl-new" hidden>+ New template</button></div>
             <div id="tpl-list" class="tpl-list"></div>
             <section id="tpl-deleted" class="tpl-deleted" aria-label="Recently deleted templates" hidden></section>
           </div>
@@ -745,28 +761,29 @@
              panes are <h3>, so with no h2 above them the document skipped a
              level (axe `heading-order`). The GROUPS pane already carried one
              — it is the house pattern, and these were the outliers. -->
-        <h2 class="admin-pane-title">Challenges</h2>
+        <h2 class="admin-pane-title" id="tasks-pane-title">Question bank</h2>
         <div id="task-controls-row" style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
-          <span data-help="library.list" data-help-label="Challenge library"></span>
-          <div class="search-wrap"><input id="task-search" placeholder="Search challenges..." aria-label="Search challenges" data-input-action="task-search"/><button class="search-clear hidden" id="task-search-clear" data-action="task-search-clear" aria-label="Clear challenges search"><span aria-hidden="true">×</span> Clear</button></div><span id="task-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="challenge" data-noun-plural="challenges"></span>
+          <!-- The list's "?" sits beside the count of what it explains (on the bank's
+               page and in a workspace, where the pane's title is visually hidden). -->
+          <div class="search-wrap"><input id="task-search" placeholder="Search questions..." aria-label="Search questions" data-input-action="task-search"/><button class="search-clear hidden" id="task-search-clear" data-action="task-search-clear" aria-label="Clear questions search"><span aria-hidden="true">×</span> Clear</button></div><span class="task-count-row"><span id="task-search-count" class="list-count" role="status" aria-live="polite" aria-atomic="true" data-noun="question" data-noun-plural="questions"></span><span data-help="library.list" data-help-label="Questions"></span></span>
+          <!-- Stage B — the bank's Topic filter (features/topics-admin.js): every
+               topic with how many of the reader's bank questions it holds. -->
+          <span class="topic-filter"><label for="task-topic-filter">Topic</label><span data-help="library.topics" data-help-label="Topics"></span><select id="task-topic-filter" data-change-action="task-topic-filter"><option value="">All topics</option></select></span>
           <div id="new-task-btn-row" style="display:flex;gap:8px">
-            <!-- v7.12.1 — top bulk-assign button (mirrors #assign-to-comp-btn on the
-                 Participants pane): shown when >=1 challenge is selected, always visible
-                 in the controls even when the sticky selection bar is scrolled below. -->
-            <button class="btn sm" id="assign-challenges-to-comp-btn" style="display:none" data-action="challenges-bulk-assign">Assign to Events</button>
-            <button class="btn sm" id="add-tasks-to-comp-btn" style="display:none" data-action="open-add-tasks-to-competition">+ Add Challenges</button>
+            <button class="btn sm" id="add-tasks-to-comp-btn" style="display:none" data-action="open-add-tasks-to-competition">+ Add from bank</button>
+            <button class="btn sm secondary" id="task-topics-btn" data-action="open-topics-dialog">Topics</button>
             <button class="btn sm secondary" id="export-tasks-btn" data-action="export-tasks">Export</button>
-            <span data-help="library.export" data-help-label="Export and import"></span>
             <button class="btn sm secondary" id="import-tasks-btn" style="display:none" data-action="click-hidden-input" data-target-id="import-tasks-file">Import</button>
+            <span data-help="library.export" data-help-label="Export and import"></span>
             <input type="file" id="import-tasks-file" accept=".json" style="display:none" data-change-action="import-tasks-file"/>
-            <button class="btn sm" data-action="open-task-form">+ New Challenge</button>
+            <button class="btn sm" data-action="open-task-form">+ New question</button>
           </div>
         </div>
         <div id="task-filters-row" style="display:flex;gap:16px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
           <button type="button" class="btn sm secondary filters-btn" id="task-filters-btn" data-action="filters-toggle" data-panel="task-filters-panel" aria-expanded="false" aria-controls="task-filters-panel">Filters</button>
           <span data-help="lists.filters" data-help-label="Filters"></span>
           <span class="filters-active" id="task-filters-panel-active"></span>
-          <div class="filters-panel card" id="task-filters-panel" role="group" aria-label="Challenge filters" hidden>
+          <div class="filters-panel card" id="task-filters-panel" role="group" aria-label="Question filters" hidden>
           <p class="t-eyebrow">Difficulty</p>
           <div class="filters" style="margin:0" id="task-diff-filters">
             <button class="filter-btn active" data-val="all" data-action="toggle-task-diff-filter">All</button>
@@ -797,7 +814,7 @@
              pinned foot. Every id and data-action the editor code and the specs
              use is unchanged; the long explanations moved behind "?" tips. -->
         <div id="admin-task-form" class="card task-form-card ce-form" style="display:none">
-          <h2 id="task-form-title" class="task-form-title">New Challenge</h2>
+          <h2 id="task-form-title" class="task-form-title">New question</h2>
           <input type="hidden" id="edit-task-id"/>
           <!-- v8.8.5 — shown when the server's can_edit_scoring is false: this
                actor may edit the challenge but not the fields another
@@ -818,7 +835,7 @@
                      "Any answer": there is no key to type, so the box explains
                      the rule instead of standing empty. -->
                 <div class="form-group" id="tf-any-note-group" style="display:none">
-                  <p class="settings-help" id="tf-any-note" style="margin:0">Any non-empty answer is accepted exactly as typed. No hint and no wrong-answer penalty — a hint or accepted answers this challenge already has are removed when you save.</p>
+                  <p class="settings-help" id="tf-any-note" style="margin:0">Any non-empty answer is accepted exactly as typed. No hint and no wrong-answer penalty — a hint or accepted answers this question already has are removed when you save.</p>
                   <!-- Event team reports — optional options make it a PICK-ONE
                        question: participants choose one, every option is accepted
                        (how a qualifying question is asked). -->
@@ -841,12 +858,12 @@
                   <div class="ce-label-row"><label id="tf-choices-label">Choices <span class="req">*</span> <span class="ce-label-note">tick each correct one</span></label><span data-help="challenge.choices" data-help-label="Choices"></span></div>
                   <div id="tf-choices-list" role="group" aria-labelledby="tf-choices-label"></div>
                   <button type="button" class="ce-link" id="tf-add-choice" data-action="task-add-choice" aria-describedby="tf-choices-cap-note">+ Add choice</button>
-                  <p id="tf-choices-cap-note" class="settings-help" style="margin:6px 0 0" hidden>That is the most a challenge can have: 20 choices.</p>
+                  <p id="tf-choices-cap-note" class="settings-help" style="margin:6px 0 0" hidden>That is the most a question can have: 20 choices.</p>
                   <div id="tf-choices-err" class="form-error" role="alert"></div>
                 </div>
               </div>
             </div>
-            <div class="ce-rail" role="group" aria-label="Challenge settings">
+            <div class="ce-rail" role="group" aria-label="Question settings">
               <!-- Difficulty: a segmented control over the hidden #tf-diff select,
                    which stays the one value the editor code reads and writes
                    (_tfDiffSync keeps the two in step). -->
@@ -877,7 +894,7 @@
                   </label>
                   <span class="help-tip"><button type="button" class="help-tip-btn" id="tf-seal-tip" data-action="help-tip" aria-expanded="false" aria-controls="tf-seal-note" aria-label="About sealing the answer" data-glyph="?"></button></span>
                 </div>
-                <p class="help-tip-note ce-tip-note" id="tf-seal-note" role="note" hidden>Only you then see or change the answer, the explanation and the hint, and only you can edit this challenge, restore an earlier version or recalculate its scores — not other organisers, not administrators. A participant competing in an event can still buy the hint there, as any hint. The one exception is a superadmin who reveals it; every reveal is recorded in the challenge's history, naming them. Participants are never shown the answer, even when the event reveals answers. You can unseal it later; you cannot seal it again.</p>
+                <p class="help-tip-note ce-tip-note" id="tf-seal-note" role="note" hidden>Only you then see or change the answer, the explanation and the hint, and only you can edit this question, restore an earlier version or recalculate its scores — not other organisers, not administrators. A participant competing in an event can still buy the hint there, as any hint. The one exception is a superadmin who reveals it; every reveal is recorded in the question's history, naming them. Participants are never shown the answer, even when the event reveals answers. You can unseal it later; you cannot seal it again.</p>
               </div>
               <!-- v8.10.1 — why sealing (or the free-response type) is unavailable.
                    OUTSIDE #tf-seal-group: the edit form hides that group, and this
@@ -888,12 +905,12 @@
               <p class="settings-help ce-note" id="tf-sealed-note" hidden></p>
               <div class="form-group" id="tf-reveal-row" hidden>
                 <button type="button" class="btn sm secondary" data-action="task-reveal-sealed" data-task-id="">Reveal sealed answer and hint</button>
-                <p class="settings-help" style="margin:6px 0 0">The reveal is recorded in this challenge's history and the event log, naming you.</p>
+                <p class="settings-help" style="margin:6px 0 0">The reveal is recorded in this question's history and the event log, naming you.</p>
               </div>
               <div class="form-group" id="tf-unseal-row" hidden>
                 <label for="tf-unseal" class="checkbox-row">
                   <input type="checkbox" id="tf-unseal"/>
-                  <span>Unseal this answer when I save — everyone who can see this challenge will be able to read it</span>
+                  <span>Unseal this answer when I save — everyone who can see this question will be able to read it</span>
                 </label>
                 <p class="settings-help" style="margin:6px 0 0">This cannot be undone: once unsealed, the answer cannot be sealed again.</p>
               </div>
@@ -938,8 +955,34 @@
               <div class="ce-sec" id="tf-author-sec">
                 <button type="button" class="ce-sec-toggle" data-action="task-sec-toggle" aria-expanded="false" aria-controls="tf-author-body"><span class="ce-sec-name">Author</span><span class="ce-sec-sum" id="tf-author-sum">+ Add author</span></button>
                 <div class="ce-sec-body" id="tf-author-body" hidden>
-                  <div class="form-group"><label for="tf-author-name">Author name</label><input id="tf-author-name" placeholder="Challenge author's name"/></div>
+                  <div class="form-group"><label for="tf-author-name">Author name</label><input id="tf-author-name" placeholder="Question author's name"/></div>
                   <div class="form-group"><label for="tf-author-linkedin">Author LinkedIn</label><input id="tf-author-linkedin" type="url" placeholder="https://linkedin.com/in/..."/></div>
+                </div>
+              </div>
+              <!-- Stage B — TOPIC AND SHARING, the controls that replace the tag
+                   box: the question's topic (features/topics-admin.js), "Shared
+                   with all organisers" (the public-domain marker) and what the
+                   question needs (needs: markers). They write the same stored
+                   values the tag routes do; free-form tags are not shown. -->
+              <div class="ce-sec" id="tf-org-sec">
+                <button type="button" class="ce-sec-toggle" data-action="task-sec-toggle" aria-expanded="false" aria-controls="tf-org-body"><span class="ce-sec-name">Topic and sharing</span><span class="ce-sec-sum" id="tf-org-sum">No topic</span></button>
+                <div class="ce-sec-body" id="tf-org-body" hidden>
+                  <div class="form-group">
+                    <div class="ce-label-row"><label for="tf-topic">Topic</label><span data-help="challenge.topic" data-help-label="Topic"></span></div>
+                    <div class="tf-topic-row"><select id="tf-topic" data-change-action="task-org-sync"><option value="">No topic</option></select><button type="button" class="ce-link" id="tf-topic-new" data-action="task-topic-new">+ New topic</button></div>
+                  </div>
+                  <div class="form-group" id="tf-shared-group">
+                    <div class="ce-seal-row">
+                      <label for="tf-shared" class="checkbox-row ce-switch"><input type="checkbox" role="switch" id="tf-shared" data-change-action="task-org-sync"/><span>Shared with all organisers</span></label>
+                      <span data-help="challenge.shared" data-help-label="Shared with all organisers"></span>
+                    </div>
+                    <p class="settings-help ce-note" id="tf-shared-nearmiss" role="note" hidden></p>
+                  </div>
+                  <p class="settings-help ce-note" id="tf-shared-note" hidden>This question belongs to its event. To share it with every organiser, save it to the Question bank and share the bank question.</p>
+                  <fieldset class="form-group tf-needs" id="tf-needs-group">
+                    <legend>This question needs</legend>
+                    <div id="tf-needs-list"></div>
+                  </fieldset>
                 </div>
               </div>
             </div>
@@ -952,7 +995,7 @@
             <button class="btn sm secondary" data-action="close-task-form">Cancel</button>
             <button class="btn sm secondary" id="save-draft-btn" data-action="save-task" data-status="draft">Save as draft</button>
             <button class="btn sm" id="save-publish-btn" data-action="save-task" data-status="published">Save &amp; publish</button>
-            <button class="btn sm" id="save-task-btn" data-action="save-task" style="display:none">Save challenge</button>
+            <button class="btn sm" id="save-task-btn" data-action="save-task" style="display:none">Save question</button>
           </div>
         </div>
         <div id="admin-task-table-card" class="card table-card"><table id="admin-task-table" class="dense" data-tcols="challenges" style="width:100%">
@@ -962,7 +1005,7 @@
                its card; the columns past the default set are under Columns
                (ui/table-columns.js). -->
           <thead><tr>
-            <th scope="col" class="cb-cell" data-label=""><label class="cb-all"><input type="checkbox" id="select-all-challenges" data-change-action="toggle-all-challenges" aria-label="Select all challenges on this page"/><span class="cb-all-text">Select all</span></label></th>
+            <th scope="col" class="cb-cell" data-label=""><label class="cb-all"><input type="checkbox" id="select-all-challenges" data-change-action="toggle-all-challenges" aria-label="Select all questions on this page"/><span class="cb-all-text">Select all</span></label></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="title">Title<span id="tsort-title-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="difficulty">Difficulty<span id="tsort-difficulty-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="type">Type<span id="tsort-type-icon"></span></th>
@@ -972,16 +1015,19 @@
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="last_changed">Last Changed<span id="tsort-last_changed-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="changed_by">Changed By<span id="tsort-changed_by-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-admin-tasks" data-col="author">Author<span id="tsort-author-icon"></span></th>
-            <th scope="col" data-tcol="tags">Tags</th>
+            <th scope="col" data-tcol="topic">Topic</th>
             <th scope="col" data-tcol="events">Events</th><th scope="col" data-tcol="actions">Actions</th>
           </tr></thead>
           <tbody id="admin-task-body"></tbody>
         </table></div>
         <div id="tasks-pagination" class="pagination"></div>
-        <!-- v7.12.0 — bulk-assign selection bar (mirrors #participants-selection-bar). -->
+        <!-- Stage B (owner ruling, 27 Nov 2026) — the Question bank's ONE door into
+             events: tick questions, then Add to events (one question opens its own
+             dialog, which also takes it out of events; several, the bulk one).
+             Inside an event the one door is + Add from bank, and rows carry no box. -->
         <div id="challenges-selection-bar" class="selection-bar" style="display:none">
           <span id="challenge-selection-count">0 selected</span>
-          <button class="btn sm" id="challenge-selection-bar-assign-btn" data-action="challenges-bulk-assign">Assign to Events</button>
+          <button class="btn sm" id="challenge-selection-bar-assign-btn" data-action="challenges-bulk-assign">Add to events</button>
         </div>
       </div>
 
@@ -1005,8 +1051,6 @@
           <!-- RBAC — People lists participants and organisers; the platform's
                admin accounts are on Users & roles. Ticking this lists them here
                too (global admins only). -->
-          <label class="checkbox-row p-ws-everyone" id="p-admins-scope" hidden><input type="checkbox" id="p-include-admins" data-change-action="p-include-admins"/> Show admin accounts</label>
-          <span data-help="people.admins" data-help-label="Show admin accounts" id="p-admins-scope-help" hidden></span>
           <button type="button" class="btn sm secondary filters-btn" id="p-filters-btn" data-action="filters-toggle" data-panel="p-filters-panel" aria-expanded="false" aria-controls="p-filters-panel">Filters</button>
           <span data-help="lists.filters" data-help-label="Filters"></span>
           <span class="filters-active" id="p-filters-panel-active"></span>
@@ -1035,7 +1079,6 @@
                open their inbox, this hands the organiser a code to read out. -->
           <button class="btn sm secondary" id="desk-invite-btn" data-action="desk-invite" title="Create an account and show a sign-in code, with no email">At the desk</button>
           <span data-help="people.desk" data-help-label="At the desk"></span>
-          <button class="btn sm" id="assign-to-comp-btn" style="display:none">Assign to Events</button>
           <span class="p-toolbar-gap" aria-hidden="true"></span>
           <span class="p-export-wrap"><button type="button" class="btn sm secondary" id="p-export-menu-btn" data-action="kebab-toggle" aria-label="Export — CSV, JSON or import">Export <span aria-hidden="true">▾</span></button><span class="kebab-menu">
             <button id="export-csv-btn" data-action="export-participants-csv">Export CSV</button>
@@ -1046,6 +1089,7 @@
           <button type="button" class="btn sm secondary" id="p-columns-btn" data-action="p-columns" aria-haspopup="dialog" aria-expanded="false">Columns</button>
           <span data-help="people.columns" data-help-label="Columns"></span>
         </div>
+        <p class="p-admins-note" id="p-admins-note" role="status" hidden>This list also shows administrator accounts, because you followed a link to one. Admin accounts are managed on Roles &amp; permissions. <button type="button" class="link-btn-inline" id="p-admins-note-roles" data-action="participant-open-roles" data-email="">Open Roles &amp; permissions</button></p>
         <div class="card table-card p-table-card">
           <table class="dense" id="p-table" data-tcols="participants">
             <thead><tr>
@@ -1087,7 +1131,7 @@
       <!-- Groups tab -->
       <div id="admin-groups-tab" style="display:none">
         <div class="admin-toolbar" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-          <h2 style="margin:0">Participant Groups</h2>
+          <h2 style="margin:0">Groups</h2>
           <span data-help="groups.list" data-help-label="Groups"></span>
           <span style="flex:1"></span>
           <button class="btn sm" data-action="group-create">New Group</button>
@@ -1136,7 +1180,7 @@
             <th scope="col" class="sortable" data-action="sort-submissions" data-col="participant">Participant<span id="sort-sub-participant-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-submissions" data-col="competition">Event<span id="sort-sub-competition-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-submissions" data-col="session">Session<span id="sort-sub-session-icon"></span></th>
-            <th scope="col" class="sortable" data-action="sort-submissions" data-col="task">Challenge<span id="sort-sub-task-icon"></span></th>
+            <th scope="col" class="sortable" data-action="sort-submissions" data-col="task">Question<span id="sort-sub-task-icon"></span></th>
             <th scope="col" class="sortable" data-action="sort-submissions" data-col="event">Activity<span id="sort-sub-event-icon"></span></th>
             <th scope="col">Detail</th>
             <th scope="col" class="sortable num-cell" data-action="sort-submissions" data-col="points">&#916; pts<span id="sort-sub-points-icon"></span></th>
@@ -1161,7 +1205,7 @@
             <button type="button" class="filter-btn" data-action="audit-type" data-type="event" aria-pressed="false">Events</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="session" aria-pressed="false">Sessions</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="person" aria-pressed="false">People</button>
-            <button type="button" class="filter-btn" data-action="audit-type" data-type="challenge_version" aria-pressed="false">Challenge versions</button>
+            <button type="button" class="filter-btn" data-action="audit-type" data-type="challenge_version" aria-pressed="false">Question versions</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="submission" aria-pressed="false">Submissions</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="hint" aria-pressed="false">Hints</button>
             <button type="button" class="filter-btn" data-action="audit-type" data-type="log_event" aria-pressed="false">Log events</button>
@@ -1271,17 +1315,20 @@
              on the left (a <select> on phones), the chosen section on the right.
              The list is BUILT FROM THE MARKUP: every .settings-section below is
              listed, in order, while it holds a card that is not display:none, so
-             a card added to a section renders with no list edit. A
+             a card added to a section renders with no list edit. Each names its
+             group (data-settings-group: people, records, system), captioned in
+             the list. The pages the sidebar opens (People, Groups, Roles &amp;
+             permissions, Audit, the guides) are never repeated here. A
              .settings-card dropped straight into .settings-bento (outside any
              section) is adopted into the section its data-settings-section
-             names, else Platform. The chosen section is remembered per browser
+             names, else General. The chosen section is remembered per browser
              (localStorage "ha:settings-section"). Every card keeps its id,
              data-action and loader. -->
         <div class="settings-shell">
           <nav class="settings-nav" aria-label="Settings sections">
             <label class="settings-pick-label" for="settings-section-pick">Section</label>
             <select id="settings-section-pick" class="settings-section-pick" data-change-action="settings-section-pick" autocomplete="off"></select>
-            <ul id="settings-section-list" class="settings-section-list"></ul>
+            <div id="settings-section-list" class="settings-section-list"></div>
           </nav>
           <div class="settings-bento">
             <!-- v8.3.33 — the pane's own failure state. Every other admin pane
@@ -1290,27 +1337,7 @@
                  sits above every section, so it shows whichever is chosen. -->
             <div id="settings-load-failure" class="card settings-card" style="display:none"></div>
 
-            <div class="settings-section" data-settings-section="platform" data-settings-label="Platform">
-              <div class="card settings-card" id="platform-name-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Platform name</h3><span data-help="settings.platform-name" data-help-label="Platform name"></span></div>
-                <!-- v7.26.0 — the card says what the name reaches; maxlength
-                     matches the server's and swagger's 120. -->
-                <p class="settings-help">Shown in the header, in every email subject and as the <strong>sender name</strong> on all outbound email.</p>
-                <div class="settings-row">
-                  <label for="settings-platform-name">Platform Name</label>
-                  <input type="text" id="settings-platform-name" placeholder="e.g. HackArena" maxlength="120"/>
-                  <button class="btn" data-action="save-platform-name">Save Name</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="settings-section" data-settings-section="look" data-settings-label="Look &amp; appearance">
-              <!-- THE PLATFORM LOOK (superadmin): filled by features/look-admin.js
-                   renderPlatformLookCard from GET /api/admin/settings. -->
-              <div class="card settings-card" id="platform-look-card" style="display:none"></div>
-            </div>
-
-            <div class="settings-section" data-settings-section="accounts" data-settings-label="Sign-in &amp; accounts">
+            <div class="settings-section" data-settings-section="signin" data-settings-group="people" data-settings-label="Sign-in">
               <div class="card settings-card" id="account-approval-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">New accounts</h3><span data-help="settings.approval" data-help-label="New accounts"></span></div>
                 <p class="settings-help">A new account is made once its owner confirms the address with an emailed code. Hold new accounts for approval, or let them play straight away.</p>
@@ -1321,66 +1348,47 @@
                   </label>
                 </div>
               </div>
-            </div>
-
-            <div class="settings-section" data-settings-section="email" data-settings-label="Email">
-              <div class="card settings-card" id="email-test-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Outbound email</h3><span data-help="settings.test-email" data-help-label="Outbound email"></span></div>
-                <p class="settings-help" id="email-relay-status" role="status">Checking the mail relay…</p>
+              <!-- The break-glass account's own card: rendered only in that
+                   session (the server refuses every other one, user-backed
+                   superadmins too). -->
+              <div class="card settings-card" id="breakglass-account-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Break-glass account</h3><span data-help="settings.breakglass" data-help-label="Break-glass account"></span></div>
+                <p class="settings-help">The one account that signs in with a password instead of an emailed code.</p>
                 <div class="settings-row">
-                  <label for="settings-test-email-to">Send a test to</label>
-                  <input type="email" id="settings-test-email-to" placeholder="you@company.com" autocomplete="off" maxlength="254"/>
-                  <button class="btn secondary" data-action="send-test-email">Send test email</button>
+                  <label for="settings-breakglass-username">Username</label>
+                  <input type="text" id="settings-breakglass-username" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="settings-breakglass-hint"/>
+                  <button class="btn" data-action="save-breakglass-username">Save username</button>
+                  <p class="settings-hint" id="settings-breakglass-hint">3 to 64 characters, no spaces and no @. It may not be any account's email address.</p>
                 </div>
-              </div>
-              <div class="card settings-card" id="unsubscribe-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Unsubscribe List</h3><span data-help="settings.unsubscribe" data-help-label="Unsubscribe list"></span></div>
-                <p class="settings-help">People who opted out of bulk email. Transactional email still reaches them.</p>
-                <!-- v7.20.7 — static search, so the term survives the re-render
-                     that follows every Remove. -->
-                <div class="search-wrap"><input id="unsub-search" placeholder="Search addresses..." aria-label="Search unsubscribed addresses" data-input-action="unsub-search"/><button class="search-clear hidden" id="unsub-search-clear" data-action="unsub-search-clear" aria-label="Clear unsubscribed search"><span aria-hidden="true">×</span> Clear</button></div>
-                <div id="unsubscribe-list-body" class="settings-scroll"></div>
-              </div>
-              <!-- Event team reports — the domains a team member's address may be at
-                   (features/event-team.js loads it; superadmin edits, global admins read). -->
-              <div class="card settings-card" id="team-domains-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Event team report domains</h3><span data-help="settings.team-domains" data-help-label="Event team report domains"></span></div>
-                <p class="settings-help">Event team reports (lead lists, scorecards) go only to addresses at these domains. One per line, for example company.com; a subdomain counts.</p>
-                <textarea id="team-domains-input" rows="4" maxlength="4000" aria-label="Allowed domains, one per line"></textarea>
-                <div class="settings-row"><button class="btn secondary" id="team-domains-save" data-action="team-domains-save">Save domains</button><span id="team-domains-note" class="settings-help" role="status"></span></div>
               </div>
             </div>
 
-            <div class="settings-section" data-settings-section="certificates" data-settings-label="Certificates design">
-              <!-- The platform certificate design. Events inherit it and may
-                   override it from their workspace's Certificates tab. -->
-              <div class="card settings-card cert-wiz-card" id="cert-config-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Certificate design</h3><span data-help="settings.certificates" data-help-label="Certificate design"></span></div>
-                <p class="settings-help">The wording, colours and parts of every certificate the platform issues.</p>
-                <div id="cert-config-body"></div>
+            <!-- The staff-teams directory (features/staff-teams.js loadStaffTeamsCard,
+                 GET /api/admin/staff-teams): teams of colleagues an event's Team &amp;
+                 reports, or its organisers, take in one step. Shown to a role
+                 holding teams.view; its writes to one holding teams.manage. -->
+            <div class="settings-section" data-settings-section="staff-teams" data-settings-group="people" data-settings-label="Staff teams">
+              <div class="card settings-card" id="staff-teams-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Staff teams</h3><span data-help="settings.staff-teams" data-help-label="Staff teams"></span></div>
+                <p class="settings-help">Colleagues who run events together, with the role each usually takes. An event can add a whole team to its Team &amp; reports, or make it its organisers.</p>
+                <div id="staff-teams-body"></div>
               </div>
             </div>
 
-            <div class="settings-section" data-settings-section="cxone" data-settings-label="Checkmarx One">
-              <div class="card settings-card" id="cxone-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Global Default CheckmarxOne Integration</h3><span data-help="settings.cxone" data-help-label="Checkmarx One integration"></span></div>
-                <p class="settings-help">Used by every event without its own Checkmarx One settings.</p>
-                <div id="cxone-status" class="settings-status"></div>
-                <div class="settings-row">
-                  <label for="cxone-api-key">API Key</label>
-                  <input type="password" id="cxone-api-key" placeholder="Paste API key" autocomplete="off" data-block-clipboard="1" aria-describedby="cxone-api-key-hint"/>
-                  <span data-help="settings.cxone-key" data-help-label="API key"></span>
-                  <p class="settings-hint" id="cxone-api-key-hint">Tenant and URLs are derived automatically from the key.</p>
-                </div>
-                <div class="settings-row">
-                  <label for="cxone-group-name">Read-Only Group Name</label>
-                  <input type="text" id="cxone-group-name" placeholder="e.g. VisibleToAll"/>
-                  <span data-help="settings.cxone-group" data-help-label="Read-only group"></span>
-                </div>
-                <div class="settings-actions">
-                  <button class="btn" data-action="save-cxone-settings">Save Integration</button>
-                  <button class="btn danger sm" id="cxone-remove-btn" style="display:none" data-action="remove-cxone-settings">Remove</button>
-                </div>
+            <div class="settings-section" data-settings-section="cxone-audit" data-settings-group="records" data-settings-label="CxOne API audit">
+              <!-- Every call the platform made to Checkmarx One (settings-admin.js
+                   loadCxoneAuditCard): the audit trail's own read, narrowed to the
+                   Checkmarx One activity and scoped per row as the Audit page is. -->
+              <div class="card settings-card" id="cxone-audit-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Checkmarx One API activity</h3><span data-help="settings.cxone-audit" data-help-label="Checkmarx One API activity"></span></div>
+                <p class="settings-help">Each account the platform set up, linked, refused or gave up on, each group grant and each removal, with its outcome, newest first. You see the rows your role may see on the Audit page.</p>
+                <!-- Scrolls in its own box, keeping its headings on a phone, as the
+                     removals table below it does (the same wrapper). -->
+                <div class="cxone-wd-scroll"><table class="dense cxone-wd-table" data-tcols="cxone-audit">
+                  <thead><tr><th scope="col" data-col="at">Time</th><th scope="col" data-col="activity">Activity</th><th scope="col" data-col="event">Event</th><th scope="col" data-col="person">Person</th><th scope="col" data-col="result">Result</th><th scope="col" data-col="detail">Details</th></tr></thead>
+                  <tbody id="cxone-audit-body"></tbody>
+                </table></div>
+                <div id="cxone-audit-pagination" class="pagination"><span id="cxone-audit-pagination-bar" class="pagination-bar"></span></div>
               </div>
               <!-- v8.12.7 — Checkmarx One account removals. Superadmin-only, and
                    hidden too while Checkmarx One is not in use and nothing is
@@ -1393,33 +1401,111 @@
               </div>
             </div>
 
-            <div class="settings-section" data-settings-section="data" data-settings-label="Data &amp; retention">
+            <div class="settings-section" data-settings-section="general" data-settings-group="system" data-settings-label="General">
+              <div class="card settings-card" id="cxone-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Default Checkmarx One integration</h3><span data-help="settings.cxone" data-help-label="Checkmarx One integration"></span></div>
+                <p class="settings-help">Used by every event without its own Checkmarx One settings.</p>
+                <div id="cxone-status" class="settings-status"></div>
+                <div class="settings-row">
+                  <span class="help-label-row settings-row-label"><label for="cxone-api-key">API Key</label><span data-help="settings.cxone-key" data-help-label="API key"></span></span>
+                  <input type="password" id="cxone-api-key" placeholder="Paste API key" autocomplete="off" data-block-clipboard="1" aria-describedby="cxone-api-key-hint"/>
+                  <p class="settings-hint" id="cxone-api-key-hint">Tenant and URLs are derived automatically from the key.</p>
+                </div>
+                <div class="settings-row">
+                  <span class="help-label-row settings-row-label"><label for="cxone-group-name">Read-Only Group Name</label><span data-help="settings.cxone-group" data-help-label="Read-only group"></span></span>
+                  <input type="text" id="cxone-group-name" placeholder="e.g. VisibleToAll"/>
+                </div>
+                <div class="settings-actions">
+                  <button class="btn" data-action="save-cxone-settings">Save Integration</button>
+                  <button class="btn danger sm" id="cxone-remove-btn" style="display:none" data-action="remove-cxone-settings">Remove</button>
+                </div>
+              </div>
               <div class="card settings-card" id="retention-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">Event history retention</h3><span data-help="settings.retention" data-help-label="Event history retention"></span></div>
                 <div id="retention-body"></div>
               </div>
-            </div>
-
-            <div class="settings-section" data-settings-section="alerts" data-settings-label="Alerts">
               <div class="card settings-card" id="alerts-card" style="display:none">
                 <div class="settings-card-head"><h3 class="settings-heading">Blocked-address alerts</h3><span data-help="settings.alerts" data-help-label="Blocked-address alerts"></span></div>
                 <div id="alerts-body"></div>
               </div>
+              <!-- Event team reports — the domains a team member's address may be at
+                   (features/event-team.js loads it; superadmin edits, global admins read). -->
+              <div class="card settings-card" id="team-domains-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Event team report domains</h3><span data-help="settings.team-domains" data-help-label="Event team report domains"></span></div>
+                <p class="settings-help">Event team reports (lead lists, scorecards) go only to addresses at these domains. One per line, for example company.com; a subdomain counts.</p>
+                <textarea id="team-domains-input" rows="4" maxlength="4000" aria-label="Allowed domains, one per line"></textarea>
+                <div class="settings-row"><button class="btn secondary" id="team-domains-save" data-action="team-domains-save">Save domains</button><span id="team-domains-note" class="settings-help" role="status"></span></div>
+              </div>
             </div>
 
-            <div class="settings-section" data-settings-section="breakglass" data-settings-label="Break-glass">
-              <!-- The break-glass account's own card: rendered only in that
-                   session (the server refuses every other one, user-backed
-                   superadmins too), so the section is listed only then. -->
-              <div class="card settings-card" id="breakglass-account-card" style="display:none">
-                <div class="settings-card-head"><h3 class="settings-heading">Break-glass account</h3><span data-help="settings.breakglass" data-help-label="Break-glass account"></span></div>
-                <p class="settings-help">The one account that signs in with a password instead of an emailed code.</p>
+            <div class="settings-section" data-settings-section="branding" data-settings-group="system" data-settings-label="Branding">
+              <div class="card settings-card" id="platform-name-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Platform name</h3><span data-help="settings.platform-name" data-help-label="Platform name"></span></div>
+                <!-- v7.26.0 — the card says what the name reaches; maxlength
+                     matches the server's and swagger's 120. -->
+                <p class="settings-help">Shown in the header, in every email subject and as the <strong>sender name</strong> on all outbound email.</p>
                 <div class="settings-row">
-                  <label for="settings-breakglass-username">Username</label>
-                  <input type="text" id="settings-breakglass-username" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="settings-breakglass-hint"/>
-                  <button class="btn" data-action="save-breakglass-username">Save username</button>
-                  <p class="settings-hint" id="settings-breakglass-hint">3 to 64 characters, no spaces and no @. It may not be any account's email address.</p>
+                  <label for="settings-platform-name">Platform Name</label>
+                  <input type="text" id="settings-platform-name" placeholder="e.g. HackArena" maxlength="120"/>
+                  <button class="btn" data-action="save-platform-name">Save Name</button>
                 </div>
+              </div>
+              <!-- THE PLATFORM LOOK: filled by features/look-admin.js
+                   renderPlatformLookCard from GET /api/admin/settings. -->
+              <div class="card settings-card" id="platform-look-card" style="display:none"></div>
+              <!-- The platform certificate design. Events inherit it and may
+                   override it from their workspace's Certificates tab. -->
+              <div class="card settings-card cert-wiz-card" id="cert-config-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Certificate design</h3><span data-help="settings.certificates" data-help-label="Certificate design"></span></div>
+                <p class="settings-help">The wording, colours and parts of every certificate the platform issues.</p>
+                <div id="cert-config-body"></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="email" data-settings-group="system" data-settings-label="Email (SMTP)">
+              <!-- The mail server in use (loadSmtpCard, GET /api/admin/smtp-settings):
+                   every reader sees it and where each value comes from; a
+                   superadmin also gets the form. -->
+              <div class="card settings-card" id="smtp-settings-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Mail server (SMTP)</h3><span data-help="settings.smtp" data-help-label="Mail server"></span></div>
+                <p class="settings-help">The server every email the platform sends goes through: sign-in codes, invitations, certificates and reports.</p>
+                <div id="smtp-settings-body"></div>
+              </div>
+              <!-- Outbound email: only for a role that may send a test but not read
+                   the mail server (ops.email without settings.view); everyone else
+                   has the test send and relay status on the card above. -->
+              <div class="card settings-card" id="email-test-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Outbound email</h3><span data-help="settings.test-email" data-help-label="Outbound email"></span></div>
+                <p class="settings-help" id="email-relay-status" role="status">Checking the mail relay…</p>
+                <div class="settings-row">
+                  <label for="settings-test-email-to">Send a test to</label>
+                  <input type="email" id="settings-test-email-to" placeholder="you@company.com" autocomplete="off" maxlength="254"/>
+                  <button class="btn secondary" data-action="send-test-email">Send test email</button>
+                </div>
+              </div>
+              <div class="card settings-card" id="unsubscribe-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Unsubscribe list</h3><span data-help="settings.unsubscribe" data-help-label="Unsubscribe list"></span></div>
+                <p class="settings-help">People who opted out of bulk email. Transactional email still reaches them.</p>
+                <!-- v7.20.7 — static search, so the term survives the re-render
+                     that follows every Remove. -->
+                <div class="search-wrap"><input id="unsub-search" placeholder="Search addresses..." aria-label="Search unsubscribed addresses" data-input-action="unsub-search"/><button class="search-clear hidden" id="unsub-search-clear" data-action="unsub-search-clear" aria-label="Clear unsubscribed search"><span aria-hidden="true">×</span> Clear</button></div>
+                <div id="unsubscribe-list-body" class="settings-scroll"></div>
+              </div>
+            </div>
+
+            <div class="settings-section" data-settings-section="health" data-settings-group="system" data-settings-label="About &amp; health">
+              <!-- About & health (loadSystemHealthCard, GET /api/admin/system-health):
+                   what is running and how it is, every figure from the route. -->
+              <div class="card settings-card" id="system-health-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">This server</h3><span data-help="settings.health" data-help-label="This server"></span></div>
+                <div id="system-health-body" role="status"></div>
+              </div>
+              <!-- The newest release notes (loadReleaseNotesCard: docs/release-notes.md,
+                   admins only, as the document is). -->
+              <div class="card settings-card" id="release-notes-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Release notes</h3><span data-help="settings.release-notes" data-help-label="Release notes"></span></div>
+                <div id="release-notes-body" class="release-notes-inline"></div>
+                <div class="settings-actions"><button class="btn secondary" data-action="release-notes-open">All release notes</button></div>
               </div>
             </div>
           </div>
@@ -1431,7 +1517,7 @@
            that run the platform and the roles they hold. The body is rendered. -->
       <div id="admin-users-tab" class="admin-tab-pane" style="display:none">
         <div class="ua-head">
-          <div class="help-label-row"><h2 class="admin-pane-title" tabindex="-1">Users &amp; roles</h2><span data-help="users.pane" data-help-label="Users and roles"></span></div>
+          <div class="help-label-row"><h2 class="admin-pane-title" tabindex="-1">Roles &amp; permissions</h2><span data-help="users.pane" data-help-label="Roles and permissions"></span></div>
           <p class="t-small">The people who run events and the platform, and what each role may do. Participants are under People.</p>
         </div>
         <div id="ua-body"></div>
@@ -1539,17 +1625,17 @@
         <div class="analytics-summary" id="analytics-summary"></div>
         <div class="card" id="analytics-table-card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-            <div class="help-label-row"><h3 style="margin:0">Per-challenge breakdown</h3><span data-help="analytics.columns" data-help-label="Breakdown columns"></span></div>
+            <div class="help-label-row"><h3 style="margin:0">Per-question breakdown</h3><span data-help="analytics.columns" data-help-label="Breakdown columns"></span></div>
             <span id="analytics-table-meta" style="font-size:var(--fs-caption);color:var(--muted)"></span>
             <!-- v7.20.7 — static chrome, so a half-typed query survives the
                  re-render every filter change triggers. -->
-            <div class="search-wrap" style="margin-left:auto"><input id="analytics-search" placeholder="Search challenges..." aria-label="Search analytics rows by challenge number, title, difficulty or tag" data-input-action="analytics-search"/><button class="search-clear hidden" id="analytics-search-clear" data-action="analytics-search-clear" aria-label="Clear analytics search"><span aria-hidden="true">×</span> Clear</button></div>
+            <div class="search-wrap" style="margin-left:auto"><input id="analytics-search" placeholder="Search questions..." aria-label="Search analytics rows by question number, title, difficulty or tag" data-input-action="analytics-search"/><button class="search-clear hidden" id="analytics-search-clear" data-action="analytics-search-clear" aria-label="Clear analytics search"><span aria-hidden="true">×</span> Clear</button></div>
             <!-- v7.24.0 — exports the whole FILTERED set (not the page on
                  screen), in the order the table is showing. Static chrome for
                  the same reason as the search box beside it. -->
             <button class="btn sm secondary" id="analytics-export-csv-btn" data-action="analytics-export-csv">Export CSV</button>
           </div>
-          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch" tabindex="0" role="region" aria-label="Per-challenge breakdown table">
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch" tabindex="0" role="region" aria-label="Per-question breakdown table">
             <table id="analytics-table" class="dense" data-tcols="analytics">
               <thead>
                 <tr>
@@ -1571,7 +1657,66 @@
             </table>
           <div class="pagination" id="analytics-pagination"></div>
           </div>
-          <p id="analytics-empty" style="display:none;color:var(--muted);text-align:center;padding:24px 0">No challenge activity in the selected window.</p>
+          <p id="analytics-empty" style="display:none;color:var(--muted);text-align:center;padding:24px 0">No question activity in the selected window.</p>
+        </div>
+      </div>
+      <!-- Marketing (features/marketing-admin.js; GET /api/admin/analytics/marketing):
+           the platform's success figures across events. The filter bar is static,
+           a SIBLING of #mk-body and the table body, which each answer re-renders. -->
+      <div id="admin-marketing-tab" style="display:none">
+        <div class="help-label-row"><h2 class="admin-pane-title">Marketing</h2><span data-help="marketing.page" data-help-label="Marketing"></span></div>
+        <p class="mk-lede">How the platform is doing across events, counted from what it recorded: each figure says what it counts and out of what. Nothing here is an estimate.</p>
+        <div class="card mk-filterbar" id="mk-filterbar">
+          <div class="mk-filter-row">
+            <div class="mk-field">
+              <div class="help-label-row"><label for="mk-preset">Events that started</label><span data-help="marketing.range" data-help-label="Range"></span></div>
+              <select id="mk-preset" data-change-action="mk-preset">
+                <option value="30d">In the last 30 days</option>
+                <option value="90d" selected>In the last 90 days</option>
+                <option value="365d">In the last 12 months</option>
+                <option value="ytd">This year</option>
+                <option value="all">At any time</option>
+                <option value="custom">Between two dates</option>
+              </select>
+            </div>
+            <div class="mk-custom" id="mk-custom" hidden>
+              <div class="mk-field"><label for="mk-from">From</label><input type="date" id="mk-from" data-change-action="mk-date"/></div>
+              <div class="mk-field"><label for="mk-to">To (included)</label><input type="date" id="mk-to" data-change-action="mk-date"/></div>
+            </div>
+            <fieldset class="mk-field mk-kinds-field"><legend>Event types (none ticked: every type)</legend><div class="mk-kinds" id="mk-kinds"></div></fieldset>
+          </div>
+          <details class="mk-events-pick" id="mk-events-pick"><summary id="mk-events-summary">Events: all in the range</summary><div id="mk-events-list"></div></details>
+          <p class="mk-status" id="mk-status" role="status"></p>
+        </div>
+        <div id="mk-body"></div>
+        <!-- The heading, then the table component's bar (Columns, Sort & filter),
+             then the table: the bar is inserted before the table's own
+             .table-card host, which sits INSIDE this card. -->
+        <div class="card mk-table-card" id="mk-table-card" hidden>
+          <div class="mk-table-head">
+            <div class="help-label-row"><h3>Per event</h3><span data-help="marketing.per-event" data-help-label="Per event"></span></div>
+            <span id="mk-table-meta" class="mk-table-meta"></span>
+            <button class="btn sm secondary" id="mk-export-csv-btn" data-action="mk-export-csv">Export CSV</button>
+          </div>
+          <div class="table-card mk-table-host">
+          <table id="mk-table" class="dense" data-tcols="marketing">
+            <thead>
+              <tr>
+                <th scope="col" data-tcol="name">Event</th>
+                <th scope="col" data-tcol="kind">Type</th>
+                <th scope="col" data-tcol="start">Started</th>
+                <th scope="col" data-tcol="joined" class="num-cell">Joined</th>
+                <th scope="col" data-tcol="played" class="num-cell">Played</th>
+                <th scope="col" data-tcol="solve_rate" class="num-cell">Solve rate</th>
+                <th scope="col" data-tcol="completion" class="num-cell">Completion</th>
+                <th scope="col" data-tcol="certificates" class="num-cell">Certificates</th>
+                <th scope="col" data-tcol="hot_leads" class="num-cell">Hot leads</th>
+              </tr>
+            </thead>
+            <tbody id="mk-table-body"></tbody>
+          </table>
+          </div>
+          <div class="pagination" id="mk-pagination"></div>
         </div>
       </div>
       </div><!-- /.admin-content -->

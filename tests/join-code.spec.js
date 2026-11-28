@@ -460,8 +460,8 @@ test.describe("v8.1.0 — a submit that fails says so", () => {
       headers: H(csrf),
       data: { title: `${uniq()} T`, description: "d", difficulty: "easy", answer_type: "text", correct_answer: "right", status: "published" },
     });
-    const taskId = (await tr.json()).id;
-    await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+    const bankId = (await tr.json()).id;
+    const taskId = (await (await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
 
     const label = uniq();
     const email = `${label}@company.example`;

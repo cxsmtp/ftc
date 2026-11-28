@@ -53,17 +53,17 @@ test.describe("a qualifying challenge on the organiser's screens", () => {
     } finally { await api.dispose(); }
   });
 
-  test("the create form's Challenges section leaves it out, and its tag out of the chips", async ({ page }) => {
+  // Stage B (owner ruling, 27 Nov 2026) — the create form no longer lists
+  // questions at all (the event's one door is + Add from bank), so it cannot
+  // offer a qualifying one; the Question bank row is where both are read.
+  test("the create form lists no questions, and the Question bank lists both with only the ordinary one's topic", async ({ page }) => {
     await adminLogin(page);
     await openCompCreateForm(page, "tournament", { advanced: false });
     const form = page.locator("#comp-form-overlay");
-    // CONTROL: the tag both challenges carry is a chip, so the chips are drawn.
-    await expect(form.locator(`#comp-ch-tags [data-ch-tag="${SHARED}"]`)).toHaveCount(1, { timeout: 15000 });
-    await expect(form.locator(`#comp-ch-tags [data-ch-tag="${QTAG}"]`), "a qualifying tag is never a chip").toHaveCount(0);
-    await form.locator("#comp-ch-search").pressSequentially(STAMP, { delay: 20 });
-    const row = (title) => form.locator("#comp-ch-list .picker-row", { hasText: title });
-    await expect(row(T.plain), "CONTROL: the ordinary challenge is listed").toHaveCount(1);
-    await expect(row(T.qual), "the qualifying challenge is not: an event gets its own copies").toHaveCount(0);
+    await expect(form.locator("#comp-name"), "PRECONDITION: the form is open").toBeVisible();
+    await expect(form.locator("#comp-ch"), "no Challenges section").toHaveCount(0);
+    await expect(form, "the qualifying challenge is not offered").not.toContainText(T.qual);
+    await expect(form, "nor the ordinary one: the form picks none").not.toContainText(T.plain);
   });
 
   test("View as participant shows it as a Quick question, with no difficulty or points", async ({ page }) => {
@@ -201,14 +201,14 @@ test.describe("an event asks each qualifying question once (ruling N7)", () => {
     // B's own four are listed (ticked: in the event); A's four are not.
     for (const k of Object.keys(W.qb)) await expect(row(W.qb[k].id), `B's own ${k}`).toBeChecked();
     for (const k of Object.keys(W.qa)) await expect(row(W.qa[k].id), `A's ${k}: B already asks it`).toHaveCount(0);
-    await expect(overlay.locator("#task-picker-note")).toContainText(/\d+ qualifying question\(s\) are not listed: this event already asks a question on each one's topic\./);
+    await expect(overlay.locator("#task-picker-note")).toContainText(/\d+ quick question\(s\) are not listed: this event already asks each of them\./);
     // A NEW topic is listed — both questions on it — and only one may be ticked.
     const [o1, o2] = W.own;
     await expect(row(o1)).toBeEnabled();
     await expect(row(o2)).toBeEnabled();
     await row(o1).check();
     await expect(row(o2), "a second question on the topic is not offered").toBeDisabled();
-    await expect(overlay.locator(".picker-row", { has: page.locator(`input[value="${o2}"]`) }).locator(".picker-row-flag.is-topic")).toHaveText("Same topic as a ticked question");
+    await expect(overlay.locator(".picker-row", { has: page.locator(`input[value="${o2}"]`) }).locator(".picker-row-flag.is-topic")).toHaveText("Same quick question as a ticked one");
     await expect(row(o1), "the tick keeps its focus").toBeFocused();
     await row(o1).uncheck();
     await expect(row(o2), "free again").toBeEnabled();
@@ -244,7 +244,7 @@ test.describe("an event asks each qualifying question once (ruling N7)", () => {
       await expect(row(q.id)).toBeEnabled();
       await expect(row(q.id)).not.toBeChecked();
     }
-    await expect(overlay.locator("#task-picker-note"), "nothing left out").not.toContainText("qualifying question");
+    await expect(overlay.locator("#task-picker-note"), "nothing left out").not.toContainText("quick question");
     await row(W.qa.developers.id).check();
     await expect(overlay.locator("#task-picker-count")).toContainText("1 to add");
     await overlay.locator("#task-picker-save").click();
@@ -261,7 +261,7 @@ test.describe("an event asks each qualifying question once (ruling N7)", () => {
     await expect(row(W.qa.developers.id), "the shared one is in D").toBeChecked();
     await expect(row(W.qb.developers.id), "the same topic's other question is left out").toHaveCount(0);
     await expect(row(W.qb.scanner.id), "CONTROL: a topic D does not ask").toBeEnabled();
-    await expect(overlay.locator("#task-picker-note")).toContainText("qualifying question(s)");
+    await expect(overlay.locator("#task-picker-note")).toContainText("quick question(s)");
   });
 
   test("the Assign dialog offers an event that already asks the topic disabled, with the reason; the bulk door's skip is in its toast", async ({ page }) => {
@@ -368,7 +368,7 @@ test.describe("an event asks each qualifying question once, through a draft or a
     await expect(overlay.locator(".picker-row", { has: page.locator(`input[value="${V.eHidden}"]`) }).locator(".picker-row-flag", { hasText: "Hidden" })).toHaveCount(1);
     await expect(row(V.eDraft)).toHaveCount(0);
     // Each count is anchored on the dash the note writes before it, so "11" is no match.
-    await expect(overlay.locator("#task-picker-note"), "the one draft, counted").toContainText(" — 1 assigned draft challenge(s) are not listed and are unaffected.");
+    await expect(overlay.locator("#task-picker-note"), "the one draft, counted").toContainText(" — 1 assigned draft question(s) are not listed and are unaffected.");
     // CONTROL: a topic E does not ask is listed, offered, not ticked.
     await expect(row(V.f.fresh), "F's question on a topic E does not ask").toHaveCount(1);
     await expect(row(V.f.fresh)).toBeEnabled();
@@ -378,7 +378,7 @@ test.describe("an event asks each qualifying question once, through a draft or a
     await expect(row(V.f.hidden), "F's question on the topic E's HIDDEN question asks: not listed").toHaveCount(0);
     // The whole note: the listing's count, then exactly these two parts, by value.
     await expect(overlay.locator("#task-picker-note"), "the draft and F's two questions, counted").toHaveText(
-      /^[^—]+ — 1 assigned draft challenge\(s\) are not listed and are unaffected\. — 2 qualifying question\(s\) are not listed: this event already asks a question on each one's topic\.$/);
+      /^[^—]+ — 1 assigned draft question\(s\) are not listed and are unaffected\. — 2 quick question\(s\) are not listed: this event already asks each of them\.$/);
     await overlay.locator('[data-action="overlay-close"]').click();
     await expect(overlay).toHaveCount(0);
 
@@ -409,13 +409,13 @@ test.describe("an event asks each qualifying question once, through a draft or a
 test("the challenge import's summary names each qualifying skip and what to change", async ({ page }) => {
   await adminLogin(page);
   const note = (d) => page.evaluate((x) => window._importDropNote(x), d);
-  expect(await note({ qualifying_key_held_skipped: 1 })).toContain("1 challenge was not overwritten because the file would make it a qualifying question on a topic an event holding it already asks (an event asks each one once)");
-  expect(await note({ qualifying_key_held_skipped: 2 })).toContain("2 challenges were not overwritten because the file would make them qualifying questions on a topic an event holding them already asks");
+  expect(await note({ qualifying_key_held_skipped: 1 })).toContain("1 question was not overwritten because the file would make it a qualifying question on a topic an event holding it already asks (an event asks each one once)");
+  expect(await note({ qualifying_key_held_skipped: 2 })).toContain("2 questions were not overwritten because the file would make them qualifying questions on a topic an event holding them already asks");
   expect(await note({ qualifying_options_fixed_skipped: 1 })).toContain("1 qualifying question was not overwritten because people have answered it and the file moves or removes options (reword an option where it stands, or add one at the end)");
   expect(await note({ qualifying_options_fixed_skipped: 3 })).toContain("3 qualifying questions were not overwritten because people have answered them");
-  expect(await note({ qualifying_copy_skipped: 1 })).toContain("1 challenge was not overwritten because its row could mean more than one challenge: several share the title (each event's own copy of a qualifying question) or several rows of the file overwrite it (edit the question in its event, or choose Add New)");
-  expect(await note({ qualifying_copy_skipped: 2 })).toContain("2 challenges were not overwritten because their rows could mean more than one challenge");
-  expect(await note({ qualifying_tag_invalid_skipped: 1 })).toContain("1 challenge was not imported because its qualifying tag is not qualifying:<key>");
-  expect(await note({ qualifying_tag_invalid_skipped: 2 })).toContain("2 challenges were not imported because their qualifying tag is not qualifying:<key>");
+  expect(await note({ qualifying_copy_skipped: 1 })).toContain("1 question was not overwritten because its row could mean more than one question: several share the title (each event's own copy of a qualifying question) or several rows of the file overwrite it (edit the question in its event, or choose Add New)");
+  expect(await note({ qualifying_copy_skipped: 2 })).toContain("2 questions were not overwritten because their rows could mean more than one question");
+  expect(await note({ qualifying_tag_invalid_skipped: 1 })).toContain("1 question was not imported because its qualifying tag is not qualifying:<key>");
+  expect(await note({ qualifying_tag_invalid_skipped: 2 })).toContain("2 questions were not imported because their qualifying tag is not qualifying:<key>");
   expect(await note({ qualifying_key_held_skipped: 0, qualifying_options_fixed_skipped: 0, qualifying_copy_skipped: 0, qualifying_tag_invalid_skipped: 0 }), "CONTROL: nothing skipped, nothing said").toBe("");
 });

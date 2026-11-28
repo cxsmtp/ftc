@@ -837,7 +837,13 @@ test("S: the attempt loop, its bounds, its sqlite3 reads and the server's storag
   const bad = [];
   for (const rel of sources) {
     const src = stripJsComments(fs.readFileSync(path.join(ROOT, rel), "utf8"));
-    count.attachments.ins += (src.match(/INSERT\s+(?:OR\s+\w+\s+)?INTO\s+task_attachments\s*\(/g) || []).length;
+    // A COPY of a stored row (an event's own copy of a question, lib/event-copies.js)
+    // writes no path of its own: `INSERT ... SELECT ... storage_path ... FROM
+    // task_attachments`, the path one a row already holds. It needs no generator;
+    // anything else naming a path is an INSERT that does.
+    const copies = (src.match(/INSERT\s+INTO\s+task_attachments\s*\([^)]*\)\s*SELECT\b[^;"'`]*?\bstorage_path\b[^;"'`]*?\bFROM\s+task_attachments\b/g) || []).length;
+    if (rel === "lib/event-copies.js") expect(copies, "anti-vacuity: the event copy's INSERT ... SELECT is recognised").toBe(1);
+    count.attachments.ins += (src.match(/INSERT\s+(?:OR\s+\w+\s+)?INTO\s+task_attachments\s*\(/g) || []).length - copies;
     count["attachments-staging"].ins += (src.match(/INSERT\s+(?:OR\s+\w+\s+)?INTO\s+task_attachments_staging\s*\(/g) || []).length;
     for (const m of src.matchAll(/path(?:\.posix)?\.(?:join|resolve)\(\s*["'`](attachments(?:-staging)?)["'`]\s*,([^)]*)\)/g)) {
       const ok = /^path\.posix\.join\(\s*"(attachments(?:-staging)?)",\s*`\$\{([\w.]+)\}\.zip`\s*\)$/.exec(m[0]);

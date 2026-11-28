@@ -28,13 +28,19 @@ const { H, makeParticipant, makeCompetition, makeTask, assignTask, enrol } = req
 
 test.use({ baseURL: BASE });
 
-/** A live event of its own with a viewer and a solver, two challenges (nothing auto-ends: checklist 1). */
+/**
+ * A live event of its own with a viewer and a solver, two challenges (nothing
+ * auto-ends: checklist 1). It runs on the ENTRY clock: the viewer only enters
+ * and reads the board, and these tests are about the board's poll, not about
+ * when a clock starts (on the first-open clock, the default, a viewer who never
+ * opened a challenge is not on the board yet).
+ */
 async function liveEvent(label, extra = {}) {
   const { api: sa, csrf } = await apiLogin("superadmin");
   try {
     const viewer = await makeParticipant(sa, csrf, `${label}-v`);
     const solver = await makeParticipant(sa, csrf, `${label}-s`);
-    const comp = await makeCompetition(sa, csrf, label, extra);
+    const comp = await makeCompetition(sa, csrf, label, { clock_start: "entry", ...extra });
     const t1 = await makeTask(sa, csrf, `${label}-1`);
     const t2 = await makeTask(sa, csrf, `${label}-2`);
     for (const t of [t1, t2]) await assignTask(sa, csrf, t.id, [comp.id]);

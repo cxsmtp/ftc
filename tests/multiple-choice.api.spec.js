@@ -53,12 +53,13 @@ async function seedLiveChoice(sa, saCsrf, choices, extra = {}) {
   expect(live, "the seed's live competition must exist").toBeTruthy();
   const r = await mkChoiceTask(sa, saCsrf, choices, { status: "published", ...extra });
   expect(r.ok(), `seed task: ${r.status()} ${await r.text()}`).toBeTruthy();
-  const taskId = (await r.json()).id;
-  const asg = await sa.post(`/api/admin/tasks/${taskId}/competitions`, {
+  const bankId = (await r.json()).id;
+  const asg = await sa.post(`/api/admin/tasks/${bankId}/competitions`, {
     headers: GUH(saCsrf), data: { competitionIds: [live.id] },
   });
   expect(asg.ok(), `assign to live: ${asg.status()} ${await asg.text()}`).toBeTruthy();
-  return { taskId, compId: live.id };
+  // The live event's OWN copy (lib/event-copies.js): what alice answers and an edit is made to.
+  return { taskId: (await asg.json()).copies[0].task_id, bankId, compId: live.id };
 }
 
 /**
@@ -96,11 +97,12 @@ async function endedCompWithChoiceTask(sa, saCsrf, choices) {
   const compId = (await compR.json()).competition.id;
   const tR = await mkChoiceTask(sa, saCsrf, choices, { status: "published" });
   expect(tR.ok(), `task: ${tR.status()} ${await tR.text()}`).toBeTruthy();
-  const taskId = (await tR.json()).id;
-  const asg = await sa.post(`/api/admin/tasks/${taskId}/competitions`, {
+  const bankId = (await tR.json()).id;
+  const asg = await sa.post(`/api/admin/tasks/${bankId}/competitions`, {
     headers: GUH(saCsrf), data: { competitionIds: [compId] },
   });
   expect(asg.ok(), `assign: ${asg.status()} ${await asg.text()}`).toBeTruthy();
+  const taskId = (await asg.json()).copies[0].task_id;   // the event's own copy: the one frozen
   const end = await sa.post(`/api/admin/competitions/${compId}/end-now`, { headers: { "x-csrf-token": saCsrf } });
   expect(end.ok(), `end-now: ${end.status()} ${await end.text()}`).toBeTruthy();
   return { compId, taskId };
@@ -237,11 +239,13 @@ test.describe("Multiple choice — what a participant may see (v7.19.0)", () => 
     const title = `MCSeed ${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const r = await mkChoiceTask(sa, saCsrf, choices, { status: "published", title });
     expect(r.ok(), `seed task: ${r.status()} ${await r.text()}`).toBeTruthy();
-    const taskId = (await r.json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, {
+    const bankId = (await r.json()).id;
+    const asg = await sa.post(`/api/admin/tasks/${bankId}/competitions`, {
       headers: GUH(saCsrf), data: { competitionIds: [live.id] },
     });
-    return { sa, saCsrf, taskId, title, compId: live.id };
+    expect(asg.ok(), `assign to live: ${asg.status()} ${await asg.text()}`).toBeTruthy();
+    // The live event's OWN copy (lib/event-copies.js): what alice reads and an edit is made to.
+    return { sa, saCsrf, taskId: (await asg.json()).copies[0].task_id, title, compId: live.id };
   }
 
   async function aliceInLive(compId) {
@@ -672,8 +676,10 @@ test.describe("Multiple choice — ext-audit round 8 (v7.20.9)", () => {
     expect(v2.correct_answer, "…and the correct set").not.toBe(v1.correct_answer);
 
     const versions = await (await sa.get(`/api/admin/tasks/${taskId}/versions`)).json();
-    const createV = versions.find((v) => v.change_type === "create");
-    expect(createV, "the create snapshot is the version to restore").toBeTruthy();
+    // The event's own copy starts with ONE full snapshot naming its origin
+    // (change_type `copy`, lib/event-copies.js): the version to restore.
+    const createV = versions.find((v) => v.change_type === "copy");
+    expect(createV, "the copy's first snapshot is the version to restore").toBeTruthy();
     expect(JSON.parse(createV.snapshot).choices,
       "the snapshot has always carried the options — the bug was in the restore").toBe(v1.choices);
 

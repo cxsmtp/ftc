@@ -89,7 +89,7 @@ test.describe("Rankings — the Top three panel follows the certificate", () => 
     await expect.poll(ranks).toEqual(["1", "2"]);
     // The panel cannot know whether the finisher attempted a challenge (a no-show
     // on 0 points gets no certificate at all), so the note says "if".
-    await expect(box.locator(".rk-certs-zero")).toHaveText("No medal certificate for 3rd place: a top-three place earns Gold, Silver or Bronze only with points above zero; that finisher gets a participation certificate if they attempted a challenge.");
+    await expect(box.locator(".rk-certs-zero")).toHaveText("No medal certificate for 3rd place: a top-three place earns Gold, Silver or Bronze only with points above zero; that finisher gets a participation certificate if they attempted a question.");
     await expect(box.locator('[data-action="rk-cert-download"][data-rank="3"]'), "no Bronze to download").toHaveCount(0);
     await expect(box, "nor is the finisher offered one by name").not.toContainText("Cy X");
 
@@ -97,7 +97,7 @@ test.describe("Rankings — the Top three panel follows the certificate", () => 
     await render([300, -5, -10, -20]);
     await expect.poll(ranks).toEqual(["1"]);
     await expect(box.locator(".rk-certs-zero")).toContainText("No medal certificate for 2nd and 3rd place:");
-    await expect(box.locator(".rk-certs-zero")).toContainText("those finishers get a participation certificate if they attempted a challenge.");
+    await expect(box.locator(".rk-certs-zero")).toContainText("those finishers get a participation certificate if they attempted a question.");
 
     // Nobody scored: the panel says why there are no medals, and lists none.
     await render([0, 0, -5, -5]);

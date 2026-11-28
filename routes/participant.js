@@ -12,9 +12,9 @@
 const { v4: uuid } = require("uuid");
 const crypto = require("crypto");
 const db = require("../db");
-const { rateLimit, testSelectTimeslotDelay, requireParticipant, requireCompleteProfile, requireCompetitionContext, requireParticipantInCompetition, tabEventMismatch, csrfProtection, applyAutoResumeToSession } = require("../lib/middleware");
+const { rateLimit, testSelectTimeslotDelay, requireParticipant, requireCompleteProfile, requireCompetitionContext, requireParticipantInCompetition, tabEventMismatch, csrfProtection, applyAutoResumeToSession, stampClockOnFirstTouch } = require("../lib/middleware");
 const { getCompetition, getCompetitionTimeslots, getTimeslot, hasTimeslots, timeslotStatus, timeslotEffectiveEnd, competitionStatus, competitionEffectiveEnd, competitionFullyEnded, ensureTaskNumbers, compareTaskNumbers, participantContentNotStarted, listParticipantCompetitions, autoResumeAllows, anchorLoginTime, userScoresOn, isOpenEnded } = require("../lib/competitions");
-const { eventPolicyForWire, eventPolicy } = require("../lib/event-policy"); // v8.1.0 (PR 12/18)
+const { eventPolicyForWire, eventPolicy, clockStartsAtFirstOpen } = require("../lib/event-policy"); // v8.1.0 (PR 12/18)
 const { _deferAudit, recordChallengeEvent, recordCompetitionEvent, recordTimeslotEvent, recordUserEvent, recordSealedReveal, sealRevealHistoryDetails, reqContext, getAdminIdentity } = require("../lib/audit");
 const { swallowed } = require("../lib/best-effort");
 const { BASE_URL, PLATFORM_VERSION, SERVER_STARTED_AT, PERF_SPAN_SLOW_MS, LOGIN_CODE_TTL_MS, RATE_LIMIT_CONFIG_PER_MIN } = require("../lib/config");
@@ -33,7 +33,7 @@ const { POINTS, HINT_DEDUCTION_RATE, taskGradingHash } = require("../lib/scoring
 // v8.12.6 — `sealRevealUnrecorded` / `SEAL_UNRECORDED_REASON`: a sealed value
 // the tier admits is withheld when its record cannot be written (below).
 const { sealedAnswerReadable, sealedHintReadable, sealedHintDenied, sealRevealUnrecorded, SEAL_UNRECORDED_REASON, answerSealed, isTaskAuthor } = require("../lib/answer-seal");
-const { categoriesFromTags } = require("../lib/categories"); // v7.21.0 — challenge categories (server-side parse only)
+const { participantCategories, topicNamesFor } = require("../lib/topics"); // a question's topic, else its legacy category tags (server-side parse only)
 const { certificatePrintedName } = require("../lib/badge"); // the name a certificate issued now would print
 const { parseChoices, parseCorrectIds, shuffleChoicesFor, choiceMode, gradeChoice, choiceIdsByText, legacySelectionIds } = require("../lib/choices");
 const { _extractOldSessionId, lookupKickedSession, kickReasonOf } = require("../lib/sessions");
@@ -57,6 +57,11 @@ const { now } = require("../lib/time");
 const { attemptState, outOfAttemptsTaskIds } = require("../lib/attempts"); // v8.1.0 — the attempt ceiling on the participant wire; #283 the list's `out_of_attempts`
 const { isStaff } = require("../lib/user-tags");
 const { staffCompeteOn, refuseCompetitor, competitorEventsForTask } = require("../lib/staff-compete"); // v8.12.0; refuseCompetitor v8.12.1 (the toggle's compete refusal); competitorEventsForTask v8.12.2 (the seal never opens to a competitor)
+// A bank question id named in the session's event means that event's own copy (lib/event-copies.js).
+// Per-session question sets: then a question outside the session the request
+// plays answers the same 404 an unassigned one does (lib/session-tasks.js).
+const { inSessionSql } = require("../lib/session-tasks");
+const _resolveEventTask = [require("../lib/event-copies").resolveEventTaskParam(db, "id"), require("../lib/session-tasks").requireTaskInSession(db, "id")];
 const { verificationGraceState } = require("../lib/self-enroll");
 const { impersonationActor, impersonationEndedDetails, isImpersonating, actingAdminCompetesInTargetEvents, destroyImpersonationSession, restoreImpersonationTargetInactive, organiserPanelOpensTo } = require("../lib/impersonation");
 const { _capsOk, _firstNonStringField, _profileMissingFields, isValidTimezone, isFreeEmail, isValidEmailFormat, normaliseEmail, sameSlotEmails, validateUrl, _nicknameCharsOk, NICKNAME_CHARSET_ERROR, PROFILE_GATE_JOIN, PROFILE_GATE_COLUMNS, profileVersionSql, awaitDeliveryWithDeadline, MAIL_REPORT_DEADLINE_MS, profileTextControlField, profileTextControlBody } = require("../lib/util");
@@ -1322,6 +1327,11 @@ app.post("/api/select-competition", requireParticipant, csrfProtection, (req, re
   //     telemetry that would be false.
   //   • users.active_competition_id — the target's auto-resume marker.
   const _impNav = isImpersonating(req);
+  // An event whose clock starts at the FIRST OPEN (lib/event-policy.js
+  // `clockStartsAtFirstOpen`) writes no anchor on entry: the branches below take
+  // their re-entry path (last_login_time and the re-entry record only), and the
+  // anchor waits for `stampClockOnFirstTouch`.
+  const _firstOpenClock = clockStartsAtFirstOpen(comp);
 
   // For multi-slot competitions, check if participant needs to pick a timeslot
   const slots = getCompetitionTimeslots(comp.id);
@@ -1338,7 +1348,7 @@ app.post("/api/select-competition", requireParticipant, csrfProtection, (req, re
       const tsStatus = timeslotStatus(ts);
       if (assigned && !_impNav && (tsStatus === "live" || tsStatus === "ended")) {
         const loginNow = now().toISOString();
-        if (!assigned.login_time && tsStatus === "live") {
+        if (!assigned.login_time && tsStatus === "live" && !_firstOpenClock) {
           // v8.12.0 — the honest anchor (lib/competitions.js anchorLoginTime).
           db.prepare("UPDATE competition_users SET login_time=?, last_login_time=? WHERE competition_id=? AND user_id=?")
             .run(anchorLoginTime(_selfUid, competitionId, loginNow), loginNow, competitionId, _selfUid);
@@ -1378,7 +1388,7 @@ app.post("/api/select-competition", requireParticipant, csrfProtection, (req, re
     req.session.timeslotId = null;
     if (assigned && !_impNav && (status === "live" || status === "ended")) {
       const loginNow = now().toISOString();
-      if (!assigned.login_time && status === "live") {
+      if (!assigned.login_time && status === "live" && !_firstOpenClock) {
         // v8.12.0 — the honest anchor (lib/competitions.js anchorLoginTime).
         db.prepare("UPDATE competition_users SET login_time=?, last_login_time=? WHERE competition_id=? AND user_id=?")
           .run(anchorLoginTime(_selfUid, competitionId, loginNow), loginNow, competitionId, _selfUid);
@@ -1538,7 +1548,15 @@ app.post("/api/select-timeslot", requireParticipant, requireCompleteProfile, csr
   const staffUser = _staffTagged && !(assigned && staffCompeteOn(comp));
 
   // Check locking: if participant already entered a live timeslot, they can't change (staff exempt)
-  if (!staffUser && assigned?.login_time && assigned?.timeslot_id) {
+  //
+  // "Entered" is the solve-clock anchor on an entry-clock event. On a FIRST-OPEN
+  // clock event (`clockStartsAtFirstOpen`) entering a live session stamps no
+  // anchor, only `last_login_time`, so that column is what records the entry
+  // there — the confirm promised "once you join, you cannot change your choice",
+  // and opening no challenge must not reopen the choice.
+  const _firstOpenClock = clockStartsAtFirstOpen(comp);
+  const _enteredSlot = !!(assigned?.login_time || (_firstOpenClock && assigned?.last_login_time));
+  if (!staffUser && _enteredSlot && assigned?.timeslot_id) {
     const currentTs = getTimeslot(assigned.timeslot_id);
     if (currentTs) {
       const currentStatus = timeslotStatus(currentTs);
@@ -1560,7 +1578,7 @@ app.post("/api/select-timeslot", requireParticipant, requireCompleteProfile, csr
   // participant across two slots (submissions.timeslot_id = X stays
   // in slot X's board while cu.timeslot_id = Y would also attach
   // them to slot Y's board).
-  if (!staffUser && (!assigned?.login_time || !assigned?.timeslot_id)) {
+  if (!staffUser && (!_enteredSlot || !assigned?.timeslot_id)) {
     const priorSlot = db.prepare(
       `SELECT timeslot_id FROM (
          SELECT timeslot_id FROM submissions
@@ -1667,7 +1685,14 @@ app.post("/api/select-timeslot", requireParticipant, requireCompleteProfile, csr
       .run(req.session.userId, compId);
     if (delR.changes) txState.reminderCleared = true;
 
-    if (freshStatus === "live" && !_impSel) {
+    if (freshStatus === "live" && !_impSel && _firstOpenClock) {
+      // A first-open clock: entering the live session records the entry
+      // (`last_login_time`, which the slot lock above reads) and starts nothing.
+      const loginNow = now().toISOString();
+      txState.loginNowIso = loginNow;
+      db.prepare("UPDATE competition_users SET last_login_time=? WHERE competition_id=? AND user_id=?")
+        .run(loginNow, compId, req.session.userId);
+    } else if (freshStatus === "live" && !_impSel) {
       const loginNow = now().toISOString();
       txState.loginNowIso = loginNow;
       txState.firstTime = !assigned?.login_time;
@@ -1874,13 +1899,16 @@ app.get("/api/tasks", requireParticipant, requireCompetitionContext, requirePart
   // (eject to the competition picker). Message-text matching is brittle.
   if (_gate) return res.status(403).json({ error: _gate.needsSlot ? "Please choose a session to view challenges." : `${sanitiseForLog(_gate.name)} has not started yet`, not_started: true, needsSlot: !!_gate.needsSlot });
   ensureTaskNumbers(compId, req.competition);
+  // Per-session question sets: the questions of the session this request plays
+  // (lib/session-tasks.js `inSessionSql`; none named: every question).
   const tasks = db.prepare(
     `SELECT t.id, t.title, t.description, t.difficulty, t.answer_type, t.active, ct.task_number
      FROM tasks t
      JOIN competition_tasks ct ON ct.task_id=t.id AND ct.competition_id=?
      WHERE ct.competition_id=? AND t.status='published' AND t.active=1
+       AND ${inSessionSql("ct.competition_id", "ct.task_id", "?")}
      ORDER BY ct.task_number, t.difficulty, t.title`
-  ).all(compId, compId).sort((a, b) => compareTaskNumbers(a.task_number, b.task_number));   // numerically, not as text; the SQL order breaks ties
+  ).all(compId, compId, req.session.timeslotId || null).sort((a, b) => compareTaskNumbers(a.task_number, b.task_number));   // numerically, not as text; the SQL order breaks ties
   const solved = db.prepare("SELECT DISTINCT task_id FROM submissions WHERE user_id=? AND competition_id=? AND is_correct=1")
     .all(req.session.userId, compId).map(r => r.task_id);
   // v7.21.0 — CATEGORIES. One batched read for the whole page rather than a
@@ -1922,10 +1950,13 @@ app.get("/api/tasks", requireParticipant, requireCompetitionContext, requirePart
   // challenge's own read. False on an uncapped challenge, a solved one and a
   // Quick question whose answer can be changed.
   const outOfAttempts = outOfAttemptsTaskIds(req.session.userId, req.competition, tasks.map(t => t.id));
-  res.json(tasks.map(t => ({ ...t, categories: categoriesFromTags(_catMap.get(t.id) || []), qualifying: tagsMakeQualifying(_catMap.get(t.id) || []), solved: solved.includes(t.id), out_of_attempts: outOfAttempts.has(t.id), hackathon_ended: mySlotEnded, competition_fully_ended: fullyEnded })));
+  // Stage B — a question's TOPIC is its category (lib/topics.js); one with no
+  // topic still reads its legacy `category:` tags.
+  const _topicNames = topicNamesFor(db, tasks.map(t => t.id));
+  res.json(tasks.map(t => ({ ...t, categories: participantCategories(_topicNames.get(t.id), _catMap.get(t.id) || []), qualifying: tagsMakeQualifying(_catMap.get(t.id) || []), solved: solved.includes(t.id), out_of_attempts: outOfAttempts.has(t.id), hackathon_ended: mySlotEnded, competition_fully_ended: fullyEnded })));
 });
 
-app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, rateLimit(60_000, 120, "tasks-get"), (req, res) => {
+app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, rateLimit(60_000, 120, "tasks-get"), (req, res) => {
   const compId = req.session.competitionId;
   // v6.20.x — withhold full challenge content (description, attachment list)
   // until the participant's window is live. See participantContentNotStarted.
@@ -1942,6 +1973,12 @@ app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, require
   const task = db.prepare("SELECT id,title,description,difficulty,answer_type,correct_answer,choices,explanation,hint,attachment_url,author_name,author_linkedin,attempt_cap,answer_sealed,created_by_id FROM tasks WHERE id=? AND active=1 AND status='published'").get(req.params.id);
   if (task) task.task_number = inComp.task_number || null;
   if (!task) return res.status(404).json({ error: "Challenge not found" });
+  // THE FIRST OPEN STARTS THE SOLVE CLOCK on an event that runs that rule
+  // (owner decision, 27 Nov 2026; lib/middleware.js `stampClockOnFirstTouch`
+  // asks the rest: a scoring challenge, live or a late entrant's open window,
+  // not impersonated, not yet started). Here, after the challenge is proved
+  // assigned and published, so a 404 never starts anybody's clock.
+  stampClockOnFirstTouch(req, task);
   const solved        = !!db.prepare("SELECT id FROM submissions WHERE user_id=? AND task_id=? AND competition_id=? AND is_correct=1").get(req.session.userId, task.id, compId);
   // v8.13.2 — ONE count, read through lib/attempts.js: the card prints this as
   // "N attempt(s)", and the submit response updates it in place from the same
@@ -2268,7 +2305,8 @@ app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, require
     grading_hash: taskGradingHash(task.answer_type, correct_answer, _rawChoices),
     // v7.21.0 — the challenge's categories, same one-directional filter as the
     // list endpoint: parsed NAMES only, never the raw tag list.
-    categories: categoriesFromTags(
+    categories: participantCategories(
+      topicNamesFor(db, [task.id]).get(task.id),
       db.prepare("SELECT tag FROM task_tags WHERE task_id=? ORDER BY tag").all(task.id).map(r => r.tag)
     ),
   });
@@ -2281,7 +2319,7 @@ app.get("/api/tasks/:id", requireParticipant, requireCompetitionContext, require
 // taskGradingHash now lives in lib/scoring.js (imported at the top) — shared by
 // GET /api/tasks/:id (routes/participant.js) and the inline submit route.
 
-app.post("/api/tasks/:id/hint", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, rateLimit(60_000, 30, "hint"), csrfProtection, (req, res) => {
+app.post("/api/tasks/:id/hint", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, rateLimit(60_000, 30, "hint"), csrfProtection, (req, res) => {
   const compId = req.session.competitionId;
   // v6.16.2 — same lifecycle gates as /api/tasks/:id/submit. Pre-fix
   // a participant who selected an UPCOMING competition could call
@@ -2385,6 +2423,9 @@ app.post("/api/tasks/:id/hint", requireParticipant, requireCompetitionContext, r
     const denied = sealedHintDenied(task, actingAdminId(req), _hintSuper, _hintScores, _hintWhy);
     if (denied) return res.status(403).json({ error: denied.message, code: denied.code, reason: denied.reason });
   }
+  // A hint asked for before any open starts a first-open clock too (a client
+  // that never opened the challenge); a no-op once the open has stamped it.
+  stampClockOnFirstTouch(req, task);
   // v7.2.x (audit) — a participant who has already SOLVED this task gains nothing
   // from a hint; don't let them self-inflict a -30% deduction. Return the hint,
   // record no hint_reveals row. (hint_reveals is keyed (comp,user,task) — no
@@ -2492,7 +2533,7 @@ app.post("/api/tasks/:id/hint", requireParticipant, requireCompetitionContext, r
 
 app.post("/api/tasks/:id/navigated-away",
   requireParticipant, rateLimit(60_000, 60, "navaway"),
-  requireCompetitionContext, requireParticipantInCompetition,
+  requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask,
   csrfProtection,
   (req, res) => {
     const taskId = req.params.id;
@@ -2563,7 +2604,7 @@ app.post("/api/tasks/:id/navigated-away",
   }
 );
 
-app.put("/api/tasks/:id/feedback", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, rateLimit(60_000, 30, "task-feedback"), csrfProtection, (req, res) => {
+app.put("/api/tasks/:id/feedback", requireParticipant, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, rateLimit(60_000, 30, "task-feedback"), csrfProtection, (req, res) => {
   // Number() throws on an object whose toString/valueOf is not callable (JSON can
   // send one), so only a number or a numeric string is converted.
   const rating = typeof req.body.rating === "number" || typeof req.body.rating === "string" ? Number(req.body.rating) : NaN;

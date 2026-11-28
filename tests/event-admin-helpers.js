@@ -254,9 +254,48 @@ async function expectRefused(res, what, code = null) {
   return b;
 }
 
+// A question added to an event lives in that event (lib/event-copies.js): the
+// event holds its OWN copy of a bank question. Read from the server's database.
+function _ro(fn) {
+  const Database = require("better-sqlite3");
+  const db = new Database(require("./helpers").TEST_DB_PATH, { readonly: true });
+  try { return fn(db); } finally { db.close(); }
+}
+/** Event `compId`'s own copy of bank question `bankId` (the one it holds), or null. */
+function eventCopyOf(bankId, compId) {
+  return _ro(db => {
+    const r = db.prepare("SELECT t.id FROM tasks t JOIN competition_tasks ct ON ct.task_id=t.id AND ct.competition_id=t.owner_competition_id WHERE t.owner_competition_id=? AND t.copied_from_task_id=?").get(compId, bankId);
+    return r ? r.id : null;
+  });
+}
+/**
+ * Run `fn` with the assign doors in the PREVIOUS release's mode (test hook
+ * `POST /api/test/legacy-shared-assign`): the bank question itself goes into the
+ * event, shared by every event it is added to. For a lock about the shape a
+ * database from before event-owned questions holds (and a qualifying question
+ * still has); always switched back off.
+ */
+async function withLegacySharedAssign(sa, saCsrf, fn) {
+  const set = async (on) => {
+    const r = await sa.post("/api/test/legacy-shared-assign", { headers: H(saCsrf), data: { on } });
+    expect((await r.json()).on, "the legacy switch took").toBe(on);
+  };
+  await set(true);
+  try { return await fn(); } finally { await set(false); }
+}
+/** The bank question `taskId` was copied from, or itself (a bank question, or one created in its event). */
+function originOf(taskId) {
+  return _ro(db => { const r = db.prepare("SELECT COALESCE(copied_from_task_id, id) AS o FROM tasks WHERE id=?").get(taskId); return r ? r.o : taskId; });
+}
+/** The bank questions event `compId`'s questions were copied from, sorted (its own id where none). */
+function originsHeldBy(compId) {
+  return _ro(db => db.prepare("SELECT COALESCE(t.copied_from_task_id, t.id) AS o FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=?").all(compId).map(r => r.o).sort());
+}
+
 module.exports = {
   H, uniq,
   makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin,
+  eventCopyOf, originsHeldBy, originOf, withLegacySharedAssign,
   makeInvitedFreeEmailUser,
   buildWorld, expectRefused,
 };

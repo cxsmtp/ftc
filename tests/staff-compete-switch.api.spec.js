@@ -224,7 +224,7 @@
 //     which is why the source pin exists rather than a larger fixture.
 const { test, expect, request } = require("./isolated-test");
 const { BASE, apiLogin, PARTICIPANT_PASS, TEST_DB_PATH } = require("./helpers");
-const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin, eventCopyOf } = require("./event-admin-helpers");
 // PURE at module scope (requires nothing; the one helper that reaches the
 // database requires it lazily inside its body), so column 0 is the documented
 // safe form and the v7.20.2 scanner is right not to flag it.
@@ -951,7 +951,7 @@ test.describe("v8.12.0 — the three content refusals", () => {
     const b = await expectSwitchRefused(await putSwitch(mixed.id, { staff_compete: true }), staffCompete.CODES.UNSEALED_ASSIGNED, "ON with an unsealed challenge");
     expect(Array.isArray(b.challenges), "the refusal NAMES the challenges").toBe(true);
     expect(b.challenges, "exactly the unsealed one — not the sealed one beside it, not the unassigned decoy")
-      .toEqual([{ id: plain.id, title: plain.title }]);
+      .toEqual([{ id: eventCopyOf(plain.id, mixed.id), title: plain.title }]);
     expect(b.error, "the sentence names the count").toMatch(/not sealed/);
     expect((await listRow(mixed.id)).staff_compete, "nothing written").toBe(0);
     expect(await eventsOf(mixed.id, "edited"), "no edit recorded").toEqual([]);
@@ -1003,13 +1003,13 @@ test.describe("v8.12.0 — the three content refusals", () => {
     const b = await expectSwitchRefused(await putSwitch(eventA.id, { staff_compete: true }), staffCompete.CODES.AUTHOR_ENROLLED, "ON with an enrolled author");
     expect(Array.isArray(b.participants), "the refusal NAMES the participants").toBe(true);
     expect(b.participants, "ONE entry for the author, carrying BOTH challenges ordered by title")
-      .toEqual([{ id: author.id, nickname: author.nickname, tasks: [{ id: mineA.id, title: mineA.title }, { id: mineB.id, title: mineB.title }] }]);
+      .toEqual([{ id: author.id, nickname: author.nickname, tasks: [{ id: eventCopyOf(mineA.id, eventA.id), title: mineA.title }, { id: eventCopyOf(mineB.id, eventA.id), title: mineB.title }] }]);
     expect(b.challenges, "the author refusal has no `challenges` key — that is the unsealed refusal's shape").toBeUndefined();
     const serialised = JSON.stringify(b);
     expect(serialised, "the outsider is not named (by value)").not.toContain(outsider.nickname);
     expect(serialised, "…nor is their challenge").not.toContain(theirs.title);
     expect(b.error, "the sentence names the person").toContain(author.nickname);
-    expect(b.error, "…and names the remedy").toMatch(/Remove that person from the event or take their challenges out first/);
+    expect(b.error, "…and names the remedy").toMatch(/Remove that person from the event or take their questions out first/);
     expect((await listRow(eventA.id)).staff_compete, "nothing written").toBe(0);
     expect(await eventsOf(eventA.id, "edited"), "no edit recorded").toEqual([]);
 
@@ -1030,8 +1030,8 @@ test.describe("v8.12.0 — the three content refusals", () => {
     // REMEDY 2 — remove the author from the event instead; the switch flips.
     const b3 = await expectSwitchRefused(await putSwitch(eventC.id, { staff_compete: true }), staffCompete.CODES.AUTHOR_ENROLLED, "ON with the same author enrolled elsewhere");
     expect(b3.participants.map(p => p.id), "the same person, on the other event").toEqual([author.id]);
-    expect(b3.participants[0].tasks, "the singular shape: one challenge held there").toEqual([{ id: mineB.id, title: mineB.title }]);
-    expect(b3.error, "the singular remedy sentence").toMatch(/Remove that person from the event or take the challenge out first/);
+    expect(b3.participants[0].tasks, "the singular shape: one challenge held there").toEqual([{ id: eventCopyOf(mineB.id, eventC.id), title: mineB.title }]);
+    expect(b3.error, "the singular remedy sentence").toMatch(/Remove that person from the event or take the question out first/);
     const rm = await sa.delete(`/api/admin/competitions/${eventC.id}/users/${author.id}`, { headers: H(saCsrf) });
     expect(rm.ok(), `remove the author: ${rm.status()} ${await rm.text()}`).toBeTruthy();
     expect((await rm.json()).removed, "the removal really happened").toBe(true);
@@ -1054,17 +1054,17 @@ test.describe("v8.12.0 — the three content refusals", () => {
     await assignTask(author.api, author.csrf, sealedMine.id, [ev.id]);
     await assignTask(author.api, author.csrf, plainMine.id,  [ev.id]);
     // Preconditions: BOTH questions would refuse — the module's own predicates say so.
-    expect(withDb(db => staffCompete.unsealedAssigned(db, ev.id)).map(t => t.id), "precondition: the unsealed one is assigned").toEqual([plainMine.id]);
+    expect(withDb(db => staffCompete.unsealedAssigned(db, ev.id)).map(t => t.id), "precondition: the unsealed one is assigned").toEqual([eventCopyOf(plainMine.id, ev.id)]);
     expect(withDb(db => staffCompete.enrolledAuthors(db, ev.id)).map(a => a.id), "precondition: the author is enrolled").toEqual([author.id]);
 
     const b1 = await expectSwitchRefused(await putSwitch(ev.id, { staff_compete: true }), staffCompete.CODES.UNSEALED_ASSIGNED, "both hold: unsealed answers first");
-    expect(b1.challenges, "…naming the unsealed one").toEqual([{ id: plainMine.id, title: plainMine.title }]);
+    expect(b1.challenges, "…naming the unsealed one").toEqual([{ id: eventCopyOf(plainMine.id, ev.id), title: plainMine.title }]);
     expect(b1.participants, "…and not the author shape").toBeUndefined();
 
     const un = await author.api.delete(`/api/admin/tasks/${plainMine.id}/competitions/${ev.id}`, { headers: H(author.csrf) });
     expect(un.ok(), `unassign the unsealed one: ${un.status()} ${await un.text()}`).toBeTruthy();
     const b2 = await expectSwitchRefused(await putSwitch(ev.id, { staff_compete: true }), staffCompete.CODES.AUTHOR_ENROLLED, "the unsealed one gone: the author refusal answers");
-    expect(b2.participants, "…naming the author with the sealed challenge they still have there").toEqual([{ id: author.id, nickname: author.nickname, tasks: [{ id: sealedMine.id, title: sealedMine.title }] }]);
+    expect(b2.participants, "…naming the author with the sealed challenge they still have there").toEqual([{ id: author.id, nickname: author.nickname, tasks: [{ id: eventCopyOf(sealedMine.id, ev.id), title: sealedMine.title }] }]);
     expect((await listRow(ev.id)).staff_compete, "nothing written by either refusal").toBe(0);
   });
 
@@ -1204,7 +1204,7 @@ test.describe("v8.12.0 — every refusal sits ABOVE validate_only (five of them)
     const cleanComp = await mkComp("dry-clean", { ...UPCOMING(), staff_compete: false });
 
     const b1 = await expectSwitchRefused(await putSwitch(unsealedComp.id, { staff_compete: true, validate_only: true }), staffCompete.CODES.UNSEALED_ASSIGNED, "dry run, unsealed");
-    expect(b1.challenges).toEqual([{ id: plain.id, title: plain.title }]);
+    expect(b1.challenges).toEqual([{ id: eventCopyOf(plain.id, unsealedComp.id), title: plain.title }]);
     const b2 = await expectSwitchRefused(await putSwitch(staffComp.id, { staff_compete: false, validate_only: true }), staffCompete.CODES.STAFF_ENROLLED, "dry run, staff enrolled");
     expect(b2.participants).toEqual([{ id: staffer.id, nickname: staffer.nickname }]);
     await expectSwitchRefused(await putSwitch(liveComp.id, { staff_compete: true, validate_only: true }), staffCompete.CODES.LOCKED, "dry run, started");
@@ -1212,7 +1212,7 @@ test.describe("v8.12.0 — every refusal sits ABOVE validate_only (five of them)
     expect(b4.code, "the ENDED code, not the started one, on the dry run too").not.toBe(staffCompete.CODES.LOCKED);
     const b5 = await expectSwitchRefused(await putSwitch(authorComp.id, { staff_compete: true, validate_only: true }), staffCompete.CODES.AUTHOR_ENROLLED, "dry run, enrolled author");
     expect(b5.participants, "the dry run carries the same participants[] shape as the real refusal")
-      .toEqual([{ id: enrolledAuthor.id, nickname: enrolledAuthor.nickname, tasks: [{ id: sealedMine.id, title: sealedMine.title }] }]);
+      .toEqual([{ id: enrolledAuthor.id, nickname: enrolledAuthor.nickname, tasks: [{ id: eventCopyOf(sealedMine.id, authorComp.id), title: sealedMine.title }] }]);
 
     // CONTROL: a clean dry run VALIDATES — and still writes nothing, which is
     // what separates "validate_only is honoured" from "nothing ever writes".
@@ -1423,7 +1423,7 @@ test.describe("v8.12.0 — lib/staff-compete.js, driven at column 0", () => {
     for (const t of [nobodys, mineB, mineA, theirs]) await assignTask(sa, saCsrf, t.id, [comp.id, empty.id]);
 
     expect(withDb(db => staffCompete.enrolledAuthors(db, comp.id)), "exactly the enrolled author, one entry, tasks by title")
-      .toEqual([{ id: author.id, nickname: author.nickname, tasks: [{ id: mineA.id, title: mineA.title }, { id: mineB.id, title: mineB.title }] }]);
+      .toEqual([{ id: author.id, nickname: author.nickname, tasks: [{ id: eventCopyOf(mineA.id, comp.id), title: mineA.title }, { id: eventCopyOf(mineB.id, comp.id), title: mineB.title }] }]);
     expect(withDb(db => staffCompete.enrolledAuthors(db, empty.id)), "the same four challenges on an event with nobody enrolled: nobody").toEqual([]);
     expect(withDb(db => staffCompete.enrolledAuthors(db, "no-such-event")), "an unknown event: an empty list, not a throw").toEqual([]);
     // THE ORDER IS PINNED AT SOURCE. Two same-author titles can land in title

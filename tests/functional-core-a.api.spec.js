@@ -565,11 +565,13 @@ test.describe("Admin", () => {
         hint: "h", status: "published",
       },
     });
-    const taskId = (await created.json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, {
+    const taskIdBank = (await created.json()).id;
+    const taskIdAssign = await sa.post(`/api/admin/tasks/${taskIdBank}/competitions`, {
       headers: { "x-csrf-token": saCsrf, "content-type": "application/json" },
       data: { competitionIds: [compId] },
     });
+    expect(taskIdAssign.ok(), await taskIdAssign.text()).toBeTruthy();
+    const taskId = (await taskIdAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     await sa.dispose();
 
     const { api: alice, csrf: aliceCsrf } = await apiLogin("alice@acme.com", PARTICIPANT_PASS);
@@ -628,11 +630,13 @@ test.describe("Admin", () => {
         hint: "h", status: "published",
       },
     });
-    const taskId = (await created.json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, {
+    const taskIdBank = (await created.json()).id;
+    const taskIdAssign = await sa.post(`/api/admin/tasks/${taskIdBank}/competitions`, {
       headers: { "x-csrf-token": saCsrf, "content-type": "application/json" },
       data: { competitionIds: [compId] },
     });
+    expect(taskIdAssign.ok(), await taskIdAssign.text()).toBeTruthy();
+    const taskId = (await taskIdAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     await sa.dispose();
 
     // Alice submits the actually-correct value "paris" — gets marked WRONG (-5).
@@ -720,8 +724,10 @@ test.describe("Admin", () => {
         hint: "h", status: "published",
       },
     });
-    const taskId = (await created.json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+    const taskIdBank = (await created.json()).id;
+    const taskIdAssign = await sa.post(`/api/admin/tasks/${taskIdBank}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+    expect(taskIdAssign.ok(), await taskIdAssign.text()).toBeTruthy();
+    const taskId = (await taskIdAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
 
     try {
       // No confirm_live — must get 409 because the competition is live.
@@ -820,8 +826,10 @@ test.describe("Admin", () => {
         hint: "hint", status: "published",
       },
     });
-    const taskId = (await created.json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+    const taskIdBank = (await created.json()).id;
+    const taskIdAssign = await sa.post(`/api/admin/tasks/${taskIdBank}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+    expect(taskIdAssign.ok(), await taskIdAssign.text()).toBeTruthy();
+    const taskId = (await taskIdAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     await sa.dispose();
 
     try {
@@ -910,7 +918,7 @@ test.describe("Admin", () => {
     const { api: u1, csrf: u1Csrf } = await apiLogin(email, PARTICIPANT_PASS);
     const u1H = { "x-csrf-token": u1Csrf, "content-type": "application/json" };
     await u1.post("/api/select-competition", { headers: u1H, data: { competitionId: S.liveComp.id } });
-    const easy = S.tasks.find(t => t.title === "Challenge easy1");
+    const easy = S.liveTask("Challenge easy1");
     expect(easy).toBeTruthy();
     const submitR = await u1.post(`/api/tasks/${easy.id}/submit`, { headers: u1H, data: { answer: "answer-easy1" , gradingHash: await gradingHashFor(u1, easy.id)} });
     expect(submitR.ok(), `submit failed: ${submitR.status()} ${await submitR.text()}`).toBeTruthy();
@@ -990,7 +998,7 @@ test.describe("Admin", () => {
     const { api: u1, csrf: u1Csrf } = await apiLogin(email, PARTICIPANT_PASS);
     const u1H = { "x-csrf-token": u1Csrf, "content-type": "application/json" };
     await u1.post("/api/select-competition", { headers: u1H, data: { competitionId: S.liveComp.id } });
-    const med = S.tasks.find(t => t.title === "Challenge med1");
+    const med = S.liveTask("Challenge med1");
     const hintR = await u1.post(`/api/tasks/${med.id}/hint`, { headers: u1H });
     expect(hintR.ok(), `hint reveal failed: ${hintR.status()}`).toBeTruthy();
     await u1.dispose();
@@ -1040,8 +1048,10 @@ test.describe("Admin", () => {
         explanation: "<p>x</p>", hint: "hint", status: "published",
       },
     });
-    const taskId = (await created.json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [S.liveComp.id] } });
+    const taskIdBank = (await created.json()).id;
+    const taskIdAssign = await sa.post(`/api/admin/tasks/${taskIdBank}/competitions`, { headers: saH, data: { competitionIds: [S.liveComp.id] } });
+    expect(taskIdAssign.ok(), await taskIdAssign.text()).toBeTruthy();
+    const taskId = (await taskIdAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     await sa.dispose();
     try {
       const { api: alice, csrf: aliceCsrf } = await apiLogin("alice@acme.com", PARTICIPANT_PASS);
@@ -1231,6 +1241,9 @@ test.describe("Admin", () => {
         name: `AssignRevive-${t}`,
         start_time: new Date(t - 60_000).toISOString(),
         duration_minutes: 120, // plenty of future headroom for the revive
+        // The newcomer's clock starts as they ENTER (the subject: a live
+        // solveTimeMs on entry), not at a first open this test never makes.
+        clock_start: "entry",
       },
     });
     const compId = (await compR.json()).competition.id;
@@ -3748,8 +3761,10 @@ test.describe("Admin", () => {
         explanation: "<p>x</p>", hint: "hint", status: "published",
       },
     });
-    const taskId = (await created.json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: saH, data: { competitionIds: [S.liveComp.id] } });
+    const taskIdBank = (await created.json()).id;
+    const taskIdAssign = await sa.post(`/api/admin/tasks/${taskIdBank}/competitions`, { headers: saH, data: { competitionIds: [S.liveComp.id] } });
+    expect(taskIdAssign.ok(), await taskIdAssign.text()).toBeTruthy();
+    const taskId = (await taskIdAssign.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     await sa.dispose();
     try {
       // Alice submits WRONG answer — one submission row exists for recalc.
@@ -4153,7 +4168,7 @@ test.describe("Admin", () => {
     await ensureState();
     const { api: alice, csrf: aliceCsrf } = await apiLogin("alice@acme.com", PARTICIPANT_PASS);
     await alice.post("/api/select-competition", { headers: { "x-csrf-token": aliceCsrf, "content-type": "application/json" }, data: { competitionId: S.liveComp.id } });
-    const easy = S.tasks.find(t => t.title === "Challenge easy1");
+    const easy = S.liveTask("Challenge easy1");
     const r = await alice.post(`/api/tasks/${easy.id}/submit`, {
       headers: { "x-csrf-token": aliceCsrf },
       multipart: { answer: "a".repeat(65537) , gradingHash: await gradingHashFor(alice, easy.id)},
@@ -4271,7 +4286,8 @@ test.describe("Admin", () => {
     const now = Date.now();
     const created = await sa.post("/api/admin/competitions", {
       headers: saH,
-      data: { name: `LB-Remove-${now}`, start_time: new Date(now - 60_000).toISOString(), duration_minutes: 120 },
+      // `entry`: bob is put on the board by entering it, the state the removal must clear.
+      data: { name: `LB-Remove-${now}`, start_time: new Date(now - 60_000).toISOString(), duration_minutes: 120, clock_start: "entry" },
     });
     const compId = (await created.json()).competition.id;
     await sa.post("/api/admin/competitions/assign", { headers: saH, data: { userIds: [S.bob.id], competitionIds: [compId] } });
@@ -4979,7 +4995,8 @@ test.describe("Benchmark user", () => {
 
   test("benchmark user excluded from participant leaderboard ranking", async () => {
     // v8.12.4 — with the CONTROL that bob would otherwise be there. He enters the
-    // event (which anchors him on its board) and the ADMIN board, which keeps
+    // event and opens a challenge (which anchors him on its board whichever rule
+    // starts its clock: entry, or the first open) and the ADMIN board, which keeps
     // benchmark rows in their own section, must show him; only then does his
     // absence from the participant board mean the exclusion worked rather than
     // that he was never on it.
@@ -4987,6 +5004,7 @@ test.describe("Benchmark user", () => {
     const bob = await apiLogin("bob@acme.com", PARTICIPANT_PASS);
     try {
       expect((await bob.api.post("/api/select-competition", { headers: H(bob.csrf), data: { competitionId: S.liveComp.id } })).ok()).toBeTruthy();
+      expect((await bob.api.get(`/api/tasks/${S.liveTask("Challenge easy1").id}`)).ok()).toBeTruthy();
     } finally { await bob.api.dispose(); }
     const { api: sa } = await apiLogin("superadmin");
     try {
@@ -5005,12 +5023,14 @@ test.describe("Benchmark user", () => {
 
   test("benchmark user shown separately in admin leaderboard", async () => {
     await ensureState();
-    // Ensure bob has login_time by selecting the live competition
+    // Ensure bob has login_time by selecting the live competition and opening a
+    // challenge (its clock may start at the first open rather than on entry)
     const { api: bobApi, csrf: bobCsrf } = await apiLogin("bob@acme.com", PARTICIPANT_PASS);
     await bobApi.post("/api/select-competition", {
       headers: { "x-csrf-token": bobCsrf, "content-type": "application/json" },
       data: { competitionId: S.liveComp.id },
     });
+    expect((await bobApi.get(`/api/tasks/${S.liveTask("Challenge easy1").id}`)).ok()).toBeTruthy();
     await bobApi.dispose();
     // Check admin leaderboard
     const { api } = await apiLogin("superadmin");
@@ -5038,9 +5058,9 @@ test.describe("Benchmark user", () => {
       data: { competitionId: S.liveComp.id },
     });
     // Bob already solved easy1 in seed, try hard1
-    const r = await api.post(`/api/tasks/${S.tasks.find(t => t.title === "Challenge hard1").id}/submit`, {
+    const r = await api.post(`/api/tasks/${S.liveTask("Challenge hard1").id}/submit`, {
       headers: { "x-csrf-token": csrf, "content-type": "application/json" },
-      data: { answer: "wrong-benchmark-guess" , gradingHash: await gradingHashFor(api, S.tasks.find(t => t.title === "Challenge hard1").id)},
+      data: { answer: "wrong-benchmark-guess" , gradingHash: await gradingHashFor(api, S.liveTask("Challenge hard1").id)},
     });
     expect(r.ok()).toBeTruthy();
     const d = await r.json();
@@ -5176,13 +5196,15 @@ test.describe("Endpoint coverage", () => {
       headers: { "x-csrf-token": aCsrf, "content-type": "application/json" },
       data: { competitionId: S.liveComp.id },
     });
-    await aApi.put(`/api/tasks/${S.easy1.id}/feedback`, {
+    // The live event's own copy of easy1: the question alice rates there.
+    const liveEasy = S.liveTask("Challenge easy1");
+    await aApi.put(`/api/tasks/${liveEasy.id}/feedback`, {
       headers: { "x-csrf-token": aCsrf, "content-type": "application/json" },
       data: { rating: 4 },
     });
     await aApi.dispose();
     // Delete Alice's feedback
-    const r = await api.delete(`/api/admin/tasks/${S.easy1.id}/feedback/${S.alice.id}`, {
+    const r = await api.delete(`/api/admin/tasks/${liveEasy.id}/feedback/${S.alice.id}`, {
       headers: { "x-csrf-token": csrf },
     });
     expect(r.ok()).toBeTruthy();
@@ -5446,8 +5468,11 @@ test.describe("Per-competition CxOne opt-out (v7.13.0)", () => {
       .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, " "))
       .split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
 
-    // Both halves of the gate, in order: the opt-out, then the missing row.
-    const optOutAt = src.search(/if\s*\(\s*_comp\?\.cxone_disabled\s*\)\s*return\s*;/);
+    // Both halves of the gate, in order: the opt-out, then the missing row. The
+    // opt-out is asked through the policy since a Booth Event never creates
+    // accounts (owner's decision, 27 Nov 2026): `cxoneProvisioningApplies` asks
+    // the kind first, then the event's own `cxone_disabled`.
+    const optOutAt = src.search(/if\s*\(\s*_comp\s*&&\s*!cxoneProvisioningApplies\(\s*_comp\s*\)\s*\)\s*return\s*;/);
     expect(optOutAt, "the cxone_disabled opt-out gate is gone").toBeGreaterThan(-1);
     const closedAt = src.search(/if\s*\(\s*competitionId\s*&&\s*!_comp\s*\)\s*return\s*;/);
     expect(closedAt,
@@ -6715,15 +6740,23 @@ test.describe("audit v7.7.32 batch 7 — remaining mediums", () => {
     const compId = (await (await sa.post("/api/admin/competitions", { headers: H(saCsrf), data: {
       name: `RM2 ${s}`, start_time: new Date(now - 60 * 60_000).toISOString(), duration_minutes: 180,
     }})).json()).competition.id;
-    const taskId = (await (await sa.post("/api/admin/tasks", { headers: H(saCsrf), data: {
+    const bankId = (await (await sa.post("/api/admin/tasks", { headers: H(saCsrf), data: {
       title: `RM2 Task ${s}`, description: "<p>x</p>", difficulty: "easy", answer_type: "text",
       correct_answer: "a", status: "published",
     }})).json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(saCsrf), data: { competitionIds: [compId] } });
+    const as = await sa.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(saCsrf), data: { competitionIds: [compId] } });
+    expect(as.ok(), await as.text()).toBeTruthy();
+    // The event holds its OWN copy (lib/event-copies.js): that is the task in the ended comp.
+    const taskId = (await as.json()).copies[0].task_id;
     await sa.post(`/api/admin/competitions/${compId}/end-now`, { headers: H(saCsrf) }); // now ended
     const r = await sa.delete(`/api/admin/tasks/${taskId}`, { headers: { "x-csrf-token": saCsrf } });
     expect(r.status(), "delete of a task in an ended comp must be blocked").toBe(400);
     expect((await r.json()).error).toMatch(/ended|frozen/i);
+    // CONTROL: the library question it was copied from is in no event, so it goes,
+    // and the ended event keeps its own copy.
+    const rb = await sa.delete(`/api/admin/tasks/${bankId}`, { headers: { "x-csrf-token": saCsrf } });
+    expect(rb.status(), `the bank question is in no event: ${await rb.text()}`).toBe(200);
+    expect((await (await sa.get("/api/admin/tasks")).json()).some(t => t.id === taskId), "the ended event's copy stays").toBe(true);
     await sa.dispose();
   });
 
@@ -6751,11 +6784,13 @@ test.describe("audit v7.7.32 batch 7 — remaining mediums", () => {
       const compId = (await (await sa.post("/api/admin/competitions", { headers: H(saCsrf), data: {
         name: `SubGuard ${s}`, start_time: new Date(Date.now() - 60 * 60_000).toISOString(), duration_minutes: 240,
       }})).json()).competition.id;
-      taskId = (await (await sa.post("/api/admin/tasks", { headers: H(saCsrf), data: {
+      const bankId = (await (await sa.post("/api/admin/tasks", { headers: H(saCsrf), data: {
         title: `SubGuard Task ${s}`, description: "<p>x</p>", difficulty: "easy", answer_type: "text",
         correct_answer: "right-answer", status: "published",
       }})).json()).id;
-      await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(saCsrf), data: { competitionIds: [compId] } });
+      const as = await sa.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(saCsrf), data: { competitionIds: [compId] } });
+      expect(as.ok(), await as.text()).toBeTruthy();
+      taskId = (await as.json()).copies[0].task_id;   // the event's own copy: the question answered
       const u = await mk7(sa, saCsrf, { verify: true, approve: true });
       uid = u.id;
       await sa.post("/api/admin/competitions/assign", { headers: H(saCsrf), data: { userIds: [u.id], competitionIds: [compId] } });
@@ -7004,8 +7039,10 @@ test.describe("audit v7.7.33 batch 8 — a11y LOWs", () => {
   test("AL12: participant-action confirms name the target (via _pLabel)", () => {
     const f = read("public/js/features/participants-admin.js");
     expect(f).toMatch(/function _pLabel/);
-    // Each confirm interpolates the target label.
-    for (const anchor of ["Marks ${_pLabel(id)}", "change ${_pLabel(userId)}", "approve ${_pLabel(id)}", "delete ${_pLabel(id)}"])
+    // Each confirm interpolates the target label. (The role change's confirm left
+    // with the row's role control: roles are changed on Roles & permissions,
+    // owner's decision, 27 Nov 2026; the block confirm stands in its place.)
+    for (const anchor of ["Marks ${_pLabel(id)}", "${_pLabel(id)} will be immediately logged out", "approve ${_pLabel(id)}", "delete ${_pLabel(id)}"])
       expect(f, anchor).toContain(anchor);
   });
 

@@ -48,6 +48,13 @@ test.describe("table component: one sort claim, fixed doors, touched tables only
           const tr = await api.post(`/api/admin/tasks/${id}/tags`, { headers: h, data: { tag } });
           expect(tr.ok(), `tag ${tag}: ${tr.status()}`).toBeTruthy();
         }
+        // Stage B — the component-sorted column is now Topic (the bank shows no tags).
+        if (tags[k].length) {
+          const tp = await api.post("/api/admin/topics", { headers: h, data: { name: `${STAMP} ${tags[k][0]}` } });
+          expect(tp.status(), `topic: ${await tp.text()}`).toBe(201);
+          const pr = await api.put(`/api/admin/tasks/${id}`, { headers: h, data: { topic_id: (await tp.json()).id } });
+          expect(pr.ok(), `file under topic: ${await pr.text()}`).toBeTruthy();
+        }
       }
       const g = await api.post("/api/admin/groups", { headers: h, data: { name: `${STAMP} group` } });
       expect(g.ok(), `group: ${g.status()} ${await g.text()}`).toBeTruthy();
@@ -74,24 +81,24 @@ test.describe("table component: one sort claim, fixed doors, touched tables only
     const rows = page.locator("#admin-task-body tr");
     await expect(rows).toHaveCount(3, { timeout: 15000 });
     const titleTh = page.locator("#admin-task-table thead th[data-col='title']");
-    const tagsTh = page.locator("#admin-task-table thead th[data-tcol='tags']");
+    const tagsTh = page.locator("#admin-task-table thead th[data-tcol='topic']");
     // PRECONDITION: the library's own default sort, Title ascending, is in force.
     await expect(titleTh).toHaveAttribute("aria-sort", "ascending");
     expect(await order(rows)).toBe("abc");
     const arrowOf = async (th) => ((await th.innerText()).match(/[▲▼]/) || [""])[0];
-    expect(await arrowOf(tagsTh), "PRECONDITION: no arrow on Tags before any sort of it").toBe("");
+    expect(await arrowOf(tagsTh), "PRECONDITION: no arrow on Topic before any sort of it").toBe("");
 
-    // Tags has no sort of its own: two presses on its label sort it descending.
+    // Topic has no sort of its own: two presses on its label sort it descending.
     await tagsTh.click({ position: { x: 8, y: 10 } });
     await tagsTh.click({ position: { x: 8, y: 10 } });
     await expect(tagsTh).toHaveAttribute("aria-sort", "descending");
     await expect.poll(() => order(rows), { timeout: 5000 }).toBe("bac");
     // ONE claim: the Title heading no longer says it sorts the rows.
-    await expect.poll(() => claims(page), { timeout: 5000 }).toEqual(["tags:descending"]);
+    await expect.poll(() => claims(page), { timeout: 5000 }).toEqual(["topic:descending"]);
     await expect(page.locator("#tsort-title-icon"), "no arrow over a column that does not order the rows").toHaveText("");
     // Sweep #316 — the heading that orders the rows SHOWS it, as a native one
     // does; hidden from a screen reader, which hears aria-sort.
-    await expect(tagsTh.locator(".tcol-sort-ic"), "Tags shows its arrow").toHaveText(/▼/);
+    await expect(tagsTh.locator(".tcol-sort-ic"), "Topic shows its arrow").toHaveText(/▼/);
     await expect(tagsTh.locator(".tcol-sort-ic")).toHaveAttribute("aria-hidden", "true");
     expect(await arrowOf(page.locator("#admin-task-table thead th[data-tcol='events']")), "CONTROL: only the sorting column has one").toBe("");
 
@@ -103,17 +110,17 @@ test.describe("table component: one sort claim, fixed doors, touched tables only
     await pop.locator("[data-tcol-sort='asc']").click();
     await expect.poll(() => order(rows), { timeout: 5000 }).toBe("abc");
     await expect.poll(() => claims(page), { timeout: 5000 }).toEqual(["title:ascending"]);
-    await expect.poll(() => arrowOf(tagsTh), { message: "Tags gives its arrow up when Title takes over" }).toBe("");
+    await expect.poll(() => arrowOf(tagsTh), { message: "Topic gives its arrow up when Title takes over" }).toBe("");
     await expect(page.locator("#tsort-title-icon")).toHaveText(/▲/);
     await page.keyboard.press("Escape");
     await expect(pop).toHaveCount(0);
 
-    // Back to Tags descending, then a press on the Title heading ITSELF: a fresh
+    // Back to Topic descending, then a press on the Title heading ITSELF: a fresh
     // pick, ascending — not the toggle of a state the heading no longer showed.
     await tagsTh.click({ position: { x: 8, y: 10 } });
     await tagsTh.click({ position: { x: 8, y: 10 } });
     await expect.poll(() => order(rows), { timeout: 5000 }).toBe("bac");
-    await expect.poll(() => claims(page), { timeout: 5000 }).toEqual(["tags:descending"]);
+    await expect.poll(() => claims(page), { timeout: 5000 }).toEqual(["topic:descending"]);
     await titleTh.click({ position: { x: 8, y: 10 } });
     await expect.poll(() => claims(page), { timeout: 5000 }).toEqual(["title:ascending"]);
     expect(await order(rows), "the rows follow the heading that claims the sort").toBe("abc");

@@ -8785,6 +8785,10 @@ test.describe("Docs hygiene", () => {
       "/api/admin/test-email": "its only write after the await is the audit row recording a send that already happened " +
         "during the await; the send was the act, authorised by requireSuperAdmin at the headers, and refusing the " +
         "record would erase the evidence of a completed send",
+      "/api/admin/smtp-settings/test": "the same shape as /api/admin/test-email: its only write after the await is " +
+        "the audit row recording a test send that already happened during the await, through a relay that is NOT saved " +
+        "(nothing is stored); the send was the act, authorised at the headers by requirePermission(\"ops.smtp\"), read " +
+        "live, and refusing the record would erase the evidence of a completed send",
       "/api/admin/certificate-config/preview": "it writes NOTHING, before or after its await: it renders sample data " +
         "to a PNG and sends it (no badge, image, settings or audit row; tests/certificate-config.spec.js counts the " +
         "tables). The answer it serves is a picture of a design, decided at the headers by requireAdmin and scope",
@@ -10841,7 +10845,9 @@ test.describe("Docs hygiene", () => {
     const fn = _f2Block(reaper, fnHdr, "function deleteUserCascade(");
     const txnHdr = fn.search(/const\s+txn\s*=\s*db\.transaction\(\s*\(\)\s*=>\s*\{/);
     const txnBody = _f2Block(fn, txnHdr, "const txn = db.transaction(() => {");
-    const callAt = fn.search(/\n\s*txn\(\)\s*;/);
+    // The call, bare or through the audit mirror buffer (the transaction records
+    // staff-team removals, so CLAUDE.md's mirror rule wraps it): both commit here.
+    const callAt = fn.search(/\n\s*(?:runTxnWithMirrorBuffer\(\s*\(\)\s*=>\s*txn\(\)\s*\)|txn\(\))\s*;/);
     const stampAt = txnBody.search(/=\s*stampDeletionForUser\(\s*db\s*,\s*userId\s*,/);
     const usersAt = txnBody.search(/DELETE FROM users WHERE id\s*=\s*\?/);
     const kicks = [...fn.matchAll(/\bscheduleRealmWithdrawal\s*\(/g)].map(m => m.index);
@@ -11358,8 +11364,10 @@ test.describe("Group leaderboard visibility gating (v7.11.7)", () => {
   test.afterAll(async () => { await sa?.dispose(); });
 
   // A live comp; `enabled` = group_leaderboard_enabled (omit to test the default).
+  // `clock_start: "entry"`: `activate` puts a member on the board by ENTERING, the
+  // rule these locks are written against (a first-open clock waits for an open).
   const mkComp = async (enabled) => {
-    const data = { name: uniq("VG"), start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240 };
+    const data = { name: uniq("VG"), start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 240, clock_start: "entry" };
     if (enabled !== undefined) data.group_leaderboard_enabled = enabled;
     return (await (await sa.post("/api/admin/competitions", { headers: saH, data })).json()).competition.id;
   };
@@ -11675,8 +11683,11 @@ test.describe("Event tags (v6.6.0)", () => {
     });
     expect(_taskR.ok(), `create task: ${await _taskR.text()}`).toBeTruthy();
     const _taskBody = await _taskR.json();
-    const _taskId = _taskBody.task ? _taskBody.task.id : _taskBody.id;
-    expect((await api.post(`/api/admin/tasks/${_taskId}/competitions`, { headers: h, data: { competitionIds: [_compId] } })).ok()).toBeTruthy();
+    const _bankId = _taskBody.task ? _taskBody.task.id : _taskBody.id;
+    const _asgT = await api.post(`/api/admin/tasks/${_bankId}/competitions`, { headers: h, data: { competitionIds: [_compId] } });
+    expect(_asgT.ok(), await _asgT.text()).toBeTruthy();
+    // The event's own copy (lib/event-copies.js): what is answered there, and the row its analytics list.
+    const _taskId = (await _asgT.json()).copies[0].task_id;
 
     const _email = `tagan-${_t}@company.example`;
     const _reg = await registerPost(api, "/api/register", {
@@ -11793,7 +11804,9 @@ test.describe("Event tags (v6.6.0)", () => {
         title: `Analytics internal task ${uniq}`, description: "<p>x</p>", difficulty: "easy",
         answer_type: "text", correct_answer: "win", status: "published",
       } })).json()).id;
-      await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+      const _asg = await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+      expect(_asg.ok(), await _asg.text()).toBeTruthy();
+      taskId = (await _asg.json()).copies[0].task_id;   // the event's own copy: what is answered there and listed by its analytics
       // A DEDICATED participant, not the shared alice: earlier tests in this file
       // tag the shared fixtures, and analytics excludes `staff` participants by
       // default — so a stray tag makes this competition's activity invisible in
@@ -11878,7 +11891,7 @@ test.describe("Event tags (v6.6.0)", () => {
     //    is whatever the admin list happens to return first and may have no
     //    activity, in which case per_challenge is empty and the loop is vacuous.
     const TAG = `v68-incl-${Date.now().toString(36)}`;
-    const target = S.easy1;
+    const target = S.liveTask("Challenge easy1");   // the Live event's own copy: the row alice's seeded solve is under
     expect(target, "seed fixture: Challenge easy1 must exist").toBeTruthy();
     try {
       const tagRes = await api.post(`/api/admin/tasks/${target.id}/tags`, { headers: h, data: { tag: TAG } });
@@ -12521,7 +12534,8 @@ test.describe("Participant groups (v6.20)", () => {
     const { api, h } = await saCtx();
     let gid, compId; let user;
     try {
-      compId = await mkComp(api, h, `GSyncLive ${uniq()}`, Date.now() - 30 * 60_000, 180); // live
+      // live, on the entry clock: selecting it is what sets login_time below
+      compId = await mkComp(api, h, `GSyncLive ${uniq()}`, Date.now() - 30 * 60_000, 180, { clock_start: "entry" });
       user = await mkUser(api, h);
       gid = await mkGroup(api, h, `GSyncLive ${uniq()}`, [user.id]);
       await api.post("/api/admin/competitions/assign", { headers: h, data: { groupIds: [gid], competitionIds: [compId] } });

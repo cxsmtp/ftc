@@ -14,7 +14,7 @@
 const { test, expect } = require("./isolated-test");
 const { registerPost } = require("./helpers");
 const { getSuperadminPass, BASE, codeLogin } = require("./helpers");
-const { openAnalyticsTab, openCompCreateForm, narrowGroupsTable, narrowEventsTable } = require("./ui-admin-helpers"); // v8.1.0 — one analytics entry point; v8.2.0 — one create entry point; v9.2.4 — one way into the Groups search
+const { openAnalyticsTab, openCompCreateForm, narrowGroupsTable, narrowEventsTable, openRowEventEdit } = require("./ui-admin-helpers"); // v8.1.0 — one analytics entry point; v8.2.0 — one create entry point; v9.2.4 — one way into the Groups search
 
 test.use({ baseURL: BASE });
 
@@ -951,12 +951,12 @@ test.describe("v7.20.11 — the analytics pickers search everything the record h
     await expect(count).toBeVisible();
     const idle = ((await count.textContent()) || "").trim();
     const total = await visible().count();
-    expect(idle).toBe(`${total} ${total === 1 ? "challenge" : "challenges"}`);
+    expect(idle).toBe(`${total} ${total === 1 ? "question" : "questions"}`);
     expect(idle, "nothing typed yet, so nothing 'matches'").not.toContain("match");
 
     await page.locator("#analytics-task-search").fill(task.title);
     await expect(visible()).toHaveCount(1);
-    await expect(count).toHaveText(`1 of ${total} challenges matches`);
+    await expect(count).toHaveText(`1 of ${total} questions matches`);
 
     // The pre-v7.20.11 picker had NO empty-state node at all: a query matching
     // nothing produced a blank grid and total silence. Both the message and the
@@ -964,8 +964,8 @@ test.describe("v7.20.11 — the analytics pickers search everything the record h
     await page.locator("#analytics-task-search").fill("zzz_no_such_challenge_zzz");
     await expect(visible()).toHaveCount(0);
     await expect(page.locator("#analytics-task-search-empty")).toBeVisible();
-    await expect(page.locator("#analytics-task-search-empty")).toHaveText("No challenges match that search.");
-    await expect(count).toHaveText("No challenges match");
+    await expect(page.locator("#analytics-task-search-empty")).toHaveText("No questions match that search.");
+    await expect(count).toHaveText("No questions match");
 
     await page.locator("#analytics-task-search").fill("");
     await expect(visible()).toHaveCount(total);
@@ -1207,9 +1207,7 @@ test.describe("v7.21.1 (A6) — CxOne fields survive a competition CREATE for a 
       await narrowEventsTable(page, name);
       const row = page.locator(`#admin-comp-body tr:has-text(${JSON.stringify(name)})`);
       await expect(row).toBeVisible({ timeout: 10000 });
-      await row.locator(".kebab-btn").click();
-      await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 5000 });
-      await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+      await openRowEventEdit(page, row);
       await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 10000 });
       await page.locator("#comp-cxone-group").fill("a6-edit-path-group");
       await page.locator("[data-action='comp-save-cxone']").click();

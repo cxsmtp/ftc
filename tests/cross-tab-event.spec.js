@@ -40,10 +40,11 @@ async function world(sa, saCsrf, label) {
   const A = await makeCompetition(sa, saCsrf, `${label}-A`);
   const B = await makeCompetition(sa, saCsrf, `${label}-B`);
   const t = await makeTask(sa, saCsrf, label, { hint: "<p>look closer</p>" });
-  await assignTask(sa, saCsrf, t.id, [A.id, B.id]);
+  // Each event holds its OWN copy (lib/event-copies.js): `tA` is the card a tab on A shows.
+  const own = Object.fromEntries((await assignTask(sa, saCsrf, t.id, [A.id, B.id])).copies.map(c => [c.competition_id, c.task_id]));
   await enrol(sa, saCsrf, A.id, [p.id]);
   await enrol(sa, saCsrf, B.id, [p.id]);
-  return { p, A, B, t };
+  return { p, A, B, t, tA: { ...t, id: own[A.id] }, tB: { ...t, id: own[B.id] } };
 }
 
 /** Sign the page's context in and put the session in `compId`, before the SPA boots. */
@@ -142,7 +143,7 @@ test.describe("v8.14.4 (R2) — a tab acts only on the event it shows", () => {
     await card.click();
     const submitOnce = async (answer) => {
       await page.locator("#ans-text").fill(answer);
-      await page.locator(`[data-action="task-submit-answer"][data-task-id="${w.t.id}"]`).click();
+      await page.locator(`[data-action="task-submit-answer"][data-task-id="${w.tA.id}"]`).click();
       const answered = page.waitForResponse(r => /\/submit$/.test(r.url()));
       await page.locator("#modal-overlay").getByRole("button", { name: "Submit", exact: true }).click();
       return answered;
@@ -350,7 +351,7 @@ test.describe("v8.14.4 (R2) — a tab acts only on the event it shows", () => {
     await page.locator("#task-grid .card-open", { hasText: w.t.title }).click();
     await page.locator("#ans-text").fill("wrong");
     const h = await holdOne(page, /\/submit$/);
-    await page.locator(`[data-action="task-submit-answer"][data-task-id="${w.t.id}"]`).click();
+    await page.locator(`[data-action="task-submit-answer"][data-task-id="${w.tA.id}"]`).click();
     await page.locator("#modal-overlay").getByRole("button", { name: "Submit", exact: true }).click();
     await expect.poll(() => h.seen, { message: "PRECONDITION: the answer naming A is out" }).toBe(true);
     expect(await page.evaluate((id) => window.selectCompetition(id), w.B.id), "this tab picks B itself").toBe(true);

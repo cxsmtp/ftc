@@ -20,7 +20,7 @@
 //     all-solved auto-end cannot fire (fixture checklist item 1).
 const { test, expect } = require("./isolated-test");
 const { apiLogin, PARTICIPANT_PASS, TEST_DATA_DIR, gradingHashFor, findLogLine } = require("./helpers");
-const { H, uniq, makeParticipant, makeTask, assignTask, enrol, buildWorld, makeCompetition, grantEventAdmin } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeTask, assignTask, enrol, buildWorld, makeCompetition, grantEventAdmin, eventCopyOf } = require("./event-admin-helpers");
 const yauzl = require("yauzl");
 const path = require("path");
 
@@ -139,7 +139,8 @@ test.beforeAll(async () => {
   const decoy = `DECOYMINE${tag}`, decoyOther = `DECOYTHEIRS${tag}`;
   await play(inMine, theirs.id, async ({ submit }) => { await submit(plain.id, decoy, false); });
   await play(inTheirs, theirs.id, async ({ submit }) => { await submit(plain.id, decoyOther, false); });
-  F = { plain, sealed, sealedKey, idle, formula, decoy, decoyOther };
+  // `mine` holds its OWN copy of each question (lib/event-copies.js): the files name those.
+  F = { plain, sealed, sealedKey, idle, formula, decoy, decoyOther, plainMine: eventCopyOf(plain.id, mine.id), sealedMine: eventCopyOf(sealed.id, mine.id) };
 });
 test.afterAll(async () => {
   for (const a of [W && W.sa, W && W.eaApi, W && W.zeroApi]) { try { await a.dispose(); } catch (_) {} }
@@ -175,19 +176,19 @@ test.describe("v8.15.0 — full event export", () => {
 
     const subs = objects(files["submissions.csv"]).filter(s => s["User ID"] === inMine.id);
     expect(subs.length, "every submission row in THIS event").toBe(3);
-    const plainSubs = subs.filter(s => s["Challenge Ref"] === F.plain.id);
+    const plainSubs = subs.filter(s => s["Challenge Ref"] === F.plainMine);
     expect(plainSubs.map(s => [s["Attempt Number"], s.Correct])).toEqual([["1", "No"], ["2", "Yes"]]);
     expect(plainSubs[0].Answer, "a formula answer is apostrophised").toBe("'" + F.formula);
     expect(plainSubs[1].Answer, "an ordinary answer is verbatim (the control)").toBe("rightanswer");
     // lib/csv.js neutralises EVERY cell that opens with a trigger, numbers included.
     expect(plainSubs[0]["Points Delta"]).toBe("'-5");
-    const sealedRow = subs.find(s => s["Challenge Ref"] === F.sealed.id);
+    const sealedRow = subs.find(s => s["Challenge Ref"] === F.sealedMine);
     expect(sealedRow.Answer).toMatch(/^\(sealed/);
     expect(all, "the sealed key is nowhere in a non-author's export").not.toContain(F.sealedKey);
     for (const d of [F.decoy, F.decoyOther, theirs.name]) expect(all, `decoy ${d}`).not.toContain(d);
 
     const hints = objects(files["hints.csv"]);
-    expect(hints.map(h => [h["User ID"], h["Challenge Ref"]])).toEqual([[inMine.id, F.plain.id]]);
+    expect(hints.map(h => [h["User ID"], h["Challenge Ref"]])).toEqual([[inMine.id, F.plainMine]]);
     expect(objects(files["feedback.csv"]).map(f => [f["User ID"], f.Rating])).toEqual([[inMine.id, "4"]]);
     const main = objects(files["rankings-main.csv"]);
     const mrow = main.find(x => x["User ID"] === inMine.id);
@@ -197,7 +198,7 @@ test.describe("v8.15.0 — full event export", () => {
     expect(mrow["Incorrect Submissions"]).toBe("1");
     expect(mrow["Hints Taken"]).toBe("1");
     expect(objects(files["time.csv"]).find(x => x["User ID"] === inMine.id)["Solve Clock Start"], "the solve clock started").not.toBe("");
-    expect(objects(files["challenges.csv"]).map(c => c["Challenge Ref"]).sort()).toEqual([F.plain.id, F.sealed.id].sort());
+    expect(objects(files["challenges.csv"]).map(c => c["Challenge Ref"]).sort()).toEqual([F.plainMine, F.sealedMine].sort());
     expect(all, "no answer KEY of the plain challenge either").not.toMatch(/Correct Answer/);
 
     // Audited, by the request's own id.
@@ -214,7 +215,7 @@ test.describe("v8.15.0 — full event export", () => {
     const r = await W.eaApi.get(EVENT_URL(W.mine.id));
     expect(r.status(), await r.text()).toBe(200);
     const files = await unzip(await r.body());
-    const row = objects(files["submissions.csv"]).find(s => s["Challenge Ref"] === F.sealed.id);
+    const row = objects(files["submissions.csv"]).find(s => s["Challenge Ref"] === F.sealedMine);
     expect(row.Answer).toBe(F.sealedKey);
   });
 
@@ -230,7 +231,7 @@ test.describe("v8.15.0 — full event export", () => {
       const sealedAnswer = async () => {
         const r = await b.api.get(EVENT_URL(mine.id));
         expect(r.status(), (await r.text()).slice(0, 300)).toBe(200);
-        return objects((await unzip(await r.body()))["submissions.csv"]).find(s => s["Challenge Ref"] === F.sealed.id).Answer;
+        return objects((await unzip(await r.body()))["submissions.csv"]).find(s => s["Challenge Ref"] === F.sealedMine).Answer;
       };
       const personText = async () => {
         const r = await b.api.get(PERSON_URL(inMine.id));
@@ -239,7 +240,7 @@ test.describe("v8.15.0 — full event export", () => {
       };
       expect(await sealedAnswer(), "CONTROL: before the reveal the key is withheld").toMatch(/^\(sealed/);
       expect(await personText(), "CONTROL: …from the person export too").not.toContain(F.sealedKey);
-      const rv = await b.api.post(`/api/admin/tasks/${F.sealed.id}/sealed-reveal`, { headers: H(b.csrf) });
+      const rv = await b.api.post(`/api/admin/tasks/${F.sealedMine}/sealed-reveal`, { headers: H(b.csrf) });
       expect(rv.status(), await rv.text()).toBe(200);
       expect(await sealedAnswer(), "the revealed superadmin reads the submitted key").toBe(F.sealedKey);
       expect(await personText(), "…and in the person export").toContain(F.sealedKey);
@@ -319,7 +320,7 @@ test.describe("v8.15.0 — full event export", () => {
     const qual = ch.filter(x => qIds.has(x["Challenge Ref"]));
     expect(qual.length, `PRECONDITION: the four qualifying questions: ${ch.map(x => x.Challenge).join(" | ")}`).toBe(4);
     for (const x of qual) expect(x.Points, `challenges.csv: ${x.Challenge}`).toBe("0");
-    expect(ch.find(x => x["Challenge Ref"] === scored.id).Points, "CONTROL: an easy challenge is worth 50").toBe("50");
+    expect(ch.find(x => x["Challenge Ref"] === eventCopyOf(scored.id, comp.id)).Points, "CONTROL: an easy challenge is worth 50").toBe("50");
     const act = await sa.get(`/api/admin/export/competition-activity?competitionId=${encodeURIComponent(comp.id)}`);
     expect(act.status(), (await act.text()).slice(0, 300)).toBe(200);
     const rows = objects((await act.text()).replace(/^\uFEFF/, ""));
@@ -461,7 +462,7 @@ test.describe("v8.15.0 — person export", () => {
         expect(subs.map(s => [s.attempt_number, s.correct, s.answer_sealed, s.answer_visible, s.answer]),
           `${who}: the rival's attempts, every answer withheld`).toEqual([[1, false, true, false, null], [2, true, true, false, null]]);
         expect(subs.every(s => typeof s.submitted_at === "string" && s.submitted_at), `${who}: with their times`).toBe(true);
-        expect(d.hints.filter(h => h.competition_id === comp.id).map(h => h.task_id), `${who}: and the hint`).toEqual([sealedH.id]);
+        expect(d.hints.filter(h => h.competition_id === comp.id).map(h => h.task_id), `${who}: and the hint (on the event's own copy)`).toEqual([eventCopyOf(sealedH.id, comp.id)]);
         expect(d.memberships.find(m => m.competition_id === comp.id).login_time, `${who}: and when their clock started`).toBeTruthy();
         const text = JSON.stringify(d);
         for (const v of [key, wrong]) expect(text, `${who}: no answer to the sealed challenge, right or wrong`).not.toContain(v);
@@ -492,8 +493,10 @@ test.describe("person export — the absences file", () => {
     const { sa, saCsrf, eaApi, ea } = W;
     const tag = uniq("abs").replace(/[^a-zA-Z0-9]/g, "");
     const p = await makeParticipant(sa, saCsrf, "absent");
-    const inScope = await makeCompetition(sa, saCsrf, "abs-in", { name: `+Absent ${tag}` });
-    const decoy = await makeCompetition(sa, saCsrf, "abs-decoy");
+    // `entry`: ENTERING each event starts the solve clock below, so a removal
+    // records an absence (on a first-open clock it would wait for an open).
+    const inScope = await makeCompetition(sa, saCsrf, "abs-in", { name: `+Absent ${tag}`, clock_start: "entry" });
+    const decoy = await makeCompetition(sa, saCsrf, "abs-decoy", { clock_start: "entry" });
     // A live session in the in-scope event: the absence records it.
     const sessionName = `Morning ${tag}`;
     const ts = await sa.post(`/api/admin/competitions/${inScope.id}/timeslots`, { headers: H(saCsrf),

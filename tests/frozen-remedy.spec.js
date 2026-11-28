@@ -41,11 +41,12 @@ test.describe("v7.29.0 — the frozen-competition remedy", () => {
       data: { title: `Frozen task ${stamp}`, description: "d", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" },
     });
     expect(tr.ok(), `create task: ${tr.status()} ${await tr.text()}`).toBeTruthy();
-    const taskId = (await tr.json()).id || (await (await api.get("/api/admin/tasks")).json()).find(t => t.title === `Frozen task ${stamp}`)?.id;
-    expect(taskId, "the challenge exists").toBeTruthy();
+    const bankId = (await tr.json()).id || (await (await api.get("/api/admin/tasks")).json()).find(t => t.title === `Frozen task ${stamp}` && !t.owner_competition_id)?.id;
+    expect(bankId, "the challenge exists").toBeTruthy();
 
-    const asg = await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h(csrf), data: { competitionIds: [compId] } });
+    const asg = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: h(csrf), data: { competitionIds: [compId] } });
     expect(asg.ok(), `assign: ${asg.status()} ${await asg.text()}`).toBeTruthy();
+    const taskId = (await asg.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): the one the end freezes
 
     // NOW end it, which is what arms the freeze.
     const end = await api.post(`/api/admin/competitions/${compId}/end-now`, { headers: h(csrf), data: {} });

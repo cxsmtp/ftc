@@ -76,10 +76,14 @@ const mkChoice = (api, csrf, choices, extra = {}) => mkTask(api, csrf, { answer_
  */
 async function liveEvent(sa, saCsrf, label, taskIds, extra = {}) {
   const ev = await makeCompetition(sa, saCsrf, label, extra);
-  const filler = await mkTask(sa, saCsrf, { answer_type: "text", correct_answer: `filler-${uniq("f")}` });
-  await assignTask(sa, saCsrf, filler, [ev.id]);
-  for (const id of taskIds) await assignTask(sa, saCsrf, id, [ev.id]);
-  return { ...ev, filler };
+  const fillerBank = await mkTask(sa, saCsrf, { answer_type: "text", correct_answer: `filler-${uniq("f")}` });
+  const filler = (await assignTask(sa, saCsrf, fillerBank, [ev.id])).copies[0].task_id;
+  // `ids`: the event's OWN copy of each named question, in order (lib/event-copies.js)
+  // — what its participants answer and what an edit to "the challenge in the
+  // event" is made to.
+  const ids = [];
+  for (const id of taskIds) ids.push((await assignTask(sa, saCsrf, id, [ev.id])).copies[0].task_id);
+  return { ...ev, filler, ids };
 }
 
 /** One owned participant, enrolled in `compIds`. */

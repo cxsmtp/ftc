@@ -77,7 +77,9 @@ async function eventWith(label, specs, extra = {}) {
         try { for (const t of olderTags) db.prepare("INSERT INTO task_tags (task_id, tag) VALUES (?,?)").run(ids[key], t); } finally { db.close(); }
       }
       const a = await sa.post(`/api/admin/tasks/${ids[key]}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
-      expect((await a.json()).assigned, `assign ${key}`).toBe(1);
+      const ab = await a.json();
+      expect(ab.assigned, `assign ${key}`).toBe(1);
+      ids[key] = ab.copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
     }
     const p = await makeParticipant(sa, csrf, label);
     const idle = await makeParticipant(sa, csrf, `${label}-idle`);
@@ -496,7 +498,7 @@ test("a Program's challenge view keeps the header countdown on a desktop, since 
   try {
     ring = await makeCompetition(sa, csrf, "cvk-ring");
     ringTask = await makeTask(sa, csrf, "cvk-ring-1");
-    await assignTask(sa, csrf, ringTask.id, [ring.id]);
+    Object.assign(ringTask, { bankId: ringTask.id, id: (await assignTask(sa, csrf, ringTask.id, [ring.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
     await enrol(sa, csrf, ring.id, [f.p.id]);
   } finally { await sa.dispose(); }
   await enter(page, f);

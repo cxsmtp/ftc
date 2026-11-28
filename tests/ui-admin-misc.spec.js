@@ -15,9 +15,7 @@ test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").showAl
 test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").openFilterPanels(page); });
 const { registerPost } = require("./helpers");
 const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, PORT_BASE, gradingHashFor, codeLogin, appearanceSettled } = require("./helpers");
-const {
-  expectSpaBooted, login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin,
-  clickTab, openKebab, findSeededTaskRow, viewComp, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, openAnalyticsTab, signUpViaUi, narrowPeopleTable } = require("./ui-admin-helpers");
+const { expectSpaBooted, login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin, clickTab, openKebab, findSeededTaskRow, viewComp, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, openAnalyticsTab, signUpViaUi, narrowPeopleTable, openRowEventEdit } = require("./ui-admin-helpers");
 
 // Route every page.goto() + page.request.* to THIS worker's server.
 test.use({ baseURL: BASE });
@@ -660,8 +658,11 @@ test.describe("Mobile admin hamburger + active nav-btn (v6.17.3)", () => {
 test.describe("Participant groups UI (v6.20)", () => {
   test("Groups nav item opens the Groups pane with a New Group action", async ({ page }) => {
     await adminLogin(page);
-    const nav = page.locator("button.admin-nav-item:has-text('Groups')").first();
+    const nav = page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first();
     await expect(nav).toBeVisible();
+    // Renamed from Teams (owner's decision, 27 Nov 2026): the page and its heading say Groups.
+    await expect(nav, "the sidebar names the page Groups").toHaveText(/^\s*Groups\s*$/);
+    await expect(page.locator("#admin-groups-tab h2")).toHaveText("Groups");
     await nav.click();
     await expect(page.locator("#admin-groups-tab")).toBeVisible();
     await expect(page.locator("#admin-groups-tab button[data-action='group-create']")).toBeVisible();
@@ -725,7 +726,7 @@ test.describe("Participant groups UI (v6.20)", () => {
     const parts = (await (await page.request.get("/api/admin/participants?limit=50")).json()).participants;
     const g = await createGroupViaApi(page, `UIGrp_${Date.now()}`, [parts[0].id]); // 1 member → others are candidates
     try {
-      await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+      await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
       await page.locator(`button[data-action='group-manage-members'][data-group-id='${g.id}']`).click();
       await page.locator("#gm-candidates label").first().waitFor({ state: "visible" });
       const firstRow = page.locator("#gm-candidates label").first();
@@ -751,7 +752,7 @@ test.describe("Participant groups UI (v6.20)", () => {
     const parts = (await (await page.request.get("/api/admin/participants?limit=50")).json()).participants;
     const g = await createGroupViaApi(page, `UIAxeGrp_${Date.now()}`, [parts[0].id]);
     try {
-      await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+      await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
       await page.locator(`button[data-action='group-manage-members'][data-group-id='${g.id}']`).click();
       await page.locator("#gm-search").waitFor({ state: "visible", timeout: 5000 });
       const { AxeBuilder } = require("@axe-core/playwright");
@@ -780,7 +781,7 @@ test.describe("Participant groups UI (v6.20)", () => {
     await adminLogin(page);
     const g = await createGroupViaApi(page, `UICompGrp_${Date.now()}`);
     try {
-      await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+      await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
       await page.locator(`button[data-action='group-bind-comps'][data-group-id='${g.id}']`).click();
       await page.locator("#gc-save").waitFor({ state: "visible" });
       const rows = page.locator(".gc-cb");
@@ -932,7 +933,7 @@ test.describe("Participant groups UI (v6.20)", () => {
       expect(seed.status(), `bulk-seed: ${seed.status()}`).toBe(200);
       fs.unlinkSync(maintFile);
 
-      await page.locator("button.admin-nav-item:has-text('Groups')").first().click();
+      await page.locator("button.admin-nav-item[data-tab-id='admin-groups-tab']").first().click();
       await page.locator(`button[data-action='group-manage-members'][data-group-id='${gid}']`).click();
       await page.locator("#gm-candidates label").first().waitFor({ state: "visible", timeout: 10000 });
       // Pager must be present (60 candidates > page size 50).
@@ -1363,7 +1364,7 @@ test.describe("v7.20.10 — Assign Challenges is a set operation", () => {
     // It is not on screen (drafts cannot be assigned, so they are not listed)…
     await expect(rowFor(picker, draftTitle), "the draft is not listed").toHaveCount(0);
     // …and the dialog says so rather than silently hiding it.
-    await expect(picker.locator("#task-picker-note")).toContainText("assigned draft challenge");
+    await expect(picker.locator("#task-picker-note")).toContainText("assigned draft question");
 
     // Make an UNRELATED change and save it.
     await boxFor(picker, f.B.title).check();
@@ -1382,7 +1383,7 @@ test.describe("v7.20.10 — Assign Challenges is a set operation", () => {
   // Mutation: in main.js, `…querySelectorAll('#task-picker-list input…')…delete(c.value)`
   // → `S._pickerCheckedIds?.clear()` (act on the whole set rather than the shown
   // rows). Bravo is then removed too and both assertions fail.
-  test("'Unselect All Shown' is scoped to the filter — a hidden row is not unassigned", async ({ page }) => {
+  test("'Unselect all shown' is scoped to the filter — a hidden row is not unassigned", async ({ page }) => {
     const f = await fixture(page);
     await f.assign(f.B.id);            // both A and B assigned this time
     await f.dispose();
@@ -1527,9 +1528,7 @@ test.describe("Multi-session → single session (v7.21.1 A4)", () => {
     await filterComps(page, name); // the table paginates and this worker's DB accumulates
     const row = page.locator(`#admin-comp-body tr:has-text('${name}')`).first();
     await expect(row).toBeVisible({ timeout: 15000 });
-    await row.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 5000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, row);
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 10000 });
   }
 
@@ -1680,16 +1679,23 @@ test.describe("v7.22.3 — analytics adopts the focused scope", () => {
     await page.locator("#analytics-filterbar .seg-control").first().waitFor({ state: "visible", timeout: 10000 });
   };
   const activeScope = (page) => page.locator('#analytics-filterbar [data-action="analytics-set-scope"].seg-active').innerText();
+  // Inside an event's workspace Analytics IS that event (owner's decision, 27
+  // Nov 2026): the scope card names it, with no Global/Event/Session switch.
+  const openWsAnalytics = async (page) => {
+    await openAnalyticsTab(page);
+    await page.locator("#analytics-ws-scope").waitFor({ state: "visible", timeout: 10000 });
+  };
 
   test("a focused competition is adopted; the scope reads Competition, not Global", async ({ page }) => {
     const fx = await seedComp(false);
     try {
       await adminLogin(page);
       await clickTab(page, "Events");
-      await viewComp(page, fx.name);           // sets the global focus
-      await openAnalytics(page);
+      await viewComp(page, fx.name);           // opens the event's workspace
+      await openWsAnalytics(page);
 
-      expect((await activeScope(page)).trim()).toBe("Event");
+      await expect(page.locator("#analytics-ws-scope .analytics-ws-event"), "the scope card names the open event").toContainText(fx.name);
+      await expect(page.locator('#analytics-filterbar [data-action="analytics-set-scope"]'), "no Global/Event switch inside the event").toHaveCount(0);
       expect(await page.evaluate(() => window._analyticsState.competitionId)).toBe(fx.compId);
       expect(await page.evaluate(() => window._analyticsState.timeslotId)).toBeNull();
       // …and the pane actually rendered figures rather than the "pick a
@@ -1712,8 +1718,8 @@ test.describe("v7.22.3 — analytics adopts the focused scope", () => {
       await expect.poll(async () => page.evaluate(() => window.S.adminSelectedTimeslotId),
         { timeout: 10000, message: "the session must become the focused scope" }).toBe(fx.tsId);
 
-      await openAnalytics(page);
-      expect((await activeScope(page)).trim()).toBe("Session");
+      await openWsAnalytics(page);
+      await expect(page.locator("#analytics-ws-slot"), "the open session is the one measured").toHaveValue(fx.tsId);
       expect(await page.evaluate(() => window._analyticsState.competitionId)).toBe(fx.compId);
       expect(await page.evaluate(() => window._analyticsState.timeslotId)).toBe(fx.tsId);
     } finally { await drop(fx); }

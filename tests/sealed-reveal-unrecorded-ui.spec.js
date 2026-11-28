@@ -91,9 +91,10 @@ async function world(label, { ended = false } = {}) {
       correct_answer: `SEALKEY_${T}`, explanation: `<p>SEALWHY_${T}</p>`, hint: `<p>SEALHINT_${T}</p>`,
       status: "published", answer_sealed: true } });
     expect(cr.ok(), await cr.text()).toBeTruthy();
-    const id = (await cr.json()).id;
+    const bankId = (await cr.json()).id;
     const comp = await makeCompetition(sa, saCsrf, label, ended ? { reveal_answers_on_end: true } : {});
-    await assignTask(aApi, ac, id, [comp.id]);
+    // The event's own copy (lib/event-copies.js): what is read there, and where a reveal is recorded.
+    const id = (await assignTask(aApi, ac, bankId, [comp.id])).copies[0].task_id;
     // A second enrollee who never solves keeps the all-solved auto-end away.
     await enrol(sa, saCsrf, comp.id, [stander.id]);
     if (ended) {
@@ -292,10 +293,11 @@ async function choiceWorld(label) {
       expect(cr.ok(), await cr.text()).toBeTruthy();
       return (await cr.json()).id;
     };
-    const sealedId = await mk(true), openId = await mk(false);
+    const sealedBank = await mk(true), openBank = await mk(false);
     const comp = await makeCompetition(sa, saCsrf, label);
-    await assignTask(aApi, ac, sealedId, [comp.id]);
-    await assignTask(aApi, ac, openId, [comp.id]);
+    // The event's own copies (lib/event-copies.js): what is read there, and where a reveal is recorded.
+    const sealedId = (await assignTask(aApi, ac, sealedBank, [comp.id])).copies[0].task_id;
+    const openId = (await assignTask(aApi, ac, openBank, [comp.id])).copies[0].task_id;
     // A second enrollee who never solves keeps the all-solved auto-end away.
     await enrol(sa, saCsrf, comp.id, [stander.id]);
     return { T, sealedId, openId, comp };

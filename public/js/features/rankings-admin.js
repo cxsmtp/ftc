@@ -144,7 +144,9 @@ const _RK_SORTERS = {
   last:    _rkTextCmp('lastName'),
   company: _rkTextCmp('company'),
   email:   _rkTextCmp('email'),
-  score:   (a, b) => (a.score ?? 0) - (b.score ?? 0),
+  // A board ranking by percentages (an overall board, per-session question sets)
+  // carries `percent`: its Score column is the percentage.
+  score:   (a, b) => (a.percent ?? a.score ?? 0) - (b.percent ?? b.score ?? 0),
   time:    (a, b) => (a.solveTimeMs ?? Number.MAX_SAFE_INTEGER) - (b.solveTimeMs ?? Number.MAX_SAFE_INTEGER),
   solved:  (a, b) => (a.allSolved ? 1 : 0) - (b.allSolved ? 1 : 0),
 };
@@ -466,7 +468,7 @@ function _rkGroupLink(name){
   const g=String(name||'');
   if(!crossNavOffered('group'))return `<span class="rk-player-name"><strong>${esc(g)}</strong></span>`;
   return `<button type="button" class="rk-player-link" data-action="rankings-open-group" data-group-name="${esc(g)}"
-           title="Show ${esc(g)} in Groups" aria-label="${esc(g)} — show in the Groups tab"><strong>${esc(g)}</strong></button>`;
+           title="Show ${esc(g)} in Groups" aria-label="${esc(g)} — show in the Groups page"><strong>${esc(g)}</strong></button>`;
 }
 
 // v7.22.0 — the rankings search. It is deliberately a plain substring match over
@@ -579,7 +581,7 @@ export const RANKINGS_TABLE_COLUMNS={
       case 'last':return u.lastName||'';
       case 'company':return u.company||'';
       case 'email':return u.email||'';
-      case 'score':return u.score??'';
+      case 'score':return u.percent??u.score??'';
       case 'time':return fmtSolveTime(u.solveTimeMs);
       case 'solved':return _rkSolvedText(u);
       default:return '';
@@ -783,6 +785,18 @@ export function exportRankingsCsv(key){
   downloadCsv(`rankings-${_rkSlug(entry.label)}-${date}.csv`, RANKINGS_CSV_HEADERS, rows);
 }
 
+// PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026) — a row's score: its
+// points, or on an overall board ranking by percentages the percentage first,
+// with the points and the session's maximum it is a share of beside it.
+// What a top-three place's certificate prints in its score slot: the percentage
+// a board ranked by percentages placed it on (as the server freezes it at mint),
+// else its points.
+function _rkPlaceScore(r){return typeof r.percent==='number'?`${r.percent}%`:`${r.score ?? 0} pts`;}
+function _rkScoreCell(u){
+  if(typeof u.percent!=='number')return `<td><strong>${u.score}</strong> pts</td>`;
+  const pct=`${u.percent.toFixed(1).replace(/\.0$/,'')}%`;
+  return `<td><strong>${esc(pct)}</strong> <span class="settings-help">${u.score} of ${Number(u.maxPoints)||0} pts</span></td>`;
+}
 export function renderLeaderboardTable(board,sortKey,boardKey,label){
   // Sort only the regular entries; benchmark rows stay pinned in their own
   // section below the divider regardless of the chosen column.
@@ -810,7 +824,7 @@ export function renderLeaderboardTable(board,sortKey,boardKey,label){
       <td><strong>#${u.rank}</strong></td>
       <td>${_rkPlayerCell(u)}</td>
       ${idCells(u)}
-      <td><strong>${u.score}</strong> pts</td>
+      ${_rkScoreCell(u)}
       ${timeCell(u)}
     </tr>`).join('');
   if(all.length>RANKINGS_PAGE){
@@ -840,7 +854,7 @@ export function renderLeaderboardTable(board,sortKey,boardKey,label){
         ${_rkPersonLink(u.nickname)}
         <span class="badge draft badge-xs late-entrant-tag">late entrant</span></div></td>
       ${idCells(u)}
-      <td><strong>${u.score}</strong> pts</td>
+      ${_rkScoreCell(u)}
       ${timeCell(u)}
     </tr>`).join('');
   }
@@ -853,7 +867,7 @@ export function renderLeaderboardTable(board,sortKey,boardKey,label){
         ${_rkPersonLink(u.nickname)}
         <span class="badge draft badge-xs benchmark-tag">benchmark</span></div></td>
       ${idCells(u)}
-      <td><strong>${u.score}</strong> pts</td>
+      ${_rkScoreCell(u)}
       ${timeCell(u)}
     </tr>`).join('');
   }
@@ -934,6 +948,8 @@ export async function loadAdminLeaderboardAllLive(comps){
   for(const c of comps){
     const ts=c.timeslots||[];
     if(ts.length>1&&(c.leaderboard_mode||'per_slot')==='per_slot'){
+      // Per-session question sets: "both" adds the overall board (no session named).
+      if(c.leaderboard_overall)fetches.push({comp:c,ts:{id:'overall',name:'Overall',overall:true},url:`/api/admin/leaderboard?competitionId=${c.id}`});
       for(const t of ts){
         fetches.push({comp:c,ts:t,url:`/api/admin/leaderboard?competitionId=${c.id}&timeslotId=${t.id}`});
       }
@@ -993,7 +1009,7 @@ export async function loadAdminLeaderboardAllLive(comps){
     const label=ts?`${esc(comp.name)} → ${esc(ts.name)}`:esc(comp.name);
     // The UNESCAPED label, for the download filename — `label` above is markup.
     const rawLabel=ts?`${comp.name} ${ts.name}`:comp.name;
-    const statusObj=ts||comp;
+    const statusObj=ts&&!ts.overall?ts:comp;
     const _rkKey=`live-${comp.id}${ts?'-'+ts.id:''}`;
     const rows=board.length?renderLeaderboardTable(board,_rkKey,_rkKey,rawLabel)
       :`<tr><td colspan="${rankingsColspan()}" class="rankings-empty-row compact">No participants yet.</td></tr>`;
@@ -1037,7 +1053,11 @@ export async function loadAdminLeaderboardPerSlot(comp,timeslots){
   // the request set, and every non-sort caller misses because it does not set
   // `_rkSortOnly`. The check must stay ABOVE the first `await` — `_rkSortOnly`
   // is cleared synchronously by the caller's `finally`.
-  const _urls=timeslots.map(ts=>`/api/admin/leaderboard?competitionId=${comp.id}&timeslotId=${ts.id}`);
+  // Per-session question sets: an event ranking per session AND overall shows
+  // its overall board first (the event-wide board: no session named).
+  const _both=!!comp.leaderboard_overall;
+  if(_both)timeslots=[{id:'overall',name:'Overall',overall:true,start_time:comp.start_time,duration_minutes:comp.duration_minutes,ended_at:comp.ended_at},...timeslots];
+  const _urls=timeslots.map(ts=>ts.overall?`/api/admin/leaderboard?competitionId=${comp.id}`:`/api/admin/leaderboard?competitionId=${comp.id}&timeslotId=${ts.id}`);
   const _key=_urls.join("|");
   let results;
   if(_rkCacheHit("per-slot",_key)){
@@ -1056,13 +1076,13 @@ export async function loadAdminLeaderboardPerSlot(comp,timeslots){
     if(mySeq!==S._rkFetchSeq)return;   // superseded mid-flight
     S._rkCache={kind:"per-slot",key:_key,data:results};
   }
-  const tsSt=ts=>computeCompStatus(ts);
+  const tsSt=ts=>computeCompStatus(ts.overall?comp:ts);
   const statusLabel=ts=>{const s=tsSt(ts);return s==='live'?'Live':s==='ended'?'Ended':'Upcoming';};
   const statusClass=ts=>`is-${tsSt(ts)}`;
   const _q=_rkSearchTerm();               // v7.22.0 — see loadAdminLeaderboardAllLive
   let _matched=0,_total=0,_hiddenCards=0;
   let html=`<div class="rankings-section-header">
-    <h3 id="admin-rankings-title">${esc(comp.name)} - Per Session Rankings</h3>
+    <h3 id="admin-rankings-title">${esc(comp.name)} - ${_both?'Overall and Per Session Rankings':'Per Session Rankings'}</h3>
     <button class="btn sm secondary" data-action="rankings-refresh">Refresh</button>
   </div>
   <div class="rankings-card-grid">`;
@@ -1076,6 +1096,7 @@ export async function loadAdminLeaderboardPerSlot(comp,timeslots){
       :`<tr><td colspan="${rankingsColspan()}" class="rankings-empty-row compact">No participants yet.</td></tr>`;
     html+=`<div class="card rankings-slot-card">
       <h4 class="rankings-card-title">${esc(ts.name)} <span class="rankings-status-pill ${statusClass(ts)}">(${statusLabel(ts)})</span>${board.length?_rkExportBtn(_rkKey,rawLabel):''}</h4>
+      ${ts.overall?`<p class="settings-help rankings-overall-note">Every session together${comp.leaderboard_percent?', ranked by the percentage of each person’s own session’s points; time breaks a tie':', ranked by points'}.</p>`:''}
       <table data-tcols="rankings">
         ${rankingsThead(_rkKey)}
         <tbody>${rows}</tbody>
@@ -1092,6 +1113,49 @@ export async function loadAdminLeaderboardPerSlot(comp,timeslots){
     if(_q&&!board.some(u=>_rkMatches(u,_q)))continue;   // its card was skipped
     _rkPaintSortIcons(`slot-${ts.id}`);
   }
+}
+
+/**
+ * Program grades (owner decision, 27 Nov 2026): each learner's grade, under the
+ * Progress card of a graded event (GET /api/admin/competitions/:id/grades).
+ * A list rather than a table: one line per learner, every value the server's.
+ */
+async function _loadProgramGrades(compId, mySeq){
+  const box=document.getElementById('rk-grades');
+  if(!box)return;
+  let d=null;
+  try{
+    const r=await fetch(`/api/admin/competitions/${encodeURIComponent(compId)}/grades`,{headers:{accept:'application/json'}});
+    d=r.ok?await r.json().catch(()=>null):null;
+  }catch{ d=null; }
+  if(mySeq!==S._rkFetchSeq)return;
+  const now=document.getElementById('rk-grades');
+  if(!now)return;
+  if(!d||!Array.isArray(d.rows)){
+    setSafeHtml(now,'<p class="rk-unranked-note" role="alert">The grades could not be loaded. Open Rankings again to retry.</p>');
+    return;
+  }
+  setSafeHtml(now,programGradesHtml(d));
+}
+
+/** The grades list (exported for its spec): every value escaped here. */
+export function programGradesHtml(d){
+  const pass=Number(d.passPercent)||60;
+  const head=`<h4 class="rk-grades-title">Grades</h4>
+    <p class="rk-unranked-note">Points earned out of ${esc(String(d.maxPoints??0))}, after wrong-answer penalties and hints. A grade counts once the learner has finished every question (solved it or used every attempt); ${esc(String(pass))}% or more earns a certificate (90% Excellent, 80% Very good, 70% Good, 60% Satisfactory). Under it the learner is told to try again.</p>`;
+  if(!d.rows.length)return head+'<p class="rk-unranked-note">Nobody has joined yet.</p>';
+  const items=d.rows.map((r)=>{
+    const who=[r.firstName,r.lastName].filter(Boolean).join(' ')||r.nickname||r.email||r.userId;
+    const g=r.grade;
+    const grade=!g?'No questions yet'
+      :(r.finished?`${esc(g.percent)} &middot; ${esc(g.label)}`:`${esc(g.percent)} so far &middot; not finished`);
+    const extra=[
+      r.attempt>1?`attempt ${esc(String(r.attempt))}`:'',
+      r.certificate?`certificate issued${r.certificate.grade?` (${esc(r.certificate.grade.label)}, ${esc(r.certificate.grade.percent)})`:''}`:'',
+    ].filter(Boolean).join(' &middot; ');
+    return `<li class="rk-grade-row" data-user-id="${esc(r.userId)}" data-band="${esc(g?g.band:'')}"><span class="rk-grade-who">${esc(who)}</span> <span class="rk-grade-val">${grade}</span>${extra?` <span class="rk-grade-extra">${extra}</span>`:''}</li>`;
+  }).join('');
+  return `${head}<ul class="rk-grade-list">${items}</ul>`;
 }
 
 export async function loadAdminLeaderboard(){
@@ -1120,7 +1184,9 @@ export async function loadAdminLeaderboard(){
         <strong>Export Activity (CSV)</strong> item on this event's row gives one line per
         participant per challenge.
       </p>
+      ${policyOrDefault(_rkComp.policy).certificate==='completion'?'<div id="rk-grades" class="rk-grades" aria-live="polite"><p class="rk-unranked-note">Loading grades…</p></div>':''}
     </div>`);
+    if(policyOrDefault(_rkComp.policy).certificate==='completion') await _loadProgramGrades(compId, mySeq);
     return;
   }
   // Restore standard single-table layout if it was replaced by per-slot view —
@@ -1259,12 +1325,12 @@ function _rkRenderTopCerts(compId, board, { reread = true } = {}) {
   const placesWord = unearned.length > 1 ? `${unearned.slice(0, -1).map(l => l.replace(' place', '')).join(', ')} and ${unearned[unearned.length - 1]}` : (unearned[0] || '');
   setSafeHtml(box, `<div class="rk-certs-head"><div><p class="eyebrow gold">Certificates</p><h3 id="rk-certs-title">Top three</h3></div>
       <p class="rk-certs-note">${ended ? 'Final placings.' : 'Provisional: the event is still running, so these can change.'} Previews use this event's certificate design; each finisher collects their own issued certificate, with its credential code, from their account.</p></div>
-    ${unearned.length ? `<p class="rk-certs-note rk-certs-zero">No medal certificate for ${esc(placesWord)}: a top-three place earns Gold, Silver or Bronze only with points above zero; ${unearned.length > 1 ? 'those finishers get' : 'that finisher gets'} a participation certificate if they attempted a challenge.</p>` : ''}
+    ${unearned.length ? `<p class="rk-certs-note rk-certs-zero">No medal certificate for ${esc(placesWord)}: a top-three place earns Gold, Silver or Bronze only with points above zero; ${unearned.length > 1 ? 'those finishers get' : 'that finisher gets'} a participation certificate if they attempted a question.</p>` : ''}
     ${top.length ? `<ol class="rk-certs-list">${top.map(r => {
       const [tier, label] = _RK_TIERS[r.rank];
       return `<li class="rk-cert" data-rank="${r.rank}">
         <figure class="rk-cert-fig"><img alt="" hidden data-rk-cert-img="${r.rank}"/><span class="rk-cert-medal rk-cert-${esc(tier)}" aria-hidden="true">${r.rank}</span></figure>
-        <div class="rk-cert-txt"><span class="eyebrow">${esc(label)}</span><b>${esc(name(r))}</b><small>${esc(r.nickname || '')} · ${esc(String(r.score ?? 0))} pts</small></div>
+        <div class="rk-cert-txt"><span class="eyebrow">${esc(label)}</span><b>${esc(name(r))}</b><small>${esc(r.nickname || '')} · ${esc(_rkPlaceScore(r))}</small></div>
         <div class="rk-cert-actions"><button type="button" class="btn sm secondary" data-action="rk-cert-preview" data-rank="${r.rank}">Preview</button><button type="button" class="btn sm${r.rank === 1 ? ' gold' : ''}" data-action="rk-cert-download" data-rank="${r.rank}">${ICO.download} PNG</button></div>
       </li>`;
     }).join('')}</ol>` : ''}`);
@@ -1321,7 +1387,7 @@ async function _rkCertPng(rank) {
   if (!r || !comp) return null;
   const [tier] = _RK_TIERS[rank];
   const nm = cutCodePoints(_rkCertName(r), 120);
-  const out = await renderCertificatePreview({ compId: comp.id, sample: { tier, name: nm, event: cutCodePoints(comp.name, 120), score: `${r.score ?? 0} pts` } });
+  const out = await renderCertificatePreview({ compId: comp.id, sample: { tier, name: nm, event: cutCodePoints(comp.name, 120), score: _rkPlaceScore(r) } });
   if (out.error) { showToast(out.error, 'error'); return null; }
   return { blob: out.blob, nm, comp };
 }

@@ -185,7 +185,7 @@ test("looks: an event's Save look, Apply to everyone now and the organisation de
     // ── Apply to everyone now (Settings, Look).
     const stamp0 = Number((await appearance()).platform_look.stamp) || 0;
     await page.evaluate(() => window.adminTab(null, "admin-settings-tab"));
-    await openSettingsSection(page, "look");
+    await openSettingsSection(page, "branding");
     await page.locator("#pl-look").selectOption("signature");
     await page.locator('[data-action="platform-look-apply"]').click();
     await expect(page.locator("#modal-overlay.open")).toContainText("Apply to everyone now?");

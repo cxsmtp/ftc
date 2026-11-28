@@ -270,7 +270,7 @@ const {
   iso, attach, makeAdmin, tagStaff, tagComp, compRow, taskRow, participantAdminRow,
   adminPanel, eventRow, openEdit, saveEdit, challengeRow, participantRow, closeKebab, focus,
   H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin,
-  loginViaApi, formLogin, adminLogin, clickTab, openKebab, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
+  loginViaApi, formLogin, adminLogin, clickTab, openKebab, viewComp, filterComps, findSeededTaskRow, openCompCreateForm, openEventMenu,
 } = F;
 
 test.use({ baseURL: BASE });
@@ -480,7 +480,7 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
     // MODAL rather than a toast, because the remedy is per challenge. This arm
     // drives the REAL form path, so it also locks the one line that wires the
     // save's failure branch to the renderer.
-    await expect(page.locator("#modal-title"), "the refusal names its remedy").toHaveText(/Seal these challenges first/, { timeout: 15000 });
+    await expect(page.locator("#modal-title"), "the refusal names its remedy").toHaveText(/Seal these questions first/, { timeout: 15000 });
     await expect(page.locator("#modal-body"), "…and the challenge").toContainText(cTask.title);
     await expect(page.locator("#modal-cancel-btn"), "an OK-only modal").toBeHidden();
     await page.locator("#modal-confirm-btn").click();
@@ -504,7 +504,7 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
     await page.locator("#comp-staff-compete").check();
     await saveEdit(page);
     await page.locator("#comp-form-overlay").waitFor({ state: "hidden", timeout: 15000 });
-    await expect(page.locator("#modal-title")).not.toHaveText(/Seal these challenges first/);
+    await expect(page.locator("#modal-title")).not.toHaveText(/Seal these questions first/);
     await expect.poll(async () => !!(await compRow(cUpSealed.id)).staff_compete,
       { message: "the switch round-trips ON", timeout: 10000 }).toBe(true);
   });
@@ -526,7 +526,7 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
     await expect(page.locator("#modal-body"), "the enrolled author is NAMED").toContainText(pAuth.nickname);
     await expect(page.locator("#modal-body"), "…with the challenge they wrote").toContainText(aSealed.title);
     await expect(page.locator("#modal-body"), "…and the remedy names Manage Participants, not the seal").toContainText(/Manage Participants/);
-    await expect(page.locator("#modal-title"), "and NOT the unsealed-challenge refusal — the challenge is sealed").not.toHaveText(/Seal these challenges first/);
+    await expect(page.locator("#modal-title"), "and NOT the unsealed-challenge refusal — the challenge is sealed").not.toHaveText(/Seal these questions first/);
     await expect(page.locator("#modal-cancel-btn"), "an OK-only modal").toBeHidden();
     await page.locator("#modal-confirm-btn").click();
     await expect(page.locator("#modal-overlay")).not.toHaveClass(/open/);
@@ -574,7 +574,7 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
     expect(onBody.code).toBe("staff_compete_unsealed_challenges");
     expect((onBody.challenges || []).map(c => c.id), "…naming the challenge").toContain(cTask.id);
     expect(await page.evaluate(d => window.showStaffCompeteRefusalModal(d), onBody), "the renderer recognises the code").toBe(true);
-    await expect(page.locator("#modal-title")).toHaveText(/Seal these challenges first/);
+    await expect(page.locator("#modal-title")).toHaveText(/Seal these questions first/);
     await expect(page.locator("#modal-body")).toContainText(cTask.title);
     await expect(page.locator("#modal-cancel-btn"), "an OK-only modal").toBeHidden();
     await page.locator("#modal-confirm-btn").click();
@@ -633,27 +633,36 @@ test.describe("v8.12.0 — the refusals that name their rows are rendered as a m
 // ═══════════════════════════════════════════════════════════════════════════
 test.describe("v8.12.0 — a competing admin's Events row", () => {
 
-  test("the row withholds every mutating item WITH the reason, keeps the read-only ones, and hides the tag controls", async ({ page }) => {
+  // The event's doors are its WORKSPACE's ⋯ menu (owner's decision, 27 Nov
+  // 2026: the Events-row menu keeps only Delete event), so the competitor rule
+  // is held there; the row keeps the tag controls and its one menu item.
+  test("the workspace menu withholds every mutating item WITH the reason and keeps the read-only ones; the row hides the tag controls and Delete", async ({ page }) => {
     await adminPanel(page, competitor.email);
-    const row = await eventRow(page, competeLive.name);
-    await openKebab(page, row);
-    const portal = page.locator("#kebab-portal");
+    const portal = await openEventMenu(page, competeLive.name);
 
     await expect(portal.locator(".kebab-note"), "withheld WITH its reason").toContainText(/You are competing in this event/);
-    // Edit / End Now / Assign Challenges / Manage Participants are the items a
-    // REGULAR admin ordinarily sees on a live event, so their absence here is
-    // the competitor rule. `comp-delete` and `comp-start-now` are listed for
-    // completeness only: a regular admin never sees Delete, and a LIVE event
-    // never renders Start Now — the real locks on those two are the superadmin
-    // arm and the upcoming-event arm below. JOIN LINK STAYS (the operator's
-    // ruling, 19 Sep 2026): the reveal is a read, and the dialog it opens is
-    // read-only for a competitor — its own describe below.
-    for (const action of ["comp-edit", "comp-end-now", "comp-assign-challenges", "comp-manage-participants", "comp-delete", "comp-start-now"]) {
+    // Edit / End Now / Add challenges are the items a REGULAR admin ordinarily
+    // sees on a live event, so their absence here is the competitor rule.
+    // `comp-delete` and `comp-start-now` are listed for completeness only: a
+    // regular admin never sees Delete, and a LIVE event never renders Start Now
+    // — the real locks on those two are the superadmin arm and the
+    // upcoming-event arm below. JOIN LINK STAYS (the operator's ruling, 19 Sep
+    // 2026): the reveal is a read, and the dialog it opens is read-only for a
+    // competitor — its own describe below.
+    // (No Add from bank in the list: neither event menu offers it to anybody, Stage
+    // B, owner ruling, 27 Nov 2026; tests/menu-door-parity.spec.js.)
+    for (const action of ["comp-edit", "comp-end-now", "comp-delete", "comp-start-now", "ws-clone"]) {
       await expect(portal.locator(`[data-action="${action}"]`), `${action} reaches a door the server refuses a competitor`).toHaveCount(0);
     }
-    for (const action of ["comp-history", "comp-organisers", "comp-self-enroll"]) {
+    for (const action of ["comp-history", "comp-self-enroll"]) {
       await expect(portal.locator(`[data-action="${action}"]`), `${action} is viewing, not editing, so it stays`).toHaveCount(1);
     }
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#ws-quick .ws-invite-btn"), "no Invite: adding people is a write").toHaveCount(0);
+    const row = await eventRow(page, competeLive.name);
+    await openKebab(page, row);
+    await expect(portal.locator(".kebab-note"), "the row's menu says why it holds no Delete").toContainText(/You are competing in this event/);
+    await expect(portal.locator("[data-action]"), "and offers nothing").toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(row.locator(".tag-add"), "+ tag is a write, so it is withheld too").toHaveCount(0);
     // The tag CHIP still renders — which events are tagged is a fact an admin
@@ -686,7 +695,7 @@ test.describe("v8.12.0 — a competing admin's Events row", () => {
     await expect(banner).toBeVisible();
     await expect(banner, "the live status is still shown").toContainText(/Live/);
     // End now lives in the header's ⋯ menu (#ws-quick), never in the status chip.
-    const menu = page.locator("#ws-quick .kebab-menu");
+    const menu = page.locator("#ws-quick .ws-more-btn + .kebab-menu");
     await expect(menu.locator('[data-action="comp-end-now"]'), "End Now reaches a door the server refuses a competitor").toHaveCount(0);
     await expect(menu, "…withheld WITH its reason").toContainText(/You are competing/);
     await expect(page.locator("#ws-rec-chips"), "…and the header says so").toContainText(/You are competing/);
@@ -698,8 +707,8 @@ test.describe("v8.12.0 — a competing admin's Events row", () => {
     await focus(page, competeLive.name);
     const banner = page.locator("#admin-scope-banner");
     await expect(banner).toContainText(/Live/);
-    await expect(page.locator('#ws-quick .kebab-menu [data-action="comp-end-now"]'), "the built-in competes nowhere, so the ⋯ menu offers End Now").toHaveCount(1);
-    await expect(page.locator("#ws-quick .kebab-menu")).not.toContainText(/You are competing/);
+    await expect(page.locator('#ws-quick .ws-more-btn + .kebab-menu [data-action="comp-end-now"]'), "the built-in competes nowhere, so the ⋯ menu offers End Now").toHaveCount(1);
+    await expect(page.locator("#ws-quick .ws-more-btn + .kebab-menu")).not.toContainText(/You are competing/);
   });
 
   test("the editor's refusal on an ENDED event they compete in does not promise self-removal — the door the ended-membership rule shuts", async ({ page }) => {
@@ -722,18 +731,16 @@ test.describe("v8.12.0 — a competing admin's Events row", () => {
 
   test("CONTROL — a switch-off event the same admin is NOT enrolled in still offers Edit and the tag controls", async ({ page }) => {
     // Without this, every absence above is satisfied by a build that removed
-    // the items from the Events table for every regular admin.
+    // the items for every regular admin.
     await adminPanel(page, competitor.email);
-    const row = await eventRow(page, plainLive.name);
-    await openKebab(page, row);
-    const portal = page.locator("#kebab-portal");
+    const portal = await openEventMenu(page, plainLive.name);
     await expect(portal.locator('[data-action="comp-edit"]'), "Edit is offered").toHaveCount(1);
     await expect(portal.locator('[data-action="comp-end-now"]'), "End Now is offered on a live event").toHaveCount(1);
-    await expect(portal.locator('[data-action="comp-assign-challenges"]')).toHaveCount(1);
-    await expect(portal.locator('[data-action="comp-manage-participants"]')).toHaveCount(1);
     await expect(portal.locator('[data-action="comp-self-enroll"]')).toHaveCount(1);
     await expect(portal.locator(".kebab-note"), "nothing is withheld, so nothing is explained").toHaveCount(0);
     await page.keyboard.press("Escape");
+    await expect(page.locator("#ws-quick .ws-invite-btn"), "Invite is offered").toHaveCount(1);
+    const row = await eventRow(page, plainLive.name);
     await expect(row.locator(".tag-add"), "+ tag is offered").toHaveCount(1);
     await expect(row.locator(".tag"), "the same tag renders here").toHaveCount(1);
     await expect(row.locator(".tag-x"), "…WITH its ×").toHaveCount(1);
@@ -743,62 +750,62 @@ test.describe("v8.12.0 — a competing admin's Events row", () => {
     // Start Now renders on an upcoming single-slot event only, so a live
     // fixture cannot lock its withholding; this one can.
     await adminPanel(page, competitor.email);
-    let row = await eventRow(page, upOn.name);
-    await openKebab(page, row);
-    const portal = page.locator("#kebab-portal");
+    let portal = await openEventMenu(page, upOn.name);
     await expect(portal.locator(".kebab-note")).toContainText(/You are competing in this event/);
     await expect(portal.locator('[data-action="comp-start-now"]'), "Start Now reaches the timeslot/competition PUT the server refuses").toHaveCount(0);
     await expect(portal.locator('[data-action="comp-edit"]')).toHaveCount(0);
     await page.keyboard.press("Escape");
 
-    row = await eventRow(page, upOff.name);
-    await openKebab(page, row);
+    portal = await openEventMenu(page, upOff.name);
     await expect(portal.locator('[data-action="comp-start-now"]'), "CONTROL: an upcoming event they do not compete in offers Start Now").toHaveCount(1);
     await expect(portal.locator('[data-action="comp-edit"]')).toHaveCount(1);
     await expect(portal.locator(".kebab-note")).toHaveCount(0);
   });
 
-  test("a user-backed SUPERADMIN who competes loses Edit, End Now and Delete on that row — and on the ENDED one they compete in — while keeping both on events they do not compete in (CONTROL)", async ({ page }) => {
+  test("a user-backed SUPERADMIN who competes loses Edit, End Now and Delete on that event — and on the ENDED one they compete in — while keeping them on events they do not compete in (CONTROL)", async ({ page }) => {
     // DESIGN decision 2: every tier. The superadmin tier is the only one where
     // the competitor rule is the SOLE thing withholding Delete (a regular admin
     // never sees it) and Edit on an ENDED event (a regular admin cannot edit one
     // anyway) — so these are the arms that go red when `!competing` is dropped
     // from the Delete branch or from `canEdit`, and nothing else in this file
-    // does.
+    // does. Delete is held in BOTH menus (the row keeps it), Edit and End Now in
+    // the workspace's.
     await adminPanel(page, saComp.email);
-    const portal = page.locator("#kebab-portal");
-
-    let row = await eventRow(page, competeLive.name);
-    await openKebab(page, row);
+    let portal = await openEventMenu(page, competeLive.name);
     await expect(portal.locator(".kebab-note"), "withheld WITH its reason, whatever the tier").toContainText(/You are competing in this event/);
     await expect(portal.locator('[data-action="comp-edit"]')).toHaveCount(0);
     await expect(portal.locator('[data-action="comp-end-now"]')).toHaveCount(0);
     await expect(portal.locator('[data-action="comp-delete"]'), "Delete is a superadmin item, and the competitor rule takes it").toHaveCount(0);
     await expect(portal.locator('[data-action="comp-history"]'), "viewing stays").toHaveCount(1);
     await page.keyboard.press("Escape");
+    let row = await eventRow(page, competeLive.name);
+    await openKebab(page, row);
+    await expect(portal.locator('[data-action="comp-delete"]'), "the row's Delete is withheld too").toHaveCount(0);
+    await page.keyboard.press("Escape");
     await expect(row.locator(".tag-x"), "the tag × is withheld from this tier too").toHaveCount(0);
 
-    row = await eventRow(page, plainLive.name);
-    await openKebab(page, row);
+    portal = await openEventMenu(page, plainLive.name);
     await expect(portal.locator('[data-action="comp-edit"]'), "CONTROL: the same superadmin edits an event they do not compete in").toHaveCount(1);
     await expect(portal.locator('[data-action="comp-end-now"]')).toHaveCount(1);
     await expect(portal.locator('[data-action="comp-delete"]'), "…and may delete it").toHaveCount(1);
     await expect(portal.locator(".kebab-note")).toHaveCount(0);
     await page.keyboard.press("Escape");
+    row = await eventRow(page, plainLive.name);
+    await openKebab(page, row);
+    await expect(portal.locator('[data-action="comp-delete"]'), "…from the row too").toHaveCount(1);
+    await page.keyboard.press("Escape");
     await expect(row.locator(".tag-x"), "…with the tag × offered").toHaveCount(1);
 
     // THE ENDED PERMUTATION. A superadmin is the one tier that can edit an ended
     // event, so this is where `!competing` in `canEdit` is the only thing
-    // withholding Edit — the lock is keyed on the row at ANY status.
-    row = await eventRow(page, endLater.name);
-    await openKebab(page, row);
+    // withholding Edit — the lock is keyed on the event at ANY status.
+    portal = await openEventMenu(page, endLater.name);
     await expect(portal.locator(".kebab-note")).toContainText(/You are competing in this event/);
     await expect(portal.locator('[data-action="comp-edit"]'), "no Edit on the ENDED event they compete in").toHaveCount(0);
     await expect(portal.locator('[data-action="comp-delete"]')).toHaveCount(0);
     await page.keyboard.press("Escape");
 
-    row = await eventRow(page, endedOn.name);
-    await openKebab(page, row);
+    portal = await openEventMenu(page, endedOn.name);
     await expect(portal.locator('[data-action="comp-edit"]'), "CONTROL: the same superadmin edits an ENDED event they do not compete in").toHaveCount(1);
     await expect(portal.locator('[data-action="comp-delete"]')).toHaveCount(1);
     await expect(portal.locator(".kebab-note")).toHaveCount(0);
@@ -835,11 +842,13 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     await expect(portal.locator('[data-action="task-view"]'), "viewing is not editing").toHaveCount(1);
     await expect(portal.locator('[data-action="task-history"]')).toHaveCount(1);
     await page.keyboard.press("Escape");
-    await expect(row.locator(".tag-add"), "+ tag is withheld on the row too").toHaveCount(0);
+    // Stage B — no tag control on any question row; the sharing switch is in
+    // the editor, read-only here (asserted below).
 
     // THE EDITOR, reached the only way left — `editTask` is on `window`.
     await page.evaluate(id => window.editTask(id), sealedHinted.id);
     await expect(page.locator("#admin-task-form")).toBeVisible();
+    await expect(page.locator("#tf-shared"), "the sharing switch is withheld with the rest of the form").toBeDisabled();
     const tfNote = page.locator("#tf-sealed-note");
     await expect(tfNote, "the form says WHY it is read-only").toBeVisible();
     await expect(tfNote).toContainText(/competing/i);
@@ -904,7 +913,8 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     await expect(portal.locator('[data-action="task-edit"]'), "a regular admin may edit an unrelated challenge").toHaveCount(1);
     await expect(portal.locator(".kebab-note"), "nothing is withheld, so nothing is explained").toHaveCount(0);
     await page.keyboard.press("Escape");
-    await expect(row.locator(".tag-add"), "+ tag is offered").toHaveCount(1);
+    // Stage B — the row carries no tag control for anyone; the sharing switch,
+    // its successor, is in the editor (asserted below once it is open).
 
     // The preview FIRST: opening the editor hides the table, and the row's View
     // button with it.
@@ -923,6 +933,8 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     await expect(page.locator("#tf-hint-group"), "the hint editor is shown").toBeVisible();
     await expect(page.locator("#save-task-btn"), "Save is offered").toBeVisible();
     await expect(page.locator("#tf-title")).toBeEnabled();
+    await page.locator('[aria-controls="tf-org-body"]').click();
+    await expect(page.locator("#tf-shared"), "the sharing switch is live").toBeEnabled();
     // "Withheld" is measured against "delivered": the unsealed challenge's key
     // (makeTask's default) reaches the field, so the empty box in the competing
     // arm is a withholding and not a form that never populates `#tf-answer`.
@@ -1061,15 +1073,17 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     // a browser signs in as it) puts it into the far compete event pAuth does
     // NOT organise. Removed again in `finally`, so the (d) switch arm's fixture
     // is byte-identical afterwards.
-    await assignTask(reader.api, reader.csrf, aSealed.id, [far.id]);
+    // The author's LIBRARY row (the Challenges page lists it; each event holds its
+    // own copy, lib/event-copies.js): the far event takes a copy of it.
+    const farCopy = (await assignTask(reader.api, reader.csrf, aSealed.bankId, [far.id])).copies[0].task_id;
     try {
       await adminPanel(page, pAuth.email);
       await clickTab(page, "Challenges");
       await expect.poll(() => page.evaluate(() => (window.adminTasksData || []).length), { timeout: 20000 }).toBeGreaterThan(0);
-      const row = await page.evaluate(id => (window.adminTasksData || []).find(t => t.id === id), aSealed.id);
+      const row = await page.evaluate(id => (window.adminTasksData || []).find(t => t.id === id), aSealed.bankId);
       expect(row.competitions.map(c => c.id), "PRECONDITION: the far event is withheld from the author's row").toEqual([aUp.id]);
       expect(row.withheld_compete, "PRECONDITION: …and the row says it competes").toBe(true);
-      await page.evaluate(id => window.editTask(id), aSealed.id);
+      await page.evaluate(id => window.editTask(id), aSealed.bankId);
       await expect(page.locator("#admin-task-form")).toBeVisible();
       await expect(page.locator("#tf-unseal-row"), "the Unseal tick is withheld — the save would meet the scoped 409").toBeHidden();
       const held = page.locator("#tf-unseal-held-note");
@@ -1079,7 +1093,7 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
       await expect(held, "the remedy is that event's organiser — not 'take it out first', which this actor cannot").toContainText(/that event.s organiser/i);
       await expect(held, "…so the imperative offered on an in-scope event is not offered here").not.toContainText(/Take it out of/);
     } finally {
-      const r = await reader.api.delete(`/api/admin/tasks/${aSealed.id}/competitions/${far.id}`, { headers: H(reader.csrf) });
+      const r = await reader.api.delete(`/api/admin/tasks/${farCopy}/competitions/${far.id}`, { headers: H(reader.csrf) });
       expect(r.ok(), `unassign aSealed from the far event: ${r.status()} ${await r.text()}`).toBeTruthy();
     }
     // CONTROL — with the far event gone the same author is offered the tick
@@ -1087,8 +1101,8 @@ test.describe("v8.12.0 — a competing admin's Challenges row", () => {
     await page.reload();
     await page.locator("#admin-page").waitFor({ state: "visible", timeout: 30000 });
     await clickTab(page, "Challenges");
-    await expect.poll(() => page.evaluate(id => !!(window.adminTasksData || []).find(t => t.id === id && !t.withheld_compete), aSealed.id), { timeout: 20000 }).toBe(true);
-    await page.evaluate(id => window.editTask(id), aSealed.id);
+    await expect.poll(() => page.evaluate(id => !!(window.adminTasksData || []).find(t => t.id === id && !t.withheld_compete), aSealed.bankId), { timeout: 20000 }).toBe(true);
+    await page.evaluate(id => window.editTask(id), aSealed.bankId);
     await expect(page.locator("#admin-task-form")).toBeVisible();
     await expect(page.locator("#tf-unseal-row"), "CONTROL: offered once no compete event holds it").toBeVisible();
     await expect(page.locator("#tf-unseal-held-note"), "CONTROL: …and no hold is reported").toBeHidden();

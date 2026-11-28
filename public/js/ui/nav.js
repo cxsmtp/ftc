@@ -528,7 +528,11 @@ function _helpItems(){
 }
 function _profileMenuBody(){
   const u=S.currentUser||{};
-  const ver=(document.getElementById('platform-version')?.textContent||'').trim();
+  // The running version: in Admin View it is at the sidebar's foot (owner
+  // decision, 27 Nov 2026, #admin-sidebar-version), so the menu does not repeat
+  // it; the participant view has no sidebar, so it stays here, small, beside
+  // Sign out (every signed-in person can still see what they run).
+  const ver=S.isAdmin?'':(document.getElementById('platform-version')?.textContent||'').trim();
   return `<div class="pm-panel" role="dialog" aria-modal="true" aria-labelledby="pm-name">
     <div class="pm-head">
       <span class="pm-avatar" aria-hidden="true">${_avatarFace()}</span>
@@ -887,6 +891,7 @@ export const _ADMIN_NAV_ICONS={
   'admin-audit-tab':ICO.clipboardCheck,
   'admin-rankings-tab':ICO.trophy,
   'admin-analytics-tab':ICO.barChart,
+  'admin-marketing-tab':ICO.target,
   'admin-logs-tab':ICO.fileText,
   'admin-settings-tab':ICO.settings,
   'admin-users-tab':ICO.users,
@@ -909,15 +914,17 @@ export const ADMIN_NAV_PERMISSIONS={
   'admin-templates-tab':['templates.view','events.create'],
   'admin-participants-tab':'participants.view','admin-groups-tab':'groups.view','admin-rankings-tab':'leaderboard.view',
   'admin-submissions-tab':'audit.view','admin-analytics-tab':'analytics.view','admin-logs-tab':'audit.raw_logs',
+  // Marketing reads every event on the platform (GET /api/admin/analytics/marketing).
+  'admin-marketing-tab':'analytics.marketing',
   // Settings opens for ANY of its cards' first reads (operator ruling,
   // 14 Nov 2026): GET /api/admin/settings (settings.view), the platform
   // certificate design (certificates.design), the alerts (ops.alerts), retention
-  // (ops.retention_view), the unsubscribed list (ops.email) and the Checkmarx One
-  // removals (ops.cxone). Each card inside shows only to a role holding what its
+  // (ops.retention_view), the unsubscribed list (ops.email), the Checkmarx One
+  // removals (ops.cxone) and the staff teams (teams.view). Each card inside shows only to a role holding what its
   // own routes check (SETTINGS_CARD_PERMISSIONS below), so a regular admin sees
   // the certificate designer, the read-only team-domains list, Retention and
   // Alerts.
-  'admin-settings-tab':['settings.view','certificates.design','ops.alerts','ops.retention_view','ops.email','ops.cxone'],'admin-users-tab':'users.view','admin-audit-tab':'audit.view',
+  'admin-settings-tab':['settings.view','certificates.design','ops.alerts','ops.retention_view','ops.email','ops.cxone','teams.view'],'admin-users-tab':'users.view','admin-audit-tab':'audit.view',
 };
 // THE SETTINGS CARDS: each shows to a role holding EVERY permission its routes
 // check (operator ruling, 14 Nov 2026) — a card that edits a value also reads
@@ -928,12 +935,16 @@ export const SETTINGS_CARD_PERMISSIONS={
   'platform-name-card':['settings.view','settings.edit'],    // GET + PATCH /api/admin/settings
   'account-approval-card':['settings.view','settings.edit'], // GET + PATCH /api/admin/settings
   'platform-look-card':['settings.view','settings.edit'],    // GET /api/admin/settings, PUT /api/admin/platform-look
-  'email-test-card':['ops.email'],                           // POST /api/admin/test-email
+  'smtp-settings-card':['settings.view'],                    // GET /api/admin/smtp-settings (the form: ops.smtp, superadmin only)
+  'email-test-card':['ops.email'],                           // POST /api/admin/test-email (shown only where the mail server card is not: settings-admin.js)
   'unsubscribe-card':['ops.email'],                          // GET, DELETE /api/admin/unsubscribed
   'cxone-card':['settings.view','ops.cxone'],                // GET /api/admin/settings, PUT/DELETE /api/admin/default-cxone
   'cxone-withdrawals-card':['ops.cxone'],                    // /api/admin/cxone/withdrawals
   'retention-card':['ops.retention_view'],                   // GET /api/admin/retention
   'alerts-card':['ops.alerts'],                              // GET /api/admin/alerts
+  'system-health-card':['settings.view'],                    // GET /api/admin/system-health
+  'cxone-audit-card':['audit.view'],                         // GET /api/admin/audit (its rows: the Checkmarx One activity)
+  'staff-teams-card':['teams.view'],                         // GET /api/admin/staff-teams (its writes: teams.manage, drawn only where the read's can_manage says so)
 };
 // Is this Settings card offered to the signed-in role? Fails closed until
 // /api/admin/me has said what the role holds (a superadmin holds every card),
@@ -964,7 +975,11 @@ export function adminCan(perm){
   // A list (a page that opens for either of its uses) is any one of them.
   if(Array.isArray(perm))return perm.some(p=>adminCan(p));
   if(Array.isArray(S.permissions))return S.permissions.includes(perm);
-  if(perm==='users.view')return !S.isEventAdmin;
+  // Two permissions no event admin ever holds, so they are decided from the
+  // tier until the permissions are known (neither item flashes into an event
+  // admin's sidebar while /api/admin/me loads): Users & roles, and Marketing,
+  // which reads every event.
+  if(perm==='users.view'||perm==='analytics.marketing')return !S.isEventAdmin;
   return true;
 }
 // Decided before `S.permissions` is known from the built-in tiers (a global
@@ -1471,7 +1486,7 @@ export async function toggleAdminView(toAdmin){
 
 // The organiser shell's pane list. The four event-only panes are reached from
 // the EVENT WORKSPACE's own section tabs; Templates from the sidebar.
-export const ADMIN_PANES=['admin-competitions-tab','admin-templates-tab','admin-event-overview-tab','admin-tasks-tab','admin-participants-tab','admin-groups-tab','admin-submissions-tab','admin-audit-tab','admin-rankings-tab','admin-analytics-tab','admin-event-certs-tab','admin-event-team-tab','admin-event-settings-tab','admin-logs-tab','admin-settings-tab','admin-users-tab'];
+export const ADMIN_PANES=['admin-competitions-tab','admin-templates-tab','admin-event-overview-tab','admin-tasks-tab','admin-participants-tab','admin-groups-tab','admin-submissions-tab','admin-audit-tab','admin-rankings-tab','admin-analytics-tab','admin-marketing-tab','admin-event-certs-tab','admin-event-team-tab','admin-event-settings-tab','admin-logs-tab','admin-settings-tab','admin-users-tab'];
 // Panes that exist only inside an event workspace: shown with an event open, never
 // from the sidebar (the workspace's own tab strip is their only door).
 export const WORKSPACE_ONLY_PANES=new Set(['admin-event-overview-tab','admin-event-certs-tab','admin-event-team-tab','admin-event-settings-tab']);
@@ -1520,7 +1535,7 @@ export function adminTab(btn,tabId,opts){
   if(tabId==='admin-competitions-tab')loadAdminCompetitions();
   if(tabId==='admin-submissions-tab')loadAdminSubmissions();
   if(tabId==='admin-rankings-tab')loadAdminRankingsTab();
-  if(tabId==='admin-participants-tab')loadAdminParticipants();
+  if(tabId==='admin-participants-tab')loadAdminParticipants({tabEntry:true});
   if(tabId==='admin-groups-tab')loadAdminGroups();
   if(tabId==='admin-tasks-tab')loadAdminTasks();
   if(tabId==='admin-analytics-tab')loadAdminAnalytics();

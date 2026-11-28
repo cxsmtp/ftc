@@ -47,7 +47,7 @@ const OVERVIEW = "admin-event-overview-tab";
 const PEOPLE = "admin-participants-tab";
 const TASKS = "admin-tasks-tab";
 const SEARCH = { [PEOPLE]: "#participants-search", [TASKS]: "#task-search" };
-const LABEL = { [PEOPLE]: "Participants", [TASKS]: "Challenges" };
+const LABEL = { [PEOPLE]: "Participants", [TASKS]: "Questions" };   // Stage B named the workspace section Questions (owner ruling, 27 Nov 2026)
 const F = {};   // this file's own events, challenges and people
 
 test.beforeAll(async () => {
@@ -61,7 +61,7 @@ test.beforeAll(async () => {
     F.tasks = [];
     for (const l of ["a", "b", "c"]) {
       const t = await makeTask(sa, csrf, `sticky-${l}`);
-      await assignTask(sa, csrf, t.id, [F.play.id]);
+      Object.assign(t, { bankId: t.id, id: (await assignTask(sa, csrf, t.id, [F.play.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
       F.tasks.push(t);
     }
     F.p = await makeParticipant(sa, csrf, "sticky-p");

@@ -1805,6 +1805,14 @@ html[data-theme="light"] .btn.danger-link:hover{color:var(--badge-red-fg)}
 #admin-page #pending-badge{margin-left:auto;background:var(--accent-strong);color:var(--on-accent);font-size:var(--fs-12);
   font-weight:var(--fw-semibold);padding:1px 6px;border-radius:var(--pill-radius)}
 .admin-sidebar.collapsed #pending-badge{display:none}
+/* The running version at the sidebar's foot; collapsed, its short form shows
+   and the full text stays for screen readers. */
+.admin-sidebar-version{margin:auto 0 0;padding:12px 16px 16px;border-top:1px solid var(--border);font-size:var(--fs-12);line-height:var(--lh-small);color:var(--muted);white-space:nowrap;flex-shrink:0}
+.admin-sidebar-version[hidden]{display:none}
+.admin-sidebar-version .asv-short{display:none}
+.admin-sidebar.collapsed .admin-sidebar-version{padding:12px 4px 16px;text-align:center}
+.admin-sidebar.collapsed .admin-sidebar-version .asv-short{display:inline}
+.admin-sidebar.collapsed .admin-sidebar-version .asv-long{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .admin-content{flex:1;min-width:0;padding:32px 40px;overflow-y:auto;display:flex;flex-direction:column}
 .admin-sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199;display:none}
 .admin-sidebar-overlay.visible{display:block}
@@ -1885,6 +1893,13 @@ table tbody tr{transition:background var(--duration-fast) var(--ease-out)}
   border:1px solid var(--border-strong);border-left:4px solid var(--accent);padding:14px 20px;border-radius:var(--r-m);
   min-height:44px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-3);
   animation:toast-in var(--duration-normal) var(--ease-spring)}
+/* While a dialog is open the stack sits at the TOP: a dialog's primary action is
+   in its footer, bottom right, where a toast otherwise lands, and pointing at a
+   toast pauses its countdown, so one over the action never left (modal.js
+   overlayDismiss keeps body.dialog-open). !important: the page placements below
+   (the phone bar, the challenge view's submit row) are written for pages, and
+   a dialog sits over all of them. */
+body.dialog-open #toast-stack{top:calc(24px + env(safe-area-inset-top, 0px))!important;bottom:auto!important}
 .toast.toast-error{border-left-color:var(--red)}
 .toast.toast-success{border-left-color:var(--green)}
 .toast.toast-warning{border-left-color:var(--yellow)}
@@ -3217,6 +3232,11 @@ html[data-theme="light"] .rich-body pre code .hljs-deletion,html[data-theme="lig
 .rankings-group-hint,.lb-group-hint{font-size:var(--fs-13);color:var(--muted);margin:0 0 10px}
 .rankings-group-card{margin-top:16px}
 .lb-group-title{margin:0 0 4px;font-size:var(--fs-17)}
+/* Per-session question sets — the board's caption, and a percentage board's score cell. */
+.lb-board-caption{margin:0 0 12px;font-size:var(--fs-14);color:var(--text-2)}
+.lb-board-caption[hidden]{display:none}
+.lb-pct{font-variant-numeric:tabular-nums}
+.lb-pts-sub,.podium-pts-sub{color:var(--muted);font-size:var(--fs-13)}
 .group-board-icon{display:inline-flex;align-items:center;color:var(--accent2)}
 .group-board-icon svg{width:16px;height:16px}
 .group-board-meta{font-size:var(--fs-12);color:var(--muted);white-space:nowrap}
@@ -3436,6 +3456,7 @@ html[data-theme="light"] .rich-body pre code .hljs-deletion,html[data-theme="lig
    assignment, so unticking it will REMOVE. Green rather than the red the other
    flags use: it states current state, it is not a warning. */
 .picker-row-flag.is-on{color:var(--green)}
+.picker-row-flag.is-quick{color:var(--text-2)}
 /* v8.13.7 — light --green MEASURES 4.30:1 on the row and 4.46:1 on a ticked
    one (Always included, In this event); the badge foreground is 6.1:1+. */
 html[data-theme="light"] .picker-row-flag.is-on{color:var(--badge-green-fg)}
@@ -3675,7 +3696,10 @@ html[data-theme="light"] .help-drawer-body th{background:var(--surface2)}
 #admin-settings-tab .settings-nav{position:sticky;top:calc(var(--header-bottom,64px) + 12px);min-width:0}
 #admin-settings-tab .settings-pick-label,#admin-settings-tab .settings-section-pick{display:none}
 #admin-settings-tab .settings-section-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
-#admin-settings-tab .settings-section-list li[hidden]{display:none}
+#admin-settings-tab .settings-section-list li[hidden],#admin-settings-tab .settings-nav-group[hidden]{display:none}
+#admin-settings-tab .settings-section-list .settings-nav-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+#admin-settings-tab .settings-nav-caption{margin:12px 12px 4px;font-family:var(--font-text);font-size:var(--fs-label);line-height:var(--lh-label);font-weight:var(--fw-semibold);letter-spacing:var(--tr-label);text-transform:uppercase;color:var(--muted)}
+#admin-settings-tab .settings-nav-group:first-child .settings-nav-caption{margin-top:0}
 #admin-settings-tab .settings-nav-item{display:flex;align-items:center;width:100%;min-height:44px;padding:8px 12px;border:1px solid transparent;border-radius:var(--r-s);background:transparent;color:var(--text-2);font-family:var(--font-text);font-size:var(--fs-14);font-weight:var(--fw-regular);line-height:var(--lh-small);text-align:left;cursor:pointer;transform:none;box-shadow:none}
 #admin-settings-tab .settings-nav-item[aria-current="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--text);font-weight:var(--fw-semibold)}
 #admin-settings-tab .settings-nav-item:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -3700,6 +3724,9 @@ html[data-theme="light"] .help-drawer-body th{background:var(--surface2)}
    wrapping (never scrolling) when narrow. The hint drops under the control. */
 #admin-settings-tab .settings-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-top:1px solid var(--border)}
 #admin-settings-tab .settings-row>label:first-child:not(.checkbox-row){flex:0 0 168px;margin:0}
+/* A field whose "?" explains it: the tip sits beside its label, in the label's column. */
+#admin-settings-tab .settings-row>.settings-row-label{flex:0 0 168px;margin:0;flex-wrap:nowrap}
+#admin-settings-tab .settings-row>.settings-row-label>label{margin:0}
 #admin-settings-tab .settings-row>input{flex:1 1 220px;width:auto;min-width:0}
 #admin-settings-tab .settings-row>.btn{flex:0 0 auto}
 #admin-settings-tab .settings-row>.help-tip,#admin-settings-tab .settings-row>[data-help]{flex:0 1 auto}
@@ -3714,6 +3741,37 @@ html[data-theme="light"] .help-drawer-body th{background:var(--surface2)}
 #admin-settings-tab .settings-alert-row>span{min-width:0;overflow-wrap:anywhere}
 #admin-settings-tab .settings-relay-bad{color:var(--danger)}
 #admin-settings-tab .settings-relay-ok{color:var(--ok)}
+/* A list of facts, one per line (each a <div> holding its dt and dd): the
+   label in the forms' label column, the value beside it; on a phone the value
+   goes under its label. The plain .settings-facts above is a two-column grid of
+   bare dt/dd pairs (retention). */
+#admin-settings-tab .settings-facts-title{margin:16px 0 4px;font-size:var(--fs-14);font-weight:var(--fw-semibold);line-height:var(--lh-small);color:var(--text)}
+#admin-settings-tab .settings-facts-title:first-child{margin-top:0}
+#admin-settings-tab .settings-facts-list{display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin:0 0 12px;font-size:var(--fs-14);line-height:var(--lh-small)}
+#admin-settings-tab .settings-facts-list>div{display:grid;grid-template-columns:168px minmax(0,1fr);gap:4px 12px;padding:8px 0;border-bottom:1px solid var(--border)}
+#admin-settings-tab .settings-facts-list dt{margin:0;color:var(--muted)}
+#admin-settings-tab .settings-facts-list dd{margin:0;color:var(--text);min-width:0;overflow-wrap:anywhere}
+/* Wide screens: two facts a line, so a section stays within a screen and a half. */
+@media(min-width:1180px){
+  #admin-settings-tab .settings-facts-list{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:32px}
+  #admin-settings-tab .settings-facts-list>div{grid-template-columns:140px minmax(0,1fr)}
+}
+#admin-settings-tab .settings-source{display:block;margin-top:2px;font-weight:var(--fw-regular);font-size:var(--fs-13);color:var(--muted)}
+#admin-settings-tab .smtp-change{margin-top:4px}
+#admin-settings-tab .smtp-change .settings-help{margin-top:12px}
+#admin-settings-tab .settings-warning{margin:0 0 12px;padding:12px 16px;border:1px solid var(--warn);border-radius:var(--r-m);background:var(--warn-soft);color:var(--text)}
+#admin-settings-tab .settings-row>select{flex:1 1 220px;width:auto;min-width:0}
+/* The newest release notes, inline (About & health): the drawer's markdown,
+   its headings moved under the card's own. */
+#admin-settings-tab .release-notes-inline{font-size:var(--fs-14);line-height:var(--lh-small);color:var(--text)}
+#admin-settings-tab .release-notes-inline h4{margin:16px 0 4px;font-size:var(--fs-16);font-weight:var(--fw-semibold);color:var(--text)}
+#admin-settings-tab .release-notes-inline h4:first-child{margin-top:0}
+#admin-settings-tab .release-notes-inline h5{margin:12px 0 4px;font-size:var(--fs-14);font-weight:var(--fw-semibold);color:var(--text-2)}
+#admin-settings-tab .release-notes-inline ul{margin:4px 0 8px;padding-left:20px}
+#admin-settings-tab .release-notes-inline li{margin:4px 0}
+#admin-settings-tab .release-notes-inline p{margin:8px 0}
+#admin-settings-tab .release-notes-inline a{color:var(--accent-ink)}
+#admin-settings-tab .release-notes-inline a:hover{color:var(--text)}
 /* CxOne integration status banner — three-state pill (connected / empty).
    Connected uses the --green-soft tinted background pattern shared with
    .log-pill and .sub-event-pill so the visual language is consistent
@@ -3765,7 +3823,9 @@ html[data-theme="light"] .help-drawer-body th{background:var(--surface2)}
   #admin-settings-tab .settings-section-pick{display:block;flex:1 1 200px;min-width:0;width:auto;min-height:44px}
   #admin-settings-tab .settings-card{padding:14px 16px}
   #admin-settings-tab .settings-row>label:first-child:not(.checkbox-row){flex:1 0 100%}
+  #admin-settings-tab .settings-row>.settings-row-label{flex:1 0 100%}
   #admin-settings-tab .settings-row>.settings-hint{padding-left:0}
+  #admin-settings-tab .settings-facts-list>div{grid-template-columns:minmax(0,1fr)}
 }
 
 /* Admin challenge form — scoped polish. Tokenises the inline margins/gaps
@@ -4085,6 +4145,17 @@ h1[tabindex="-1"],h2[tabindex="-1"],.page[tabindex="-1"],.admin-tab-pane[tabinde
 .kind-seg-opt input:disabled + span{cursor:not-allowed;color:var(--muted)}
 .kind-seg-opt input:disabled:checked + span{color:var(--text-2);outline:1px dashed var(--border-strong)}
 @media (pointer:coarse),(max-width:768px){.kind-seg-opt span{min-height:44px}}
+/* The form names the type chosen on the New event page; Change type opens the
+   choice under it (competitions-admin.js compKindChangeToggle). */
+.comp-kind-current{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-1) 0}
+.comp-kind-current .kind-chip{margin-left:0}
+.comp-kind-current .link-btn{min-height:44px;display:inline-flex;align-items:center;align-self:auto;font-size:var(--fs-14)}
+.kind-seg[hidden]{display:none}
+/* People: the one note saying admin accounts are listed (a link to one). */
+.p-admins-note{margin:0 0 var(--s-3);padding:var(--s-2) var(--s-3);border:1px solid var(--border);border-radius:var(--r-m);background:var(--surface-2);color:var(--text-2);font-size:var(--fs-13);line-height:1.45}
+.p-admins-note[hidden]{display:none}
+/* Analytics inside a workspace: the event it measures, named, not picked. */
+.analytics-ws-event{display:flex;align-items:center;flex-wrap:wrap;gap:var(--s-2);margin:var(--s-2) 0 0;font-weight:var(--fw-semibold);color:var(--text)}
 .comp-kind-blurb{margin:6px 0 2px;font-size:var(--fs-13);color:var(--muted);line-height:1.45}
 .comp-form-from{margin:0 0 12px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface-2);font-size:var(--fs-13);color:var(--text-2)}
 .comp-form-from svg{vertical-align:-2px}
@@ -4165,6 +4236,13 @@ h1[tabindex="-1"],h2[tabindex="-1"],.page[tabindex="-1"],.admin-tab-pane[tabinde
    nothing is wrong, this kind simply has no board. */
 .rk-unranked-note{margin:0 0 10px;font-size:var(--fs-14);line-height:1.5;color:var(--muted)}
 .rk-unranked-note:last-child{margin-bottom:0}
+/* Program grades (27 Nov 2026): the Progress card's per-learner grade list. */
+.rk-grades{margin-top:16px}
+.rk-grades-title{margin:0 0 6px;font-size:var(--fs-14);font-weight:var(--fw-semibold)}
+.rk-grade-list{list-style:none;margin:0;padding:0}
+.rk-grade-row{padding:8px 0;border-top:1px solid var(--border);font-size:var(--fs-14);line-height:1.5}
+.rk-grade-who{font-weight:var(--fw-semibold);color:var(--text)}
+.rk-grade-val,.rk-grade-extra{color:var(--muted)}
 
 /* v8.1.0 (PR 21) — the unscoped Analytics prompt. Body copy on a card, not a
    warning: nothing is wrong, the pane is asking what to measure. */
@@ -5115,16 +5193,21 @@ body.mcf #qa-playbar{display:none!important}
 .tpl-kinds{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:14px}
 .tpl-kinds[hidden]{display:none}
 .tpl-kind{display:grid;grid-template-rows:auto 1fr;text-align:left;padding:0;overflow:hidden;border-radius:var(--r-l);background:var(--surface);
-  border:1px solid var(--border);box-shadow:var(--sh-1);color:var(--text);font:inherit;cursor:pointer;transition:border-color var(--duration-fast) var(--ease-out),box-shadow var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out)}
-@media(hover:hover){.tpl-kind:hover{border-color:var(--accent);box-shadow:var(--sh-2);transform:translateY(-2px)}}
-/* A kind card is not the button (its bullet list is no button content): the
-   control is the .card-open in its title, and the card shows its focus. */
-.tpl-kind:has(.card-open:focus-visible){outline:2px solid var(--focus);outline-offset:3px}
+  border:1px solid var(--border);box-shadow:var(--sh-1);color:var(--text);font:inherit;transition:border-color var(--duration-fast) var(--ease-out)}
+/* A kind card is not a button: it holds two starts (Recommended setup, Start
+   blank), each a button in its foot with its own focus ring. The card shows
+   which one the quick spin beside it is for. */
+.tpl-kind.active{border-color:var(--accent)}
 .tpl-kind-art{display:grid;place-items:center;height:120px;background:var(--surface-2);border-bottom:1px solid var(--border)}
 .tpl-kind-art svg{width:150px;height:92px;fill:none;stroke:var(--accent-ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.tpl-kind-body{display:grid;gap:6px;padding:16px 18px 18px;align-content:start}
-.tpl-kind-title{font-family:var(--font-display);font-variation-settings:var(--display-opsz);font-size:var(--fs-22);line-height:1.1}
-.tpl-kind-default{justify-self:start;font-size:var(--fs-12);font-weight:var(--fw-semibold);padding:2px 10px;border-radius:var(--pill-radius);background:var(--accent-soft);color:var(--accent-ink)}
+.tpl-kind-body{display:flex;flex-direction:column;gap:6px;padding:16px 18px 18px}
+.tpl-kind-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.tpl-kind-title{margin:0;font-family:var(--font-display);font-variation-settings:var(--display-opsz);font-size:var(--fs-22);line-height:1.1}
+.tpl-kind-head .tpl-kind-more{flex:none;margin:-8px -10px 0 0}
+.tpl-kind-rec-about{margin:6px 0 0;font-size:var(--fs-13);color:var(--muted)}
+.tpl-kind-rec-about b{color:var(--text-2);font-weight:var(--fw-semibold)}
+.tpl-kind-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px}
+.tpl-kind-default{align-self:flex-start;font-size:var(--fs-12);font-weight:var(--fw-semibold);padding:2px 10px;border-radius:var(--pill-radius);background:var(--accent-soft);color:var(--accent-ink)}
 .tpl-list-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:26px 0 10px}
 .tpl-list-title{margin:0;font-size:var(--fs-17)}
 .tpl-list{display:grid;gap:10px}
@@ -5718,9 +5801,9 @@ body.mcf #qa-playbar{display:none!important}
 .tpl-ed-tasks,.tpl-ed-task-results{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .tpl-ed-task,.tpl-ed-task-results li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tpl-ed-task-title,.tpl-ed-task-results li>.tpl-ed-hit-title{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
-.tpl-ed-hit-tags{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 100%;min-width:0}
-.tpl-ed-hit-tags .tag{font-size:var(--fs-12);overflow-wrap:anywhere}
-.tpl-ed-hit-tags .tag.is-hit{border:1px solid var(--accent-ink);color:var(--accent-ink);font-weight:var(--fw-semibold)}
+.tpl-ed-hit-topic{overflow-wrap:anywhere}
+.tpl-ed-task-find{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tpl-ed-task-find .search-wrap{flex:1 1 220px;min-width:0}
 .tpl-ed-task-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .tpl-ed-task-bar .list-count{margin:0}
 .tpl-ed-summary{position:sticky;top:0;padding:14px 16px}
@@ -5789,9 +5872,12 @@ body.mcf #qa-playbar{display:none!important}
    On every width: Log out and the footer go while a challenge is open, and so
    do the header's countdown and day chip wherever the play bar draws its ring —
    the ring is then the one clock. A Program's bar draws none (its deadline is
-   weeks out), so its header countdown stays. On a phone the whole header steps
-   aside (the block above). */
+   weeks out), so its header countdown stays. The header's score pill goes too
+   wherever the play bar shows the score, so the page says it once (owner's
+   decision, 27 Nov 2026). On a phone the whole header steps aside (the block
+   above). */
 @supports selector(:has(*)){
+  body:has(#task-detail-page.active #qa-stats .qa-score:not([hidden])):not(.mcf) #header-score,
   body:has(#task-detail-page.active):not(.mcf) #app-footer,
   body:has(#task-detail-page.active #qa-stats .qa-gauge):not(.mcf) #header-timer,
   body:has(#task-detail-page.active #qa-stats .qa-gauge):not(.mcf) #header-day,
@@ -6236,7 +6322,7 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .help-label-row.cw-sub-row{margin:12px 0 4px}
 .ua-head>.help-label-row{margin:0 0 12px}
 #comp-form-overlay .help-label-row>h3,#comp-form-overlay .help-label-row>h4,.help-label-row>.cw-sub,.ua-head>.help-label-row>h2{margin:0}
-.lb-help-row{margin:0 0 12px}
+.lb-title-row{margin:0}
 
 /* -- CHALLENGE EDITOR (v8.17.0) -------------------------------------------
    The compact New / Edit Challenge form: the question on the left, a settings
@@ -6329,6 +6415,49 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .ce-sec-body{padding:6px 0 4px}
 .ce-sec-body[hidden]{display:none}
 .ce-sec-help{margin:0 0 6px}
+/* Stage B — the editor's Topic and sharing row. */
+.tf-topic-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tf-topic-row select{flex:1;min-width:0}
+.tf-needs{border:0;margin:8px 0 0;padding:0;min-width:0}
+.tf-needs legend{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-2);padding:0;margin-bottom:4px}
+/* Stage B — the Question bank's Topic filter, topic chip and Topics dialog. */
+.topic-filter{display:inline-flex;align-items:center;gap:6px}
+.task-count-row{display:inline-flex;align-items:center;gap:6px}
+.topic-filter label{font-size:var(--fs-13);font-weight:var(--fw-semibold);color:var(--text-2)}
+.topic-filter select{max-width:min(260px, 60vw)}
+.topic-chip{display:inline-block;padding:1px 8px;border-radius:var(--r-s);font-size:var(--fs-12);font-weight:var(--fw-semibold);background:var(--surface-2);color:var(--text);border:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:8em;vertical-align:middle}
+/* Per-session question sets (owner decision, 27 Nov 2026) — the sessions a
+   question is in, on each of the open event's questions in its workspace
+   (features/task-sessions.js). A button where the viewer may change it, else
+   text. Narrowed to chosen sessions: an accent edge and accent ink, so a
+   question in every session (the default) reads quiet. 24 px is the SC 2.5.8
+   floor of a dense admin table (the accepted touch-target rulings). */
+.session-chip{display:inline-flex;align-items:center;min-height:24px;padding:1px 8px;margin:0 4px 2px 0;border-radius:var(--r-s);font-family:var(--font-text);font-size:var(--fs-12);font-weight:var(--fw-semibold);background:var(--surface-2);color:var(--text);border:1px solid var(--border);white-space:normal;text-align:left;vertical-align:middle;max-width:16em}
+.session-chip.is-narrowed{border-color:var(--accent);color:var(--accent-ink)}
+button.session-chip{cursor:pointer;transition:border-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out)}
+@media(hover:hover){
+  button.session-chip:hover{background:var(--surface-2);border-color:var(--accent);color:var(--accent-ink)}
+  button.session-chip.is-narrowed:hover{background:var(--surface-2);color:var(--text)}
+}
+button.session-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(pointer:coarse),(max-width:768px){button.session-chip{min-height:44px;padding:4px 12px}}
+.tsq-modal .picker-rows{min-height:0;flex:none;display:flex;flex-direction:column;gap:6px}
+.tsq-modal .tsq-name{min-width:0;overflow-wrap:anywhere}
+.tsq-modal .tsq-why{color:var(--muted);font-size:var(--fs-12)}
+.tsq-modal .tsq-error[hidden]{display:none}
+.tsq-modal .tsq-list{border:0;padding:0;margin:0}
+.topics-card{max-width:min(560px, calc(100vw - 32px));width:100%;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto}
+.topics-add{margin:12px 0}
+.topics-add label{display:block;font-size:var(--fs-13);font-weight:var(--fw-semibold);margin-bottom:6px}
+.topics-add-row{display:flex;gap:8px}
+.topics-add-row input{flex:1;min-width:0}
+.topics-list{list-style:none;margin:8px 0 0;padding:0}
+.topics-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--border)}
+.topics-name{flex:1;min-width:0;font-weight:var(--fw-semibold);overflow-wrap:anywhere}
+.topics-count{color:var(--text-2);font-size:var(--fs-13)}
+.topics-acts{display:flex;gap:6px;flex-wrap:wrap}
+.topics-note{color:var(--text-2);font-size:var(--fs-13)}
+.topics-empty{color:var(--text-2);padding:8px 0}
 .ce-attach-actions{display:flex;flex-wrap:wrap;gap:4px 14px;padding:0 4px}
 #tf-attach-url-toggle{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;line-height:32px}
 #admin-task-form.ce-form .tf-attachments-list{margin:4px 0;min-height:0}
@@ -6371,6 +6500,12 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 @media(hover:hover){.ua-switch-btn[aria-selected="false"]:hover{background:var(--surface-2);color:var(--accent-ink)}}
 .ua-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .ua-toolbar .search-wrap{flex:1 1 260px;max-width:420px}
+/* Add user and its "?" stay together at the toolbar's end (the toolbar spreads
+   its items apart, which left the tip alone at the far edge). */
+.ua-add-row{display:inline-flex;align-items:center;gap:6px}
+/* "Last sign-in" is one heading line where the table has room; at 1024 px it
+   may break at its hyphen, so the table still fits its card. */
+@media(min-width:1280px){#admin-page table.ua-table th[data-tcol="last_sign_in"]{white-space:nowrap!important}}
 .ua-table-wrap{position:relative;overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-m);background:var(--surface)}
 .ua-table{width:100%;border-collapse:collapse}
 .ua-table th,.ua-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
@@ -6584,6 +6719,12 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
   /* Spelled out, never `td :is(…)`: _minifyCss drops the space before ":" and
      the descendant rule would become a compound one that matches nothing. */
   #admin-page table[data-tcols] td .tag,#admin-page table[data-tcols] td .chip,#admin-page table[data-tcols] td .cell-chips>*{max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere}
+  /* A word chip (a role, an event's name) and an address never split inside a
+     word: break-word, unlike anywhere, keeps the longest word in the column's
+     minimum width, so the table gives the column room rather than "Admi|n" or
+     "example.co|m". A topic chip is one line, cut short with its whole name in
+     the DOM and its title (.topic-chip). */
+  #admin-page table[data-tcols] td .chip,#admin-page table[data-tcols] td.cell-addr{overflow-wrap:break-word}
   #admin-page table[data-tcols] td.tcol-grow{width:34%}
   /* A row's buttons stack rather than widen the table past its card. */
   #admin-page table[data-tcols] td .action-cell.task-actions{flex-wrap:wrap;white-space:normal}
@@ -6646,8 +6787,80 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .team-preview{display:block;width:100%;height:65vh;height:65dvh;border:1px solid var(--border);border-radius:var(--r-m);background:var(--surface)}
 .team-preview-subject{margin:0 0 8px}
 @media(max-width:768px){#ws-team .team-grid{grid-template-columns:minmax(0,1fr)}}
+/* STAFF TEAMS (features/staff-teams.js): the Settings card, and the two event
+   doors (Team & reports, the Organisers card) with their dialogs. */
+#staff-teams-body .st-toolbar,#staff-teams-body .st-members-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+#staff-teams-body .st-count{margin:0}
+#staff-teams-body .st-empty{margin:0}
+#staff-teams-body .st-team-open{display:inline-flex;align-items:center;min-height:44px;font-size:var(--fs-14);font-weight:var(--fw-semibold);text-align:left;overflow-wrap:anywhere}
+@media(min-width:769px){#staff-teams-body tr.is-current td{background:var(--accent-soft)}}
+#staff-teams-body .st-actions{white-space:nowrap;text-align:right}
+#staff-teams-body .st-actions .btn+.btn{margin-left:6px}
+#staff-teams-body .st-members{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+#staff-teams-body .st-members-head .help-label-row{min-width:0}
+#staff-teams-body .st-members-title{margin:0;font-size:var(--fs-16);overflow-wrap:anywhere}
+#staff-teams-body .st-email{overflow-wrap:anywhere}
+#ws-team .team-staff-door{margin:12px 0 0;gap:8px}
+.ws-org-team{display:flex;align-items:center;gap:8px;margin-top:12px}
+.st-dialog .st-preview{margin:4px 0 0}
+.st-dialog .st-out-list{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px;max-height:40vh;max-height:40dvh;overflow:auto;font-size:var(--fs-14);overflow-wrap:anywhere}
+.st-dialog .st-out-list li{padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface-2)}
+.st-dialog .st-out-list[data-outcome="skipped"] li{border-style:dashed}
+.st-dialog .st-out-h{margin:12px 0 6px;font-size:var(--fs-14)}
+.st-dialog .st-out-none{margin:0 0 12px;color:var(--text-2)}
+.st-dialog .st-warn{margin:12px 0 0;padding:10px 12px;border-radius:var(--r-m);background:var(--warn-soft);color:var(--text);font-size:var(--fs-14)}
 /* A qualifying question on the list and its answered view: no right answer, so a
    neutral mark instead of the green "correct" one. */
 .task-card.solved.quick::after{content:'✓ ANSWERED'}
 .choice-review-row.is-picked,#task-detail-card.qa-card .choice-review-row.is-picked,#task-detail-card.qa-card .choice-option.is-picked{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
 #task-detail-card.qa-card .choice-review-row.is-picked .tpc-badge{color:var(--accent-ink)}
+
+/* ── MARKETING (features/marketing-admin.js) ─────────────────────────────────
+   The platform's success figures across events. KPI tiles in a grid that wraps
+   to the width (no sideways scroll at 390), bar lists reusing the workspace's
+   .ws-bars, one section card per question the page answers. Tokens only. */
+.mk-lede{margin:0 0 16px;max-width:72ch;color:var(--text-2);font-size:var(--fs-small);line-height:var(--lh-small)}
+.mk-filterbar{display:grid;gap:12px}
+.mk-filter-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end}
+.mk-field{display:grid;gap:6px;min-width:0}
+.mk-field>.help-label-row{margin:0}
+.mk-field label,.mk-kinds-field legend{font-size:var(--fs-label);line-height:var(--lh-label);font-weight:var(--fw-semibold);color:var(--text)}
+.mk-custom{display:flex;flex-wrap:wrap;gap:16px}
+.mk-custom[hidden]{display:none}
+.mk-kinds-field{border:0;margin:0;padding:0}
+.mk-kinds{display:flex;flex-wrap:wrap;gap:4px 16px}
+.mk-events-pick summary{cursor:pointer;font-size:var(--fs-small);line-height:var(--lh-small);font-weight:var(--fw-semibold);color:var(--accent-ink)}
+.mk-event-opts{list-style:none;margin:8px 0;padding:0;display:grid;gap:2px;max-height:240px;overflow:auto;position:relative}
+.mk-event-opts small{color:var(--muted);font-size:var(--fs-caption)}
+.mk-status{margin:0;min-height:1lh;font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--muted)}
+.mk-section{display:grid;gap:16px}
+.mk-section>.help-label-row{margin:0}
+.mk-section h3{margin:0}
+.mk-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));align-items:stretch;gap:12px}
+.mk-kpi{padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-m);background:var(--surface);min-width:0}
+.mk-kpi>.help-label-row{margin:0;flex-wrap:nowrap;align-items:flex-start}
+/* The tip stays beside its label: the label takes the room and wraps, the "?" keeps its place at its right. */
+.mk-kpi>.help-label-row>.mk-kpi-label{flex:0 1 auto;min-width:0}
+.mk-kpi>.help-label-row>[data-help]{flex:none}
+.mk-kpi-label{margin:0}
+.mk-kpi-num{margin:6px 0 2px;font-family:var(--font-display);font-size:var(--fs-28);line-height:var(--lh-fig-m);color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.mk-kpi-sub{margin:0;font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--muted);overflow-wrap:anywhere}
+.mk-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+.mk-figure{margin:0;min-width:0}
+.mk-fig-cap{margin:0 0 10px;font-size:var(--fs-small);line-height:var(--lh-small);font-weight:var(--fw-semibold);color:var(--text)}
+.mk-bars .ws-bar-title{font-weight:var(--fw-regular)}
+.mk-bar-fill{background:var(--accent)}
+.mk-note{margin:0;font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--muted)}
+.mk-note-row{margin:0;flex-wrap:nowrap;align-items:flex-start}
+.mk-note-row>[data-help]{flex:none}
+.mk-empty{color:var(--text-2)}
+.mk-table-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:12px}
+.mk-table-head>.help-label-row{margin:0}
+.mk-table-head h3{margin:0}
+.mk-table-meta{font-size:var(--fs-caption);color:var(--muted)}
+.mk-table-head .btn{margin-left:auto}
+.mk-na{color:var(--muted)}
+#mk-table-card[hidden]{display:none}
+#admin-marketing-tab>.help-label-row{margin:0 0 4px}
+#admin-marketing-tab>.help-label-row>.admin-pane-title{margin:0}
+#admin-marketing-tab>.card,#mk-body>.card{margin-bottom:16px}

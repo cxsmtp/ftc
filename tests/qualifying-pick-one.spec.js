@@ -179,8 +179,8 @@ test("a hint on a qualifying question costs nothing; a hint on any other challen
   const old = await makeTask(sa.api, sa.csrf, "q-hint-legacy", { hint: "<p>Look left</p>" });
   tagDirectly(old.id, "qualifying:hinted");
   const plain = await makeTask(sa.api, sa.csrf, "q-hint-plain", { hint: "<p>Look right</p>" });
-  await assignTask(sa.api, sa.csrf, old.id, [comp.id]);
-  await assignTask(sa.api, sa.csrf, plain.id, [comp.id]);
+  old.id = (await assignTask(sa.api, sa.csrf, old.id, [comp.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+  plain.id = (await assignTask(sa.api, sa.csrf, plain.id, [comp.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
   const p = await makeParticipant(sa.api, sa.csrf, "q-hinter");
   await enrol(sa.api, sa.csrf, comp.id, [p.id]);
   const me = await apiLogin(p.email, PARTICIPANT_PASS);
@@ -203,8 +203,8 @@ test("on the card, an older qualifying question of another type warns of no pena
   const old = await makeTask(sa.api, sa.csrf, "q-card-legacy", { hint: "<p>Look up</p>" });
   tagDirectly(old.id, "qualifying:cardtopic");
   const other = await makeTask(sa.api, sa.csrf, "q-card-other");   // a second challenge (fixture checklist 1)
-  await assignTask(sa.api, sa.csrf, old.id, [comp.id]);
-  await assignTask(sa.api, sa.csrf, other.id, [comp.id]);
+  old.id = (await assignTask(sa.api, sa.csrf, old.id, [comp.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+  other.id = (await assignTask(sa.api, sa.csrf, other.id, [comp.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
   const p = await makeParticipant(sa.api, sa.csrf, "q-card-p");
   await enrol(sa.api, sa.csrf, comp.id, [p.id]);
   // Signed in before the first navigation (CLAUDE.md, *STANDING RULES for adding tests*).

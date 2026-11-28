@@ -55,14 +55,17 @@ async function createPickOne(texts, extra = {}) {
 async function liveEventWith(taskIds, label) {
   const comp = await makeCompetition(SA.api, SA.csrf, label);
   const idle = await makeTask(SA.api, SA.csrf, `${label}-idle`);
-  for (const id of [...taskIds, idle.id]) await assignTask(SA.api, SA.csrf, id, [comp.id]);
+  // `ids`: the event's OWN copy of each named question, in order (lib/event-copies.js).
+  const ids = [];
+  for (const id of taskIds) ids.push((await assignTask(SA.api, SA.csrf, id, [comp.id])).copies[0].task_id);
+  await assignTask(SA.api, SA.csrf, idle.id, [comp.id]);
   const player = await makeParticipant(SA.api, SA.csrf, `${label}-player`);
   const bystander = await makeParticipant(SA.api, SA.csrf, `${label}-bystander`);
   await enrol(SA.api, SA.csrf, comp.id, [player.id, bystander.id]);
   const p = await apiLogin(player.email);
   const sel = await p.api.post("/api/select-competition", { headers: H(p.csrf), data: { competitionId: comp.id } });
   expect(sel.ok(), `select: ${sel.status()} ${await sel.text()}`).toBeTruthy();
-  return { comp, player, p };
+  return { comp, player, p, ids };
 }
 async function submit(p, compId, taskId, answer) {
   const gradingHash = await gradingHashFor(p.api, taskId);
@@ -122,9 +125,10 @@ test.describe("Pick-one questions — authoring through the API", () => {
   test("submit: one of the options is correct and scores the difficulty's points; anything else is refused before grading; the solved view names the participant's own pick", async () => {
     const cr = await createPickOne(["Red", "Green"]);
     expect(cr.status(), await cr.text()).toBe(200);
-    const taskId = (await cr.json()).id;
-    const [red, green] = choicesOf(taskId);
-    const { comp, player, p } = await liveEventWith([taskId], "pk-submit");
+    const taskBank = (await cr.json()).id;
+    const [red, green] = choicesOf(taskBank);
+    // The event's own copy (same option ids): what is answered and stored there.
+    const { comp, player, p, ids: [taskId] } = await liveEventWith([taskBank], "pk-submit");
     try {
       const view = await (await p.api.get(`/api/tasks/${taskId}`)).json();
       expect(view.pick_one, "the participant is told it is a pick-one question").toBe(true);
@@ -155,14 +159,16 @@ test.describe("Recalculate and a pick-one question", () => {
     const free = await SA.api.post("/api/admin/tasks", { headers: H(SA.csrf), data: {
       title: `Recalc free ${uniq("f")}`, description: "d", difficulty: "easy", answer_type: "any", status: "published" } });
     expect(free.status(), await free.text()).toBe(200);
-    const freeId = (await free.json()).id;
+    const freeBank = (await free.json()).id;
     const po = await createPickOne(["Yes", "No", "Maybe"]);
     expect(po.status(), await po.text()).toBe(200);
-    const poId = (await po.json()).id;
-    const [yes, no, maybe] = choicesOf(poId);
-    const txt = await makeTask(SA.api, SA.csrf, "recalc-text", { correct_answer: "alpha" });
+    const poBank = (await po.json()).id;
+    const [yes, no, maybe] = choicesOf(poBank);
+    const txtBank = await makeTask(SA.api, SA.csrf, "recalc-text", { correct_answer: "alpha" });
 
-    const { comp, player, p } = await liveEventWith([freeId, poId, txt.id], "pk-recalc");
+    // The event's own copies: what is answered, edited and recalculated there.
+    const { comp, player, p, ids: [freeId, poId, txtId] } = await liveEventWith([freeBank, poBank, txtBank.id], "pk-recalc");
+    const txt = { ...txtBank, id: txtId };
     try {
       for (const [id, ans] of [[freeId, "whatever I typed"], [poId, JSON.stringify([maybe.id])], [txt.id, "alpha"]]) {
         const r = await submit(p, comp.id, id, ans);
@@ -245,9 +251,10 @@ test.describe("The qualifying tag on an organiser's own question", () => {
 
     // A challenge in an event that has ENDED: both directions are refused.
     const ended = await createPickOne(["Few", "Many"]);
-    const endedId = (await ended.json()).id;
+    const endedBank = (await ended.json()).id;
     const comp = await makeCompetition(SA.api, SA.csrf, "pk-frozen");
-    await assignTask(SA.api, SA.csrf, endedId, [comp.id]);
+    // The event's own copy: the challenge an ended session freezes (lib/event-copies.js).
+    const endedId = (await assignTask(SA.api, SA.csrf, endedBank, [comp.id])).copies[0].task_id;
     const pre = await tag(endedId, "qualifying:budget");
     expect(pre.status(), `PRECONDITION: tagged while live: ${await pre.text()}`).toBe(200);
     const end = await SA.api.post(`/api/admin/competitions/${comp.id}/end-now`, { headers: H(SA.csrf) });
@@ -279,9 +286,9 @@ test.describe("The qualifying tag on an organiser's own question", () => {
     };
     const qualifyingTags = (taskId) => dbAll("SELECT tag FROM task_tags WHERE task_id=? AND tag LIKE 'qualifying:%'", taskId).map(r => r.tag);
 
-    const frozen = (await (await createPickOne(["Few", "Many"])).json()).id;
+    const frozenBank = (await (await createPickOne(["Few", "Many"])).json()).id;
     const ended = await makeCompetition(SA.api, SA.csrf, "pk-restore-ended");
-    await assignTask(SA.api, SA.csrf, frozen, [ended.id]);
+    const frozen = (await assignTask(SA.api, SA.csrf, frozenBank, [ended.id])).copies[0].task_id;   // the event's own copy
     expect((await tag(frozen, "qualifying:budget")).status(), "PRECONDITION: tagged while live").toBe(200);
     const vFrozen = await untaggedVersion(frozen);
     expect((await SA.api.post(`/api/admin/competitions/${ended.id}/end-now`, { headers: H(SA.csrf) })).ok()).toBeTruthy();
@@ -292,9 +299,9 @@ test.describe("The qualifying tag on an organiser's own question", () => {
 
     // CONTROL: in a live event the same restore drops the tag and clears the
     // challenge's number, so the event renumbers it in the scoring level.
-    const open = (await (await createPickOne(["Low", "High"])).json()).id;
+    const openBank = (await (await createPickOne(["Low", "High"])).json()).id;
     const live = await makeCompetition(SA.api, SA.csrf, "pk-restore-live");
-    await assignTask(SA.api, SA.csrf, open, [live.id]);
+    const open = (await assignTask(SA.api, SA.csrf, openBank, [live.id])).copies[0].task_id;   // the event's own copy
     expect((await tag(open, "qualifying:budget")).status()).toBe(200);
     const vOpen = await untaggedVersion(open);
     { const db = new Database(TEST_DB_PATH); try { db.prepare("UPDATE competition_tasks SET task_number='4.01' WHERE task_id=?").run(open); } finally { db.close(); } }
@@ -316,10 +323,11 @@ test.describe("The qualifying tag on an organiser's own question", () => {
       return vs[vs.length - 1].id;
     };
     const ended = await makeCompetition(SA.api, SA.csrf, "pk-restore-malformed");
-    const bad = (await (await createPickOne(["One", "Two"])).json()).id;
-    const plain = (await (await createPickOne(["Uno", "Dos"])).json()).id;
-    await assignTask(SA.api, SA.csrf, bad, [ended.id]);
-    await assignTask(SA.api, SA.csrf, plain, [ended.id]);
+    const badBank = (await (await createPickOne(["One", "Two"])).json()).id;
+    const plainBank = (await (await createPickOne(["Uno", "Dos"])).json()).id;
+    // The event's own copies: what the ended event holds, and what is restored.
+    const bad = (await assignTask(SA.api, SA.csrf, badBank, [ended.id])).copies[0].task_id;
+    const plain = (await assignTask(SA.api, SA.csrf, plainBank, [ended.id])).copies[0].task_id;
     const vBad = await firstVersion(bad);
     const vPlain = await firstVersion(plain);
     const MALFORMED = "qualifying:Not A Key!";
@@ -360,6 +368,9 @@ test.describe("The editor's Options box", () => {
     expect(first.map(c => c.text), "one option per non-empty line, trimmed").toEqual(["Red", "Green"]);
 
     // Edit: the box shows the options; a new line is added, the others kept.
+    // The list reloads after the save; open the row only once it is in the model
+    // (an edit of a row the list has not drawn yet closes the form instead).
+    await expect.poll(() => page.evaluate((tid) => (window.S.adminTasksData || []).some(t => t.id === tid), id), { timeout: 15000 }).toBe(true);
     await page.evaluate((tid) => window.editTask(tid), id);
     await expect(page.locator("#tf-any-options")).toHaveValue("Red\nGreen", { timeout: 10000 });
     await page.locator("#tf-any-options").fill("Red\nGreen\nBlue");

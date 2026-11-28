@@ -18,7 +18,7 @@
 const { test, expect } = require("./isolated-test");
 const { registerPost } = require("./helpers");
 const { apiLogin, BASE, PARTICIPANT_PASS } = require("./helpers");
-const { adminLogin, clickTab, filterComps, openKebab } = require("./ui-admin-helpers");
+const { adminLogin, openEventMenu } = require("./ui-admin-helpers");
 
 // Route every page.goto() + page.request.* to THIS worker's server.
 test.use({ baseURL: BASE });
@@ -161,23 +161,17 @@ test.beforeAll(async () => {
 });
 
 /**
- * Open the delivery panel from the Competitions kebab and return the modal body.
- *
- * filterComps() narrows the PAGINATED competitions table first (v7.15.29 — a row
- * can genuinely be off page 1 once other files have created competitions), and
- * openKebab() is the hardened toggle-aware helper (v7.21.25 — a single naive
- * click is a known flake shape: the kebab is a toggle, and the table re-renders
- * on a 15 s poll).
+ * Open the delivery panel from the event's workspace ⋯ menu (the event's doors
+ * are its workspace's; the Events-row menu keeps only Delete event) and return
+ * the modal body. openEventMenu narrows the paginated Events table first and
+ * presses the toggle until the menu is open.
  */
 async function openDeliveryPanel(page, name = COMP_NAME) {
-  await clickTab(page, "Events");
-  await filterComps(page, name);
-  const row = page.locator(`#admin-comp-body tr:has-text('${name}')`).first();
-  await expect(row).toBeVisible({ timeout: 10000 });
-  await openKebab(page, row);
-  const item = page.locator("#kebab-portal button:has-text('Email Delivery')").first();
+  const portal = await openEventMenu(page, name);
+  const item = portal.locator('[data-action="comp-delivery"]').first();
+  await expect(item, "the item reads Email delivery").toHaveText(/Email delivery/);
   await expect(item,
-    "the delivery item must be on the kebab for an UPCOMING event — it is deliberately not status-gated")
+    "the delivery item must be on the menu for an UPCOMING event — it is deliberately not status-gated")
     .toBeVisible({ timeout: 5000 });
   await item.click();
   await expect(page.locator("#modal-overlay")).toBeVisible({ timeout: 15000 });

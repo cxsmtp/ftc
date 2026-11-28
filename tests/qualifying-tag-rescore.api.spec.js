@@ -29,7 +29,7 @@
 //     changes nothing about it is still accepted; unlocked, the flip goes through.
 const { test, expect } = require("./isolated-test");
 const { apiLogin, TEST_DB_PATH } = require("./helpers");
-const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, withLegacySharedAssign } = require("./event-admin-helpers");
 
 const sql = (fn) => {
   const Database = require("better-sqlite3");
@@ -85,9 +85,14 @@ test.describe("sweep #91 — a qualifying tag change re-scores the answers alrea
     const S = await makeTask(sa, csrf, "r91s");
     // An unsolved challenge in each event keeps the all-solved end away (fixture item 1).
     const X = await makeTask(sa, csrf, "r91x");
-    await assignTask(sa, csrf, Q.id, [L1.id, L2.id]);
-    await assignTask(sa, csrf, S.id, [D.id]);
-    await assignTask(sa, csrf, X.id, [L1.id, L2.id, D.id]);
+    // ONE challenge held by two events: the shape a database from before
+    // event-owned questions holds (and a qualifying question still has), built
+    // through the previous release's assign doors (lib/event-copies.js).
+    await withLegacySharedAssign(sa, csrf, async () => {
+      await assignTask(sa, csrf, Q.id, [L1.id, L2.id]);
+      await assignTask(sa, csrf, S.id, [D.id]);
+      await assignTask(sa, csrf, X.id, [L1.id, L2.id, D.id]);
+    });
     const p1 = await makeParticipant(sa, csrf, "r91p1"), p2 = await makeParticipant(sa, csrf, "r91p2"), p3 = await makeParticipant(sa, csrf, "r91p3");
     await enrol(sa, csrf, L1.id, [p1.id]);
     await enrol(sa, csrf, L2.id, [p2.id]);
@@ -137,8 +142,8 @@ test.describe("sweep #91 — a qualifying tag change re-scores the answers alrea
     const E = await makeCompetition(sa, csrf, "r91e");
     const Q = await pickOne(sa, csrf, "r91eq");
     const X = await makeTask(sa, csrf, "r91ex");
-    await assignTask(sa, csrf, Q.id, [E.id]);
-    await assignTask(sa, csrf, X.id, [E.id]);
+    Q.id = (await assignTask(sa, csrf, Q.id, [E.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+    X.id = (await assignTask(sa, csrf, X.id, [E.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     const p = await makeParticipant(sa, csrf, "r91ep");
     await enrol(sa, csrf, E.id, [p.id]);
     await answer(p, E.id, Q.id, JSON.stringify([optionIds(Q.id)[0]]));
@@ -158,8 +163,8 @@ test.describe("sweep #91 — a qualifying tag change re-scores the answers alrea
     const L = await makeCompetition(sa, csrf, "r91r");
     const Q = await pickOne(sa, csrf, "r91rq");
     const X = await makeTask(sa, csrf, "r91rx");
-    await assignTask(sa, csrf, Q.id, [L.id]);
-    await assignTask(sa, csrf, X.id, [L.id]);
+    Q.id = (await assignTask(sa, csrf, Q.id, [L.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+    X.id = (await assignTask(sa, csrf, X.id, [L.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     const p = await makeParticipant(sa, csrf, "r91rp");
     await enrol(sa, csrf, L.id, [p.id]);
     await answer(p, L.id, Q.id, JSON.stringify([optionIds(Q.id)[0]]));
@@ -193,8 +198,14 @@ test.describe("sweep #91 — a qualifying tag change re-scores the answers alrea
     const L = await makeCompetition(sa, csrf, "r91i");
     const Q = await pickOne(sa, csrf, "r91iq");
     const X = await makeTask(sa, csrf, "r91ix");
-    await assignTask(sa, csrf, Q.id, [L.id]);
-    await assignTask(sa, csrf, X.id, [L.id]);
+    // The import overwrites LIBRARY questions only; an event's own copy is out of
+    // its reach (lib/event-copies.js). A library question an event holds is the
+    // shape a database from before event-owned questions has, built through the
+    // previous release's assign doors.
+    await withLegacySharedAssign(sa, csrf, async () => {
+      await assignTask(sa, csrf, Q.id, [L.id]);
+      await assignTask(sa, csrf, X.id, [L.id]);
+    });
     const p = await makeParticipant(sa, csrf, "r91ip");
     await enrol(sa, csrf, L.id, [p.id]);
     await answer(p, L.id, Q.id, JSON.stringify([optionIds(Q.id)[0]]));
@@ -237,8 +248,8 @@ test.describe("sweep #91 — a qualifying tag change re-scores the answers alrea
     const L = await makeCompetition(sa, csrf, "r91l");
     const Q = await pickOne(sa, csrf, "r91lq");
     const X = await makeTask(sa, csrf, "r91lx");
-    await assignTask(sa, csrf, Q.id, [L.id]);
-    await assignTask(sa, csrf, X.id, [L.id]);
+    Q.id = (await assignTask(sa, csrf, Q.id, [L.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+    X.id = (await assignTask(sa, csrf, X.id, [L.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     const p = await makeParticipant(sa, csrf, "r91lp");
     await enrol(sa, csrf, L.id, [p.id]);
     await answer(p, L.id, Q.id, JSON.stringify([optionIds(Q.id)[0]]));

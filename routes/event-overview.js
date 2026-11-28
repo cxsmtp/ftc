@@ -47,6 +47,7 @@ const db = require("../db");
 const { requireAdmin } = require("../lib/middleware");
 const { getCompetition, getCompetitionTimeslots, competitionEffectiveEnd } = require("../lib/competitions");
 const { qualifyingSql, notQualifyingSql } = require("../lib/qualifying");
+const { inSessionSql } = require("../lib/session-tasks");   // per-session question sets
 const { lateEntryDeadline } = require("../lib/late-entry");
 const { competitionDenied, competitorIds } = require("../lib/event-admin");
 const { competitorEditDenied, refuseCompetitor, staffCompeteOn } = require("../lib/staff-compete");
@@ -212,16 +213,26 @@ module.exports = function register(app) {
       // as every count of finishing leaves them out) — the Program's "how many
       // completed", and the organiser's "is anyone done" everywhere else.
       const visible = taskRows.filter(t => t.status === "published" && (t.active === 1 || t.active === true) && !t.qualifying).length;
+      // PER-SESSION QUESTION SETS — "every" is the questions of the member's OWN
+      // session (lib/session-tasks.js `inSessionSql` over their membership's
+      // session), on both sides: the solves counted and the set they are
+      // measured against. An event nobody narrowed measures every member against
+      // the same set, as before.
       const finished = visible ? (db.prepare(
         `SELECT COUNT(*) AS n FROM (
            SELECT ce.user_id FROM challenge_events ce
              JOIN tasks t ON t.id=ce.task_id
              JOIN competition_tasks ct ON ct.competition_id=ce.competition_id AND ct.task_id=ce.task_id
+             JOIN competition_users cu ON cu.competition_id=ce.competition_id AND cu.user_id=ce.user_id
             WHERE ce.competition_id=? AND ce.event_type='solved' AND ce.impersonated=0 AND ${CE}
-              AND ce.user_id ${MEMBER}
               AND t.status='published' AND t.active=1 AND ${notQualifyingSql("t")}
-            GROUP BY ce.user_id HAVING COUNT(DISTINCT ce.task_id) >= ?)`
-      ).get(comp.id, comp.id, visible, ...B).n || 0) : 0;
+              AND ${inSessionSql("ct.competition_id", "ct.task_id", "cu.timeslot_id")}
+            GROUP BY ce.user_id, cu.timeslot_id
+           HAVING COUNT(DISTINCT ce.task_id) >= (
+             SELECT COUNT(*) FROM competition_tasks ct2 JOIN tasks t2 ON t2.id=ct2.task_id
+              WHERE ct2.competition_id=ce.competition_id AND t2.status='published' AND t2.active=1 AND ${notQualifyingSql("t2")}
+                AND ${inSessionSql("ct2.competition_id", "ct2.task_id", "cu.timeslot_id")}))`
+      ).get(comp.id, ...B).n || 0) : 0;
       const tasks = taskRows.map(t => {
         const s = stats.get(t.id) || {};
         return {

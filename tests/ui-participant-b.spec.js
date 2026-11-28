@@ -12,7 +12,7 @@ const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, TEST_DB_P
 // place and is imported rather than becoming a fourth copy. ui-admin-helpers
 // requires only `expect`, never ./isolated-test (v7.21.35), so importing it here
 // cannot disturb the per-file isolation hook.
-const { filterComps, fillBreakGlass, submitLogin } = require("./ui-admin-helpers");
+const { filterComps, fillBreakGlass, submitLogin, openRowEventMenu } = require("./ui-admin-helpers");
 
 // v8.7.5 — resolve an admin tab by its `data-tab-id`, never by its visible
 // label: the sidebar's Events tab keeps the id `admin-competitions-tab` (ids are
@@ -305,8 +305,10 @@ test.describe("Mobile responsive", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   test("version visible on mobile", async ({ page }) => {
-    await adminLogin(page);
-    // The version moved into the account menu (small, above Sign out).
+    // A participant has no admin sidebar, so the version stays in the account
+    // menu (small, beside Sign out). An admin's is at the sidebar's foot (owner
+    // decision, 27 Nov 2026; tests/settings-about-health-ui.spec.js).
+    await participantLogin(page);
     const ver = (await require("./chrome-helpers").openAccountMenu(page)).locator(".pm-ver");
     await expect(ver).toBeVisible({ timeout: 3000 });
     expect(await ver.textContent()).toMatch(/^v\./);
@@ -331,11 +333,26 @@ test.describe("Mobile responsive", () => {
 
 test.describe("Version display", () => {
   test("version visible on desktop", async ({ page }) => {
+    // Admin View: at the sidebar's foot (owner decision, 27 Nov 2026), and the
+    // account menu does not repeat it.
     await adminLogin(page);
-    // The version moved into the account menu (small, above Sign out).
-    const ver = (await require("./chrome-helpers").openAccountMenu(page)).locator(".pm-ver");
-    await expect(ver).toBeVisible({ timeout: 3000 });
-    expect(await ver.textContent()).toMatch(/^v\.\d+\.\d+\.\d+$/);
+    const foot = page.locator("#admin-sidebar-version .asv-long");
+    await expect(foot).toBeVisible({ timeout: 5000 });
+    expect(await foot.textContent()).toMatch(/^Version \d+\.\d+\.\d+$/);
+    await require("./chrome-helpers").openAccountMenu(page);
+    await expect(page.locator("#profile-menu-overlay [data-action='do-logout']"), "CONTROL: the menu is open").toBeVisible();
+    await expect(page.locator("#profile-menu-overlay .pm-ver"), "not repeated in Admin View").toHaveCount(0);
+  });
+
+  test("version visible on desktop in the participant view: the account menu", async ({ browser }) => {
+    const ctx = await browser.newContext({ baseURL: BASE, viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+    try {
+      await participantLogin(page);
+      const ver = (await require("./chrome-helpers").openAccountMenu(page)).locator(".pm-ver");
+      await expect(ver).toBeVisible({ timeout: 3000 });
+      expect(await ver.textContent()).toMatch(/^v\.\d+\.\d+\.\d+$/);
+    } finally { await ctx.close(); }
   });
 });
 
@@ -360,8 +377,9 @@ test.describe("History dialog", () => {
     await filterComps(page, compName);
     const row = page.locator(`#admin-comp-body tr:has-text('${compName}')`).first();
     await expect(row).toBeVisible({ timeout: 5000 });
-    await openKebab(page, row);
-    await page.locator("#kebab-portal button:has-text('History')").first().click();
+    // The event's History is its workspace ⋯ menu's (the row keeps only Delete event).
+    await openRowEventMenu(page, row);
+    await page.locator('#kebab-portal [data-action="comp-history"]').click();
     await expect(page.locator("#hist-overlay")).toBeVisible({ timeout: 5000 });
   }
 
@@ -454,10 +472,10 @@ test.describe("navigated_away signal", () => {
       difficulty: "easy", answer_type: "text", correct_answer: "x",
       explanation: "—", status: "published",
     }});
-    const taskId = (await tr.json()).id;
+    let taskId = (await tr.json()).id;
     const comps = await (await sa.get("/api/admin/competitions")).json();
     const liveComp = comps.find(c => c.name === "Test Live");
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [liveComp.id] } });
+    taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [liveComp.id] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     // Register + verify + approve + set password for fresh participant
     const { api: anon, csrf: anonCsrf } = await freshCtx();
     await registerPost(anon, "/api/register", {
@@ -562,10 +580,10 @@ test.describe("navigated_away signal", () => {
       difficulty: "easy", answer_type: "text", correct_answer: "x",
       explanation: "—", status: "published",
     }});
-    const taskId = (await tr.json()).id;
+    let taskId = (await tr.json()).id;
     const comps = await (await sa.get("/api/admin/competitions")).json();
     const liveComp = comps.find(c => c.name === "Test Live");
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [liveComp.id] } });
+    taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [liveComp.id] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     const { api: anon, csrf: anonCsrf } = await freshCtx();
     await registerPost(anon, "/api/register", {
       headers: { "x-csrf-token": anonCsrf, "content-type": "application/json" },
@@ -871,6 +889,12 @@ test.describe("Leaderboard top-20 cap (v6.14.1)", () => {
     // refused precondition now fails AS a precondition instead of silently
     // redirecting this assertion at another competition's board.
     await enterCompAsParticipant(page, me.email, live.id);
+    // The seeded event's clock may start at the first open of a challenge rather
+    // than on entry, so open one: the board then lists the caller either way.
+    { const tl = await (await page.request.get("/api/tasks")).json();
+      const first = (Array.isArray(tl) ? tl : (tl.tasks || [])).find(t => !t.qualifying);
+      expect(first, "PRECONDITION: the event has a scoring challenge to open").toBeTruthy();
+      expect((await page.request.get(`/api/tasks/${first.id}`)).ok(), "PRECONDITION: the challenge opens").toBeTruthy(); }
     await page.locator(".nav-btn:not([aria-disabled=true]):has-text('Leaderboard')").first().waitFor({ state: "visible", timeout: 15000 });
     await page.locator(".nav-btn:not([aria-disabled=true]):has-text('Leaderboard')").first().click();
     await page.locator("#leaderboard-page.active").waitFor({ state: "visible", timeout: 5000 });
@@ -1231,11 +1255,11 @@ test.describe("Auth landing UI (v7.3.0)", () => {
       data: { name, start_time: new Date(Date.now() - 5 * 60_000).toISOString(), duration_minutes: 240 },
     })).json()).competition.id;
     const taskTitle = `${label}-CH ${t}`;
-    const taskId = (await (await sa.post("/api/admin/tasks", {
+    let taskId = (await (await sa.post("/api/admin/tasks", {
       headers: h,
       data: { title: taskTitle, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" },
     })).json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] } });
+    taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: h, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     const rv = await (await sa.get(`/api/admin/competitions/${compId}/self-enroll`)).json();
     const put = await sa.put(`/api/admin/competitions/${compId}`, { headers: h, data: { self_enroll_enabled: true, expectedUpdatedAt: rv.updated_at } });
     expect(put.ok(), "self-enrollment enabled").toBeTruthy();
@@ -1452,7 +1476,7 @@ test.describe("v7.21.0 — challenge category ribbons", () => {
         headers: h, data: { competitionIds: [COMP_ID] },
       });
       expect(ar.ok(), `assign ${title}: ${ar.status()}`).toBeTruthy();
-      return id;
+      return (await ar.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is listed there
     };
 
     // Two categories PLUS a free-text admin label on the same challenge.

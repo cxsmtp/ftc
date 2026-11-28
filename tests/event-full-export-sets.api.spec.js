@@ -49,7 +49,9 @@
 // files.
 const { test, expect } = require("./isolated-test");
 const { apiLogin, freshCtx, registerPost, PARTICIPANT_PASS, TEST_DB_PATH, gradingHashFor } = require("./helpers");
-const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol } = require("./event-admin-helpers");
+// An event holds its OWN copy of each question (lib/event-copies.js); the files
+// name the copies, compared here by the bank question each came from.
+const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, originOf } = require("./event-admin-helpers");
 const yauzl = require("yauzl");
 const Database = require("better-sqlite3");
 
@@ -335,14 +337,14 @@ test.describe("sweep #232 — the full event export, by value", () => {
       expect(tFiles[f], `${f}: by address too`).not.toContain(P.staffp.email);
     }
     expect(sortedIds(objects(before["participants.csv"]))).toEqual([...want, P.staffp.id].sort());
-    const hintRows = (files) => objects(files["hints.csv"]).map((h) => [h["User ID"], h["Challenge Ref"], h["Points Deducted"], h.Session]);
+    const hintRows = (files) => objects(files["hints.csv"]).map((h) => [h["User ID"], originOf(h["Challenge Ref"]), h["Points Deducted"], h.Session]);
     expect(hintRows(before).sort(), "CONTROL: the staff member's hint, and the removed hint-taker's")
       .toEqual([[P.staffp.id, F.hard.id, "45", B.name], [P.hintonly.id, F.hard.id, "45", B.name]].sort());
     expect(hintRows(tFiles), "after the tag: the removed hint-taker's hint alone").toEqual([[P.hintonly.id, F.hard.id, "45", B.name]]);
-    expect(objects(before["feedback.csv"]).map((x) => [x["User ID"], x["Challenge Ref"], x.Rating]), "CONTROL: their rating").toEqual([[P.staffp.id, F.med.id, "5"]]);
+    expect(objects(before["feedback.csv"]).map((x) => [x["User ID"], originOf(x["Challenge Ref"]), x.Rating]), "CONTROL: their rating").toEqual([[P.staffp.id, F.med.id, "5"]]);
     expect(objects(tFiles["feedback.csv"]), "after the tag nobody else rated").toEqual([]);
     // navigation.csv: the bounce of a participant is kept, the staff member's is not.
-    expect(objects(tFiles["navigation.csv"]).map((x) => [x["User ID"], x["Challenge Ref"], x["Navigated Away"]]), "navigation: g2's bounce")
+    expect(objects(tFiles["navigation.csv"]).map((x) => [x["User ID"], originOf(x["Challenge Ref"]), x["Navigated Away"]]), "navigation: g2's bounce")
       .toEqual([[P.g2.id, F.hard.id, "1"]]);
     expect(objects(before["navigation.csv"]).map((x) => x["User ID"]).sort(), "CONTROL: both bounces before the tag").toEqual([P.g2.id, P.staffp.id].sort());
 
@@ -420,13 +422,13 @@ test.describe("sweep #232 — the full event export, by value", () => {
     const people = objects(sFiles["participants.csv"]);
     expect(people.map((p) => [p["User ID"], p.Enrolled, p["Added Directly"]]), "the staff competitor, enrolled").toEqual([[P.staffc.id, "Yes", "Yes"]]);
     expect(people[0].Tags.split("; "), "…and labelled staff").toContain("staff");
-    expect(objects(sFiles["submissions.csv"]).map((x) => [x["User ID"], x["Challenge Ref"], x.Correct, x["Points Delta"]]), "their answer")
+    expect(objects(sFiles["submissions.csv"]).map((x) => [x["User ID"], originOf(x["Challenge Ref"]), x.Correct, x["Points Delta"]]), "their answer")
       .toEqual([[P.staffc.id, s1.id, "Yes", "50"]]);
-    expect(objects(sFiles["hints.csv"]).map((x) => [x["User ID"], x["Challenge Ref"], x["Points Deducted"]]), "their hint")
+    expect(objects(sFiles["hints.csv"]).map((x) => [x["User ID"], originOf(x["Challenge Ref"]), x["Points Deducted"]]), "their hint")
       .toEqual([[P.staffc.id, s2.id, "45"]]);
-    expect(objects(sFiles["feedback.csv"]).map((x) => [x["User ID"], x["Challenge Ref"], x.Rating]), "their rating")
+    expect(objects(sFiles["feedback.csv"]).map((x) => [x["User ID"], originOf(x["Challenge Ref"]), x.Rating]), "their rating")
       .toEqual([[P.staffc.id, s1.id, "4"]]);
-    expect(objects(sFiles["navigation.csv"]).map((x) => [x["User ID"], x["Challenge Ref"], x["Navigated Away"]]), "their bounce")
+    expect(objects(sFiles["navigation.csv"]).map((x) => [x["User ID"], originOf(x["Challenge Ref"]), x["Navigated Away"]]), "their bounce")
       .toEqual([[P.staffc.id, s2.id, "1"]]);
     expect(sortedIds(objects(sFiles["time.csv"])), "time.csv: the same set as participants.csv").toEqual([P.staffc.id]);
     // CONTROL: the switch off, the same rule keeps T's staff-tagged member out.

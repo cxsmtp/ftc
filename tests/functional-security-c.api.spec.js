@@ -3462,7 +3462,7 @@ test.describe("v6.13.18 — auditor invariants", () => {
     // point in the suite. Same throwaway-user pattern as the v6.13.17
     // block test at line 5215.
     await ensureState();
-    const med1 = S.tasks.find(t => t.title === "Challenge med1");
+    const med1 = S.liveTask("Challenge med1");
     expect(med1, "Challenge med1 in seed").toBeTruthy();
     const { api: sa, csrf: saCsrf } = await apiLogin("superadmin");
     const saJsonH = { "x-csrf-token": saCsrf, "content-type": "application/json" };
@@ -4258,7 +4258,14 @@ test.describe("v6.14.1 — participant leaderboard top-20 cap", () => {
         // never admitted by relaxing the scanner. `placementCertificates` is a
         // boolean about the EVENT (a dry run issues no certificates), naming no
         // population.
-        const allowedKeys = new Set(["ranking_enabled", "top3", "board", "me", "groupBoard", "lateBoard", "leaderboard_mode", "timeslot_id", "board_limit", "ended", "canShareBadge", "lateEntrantMe", "lateWindowOpen", "lateDeadline", "placementCertificates"]);
+        // Per-session question sets (owner decision, 27 Nov 2026): `ranking` (which
+        // boards the event ranks on, a fixed word), `percent` (a boolean: the main
+        // board ranks by percentages), `sessionName` (the caller's own session's
+        // name) and `overallBoard` (null here; when present the overall board under
+        // the main board's viewing rules: capped at `board_limit`, `me` resolved
+        // before the cap, no count). None names a population, and none matches
+        // `leakyNamePattern` below.
+        const allowedKeys = new Set(["ranking_enabled", "top3", "board", "me", "groupBoard", "lateBoard", "leaderboard_mode", "timeslot_id", "board_limit", "ended", "canShareBadge", "lateEntrantMe", "lateWindowOpen", "lateDeadline", "placementCertificates", "ranking", "percent", "overallBoard", "sessionName"]);
         const extraKeys = Object.keys(body).filter(k => !allowedKeys.has(k));
         expect(extraKeys, `unexpected key(s) in /api/leaderboard response: ${JSON.stringify(extraKeys)}. Any new top-level field must be evaluated for participant-count leakage.`).toEqual([]);
         // Defence-in-depth: recursively scan for any field whose NAME
@@ -4354,6 +4361,9 @@ test.describe("v6.14.1 — participant leaderboard top-20 cap", () => {
           "solveTimeMs", "allSolved", "rank", "isBenchmark",
           // group-board entry shape (routes/leaderboard.js strips memberCount)
           "type", "groupId", "name", "mine",
+          // an overall board ranking by percentages: the row's own share of its
+          // session's maximum (per-session question sets); never the maximum itself
+          "percent",
         ]);
         const offenders = [];
         const walkEntries = (arr, where) => {
@@ -4368,6 +4378,8 @@ test.describe("v6.14.1 — participant leaderboard top-20 cap", () => {
         walkEntries(body.me ? [body.me] : [], "me");
         walkEntries(body.groupBoard?.board, "groupBoard.board");
         walkEntries(body.groupBoard?.me ? [body.groupBoard.me] : [], "groupBoard.me");
+        walkEntries(body.overallBoard?.board, "overallBoard.board");
+        walkEntries(body.overallBoard?.me ? [body.overallBoard.me] : [], "overallBoard.me");
         expect(offenders,
           `unexpected key(s) on a participant leaderboard ENTRY: ${JSON.stringify(offenders)}. ` +
           `The participant board carries the public handle only — first/last name, company and ` +
@@ -4724,6 +4736,7 @@ test.describe("v6.16.4 — auditor invariants", () => {
         headers: saJsonH, data: { competitionIds: [compId] },
       });
       expect(assignR.ok()).toBeTruthy();
+      taskId = (await assignR.json()).copies[0].task_id;   // the event's own copy: the question the ended session freezes
       await sa.post(`/api/admin/competitions/${compId}/end-now`, { headers: saH });
       const ansR = await sa.put(`/api/admin/tasks/${taskId}`, { headers: saJsonH, data: { correct_answer: "rotated" } });
       expect(ansR.status()).toBe(409);
@@ -5639,7 +5652,8 @@ test.describe("v6.16.22 — security audit batch", () => {
       await sa.post(`/api/admin/participants/${regAdminId}/role`, { headers: saH, data: { role: "admin" } });
       // Pick an unassigned task we can lock + assign cleanly.
       const tasks = await (await sa.get("/api/admin/tasks")).json();
-      const candidate = tasks.find(t => t.status === "published" && t.title === "Challenge easy2");
+      // The library row of easy2 (each seeded event holds its own same-titled copy).
+      const candidate = tasks.find(t => t.status === "published" && t.title === "Challenge easy2" && !t.owner_competition_id);
       lockedTaskId = candidate.id;
       // Clear any pre-existing assignments on this task (test seed
       // pre-assigned easy2 to upcomingComp; unassign first so we can
@@ -5653,6 +5667,9 @@ test.describe("v6.16.22 — security audit batch", () => {
         headers: saH, data: { competitionIds: [upcomingCompId] },
       });
       expect(ar.ok()).toBeTruthy();
+      // The upcoming event holds its OWN copy (lib/event-copies.js): that is the
+      // challenge locked and unassigned below.
+      lockedTaskId = (await ar.json()).copies[0].task_id;
       // Lock it (superadmin-only).
       const lr = await sa.post(`/api/admin/tasks/${lockedTaskId}/lock`, { headers: saH, data: { locked: true } });
       expect(lr.ok()).toBeTruthy();
@@ -5699,7 +5716,8 @@ test.describe("v6.16.22 — security audit batch", () => {
     try {
       compId = S.liveComp.id;
       const tasks = await (await sa.get("/api/admin/tasks")).json();
-      taskId = tasks.find(t => t.title === "Challenge easy1").id;
+      // The live event's own copy of easy1: the question its rows name.
+      taskId = tasks.find(t => t.title === "Challenge easy1" && t.owner_competition_id === compId).id;
       userId = S.alice.id;
       const dbW = new Database(TEST_DB_PATH);
       try {

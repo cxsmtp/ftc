@@ -76,7 +76,7 @@ test.describe("sweep #501 — what a role that cannot approve sees while approva
     } finally { await setApproval(false); }
   });
 
-  test("the desk sign-up says why it is withheld, on the People button, in the workspace menu and in the palette; with approval off it opens (CONTROL)", async ({ page }) => {
+  test("the desk sign-up says why it is withheld, on the People button, in the workspace's Invite menu and in the palette; with approval off it opens (CONTROL)", async ({ page }) => {
     await setApproval(true);
     try {
       await loginViaApi(page, org.email);
@@ -99,19 +99,21 @@ test.describe("sweep #501 — what a role that cannot approve sees while approva
       await expect(pal.locator("input")).toHaveValue("desk");
       await expect(pal).not.toContainText("Sign up at the desk");
       await page.keyboard.press("Escape");
-      // The event workspace's ⋯ menu holds the reason in the item's place.
+      // The event workspace's Invite menu holds the reason in the item's place
+      // (the header's one control for adding people; owner's decision, 27 Nov
+      // 2026), beside the email invitation.
       await page.locator('button.admin-nav-item[data-tab-id="admin-competitions-tab"]').click();
       await viewComp(page, comp.name);
-      await page.locator("#ws-quick .ws-more-btn").click();
+      await page.locator("#ws-quick .ws-invite-btn").click();
       const portal = page.locator("#kebab-portal");
-      await expect(portal.locator('[data-action="comp-history"]'), "PRECONDITION: the ⋯ menu is open").toBeVisible();
+      await expect(portal.locator('[data-action="ws-invite"]'), "PRECONDITION: the Invite menu is open").toBeVisible();
       await expect(portal.locator(".kebab-note")).toContainText(REASON);
       await expect(portal.locator('[data-action="desk-invite"]')).toHaveCount(0);
       await page.keyboard.press("Escape");
     } finally { await setApproval(false); }
     // CONTROL: approval off, the same role is offered the desk sign-up in its
-    // event's ⋯ menu (a role scoped to its events uses it from inside an event),
-    // and the press opens the prompt.
+    // event's Invite menu (a role scoped to its events uses it from inside an
+    // event), and the press opens the prompt.
     await page.reload();
     await expect(page.locator("#admin-page")).toBeVisible({ timeout: 20000 });
     await page.locator('button.admin-nav-item[data-tab-id="admin-participants-tab"]').click();
@@ -127,7 +129,7 @@ test.describe("sweep #501 — what a role that cannot approve sees while approva
     await expect(pal2).toBeHidden();
     await page.locator('button.admin-nav-item[data-tab-id="admin-competitions-tab"]').click();
     await viewComp(page, comp.name);
-    await page.locator("#ws-quick .ws-more-btn").click();
+    await page.locator("#ws-quick .ws-invite-btn").click();
     const portal2 = page.locator("#kebab-portal");
     await expect(portal2.locator('[data-action="desk-invite"]'), "the item is offered").toBeVisible();
     await expect(portal2.locator(".kebab-note", { hasText: REASON })).toHaveCount(0);

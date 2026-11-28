@@ -24,9 +24,9 @@ const { expect } = require("@playwright/test");
 const { BASE, apiLogin, PARTICIPANT_PASS } = require("./helpers");
 const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin } = require("./event-admin-helpers");
 const {
-  loginViaApi, login: formLogin, adminLogin, clickTab, openKebab, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
+  loginViaApi, login: formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
   textContrast, rowMarking,
-  showEveryoneInWorkspace, narrowPeopleTable } = require("./ui-admin-helpers");
+  showEveryoneInWorkspace, narrowPeopleTable, openEventMenu, openEventEdit } = require("./ui-admin-helpers");
 
 const iso = ms => new Date(Date.now() + ms).toISOString();
 
@@ -209,7 +209,8 @@ async function buildFixture() {
     hUnsealed    = await makeTask(reader.api, reader.csrf, "hunsealed");
     agTask       = await makeTask(reader.api, reader.csrf, "agtask");
 
-    await assignTask(a1.api, a1.csrf, sealedHinted.id, [competeLive.id]);   // a sealed challenge in the compete event
+    // A sealed challenge in the compete event: the event's OWN copy (lib/event-copies.js), which every door below acts on.
+    sealedHinted = { ...sealedHinted, bankId: sealedHinted.id, id: (await assignTask(a1.api, a1.csrf, sealedHinted.id, [competeLive.id])).copies[0].task_id };
     await assignTask(a1.api, a1.csrf, endSealed.id, [endLater.id]);         // …and one in the event that will be ENDED below
     await assignTask(reader.api, reader.csrf, agTask.id, [agOff.id]);       // the capped switch-OFF event holds an unsealed one
     // ONE ATTACHMENT on the sealed challenge and one on its unrelated twin: the
@@ -223,11 +224,13 @@ async function buildFixture() {
     // version; a challenge with one version has no such row, and "no Restore
     // button" is then true of every challenge on the platform. Measured: the
     // first draft of that arm asserted against a one-row history and failed.
-    const v2 = await a1.api.put(`/api/admin/tasks/${sealedHinted.id}`, { headers: H(a1.csrf), data: { description: "<p>d2</p>" } });
+    // The LIBRARY question: its row is the one the Challenges page lists, and
+    // whose History the arms read (the event's copy keeps its own versions).
+    const v2 = await a1.api.put(`/api/admin/tasks/${sealedHinted.bankId}`, { headers: H(a1.csrf), data: { description: "<p>d2</p>" } });
     expect(v2.ok(), `author edits the sealed challenge: ${v2.status()} ${await v2.text()}`).toBeTruthy();
-    const vers = await (await a1.api.get(`/api/admin/tasks/${sealedHinted.id}/versions`)).json();
+    const vers = await (await a1.api.get(`/api/admin/tasks/${sealedHinted.bankId}/versions`)).json();
     expect((Array.isArray(vers) ? vers : vers.versions || []).length, "the sealed challenge holds at least two versions").toBeGreaterThanOrEqual(2);
-    await assignTask(reader.api, reader.csrf, cTask.id, [cUp.id]);          // an UNSEALED one on the switch-off event (c)
+    Object.assign(cTask, { bankId: cTask.id, id: (await assignTask(reader.api, reader.csrf, cTask.id, [cUp.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js): what is opened and answered there
     await assignTask(a1.api, a1.csrf, cSealed.id, [cUpSealed.id]);          // a sealed one on the (c) control
   } finally { await a1.api.dispose(); await a2.api.dispose(); }
 
@@ -256,7 +259,7 @@ async function buildFixture() {
     const pa = await apiLogin(pAuth.email, PARTICIPANT_PASS);
     try {
       aSealed = await makeTask(pa.api, pa.csrf, "asealed", { answer_sealed: true });
-      await assignTask(pa.api, pa.csrf, aSealed.id, [aUp.id]);
+      Object.assign(aSealed, { bankId: aSealed.id, id: (await assignTask(pa.api, pa.csrf, aSealed.id, [aUp.id])).copies[0].task_id });   // the event's own copy (lib/event-copies.js), which the refusals name
     } finally { await pa.api.dispose(); }
   }
   // ONE FEEDBACK ROW on the sealed challenge, left by the mate — the purge
@@ -337,7 +340,7 @@ async function buildFixture() {
   const pl = await (await reader.api.get("/api/admin/participants?limit=5000&kind=all")).json();
   const pby = id => (pl.participants || []).find(p => p.id === id);
   expect((pby(pAuth.id)?.competitions || []).some(c => c.id === aUp.id), "the author is ENROLLED in the switch-off event").toBe(true);
-  expect(((await taskRow(aSealed.id)).competitions || []).map(c => c.id), "…which holds their sealed challenge").toContain(aUp.id);
+  expect(((await taskRow(aSealed.bankId)).competitions || []).map(c => c.id), "…which holds their sealed challenge").toContain(aUp.id);
   expect(pby(legacyP.id)?.role, "legacyP was promoted").toBe("admin");
   expect(pby(legacyP.id)?.tags || [], "…and carries the staff tag the promotion adds").toContain("staff");
   expect((pby(legacyP.id)?.competitions || []).some(c => c.id === upOff.id), "…while KEEPING the switch-off row written before it").toBe(true);
@@ -387,15 +390,11 @@ async function eventRow(page, name) {
   return row;
 }
 
-/** Open the EDIT form of a named event through the row kebab. */
+/** Open the EDIT form of a named event from its workspace (⋯ → Edit settings),
+ *  Advanced open (the event's doors are its workspace's; the row menu keeps
+ *  only Delete event). */
 async function openEdit(page, name) {
-  const row = await eventRow(page, name);
-  await openKebab(page, row);
-  const edit = page.locator('#kebab-portal [data-action="comp-edit"]');
-  await expect(edit, `Edit is offered on "${name}"`).toHaveCount(1);
-  await edit.click();
-  await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 15000 });
-  await page.locator("#comp-name").waitFor({ state: "visible", timeout: 15000 });
+  await openEventEdit(page, name);
 }
 
 /** Press Save on the edit form and accept the "Update …" confirmation. */
@@ -407,12 +406,15 @@ async function saveEdit(page) {
 }
 
 /** Challenges tab, model loaded, narrowed to ONE row. */
-async function challengeRow(page, title) {
+async function challengeRow(page, title, id) {
   await clickTab(page, "Challenges");
   await expect.poll(() => page.evaluate(() => (window.adminTasksData || []).length), {
     message: "the challenge model loaded", timeout: 20000,
   }).toBeGreaterThan(0);
-  const row = (await findSeededTaskRow(page, title)).first();
+  // With an id, THAT row: the library question and each event's own copy of it
+  // (lib/event-copies.js) share a title.
+  const rows = await findSeededTaskRow(page, title);
+  const row = (id ? rows.filter({ has: page.locator(`[data-task-id="${id}"]`) }) : rows).first();
   await expect(row, `the table narrowed to "${title}"`).toBeVisible({ timeout: 15000 });
   return row;
 }
@@ -429,15 +431,10 @@ async function participantRow(page, email) {
   // NON-members (the Invite rows), so list everyone, as the old focus did. A
   // no-op outside a workspace and once pressed.
   await showEveryoneInWorkspace(page);
-  // RBAC — People lists admin accounts only with "Show admin accounts" ticked
-  // (the box exists outside a workspace, for global admins); these fixtures
-  // include admin rows.
-  const inc = page.locator("#p-include-admins");
-  if (await inc.isVisible().catch(() => false) && !(await inc.isChecked())) {
-    const reload = page.waitForResponse((r) => r.url().includes("/api/admin/participants?") && r.url().includes("kind=all"));
-    await inc.check();
-    await reload;
-  }
+  // RBAC — People lists admin accounts only after a link to one (they live on
+  // Roles & permissions; outside a workspace, for global admins); these
+  // fixtures include admin rows.
+  await require("./ui-admin-helpers").peopleWithAdminAccounts(page);
   await narrowPeopleTable(page, email);
   const row = page.locator(`#admin-participants-body tr:has-text("${email}")`).first();
   await expect(row, `the participants table narrowed to ${email}`).toBeVisible({ timeout: 15000 });
@@ -572,5 +569,5 @@ module.exports = {
   adminPanel, eventRow, openEdit, saveEdit, challengeRow, participantRow, closeKebab, focus,
   expectInactiveRow, toDarkTheme,
   H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, grantEventAdmin,
-  loginViaApi, formLogin, adminLogin, clickTab, openKebab, viewComp, filterComps, findSeededTaskRow, openCompCreateForm,
+  loginViaApi, formLogin, adminLogin, clickTab, openKebab, openAddToEventsFor, viewComp, filterComps, findSeededTaskRow, openCompCreateForm, openEventMenu,
 };

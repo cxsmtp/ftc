@@ -25,6 +25,8 @@ const { enqueueCertificateDispatch } = require("../lib/certificate-dispatch"); /
 const { reconcileCompetitionMembership } = require("../lib/group-sync");
 const { sanitiseForLog, log } = require("../lib/log");
 const { now } = require("../lib/time");
+const { taskSessionsMap, decideTaskSessions, writeTaskSessions } = require("../lib/session-tasks");   // per-session question sets
+const { isQualifyingTask } = require("../lib/qualifying");
 // batch 7 — boundary schema (lib/validate.js); one source of truth for the
 // timeslot create + edit field-shape validation (create/edit can't drift).
 const SESSION_FIELD_SCHEMA = {
@@ -544,5 +546,87 @@ module.exports = function register(app, { allParticipantsSolvedAll }) {
     enqueueCertificateDispatch(comp.id, { reason: "ended" });   // v8.15.1 — the dispatcher re-checks the full end
     const updated = getTimeslot(ts.id);
     res.json({ ok: true, timeslot: { ...updated, status: timeslotStatus(updated), effective_end: timeslotEffectiveEnd(updated)?.toISOString() || null } });
+  });
+
+  // ── PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026) ─────────────────
+  //
+  // "Each session can hold a different question set." A Competition's question
+  // is in every session unless it is narrowed to chosen ones (lib/session-tasks.js).
+  // The workspace's Questions section reads the event's choices here and changes
+  // one question's at a time below.
+  app.get("/api/admin/competitions/:id/task-sessions", requireAdmin, (req, res) => {
+    const comp = getCompetition(req.params.id);
+    if (!comp) return res.status(404).json({ error: "Event not found" });
+    const denied = competitionDenied(req, comp.id);
+    if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
+    const slots = getCompetitionTimeslots(comp.id);
+    res.json({
+      ok: true,
+      // Offered only where it can be used: a kind that runs sessions, with two or more.
+      offered: eventPolicy(comp).sessions === "many" && slots.length >= 2,
+      timeslots: slots.map(ts => ({ id: ts.id, name: ts.name, start_time: ts.start_time, status: timeslotStatus(ts) })),
+      tasks: Object.fromEntries(taskSessionsMap(db, comp.id)),
+    });
+  });
+
+  // One question's sessions: `timeslotIds` an array of this event's session ids,
+  // or null for every session. `expectedTimeslotIds` (optional, the same shape)
+  // is the set the dialog was drawn from: a change made meanwhile answers 409.
+  app.put("/api/admin/competitions/:id/tasks/:taskId/sessions", requireAdmin, csrfProtection, (req, res) => {
+    const comp = getCompetition(req.params.id);
+    if (!comp) return res.status(404).json({ error: "Event not found" });
+    // An assignment door: the competitor lock first, then scope (CLAUDE.md, Staff can compete).
+    { const _cmp = refuseCompetitor(res, competitorEditDenied(db, competitorIds(req), comp.id)); if (_cmp) return _cmp; }
+    const denied = competitionDenied(req, comp.id);
+    if (denied) return res.status(403).json({ error: denied.message, code: denied.code });
+    const taskId = String(req.params.taskId);
+    const task = db.prepare(
+      "SELECT t.id, t.title FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=? AND ct.task_id=?"
+    ).get(comp.id, taskId);
+    if (!task) return res.status(404).json({ error: "This question is not in this event.", code: "task_not_in_event" });
+    const idList = (v) => v === null || (Array.isArray(v) && v.length <= BULK_ADMIN_MAX && v.every(x => typeof x === "string" && x.length > 0 && x.length <= 64));
+    const requested = req.body?.timeslotIds;
+    if (requested === undefined || !idList(requested)) {
+      return res.status(400).json({ error: "timeslotIds must be a list of this event's session ids, or null for every session.", code: "task_sessions_invalid" });
+    }
+    const expected = req.body?.expectedTimeslotIds;
+    if (expected !== undefined && !idList(expected)) {
+      return res.status(400).json({ error: "expectedTimeslotIds must be a list of session ids, or null.", code: "task_sessions_invalid" });
+    }
+    const adminId = getAdminIdentity(req);
+    const ctx = reqContext(req);
+    const sameSet = (a, b) => {
+      const x = a && a.length ? [...a].sort() : null, y = b && b.length ? [...b].sort() : null;
+      return x === null || y === null ? x === y : x.join(",") === y.join(",");
+    };
+    let out = null;
+    const txn = db.transaction(() => {
+      // Decided inside the write, on fresh rows: a session that started, or a
+      // choice somebody else made, since the dialog was drawn is honoured here.
+      const slots = getCompetitionTimeslots(comp.id);
+      const current = taskSessionsMap(db, comp.id).get(task.id) || null;
+      if (expected !== undefined) {
+        const all = slots.map(x => x.id);
+        const norm = (v) => (v === null || (v.length === all.length && all.every(id => v.includes(id))) ? null : v);
+        if (!sameSet(norm(expected), current)) {
+          out = { status: 409, body: { error: "Someone changed this question's sessions since you opened it. Close the dialog and open it again to see the current choice.", code: "task_sessions_changed" } };
+          return;
+        }
+      }
+      const d = decideTaskSessions({ comp, slots, isQualifying: isQualifyingTask(db, task.id), current, requested, slotStatus: timeslotStatus });
+      if (d.refusal) { out = { status: d.refusal.status, body: { error: d.refusal.error, code: d.refusal.code } }; return; }
+      if (sameSet(d.next, d.before)) { out = { status: 200, body: { ok: true, changed: false, timeslotIds: d.next } }; return; }
+      writeTaskSessions(db, comp.id, task.id, d.next);
+      const names = (ids) => (ids === null ? "every session" : ids.map(id => (slots.find(x => x.id === id) || {}).name || id));
+      recordCompetitionEvent(comp.id, "task_sessions_changed", adminId, {
+        task_id: task.id, task_title: task.title, from: names(d.before), to: names(d.next), ...ctx,
+      });
+      out = { status: 200, body: { ok: true, changed: true, timeslotIds: d.next } };
+    });
+    runTxnWithMirrorBuffer(() => txn.immediate());
+    // A participant's set decides their finish and, on a percentage board, their
+    // maximum: the boards rebuild after the commit.
+    if (out && out.body && out.body.changed) invalidateLeaderboardCache(comp.id);
+    res.status(out.status).json(out.body);
   });
 };

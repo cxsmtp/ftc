@@ -252,14 +252,14 @@ test("the allowed-domain list's Save is hidden from an administrator who cannot 
     await ap.goto("/");
     await expect(ap.locator("#admin-page")).toBeVisible({ timeout: 20000 });
     await ap.locator('.admin-nav-item[data-tab-id="admin-settings-tab"]').click();
-    await openSettingsSection(ap, "email");
+    await openSettingsSection(ap, "general");   // the team report domains are under General (owner decision, 27 Nov 2026)
     await expect(ap.locator("#team-domains-note")).toHaveText("Only a superadmin changes this list.", { timeout: 15000 });
     await expect(ap.locator("#team-domains-save"), "the Save its PUT refuses is not on screen").toBeHidden();
   } finally { await ctx.close(); }
   // CONTROL: a superadmin's Save is there.
   await adminLogin(page);
   await page.locator('.admin-nav-item[data-tab-id="admin-settings-tab"]').click();
-  await openSettingsSection(page, "email");
+  await openSettingsSection(page, "general");
   await expect(page.locator("#team-domains-save")).toBeVisible({ timeout: 15000 });
 });
 

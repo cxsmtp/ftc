@@ -20,7 +20,7 @@
 // Every fixture is the test's own; each value asserted is one only the fix gives.
 const { test, expect } = require("./isolated-test");
 const { apiLogin, TEST_DB_PATH } = require("./helpers");
-const { H, uniq, makeCompetition, makeTask, assignTask, buildWorld } = require("./event-admin-helpers");
+const { H, uniq, makeCompetition, makeTask, assignTask, buildWorld, originsHeldBy } = require("./event-admin-helpers");
 const Database = require("better-sqlite3");
 
 const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
@@ -197,7 +197,7 @@ test.describe("Qualifying questions are per-event copies", () => {
     expect(copyQ.length, "the copy has four qualifying questions of its own").toBe(4);
     expect(copyQ.filter(id => srcQ.includes(id)), "none shared with the source").toEqual([]);
     expect(b.qualifying_questions).toBe(4);
-    expect(dbGet("SELECT 1 x FROM competition_tasks WHERE competition_id=? AND task_id=?", b.competition.id, plain.id), "CONTROL: an ordinary challenge is copied").toBeTruthy();
+    expect(originsHeldBy(b.competition.id), "CONTROL: an ordinary challenge is copied (as the new event's own copy of it)").toContain(plain.id);
     expect(b.skipped_challenges, "the replaced built-ins are not reported; the custom one is").toEqual([{ task_id: own.id, title: own.title, reason: "qualifying" }]);
   });
 
@@ -218,7 +218,7 @@ test.describe("Qualifying questions are per-event copies", () => {
     expect(qualifyingIds(b.competition.id), "no built-in questions the source never had").toEqual([]);
     expect(b.qualifying_questions).toBe(0);
     expect(b.skipped_challenges, "the organiser's own question is named as left out").toEqual([{ task_id: own.id, title: own.title, reason: "qualifying" }]);
-    expect(dbGet("SELECT 1 x FROM competition_tasks WHERE competition_id=? AND task_id=?", b.competition.id, plain.id), "CONTROL: the ordinary challenge is copied").toBeTruthy();
+    expect(originsHeldBy(b.competition.id), "CONTROL: the ordinary challenge is copied (as the new event's own copy of it)").toContain(plain.id);
   });
 
   test("a clone of an event holding ONE built-in question, reworded, gets every built-in one, fresh and in its default wording", async () => {
@@ -286,7 +286,7 @@ test.describe("Qualifying questions are per-event copies", () => {
     const b2 = await sp2.json();
     expect(qualifyingIds(b2.competition.id), "nothing shared without the tick").toEqual([]);
     expect(b2.skipped_challenges.map(x => [x.task_id, x.reason]), "and the left-out row is named").toEqual([[srcQ[0], "qualifying"]]);
-    expect(dbGet("SELECT 1 x FROM competition_tasks WHERE competition_id=? AND task_id=?", b2.competition.id, plain.id), "CONTROL: the ordinary challenge comes with it").toBeTruthy();
+    expect(originsHeldBy(b2.competition.id), "CONTROL: the ordinary challenge comes with it (as the new event's own copy of it)").toContain(plain.id);
   });
 });
 

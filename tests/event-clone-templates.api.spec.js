@@ -19,7 +19,7 @@
 //     against the real db.js in a throwaway data directory.
 const { test, expect } = require("./isolated-test");
 const { apiLogin, PARTICIPANT_PASS, TEST_DB_PATH } = require("./helpers");
-const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, buildWorld } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeCompetition, makeTask, assignTask, enrol, buildWorld, eventCopyOf, originsHeldBy } = require("./event-admin-helpers");
 const Database = require("better-sqlite3");
 const fs = require("fs");
 const os = require("os");
@@ -107,9 +107,13 @@ test.describe("v8.15.0 — Clone event", () => {
       expect(db.prepare("SELECT COUNT(*) n FROM competition_users WHERE competition_id=?").get(cid).n, "no participants").toBe(0);
       expect(db.prepare("SELECT COUNT(*) n FROM submissions WHERE competition_id=?").get(src.id).n).toBeGreaterThan(0);
       expect(db.prepare("SELECT COUNT(*) n FROM submissions WHERE competition_id=?").get(cid).n, "no submissions").toBe(0);
-      // Same challenges.
+      // Same challenges, each the clone's OWN fresh copy (lib/event-copies.js):
+      // copied from the same bank questions, never the source's rows.
       const ids = (x) => db.prepare("SELECT task_id FROM competition_tasks WHERE competition_id=? ORDER BY task_id").all(x).map(r => r.task_id);
-      expect(ids(cid)).toEqual(ids(src.id));
+      expect(originsHeldBy(cid)).toEqual(originsHeldBy(src.id));
+      expect(originsHeldBy(cid)).toEqual([t1.id, t2.id].sort());
+      expect(ids(cid).filter(x => ids(src.id).includes(x)), "no question is shared with the source").toEqual([]);
+      for (const x of ids(cid)) expect(db.prepare("SELECT owner_competition_id FROM tasks WHERE id=?").get(x).owner_competition_id, "owned by the clone").toBe(cid);
       // Tags.
       expect(db.prepare("SELECT tag FROM competition_tags WHERE competition_id=?").all(cid).map(r => r.tag)).toContain("clonetag");
       // Sessions re-based: the first one at the NEW start, the others keeping
@@ -153,7 +157,8 @@ test.describe("v8.15.0 — Clone event", () => {
     expect(b.forced_settings, "group board is allowed for a booth, so it is NOT forced").not.toContain("group_leaderboard_enabled");
     expect(b.sessions_copied).toBe(0);
     expect(b.assigned_challenges).toBe(1);
-    expect(b.skipped_challenges.map(s => [s.task_id, s.reason])).toEqual([[file.id, "unfit"]]);
+    // The clone judges the SOURCE event's own copy of each question.
+    expect(b.skipped_challenges.map(s => [s.task_id, s.reason])).toEqual([[eventCopyOf(file.id, src.id), "unfit"]]);
     const db = ro();
     try {
       const c = db.prepare("SELECT * FROM competitions WHERE id=?").get(b.competition.id);
@@ -232,9 +237,13 @@ test.describe("v8.15.0 — Event templates", () => {
     const list = (await r.json()).templates;
     const built = list.filter(t => t.is_builtin);
     expect(built.map(t => [t.name, t.event_kind]).sort()).toEqual([
-      ["Booth quick-spin", "booth"], ["Learning Program (30 days)", "program"], ["Tournament (2 h)", "tournament"],
+      ["Booth day (8 hours)", "booth"], ["Competition (several sessions)", "tournament"], ["Learning program (30 days)", "program"],
     ]);
     for (const t of built) expect(t.task_ids, `${t.name} carries no challenges`).toEqual([]);
+    // The booth's recommended setup runs a full conference day with its join link open.
+    expect(built.find(t => t.event_kind === "booth").settings).toEqual({ duration_minutes: 480, self_enroll_enabled: true });
+    expect(built.find(t => t.event_kind === "tournament").settings).toEqual({ duration_minutes: 120 });
+    expect(built.find(t => t.event_kind === "program").settings).toEqual({ duration_minutes: 43200 });
   });
 
   test("the built-ins are seeded once: a deleted one does not come back at the next boot", () => {
@@ -251,7 +260,7 @@ test.describe("v8.15.0 — Event templates", () => {
       try {
         expect(db.prepare("SELECT COUNT(*) n FROM event_templates WHERE is_builtin=1").get().n).toBe(3);
         expect(db.prepare("SELECT value FROM settings WHERE key='event_templates_seeded_at'").get(), "the marker is armed").toBeTruthy();
-        db.prepare("DELETE FROM event_templates WHERE name='Tournament (2 h)'").run();
+        db.prepare("DELETE FROM event_templates WHERE builtin_key='tournament-2h'").run();
       } finally { db.close(); }
       const second = run();
       expect(second.status, second.stderr).toBe(0);
@@ -332,7 +341,7 @@ test.describe("v8.15.0 — Event templates", () => {
       // matrix reaches the spawned event.
       expect(JSON.parse(row.registration_field_policy).city, "the template's sign-up matrix is carried").toBe("required");
       expect(db.prepare("SELECT tag FROM competition_tags WHERE competition_id=?").all(row.id).map(r => r.tag)).toEqual(["tpltag"]);
-      expect(db.prepare("SELECT task_id FROM competition_tasks WHERE competition_id=?").all(row.id).map(r => r.task_id)).toEqual([t.id]);
+      expect(originsHeldBy(row.id), "the spawned event holds its own copy of the template's question").toEqual([t.id]);
       const d = JSON.parse(db.prepare("SELECT details FROM competition_events WHERE competition_id=? AND event_type='created'").get(row.id).details);
       expect(d.via).toBe("template");
       expect(d.template_id).toBe(tpl.id);
@@ -598,7 +607,8 @@ test.describe("sweep #63 — the challenges of an event you compete in stay out 
     expect(pr.ok(), await pr.text()).toBeTruthy();
     return u;
   };
-  const tasksOf = (compId) => { const db = ro(); try { return db.prepare("SELECT task_id FROM competition_tasks WHERE competition_id=? ORDER BY task_id").all(compId).map(r => r.task_id); } finally { db.close(); } };
+  // The questions an event holds, named by the bank question each was copied from.
+  const tasksOf = (compId) => originsHeldBy(compId);
   const tplNamed = (name) => { const db = ro(); try { return db.prepare("SELECT * FROM event_templates WHERE name=?").get(name); } finally { db.close(); } };
 
   test.beforeAll(async () => {
@@ -675,7 +685,8 @@ test.describe("sweep #63 — the challenges of an event you compete in stay out 
       const clone = await cl.api.post(`/api/admin/competitions/${S.id}/clone`, { headers: H(cl.csrf), data: { name: `${name} clone` } });
       expect(clone.status(), await clone.text()).toBe(200);
       const cb = await clone.json();
-      expect(cb.skipped_challenges.map(x => [x.task_id, x.reason])).toEqual([[T.id, "competing"]]);
+      // A clone judges the source event's own copy (lib/event-copies.js).
+      expect(cb.skipped_challenges.map(x => [x.task_id, x.reason])).toEqual([[eventCopyOf(T.id, S.id), "competing"]]);
       expect(tasksOf(cb.competition.id)).toEqual([U.id]);
       // CONTROLS: the non-competing admin's spawn and the superadmin's clone carry both.
       const bsp = await bl.api.post(`/api/admin/event-templates/${tpl.id}/spawn`, { headers: H(bl.csrf), data: { name: `${name} spawn by` } });

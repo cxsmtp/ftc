@@ -504,9 +504,9 @@ test.describe("v8.1.0 — the kind surfaces", () => {
     // read the three words.
     await page.click('[data-action="open-competition-form"]');
     await page.locator('#tpl-kind-cards [data-action="new-event-start"]').first().waitFor({ state: "visible", timeout: 10000 });
-    const cards = await page.locator('#tpl-kind-cards [data-action="new-event-start"] .tpl-kind-title').allTextContents();
+    const cards = await page.locator('#tpl-kind-cards .tpl-kind:has([data-action="new-event-start"]) .tpl-kind-title').allTextContents();
     expect(cards).toEqual(["Booth Event", "Competition", "Program"]);
-    expect(await page.locator('#tpl-kind-cards [data-action="new-event-start"]:has(.tpl-kind-default)').getAttribute("data-kind"),
+    expect(await page.locator('#tpl-kind-cards .tpl-kind:has(.tpl-kind-default)').getAttribute("data-kind"),
       "the default is the kind every existing event already is").toBe("tournament");
     expect(await page.locator("#tpl-kind-cards .tpl-kind-default").count(),
       "exactly one starter is marked as the usual answer").toBe(1);

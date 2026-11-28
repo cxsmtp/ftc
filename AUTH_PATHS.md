@@ -66,7 +66,7 @@ stored). A tombstone that cannot be read refuses at commit (fail closed).
 | `role` | `participant` / `event_admin` / `admin` / `superadmin`, or a custom role. `event_admin` is an admin TIER; which events it may act on is `competition_admins`. The role's class also decides the default sign-in method (`login_method` above). Matrix: `ROLES_AND_PERMISSIONS.md` | every account sign-in (code or password, through `_signInAs`) sets the session's admin flags from the role; admin tiers get `missing_fields: []` |
 | `self_enroll_grace_until` | the 48 h verification grace, stamped by a DESK-code redemption on an unverified account | §6 |
 | `linkedin_sub` / `linkedin_last_callback_key` | **legacy, unused** — the removed LinkedIn sign-in's identity binding. Kept so no row changes; `registered_via='linkedin'` rows keep their reaper exemption | — |
-| `first_verified_at` | stamped when an account first becomes verified, never cleared (`COALESCE`). Write sites include `/verify`, `/confirm-email`, admin force-verify, an EMAILED code redemption, the sign-up a redeemed proof completes (paths A and B), the participant import, desk-invite and Users & roles Add user | exempts the row from the unverified-account reaper (§4b) |
+| `first_verified_at` | stamped when an account first becomes verified, never cleared (`COALESCE`). Write sites include `/verify`, `/confirm-email`, admin force-verify, an EMAILED code redemption, the sign-up a redeemed proof completes (paths A and B), the participant import, desk-invite and Roles & permissions Add user | exempts the row from the unverified-account reaper (§4b) |
 
 **Single source of truth for the grace classifier:** `verificationGraceState(user)`
 (`lib/self-enroll.js`, pure) — consumed by `requireParticipant` (`lib/middleware.js`),
@@ -326,7 +326,7 @@ card's "Have an event code?" dialog, whose one button continues to the email ste
   carried verbatim; `registration_competition_id`, `password_set_at` and `login_method`
   are not (none is in the export), so a CREATED account signs in by its role's default
   method and an overwritten one keeps its own.
-- **Add user** (Users & roles, `POST /api/admin/users`, `users.manage`) — creates a NEW
+- **Add user** (Roles & permissions, `POST /api/admin/users`, `users.manage`) — creates a NEW
   account with an admin role: **V=1, A=1**, `registered_via='manual'`,
   `password_hash = NO_PASSWORD_HASH`, `login_method` NULL. With an unscoped admin role the
   method therefore defaults to `password` with none set: the first sign-in is by emailed
@@ -773,7 +773,7 @@ unverified is never reaped.
 
 **Who the verification machinery still serves (operator ruling, 14 Nov 2026).** Every door
 that creates an account today — a sign-up with an emailed code, an invitation, the desk,
-Users & roles — creates it verified. So the verification link (`/verify`), the 48 h grace
+Roles & permissions — creates it verified. So the verification link (`/verify`), the 48 h grace
 (§6) and the "Verify email" chip with its resend act on two kinds of account only: ones
 still unverified from before email first, and ones a participant import marks unverified
 (`verified: 0`, kept so an operator can force re-verification); the reaper acts on those of
@@ -787,7 +787,7 @@ into the unverified state reworked.
   verify, `POST /confirm-email`, and an **EMAILED sign-in-code redemption**; plus the
   participant-import overwrite. Four more paths stamp it at **creation** rather than on a
   transition (the sign-up a redeemed proof completes, the import INSERT of a row marked
-  verified or carrying the stamp, desk-invite and Users & roles Add user). See §1 for the full write-site list. It is
+  verified or carrying the stamp, desk-invite and Roles & permissions Add user). See §1 for the full write-site list. It is
   **never cleared**. The reaper only deletes rows where it is
   **NULL**, so a once-verified account (even one later set `verified=0` by a participant import
   overwrite forcing re-verification)
@@ -1034,7 +1034,7 @@ about their account. EMAIL_RULES.md §7 lists every reason.
 - **Corporate-email rule:** enforced on every registration write path that creates an
   account from a submitted form via `isFreeEmail`, with **five** exceptions: an admin
   `invitationId` (and the profile gate re-imposes `corporate_email`), the participant
-  import, a superadmin's participant edit, Users & roles Add user (an admin account may
+  import, a superadmin's participant edit, Roles & permissions Add user (an admin account may
   use a personal address: operator ruling, 24 Nov 2026; §2 F), the last three audited
   `bypassed_free_email_rule`, and `POST /api/admin/perf/bulk-seed-users` (perf tooling).
   An EXISTING address on a registration form skips it because nothing is created.
@@ -1072,7 +1072,7 @@ about their account. EMAIL_RULES.md §7 lists every reason.
 | the built-in superadmin's `POST /api/login`, the SPA-shell paths, the credential body cap (`_AUTH_PATHS`) | `server.js` |
 | the break-glass username (`getBreakglassUsername`, `validateBreakglassUsername`, `breakglassNameHeldByAccount`) | `lib/settings.js` |
 | admin lifecycle (verify / approve / deny / block / unlock / role), **Email sign-in code, the desk reveal and the at-desk invite** | `routes/participants.js` |
-| Users & roles: Add user (primary only; a secondary refused `email_is_secondary`) | `routes/users.js` |
+| Roles & permissions: Add user (primary only; a secondary refused `email_is_secondary`) | `routes/users.js` |
 | invitations (an existing account by primary; a secondary refused by name) | `routes/invitations.js` |
 | the kicker's context and its method-dependent advice (`kickerContext`) | `lib/sessions.js`, `public/js/features/session-monitor.js` |
 | `/api/me`, `PUT /api/me`, `select-competition`, `session-status` / `keepalive`, impersonation exit | `routes/participant.js` |

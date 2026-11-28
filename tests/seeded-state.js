@@ -35,8 +35,13 @@ function makeState() {
     S.endedComp = comps.find(c => c.name === "Test Ended");
     const tasks = await (await api.get("/api/admin/tasks")).json();
     S.tasks = tasks;
-    S.easy1 = tasks.find(t => t.title === "Challenge easy1");
-    S.draft1 = tasks.find(t => t.title === "Challenge draft1");
+    // The library rows: each seeded event holds its own same-titled copy (lib/event-copies.js).
+    S.easy1 = tasks.find(t => t.title === "Challenge easy1" && !t.owner_competition_id);
+    S.draft1 = tasks.find(t => t.title === "Challenge draft1" && !t.owner_competition_id);
+    // The question a seeded EVENT holds under a seeded title: that event's own copy.
+    // What its participants answer, buy hints on and are numbered by.
+    S.copyIn = (comp, title) => tasks.find(t => t.title === title && t.owner_competition_id === comp.id);
+    S.liveTask = (title) => S.copyIn(S.liveComp, title);
     const parts = (await (await api.get("/api/admin/participants?limit=200")).json()).participants;
     S.alice = parts.find(p => p.email === "alice@acme.com");
     S.bob = parts.find(p => p.email === "bob@acme.com");

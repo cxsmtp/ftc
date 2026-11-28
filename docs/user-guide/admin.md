@@ -68,11 +68,11 @@ box that reaches everything you may do. Type a few letters; the results come in
 four groups:
 
 - **Go to** — every page in your sidebar and, inside an event, that event's
-  sections (Overview, Participants, Challenges, Rankings and the rest);
-- **Actions** — what you can do from here: **New event**, **New challenge**,
+  sections (Overview, Participants, Questions, Rankings and the rest);
+- **Actions** — what you can do from here: **New event**, **New question**,
   **Invite people**, **Sign up at the desk**, **New template** and the exports,
-  and inside an event the doors of its **⋯** menu (Add challenges, Clone,
-  Export everything, Join-link settings, Edit settings, History, …). Only what
+  and inside an event its **Invite** choices and the doors of its **⋯** menu
+  (Clone, Export everything, Join-link settings, Edit settings, History, …). Only what
   your role may use is listed. The irreversible doors — **End now**, **Close
   late entries now**, **Delete** — stay in the **⋯** menu, behind their confirm;
 - **Events** — any event by name, which opens its workspace;
@@ -118,7 +118,7 @@ view where nothing loads, and you stay in the admin panel until you do.
 
 This shows you the participant experience *as yourself*. To see the platform
 through one **specific** participant's eyes — their events, their
-challenges, their score — use
+questions, their score — use
 [Impersonating a participant](#impersonating-a-participant) instead.
 
 All the tabs of one browser share one session, so the switch applies to all of
@@ -148,8 +148,8 @@ else that is yours rather than theirs.
 
 ### Tables: columns, sorting and filtering
 
-Every admin table (Events, Challenges, Participants, Groups, Live rankings,
-Analytics, Activity, Audit, Logs, Users & roles, the tables in
+Every admin table (Events, Questions, Participants, Groups, Live rankings,
+Analytics, Activity, Audit, Logs, Roles & permissions, the tables in
 **Team & reports**, issued certificates and the Checkmarx One removals list)
 fits the window without scrolling sideways. Each shows a small default
 set of columns; **Columns** above the table adds or removes any of the others,
@@ -161,7 +161,7 @@ keeps its own search, sorting and pages.
 Every column heading has a small filter button beside its name. It opens
 **Sort ascending** / **Sort descending** and a filter that fits the column: a
 text box ("contains"), a list of the values in it, or a date range. Clicking the
-heading's name still sorts as before. On Events, Challenges, Participants,
+heading's name still sorts as before. On Events, Questions, Participants,
 Analytics and Live rankings a filter narrows the whole list before it is paged
 (on a rankings board, before its top 50), and on Participants, Analytics and
 Live rankings **Export CSV** follows it too; on the other tables it narrows
@@ -173,7 +173,7 @@ narrowed they reorder the page in front of you, as clicking the heading does
 there, and ask the server nothing. Either way the pager says whether every
 match was ranked. The Events list keeps
 its usual order (live first, then upcoming, then ended, latest finish first)
-until you choose a heading; Duration, Tags, Challenges and Sessions are under
+until you choose a heading; Duration, Tags, Questions and Sessions are under
 **Columns** there, and Session is under **Columns** on Activity. On Logs, First,
 Last and Groups are under **Columns**, and switching between the audit and
 request logs clears the heading filters. **Clear column filters** removes them
@@ -207,7 +207,7 @@ a chip you can press to remove; **Clear all** in the panel removes them all. The
 panel stays open or closed as you left it in this browser. On a phone it opens
 as a sheet over the page, only when you press **Filters**: **Done** or **Esc**
 closes it and you are back on the **Filters** button. The People page and
-the Challenge library use the same **Filters** button.
+the Question bank use the same **Filters** button.
 
 **The list opens showing live, upcoming and late-entry events.** The **Ended**
 filter starts switched off, so a finished event is not missing — turn on
@@ -237,12 +237,13 @@ it instead, and click again to reverse.
 From here you can:
 - Create an event and its sessions.
 - Edit an event's name, start time, and duration.
-- **Mark an event as a test / dry run** — tick **"Mark as test / dry run"**
-  near the bottom of the event create/edit dialog.
-  These are left out of Analytics by default and cannot mint achievement badges
-  — use them for rehearsals and test runs. They are flagged with a yellow edge
-  and a **test/dry run** badge wherever they appear. This is backed by the
-  built-in **test/dry run** tag, so you can also add or remove it directly.
+- **Mark an event as a dry run** — tick **Dry run** under **Advanced settings**
+  on the event form. These are left out of Analytics by default and cannot mint
+  achievement badges — use them for rehearsals and test runs. They are flagged
+  with a yellow edge and a **test/dry run** badge wherever they appear. The box
+  *is* the built-in **test/dry run** tag: ticking it adds the tag, and removing
+  the tag anywhere (the × on the Events list) unticks it, so you can also add or
+  remove it directly.
 - **Tag events** — tags show as searchable badges (the **test/dry run**
   tag above is the built-in one).
 - **Let staff compete** — tick **Staff can compete** on the event form and
@@ -253,8 +254,11 @@ From here you can:
   dialog has a **CxOne Integration** section where you can:
   - tick **"Don't create CxOne accounts for this event"** to skip CxOne
     (Checkmarx One) account provisioning for that event entirely. Where
-    it starts depends on the event type — already ticked for a Booth Event and a
-    Program, unticked for a Competition — and you can toggle it any time.
+    it starts depends on the event type — already ticked for a Program,
+    unticked for a Competition — and you can toggle it any time. A **Booth
+    Event never creates Checkmarx One accounts** (its walk-ups do not use the
+    product), so its form has no CxOne section at all, and changing an event
+    to a Booth Event turns its accounts off.
     Ticking it also stops any account still being set up for this event at
     that moment — as does removing that participant from the event — while
     accounts already created in Checkmarx One are not removed; and
@@ -295,7 +299,8 @@ From here you can:
 - **Top 3** — on an ended, ranked event, this button beside **Open**
   downloads a ZIP of the issued 1st, 2nd and 3rd place certificates (a top-three
   place earns one only with points above zero) of every leaderboard the event has: one top three per session when each session is
-  ranked on its own (each session's files in a folder named after it), and the
+  ranked on its own (each session's files in a folder named after it), the
+  overall board's in `overall` when the event ranks both, and the
   late entrants' own top three beside the main one (in `late-entrants`). Each
   file is named after its place and its holder, as the certificate prints the
   name (for example `1-josé-garcía-certificate.pdf`), so you can tell whose it
@@ -307,26 +312,15 @@ From here you can:
   of handing you an empty file. A ZIP that leaves out a place still waiting for
   its certificate says how many are missing and why, and a certificate revoked
   while the file is being prepared is left out, and the message says so.
-- The three-dot menu carries the rest of a row's actions: **Edit**, **History**,
-  **Organisers** (see [Making somebody an event
-  admin](#making-somebody-an-event-admin)), **Email Delivery** (see [Email
-  delivery](#email-delivery)), **Export Activity (CSV)** (see [Export challenge
-  activity](#export-challenge-activity)), **Assign Challenges**, **Manage
-  Participants** (opens this event's workspace on its Participants section, with
-  everyone listed, ready to invite or remove people), **Join Link** (see [Self-enrollment
-  links](#self-enrollment-links)), **Close late entries now** (see [Closing late
-  entries early](#closing-late-entries-early)), **Start Now** (see [Starting an
-  event early](#starting-an-event-early)) and **End Now**. Which of them appear
-  depends on where the event is in its life: Assign Challenges only until it
-  ends, Manage Participants and Join Link until it ends too — except on a Booth
-  Event still taking late entries, where both stay until late entry closes (see
-  [Late entries](#late-entries)) — Close late entries now only on such an event,
-  Export Activity only once it is live or ended, Start Now only on an upcoming
-  single-session event, End Now only while it is live, and Edit only until the
-  end time has passed (after that, only a superadmin). **Delete** is there too,
-  for a superadmin. And if you are enrolled in the event yourself, on an event
-  that lets staff compete, the menu withholds everything that would change it —
-  see [The competitor lock](#the-competitor-lock).
+- The three-dot menu holds **Delete event** (a superadmin, or a role given it),
+  for tidying the list without opening each event. Everything else you do to an
+  event — editing it, its history, email delivery, the activity export, adding
+  questions, its participants, the join link, starting, ending and closing late
+  entries — is in the event's workspace (**Open**): see [The event
+  workspace](#the-event-workspace). A row with nothing to offer you has no ⋮.
+  If you are enrolled in the event yourself, on an event that lets staff
+  compete, the menu says so instead of offering Delete — see [The competitor
+  lock](#the-competitor-lock).
 
 ### Email delivery
 
@@ -350,7 +344,7 @@ want these numbers is the night before, while people are still registering.
 An event's **Team & reports** section names the people its reports go to: one or
 more Solutions Engineers, Marketing, Sales and SDRs, plus an SE, Marketing and
 Sales manager. They need no account; a name and an address are enough, and the
-address must be at a domain a superadmin allowed under **Settings**, **Email**.
+address must be at a domain a superadmin allowed under **Settings**, **General**.
 You can change the team of any event, and an event admin of their own events;
 nobody competing in the event can. A team member is emailed participants' details,
 so a custom role adds members and uses **Send now** only if it may also see
@@ -359,33 +353,41 @@ file, export data); otherwise the section says why in place of the control. Only
 a member whose address is an account able to open this event (an administrator,
 or one of its organisers) gets each email's button; everyone else is told the
 next step in words they can act on (Marketing to load the attached file into the
-CRM, an SE to ask you to edit a challenge), with no link to a page they could not
+CRM, an SE to ask you to edit a question), with no link to a page they could not
 open. Set an optional lead target and hot-lead target beside them.
+
+**Add a staff team** (below the add form) adds a whole [staff
+team](#staff-teams) at once: pick the team and either each member's default role
+or one role for everyone. Each member is added under the same rules as adding one
+person (an allowed domain, a role your role may add, nobody twice in the same
+role), and the dialog then lists who was added and who was skipped, with the
+reason. It is offered to anyone who may add one person and also see the staff
+teams, so an event admin adds people one at a time.
 
 ![The Team & reports section of an event](../screenshots/admin/70-workspace-team-reports.png)
 
 **Qualifying questions.** A Booth Event gets four by default, from the
 **Add the qualifying questions** tick when you create it, from a template too
 (off for the other types, but available; an event where staff compete asks none,
-because it holds sealed challenges only and a qualifying question can never be
+because it holds sealed questions only and a qualifying question can never be
 sealed): team size, current scanner, evaluation timeline, and
-whether they want a follow-up. They are ordinary challenges you can edit or remove
-for this event. Tagging a challenge `qualifying:<key>` makes it one too, as long
+whether they want a follow-up. They are ordinary questions you can edit or remove
+for this event. Tagging a question `qualifying:<key>` makes it one too, as long
 as it is a pick-one question (**Any answer**, with two or more options), like the
 four built-in ones: the event team's reports read which option each person picked,
-so the tag is refused on any other kind of challenge, and so is a change that
-would turn a qualifying question into one. A qualifying challenge scores nothing (the exports list it at 0
+so the tag is refused on any other kind of question, and so is a change that
+would turn a qualifying question into one. A qualifying question scores nothing (the exports list it at 0
 points) and never counts toward finishing, ranking or a Program's completion, so
 answering one never ends an event, and adding or removing that tag (or restoring
-a version of the challenge that does) re-scores at once the answers already
-given in every event using the challenge — with the tag they earn nothing and
+a version of the question that does) re-scores at once the answers already
+given in every event using the question — with the tag they earn nothing and
 its hint costs nothing; without it they earn the difficulty's points, a wrong
 answer costs its penalty and the hint its price, and whether an answer was right
 never changes — and each event whose scores moved records **Scores
 recalculated** on its **History**. The change is refused once one of those events has ended a
-session, and while the challenge is locked (unlock it first; any other tag can
+session, and while the question is locked (unlock it first; any other tag can
 still be added): an event admin can do it only to
-a challenge of their own that no other organiser's event uses, as with changing
+a question of their own that no other organiser's event uses, as with changing
 its answer or difficulty. Participants see them last,
 in a fixed order (developers, scanner, evaluating, follow-up, then your own),
 numbered 4.01, 4.02 and so on, as a **Quick question**: no difficulty, no rating,
@@ -395,15 +397,15 @@ with options until the event ends (**Change answer** on the answered question),
 so a slip of the thumb is not final; the reports read each person's latest answer.
 
 **One question per topic.** Another event's qualifying question can be added to
-this one (through **Add challenges**, **Assign to Events** or the bulk assign);
+this one (through **Add from bank**, or **Add to events** on the Question bank);
 the two events then share that question's wording, while each keeps its own
 answers. But an event asks each one once: a question on a topic the event
 already asks (its own developers question, say) is not listed in **Add
-challenges**, is greyed out as *Topic already asked* in **Assign to Events**, and
-is skipped, and counted in the toast, by the bulk assign. Only one question per
-topic can be ticked in **Add challenges** at a time. A question the event holds
-counts even while it is hidden or a draft. Tagging a challenge, restoring one of
-its versions or importing a challenge file cannot make an event ask a topic twice
+from bank**, is greyed out as *Topic already asked* in a single question's **Add to events**
+dialog, and is skipped, and counted in the toast, by the bulk one. Only one question per
+topic can be ticked in **Add from bank** at a time. A question the event holds
+counts even while it is hidden or a draft. Tagging a question, restoring one of
+its versions or importing a question file cannot make an event ask a topic twice
 either.
 
 **Who is hot.** Hot: 250 or more developers and evaluating within 6 months, or
@@ -420,7 +422,7 @@ places.** The reports read each answer by the place of the option picked in the
 list, so moving an option, removing one or adding one above another would change
 how everyone who already answered is counted (hot, warm or cold included). The
 editor says so beside the **Options** box and refuses such a save, and a
-challenge import does not apply one either. Rewording is fine: a line you edit
+question import does not apply one either. Rewording is fine: a line you edit
 where it stands stays the same option, and the answers already given to it follow
 its new wording (so keep its meaning). A new option can be added at the end.
 The rule holds while the question carries its `qualifying:` tag: if you take the
@@ -431,10 +433,10 @@ counted again by the options' new places.
 revive it first), each role gets one email led by the one thing to do (a button
 where the address can open the event, words saying what to do otherwise):
 
-- **Solutions Engineer:** **Edit** the worst challenge, with why; if nothing is
+- **Solutions Engineer:** **Edit** the worst question, with why; if nothing is
   flagged, **Clone for the next event** and a line saying nothing needs fixing.
   Below it: difficulty flags, undelivered certificate emails, low ratings, the
-  challenge table and the podium (none if nobody scored; on an event whose
+  question table and the podium (none if nobody scored; on an event whose
   sessions are ranked separately, one for each session, and the late entrants'
   own once late entries close). Anyone who
   answered anything, a qualifying question included, counts as played.
@@ -501,10 +503,10 @@ event's organiser to remove them, which you do in this section.
 When a competition or a booth event ends — **End Now**, its scheduled end, the
 last session ending, or every participant finishing — the platform issues each
 participant the certificate they earned (a top-three placing with points above
-zero, or participation for anyone else who attempted a challenge) and emails it to them as a PDF, with a
+zero, or participation for anyone else who attempted a question) and emails it to them as a PDF, with a
 congratulation written for their placing. On a **Program** each participant is
 emailed the moment they complete it, including when an edit of yours completes
-them (hiding, unpublishing or removing a challenge they had not solved, or
+them (hiding, unpublishing or removing a question they had not solved, or
 re-marking an earlier answer correct). The emails go out about five minutes after
 the end, so an **End Now** pressed by mistake and undone straight away sends
 nothing.
@@ -512,7 +514,7 @@ nothing.
 - **Each certificate is emailed once.** Reviving an event and ending it again
   emails only the people who earned their first certificate in the meantime;
   a certificate someone already holds does not change and is not sent again.
-- **Not emailed:** members who never attempted a challenge, staff and
+- **Not emailed:** members who never attempted a question, staff and
   benchmark participants (who are not on the leaderboard), a dry-run event, and
   anyone who unsubscribed from event emails (their certificate is still issued).
   Who counts is checked again just before each certificate is issued, so
@@ -592,14 +594,18 @@ at the top as you scroll.
   With the link off the pill reads **Join link off** and opens the settings.
 
   ![The join pill's panel: the QR with the event code in its centre, Copy link and Full-screen QR](../screenshots/admin/68-join-qr-popover.png)
-- **Invite** — the one primary button (see [Inviting
-  participants](#inviting-participants)). **Approve** joins it while somebody in
-  the event is waiting for approval.
-- **⋯** — every other door for the event, in one place: **Add challenges**,
-  **Clone**, **Export everything** (a ZIP), **Export activity (CSV)** (once it is
-  live or ended), **Sign up at the desk**, **Save as template** (administrators),
-  **Join-link settings**, **Edit settings**, **History**, **Organisers**, **Email
-  delivery** and **Start now** (an upcoming single-session event). The
+- **Invite** — the one primary button, and the one place to add people to the
+  event: it opens a menu with **Email invitation** (the **Invite Participants**
+  dialog, this event ticked — see [Inviting participants](#inviting-participants))
+  and **Sign up at the desk** (see [At the desk](#at-the-desk)). It is offered
+  while the event takes new members. **Approve** joins it while somebody in the
+  event is waiting for approval.
+- **⋯** — every other door for the event, in one place: **Clone**, **Export
+  everything** (a ZIP), **Export activity (CSV)** (once it is live or ended),
+  **Save as template** (administrators), **Join-link settings**, **Edit
+  settings**, **History**, **Email delivery** and **Start now** (an upcoming
+  single-session event). Who runs the event is the Overview's **Organisers**
+  card. The
   irreversible ones come last, after a divider, each behind its own confirmation:
   **Close late entries now** (a finished Booth Event still taking late entries —
   see [Closing late entries early](#closing-late-entries-early)), **End now**
@@ -609,23 +615,23 @@ Below the header, a band of live figures led by the countdown (time left with a
 bar of how much has gone, the time until the start, or when it ended; **No fixed
 deadline** for a running Program whose deadline is five years or more away), then only
 the figures that matter now: people playing (answered in the last five minutes)
-while it is live, how many joined, the challenges before the start, and the
+while it is live, how many joined, the questions before the start, and the
 answers with how many were correct on a ranked event, once there are any. They count up and flash
 when they change. Then the event's **sections**, a strip of tabs:
 
 - **Overview** — the event's command centre, refreshed every 15 seconds while it
   is on screen, and built around what you do next:
-  - **Before the start**, **Ready to start?** checks the challenges (published
+  - **Before the start**, **Ready to start?** checks the questions (published
     and visible; the quick questions do not count, so an event holding only
-    them has no challenges yet), the join link, who has joined and, on a Competition, the
-    sessions. Each item still to do has the button that fixes it (**Add
-    challenges**, **Join-link settings**, **Add session**), or **Show me**, which
+    them has no questions yet), the join link, who has joined and, on a Competition, the
+    sessions. Each item still to do has the button that fixes it (**Add from
+    bank**, **Join-link settings**, **Add session**), or **Show me**, which
     takes you to **Invite** or the join code at the top.
   - **While it is live**, a row of what needs you now: people waiting for
-    approval, nobody joined yet, challenges participants cannot see, challenges
+    approval, nobody joined yet, questions participants cannot see, questions
     nobody has solved yet. It reads **Nothing needs you right now** when that is
     so. Below it, **Progress**: how many of the event's people have solved every
-    challenge (the quick questions are not counted) and how many solved each one,
+    question (the quick questions are not counted) and how many solved each one,
     so you can see where people are stuck (the
     leaderboard itself is under **Rankings**), the **Live feed** of joins and solves once there
     are any, the **Sessions** card with each session's **Start now**, **End now**,
@@ -635,13 +641,13 @@ when they change. Then the event's **sections**, a strip of tabs:
     issued and emailed (with **Download top 3 certificates** on that card for a
     ranked event).
 
-  Everything else is behind **Show challenges, activity and organisers**: the
-  challenge set, where pressing a challenge opens its difficulty, points, how
+  Everything else is behind **Show questions, activity and organisers**: the
+  question set, where pressing a question opens its difficulty, points, how
   many solved it and whether participants can see it (a quick question says it
-  scores no points); before the start, **Solve rate**, a bar per challenge (from
+  scores no points); before the start, **Solve rate**, a bar per question (from
   the start the bars are in **Progress**); **Activity over time**, a chart of
   joins, answers and correct answers since the start; and the organisers. Long
-  lists open in place with **Show more**, and **Open Challenges**, **Open
+  lists open in place with **Show more**, and **Open Questions**, **Open
   Analytics** and **Open Certificates** still take you to those sections.
   **Joined**, and every line saying how many people have joined apart from the
   activity chart's Joins and its summary, counts everyone enrolled, like the Events list and the
@@ -666,10 +672,15 @@ when they change. Then the event's **sections**, a strip of tabs:
   platform** to list every account, each with **Add to event**; untick it to
   narrow back. On a multi-session event the rows of people in other sessions are
   dimmed. See [Participants](#participants).
-- **Challenges** — the event's challenges first, then the rest of the library
-  dimmed below them, ready to add.
+- **Questions** — the event's own questions first (edit any of them, its answer
+  included, for this event only), then the rest of the Question bank dimmed below
+  them, ready to add. **+ Add from bank** adds bank questions (the event gets its
+  own copy of each), **+ New question** makes a question that belongs to the
+  event from the start, and **Save to bank** in an event question's menu copies
+  it into the bank as a new bank question (never linked: later changes to either
+  do not reach the other).
 
-  ![An event's Challenges section — its challenges at the top](../screenshots/admin/18-challenges-scoped.png)
+  ![An event's Questions section — its questions at the top](../screenshots/admin/18-challenges-scoped.png)
 - **Rankings** — its leaderboard (a single session's, if you picked one), the
   **Top three** with their certificates (see [Certificates](#certificates)), and,
   if the group leaderboard is on and at least two non-empty groups are assigned,
@@ -695,35 +706,52 @@ the note *You are competing in this event — you can view it, not change it* (s
 [The competitor lock](#the-competitor-lock)).
 
 **The sidebar is for the pages about every event**: **Events**, **New event**,
-**Challenge library**, **Live rankings**, **Analytics** and **Audit** under
-*Manage*; **People** (participants and event organisers; admin accounts with
-**Show admin accounts**) and **Groups** under *Participants*;
-**Users & roles** and **Settings** under *Admin*. Opening one of those leaves the
+**Question bank**, **Live rankings**, **Analytics**, **Marketing** and **Audit** under
+*Manage*; **People** (participants and event organisers; admin accounts are on
+**Roles & permissions**) and **Groups** under *Participants*;
+**Roles & permissions** and **Settings** under *Admin*. Opening one of those leaves the
 event's workspace, so they always show everything you may see.
 
 On a phone the sidebar becomes a section bar at the top of the page, the event's
 sections are behind the **Section** button, every table becomes a list of cards,
 and nothing scrolls sideways.
 
-### New event: blank or from a template
+### New event: a recommended setup, blank, or a template
 
 Every event starts on one page: **New event** (in the sidebar, or **+ New
-Event** on the Events page). Under **Start blank** there is one card per event
-type; under **Start from a template** are the built-in templates and your own.
-Either way you get the same create form (see [Creating an event](#creating-an-event)).
+Event** on the Events page). Under **Choose a type** there is one card per event
+type, each with two buttons: **Recommended setup** starts from that type's
+recommended setup (named on the card), and **Start blank** starts empty. Under
+**Your templates** are the templates your organisers saved. Whichever you pick,
+you get the same create form (see [Creating an event](#creating-an-event)).
 
-Picking a **template** opens that form already filled in from it: its type,
+The recommended setups come with the platform and carry no questions: add those
+to the event you create:
+
+- **Booth day (8 hours)** — a Booth Event for a full conference day, where
+  visitors join by QR code or a short code and play on their phones. **Add the
+  qualifying questions** comes ticked, as for every new Booth Event; you can add
+  more questions, and questions of your own, after you create it.
+- **Competition (several sessions)** — a ranked two-hour Competition that you
+  can run once or in several sessions.
+- **Learning program (30 days)** — a self-paced Program open for 30 days, where
+  everyone who finishes every question earns a completion certificate.
+
+If a type's recommended setup is missing, its card offers **Start blank** only,
+and **Restore built-in templates** at the bottom of the page brings it back.
+
+Picking a **recommended setup** or a **template** opens that form already filled in from it: its type,
 duration, attempts, answers, sign-up fields and the rest, with a note naming the
-template and how many challenges come with it. Change anything you like, then
-**Create event**: the event is made with the template's challenges, tags and
+template and how many questions come with it. Change anything you like, then
+**Create event**: the event is made with the template's questions, tags and
 join-link settings, your changes are applied on top, and it opens in its
-workspace, ready to share. A challenge you may not see is left out and counted,
-and a challenge that could not be copied is named with the reason — among them
+workspace, ready to share. A question you may not see is left out and counted,
+and a question that could not be copied is named with the reason — among them
 one held by an event you compete in, which the form shows unticked, marked
 **Left out: you compete in an event that holds it**. If one of
 your changes is refused after the event was made, the form says so and stays
 open as the create that made it: fix the named problem and press **Finish
-creating**, which saves your changes to that event and then adds the challenges
+creating**, which saves your changes to that event and then adds the questions
 you ticked and the Checkmarx One settings, without making a second one. If no
 answer comes back for your changes (a dropped connection), the message says they
 may not have been saved; press **Finish creating** again, and it first checks
@@ -731,25 +759,23 @@ the event: changes that did arrive are not sent twice, and if someone else
 changed the event in the meantime it stops and says so rather than overwrite
 their change.
 
-An **event admin** cannot start an event from scratch, so they see templates
-only; picking one opens the **Quick spin** panel, which asks just for an
+An **event admin** cannot start an event from scratch, so their type cards offer
+**Recommended setup** only, beside the templates; picking one opens the **Quick spin** panel, which asks just for an
 **Event name**, a **Date** and the time it **Opens** (or tick **Opens now**),
 with **Add the qualifying questions** (ticked for a Booth Event). A start inside
 the hour the clocks skip when they go forward is refused, as the event form
 refuses it.
 
-Three templates come with the platform: **Booth quick-spin** (a one-hour Booth
-Event, join by QR or code), **Tournament (2 h)** and
-**Learning Program (30 days)**. They carry no challenges: add those to the event
-you create from them.
-
 **Making and changing templates is for administrators.** **New template** on the
 New event page opens the template editor; each template row's **⋮** menu has
-**Edit**, **Duplicate**, **Protect** and **Delete**. Templates are hard to lose:
+**Edit**, **Duplicate**, **Protect** and **Delete**. A recommended setup is a
+built-in template, changed from its type card's **⋮** menu: **Edit recommended
+setup**, **Duplicate as a template** and **Reset to default**. Templates are hard
+to lose:
 
-- **A built-in template cannot be deleted.** Its menu offers **Reset to default**
-  instead, which puts back the shipped name, settings and type (and empties its
-  challenge list).
+- **A recommended setup (a built-in template) cannot be deleted.** Its menu
+  offers **Reset to default** instead, which puts back the shipped name,
+  settings and type (and empties its question list).
 - **A protected template cannot be deleted by anyone** until an administrator
   chooses **Unprotect**. Protected templates carry a **Protected** badge.
 - **Delete is never final at once.** A deleted template moves to **Recently
@@ -760,9 +786,11 @@ New event page opens the template editor; each template row's **⋮** menu has
 
 The editor groups the settings as **Basics** (name, description,
 event type, tags), **Joining** (join link and QR, late entries,
-and the sign-up fields), **Play** (how long it runs, attempts per challenge,
-staff compete, Checkmarx One accounts), **Scoring & boards**, **Challenges**
-(find published challenges and add them; they are listed in the order an event
+and the sign-up fields), **Play** (how long it runs, attempts per question,
+staff compete, Checkmarx One accounts), **Scoring & boards**, **Questions**
+(pick a **Topic**, as the Question bank's filter does, or **No topic**, and
+narrow it by title; each result names its topic; **Add all shown** adds every
+question listed; they are listed in the order an event
 numbers them, by difficulty and then title, which is the order participants
 meet them in) and **Certificates**, with a live **Summary** beside them.
 **New template** opens with no event type chosen: pick one, as **Create
@@ -771,25 +799,25 @@ cannot use is shown switched off, with the reason, and is never saved. The join
 link, late entries and Checkmarx One accounts start as the
 chosen type sets them for a new event, follow it when you change the type, and
 are saved only once you change them, so an event made from the template still
-gets its type's own setting. Qualifying questions are not offered as challenges:
+gets its type's own setting. Qualifying questions are not offered as questions:
 an event made from the template gets its own through **Add the qualifying
-questions**. Nor can a challenge held by an event you compete in go into a
+questions**. Nor can a question held by an event you compete in go into a
 template, as the template would carry it into events you organise: the picker
 shows it with **Cannot be added: you compete in “…”, which holds it** and no
 **Add** button, and a template already holding one cannot be saved until you
-remove it (its row says **Remove it to save**). Any challenge a save refuses is
+remove it (its row says **Remove it to save**). Any question a save refuses is
 named on its own row with **Remove it to save**; changing the event type (or
 **Staff compete**) clears that note, and the next save judges the list again. A
-role that may change templates but not view the challenge library sees the
-template's challenges with **Remove** but no search, and a line saying it
-cannot add challenges there; the template keeps the challenges it does not
+role that may change templates but not view the question library sees the
+template's questions with **Remove** but no search, and a line saying it
+cannot add questions there; the template keeps the questions it does not
 remove. You can also save a running event as a template from its workspace:
-**⋯ → Save as template** keeps its type, settings, tags and challenges (its
+**⋯ → Save as template** keeps its type, settings, tags and questions (its
 planned length, also after **End Now**), never its people, scores, dates or
 qualifying questions. A template never holds a Checkmarx One key, so an event
 that creates accounts with its own key gives a template with Checkmarx One
 accounts off; the dialog and the message that confirms it say so. **Save as
-template** refuses a challenge held by an event you compete in, naming it. An event admin can spin up templates but not make or change
+template** refuses a question held by an event you compete in, naming it. An event admin can spin up templates but not make or change
 them.
 
 ![The template editor: Basics, Joining and the sign-up fields, with the live Summary beside them](../screenshots/admin/66-template-editor.png)
@@ -799,14 +827,14 @@ them.
 **⋯ → Clone** in an event's workspace makes a new event from this one's setup.
 The **Clone event** dialog asks for a **Name** and when it **Starts** (your local
 time; tomorrow on the hour unless you change it), and says what it copies: the
-**settings and the challenges**. Participants, scores and the join link are not
+**settings and the questions**. Participants, scores and the join link are not
 copied, and the new event starts empty. A start inside the hour the clocks skip
 when they go forward is refused, as the event form refuses it.
 
 ![The Clone event dialog: a name and a start](../screenshots/admin/67-clone-dialog.png)
 
 In detail, a clone takes the settings on the event's form, the tags, the same
-challenges and — for a Competition — its sessions, the first at the new start and
+questions and — for a Competition — its sessions, the first at the new start and
 the rest keeping their spacing; a pinned late-entry deadline keeps its distance
 from the end. An
 event ended early with **End Now** is copied as it was planned: the length it was
@@ -828,8 +856,8 @@ joined the copy would get an account in the platform's default tenant instead.
 The **Clone event** dialog says so before you press **Clone event**. To turn
 them on, untick that box in the copy's settings, and paste the key there too if
 the accounts belong in the same tenant as before. It always starts upcoming, and its own History says what it was
-cloned from. A challenge the copy does not take — a draft, a qualifying
-question you wrote for the old event, an unsealed challenge for an event where
+cloned from. A question the copy does not take — a draft, a qualifying
+question you wrote for the old event, an unsealed question for an event where
 staff compete, one held by an event you compete in — is left out and named with
 the reason in the message that confirms the copy, rather than failing it; one you may not see is counted, not
 named. The same message names the trusted network IPs, the Checkmarx One
@@ -844,7 +872,11 @@ are competing in.
 
 An event's **Certificates** section lists every certificate it has issued —
 holder (named as the certificate prints the name, which is also what the
-downloads are called), which certificate (1st, 2nd, 3rd place, participation or completion),
+downloads are called), which certificate (1st, 2nd, 3rd place, participation or completion;
+on an event with two or more sessions a place names its board, such as *1st
+Place — Session A* or *1st Place — Overall*, and the certificate prints it; a
+place on an overall board ranked by percentages shows and prints the percentage
+it was ranked on, such as *75%*, instead of its points),
 score and whether the holder has been emailed it — with
 **PDF** and **PNG** downloads and **Re-send** for the email (one holder at a time,
 and it works with the congratulations email switched off; a delivery cut short
@@ -886,7 +918,7 @@ and the downloads. Only a superadmin can change the design of an event that has
 ended: anyone else sees why, with the preview and the downloads. If somebody else
 saved the design after you opened it, **Save design** says so and offers their
 version rather than putting back what they changed. The **platform design** every event starts from is under **Settings**,
-**Certificates design**: press **Open the certificate designer**; it works the
+**Branding**: press **Open the certificate designer**; it works the
 same way, and an event with its own design keeps it.
 
 ![An ended event's Certificates section: the issued certificates, then its certificate design](../screenshots/admin/69-workspace-certificates.png)
@@ -897,7 +929,7 @@ rows that earn a Gold, Silver or Bronze certificate with their certificate:
 **PNG** of what the design will give them (labelled provisional while the event
 runs). A place earns one only with points above zero; a note names any top-three
 place that does not, whose holder gets a participation certificate if they
-attempted a challenge. A Gold, Silver or Bronze certificate already issued to a
+attempted a question. A Gold, Silver or Bronze certificate already issued to a
 place on zero points or fewer keeps its medal, and the **Top three** lists that
 place with it; a superadmin can revoke it. Each place is named, and previewed, as
 its certificate prints the name (also what its **PNG** or **Issued PDF** is
@@ -909,29 +941,31 @@ refused with a message rather than handing out a preview in its place.
 ### Creating an event
 
 Click **+ New Event** (or **New event** in the sidebar). The **New event** page
-offers a blank start for each type, and your templates; whichever you pick opens
-**one form** that holds everything about the event.
+offers one card per type, each with its **Recommended setup** and **Start
+blank**, and below them your templates; whichever you pick opens **one form**
+that holds everything about the event.
 
 #### Pick a starting point
 
-![The New event page: a blank start per type, then the templates](../screenshots/admin/44-competition-create-kind.png)
+![The New event page: one card per type, then the templates](../screenshots/admin/44-competition-create-kind.png)
 
-Three blank starters, each with a short description of what that type is for:
+Three type cards, each with a short description of what that type is for:
 
 - **Booth Event** — a few hours, in one room, one session. Phone-solvable
-  challenges, no Checkmarx One tenant needed, walk-up sign-up.
+  questions, no Checkmarx One tenant needed, walk-up sign-up.
 - **Competition** — online or hybrid, from a few hours to several days. One
   session or many. Ranked, with certificates and LinkedIn sharing. This is how
   every competition you already have behaves, and it is marked **Most common**.
 - **Program** — self-paced learning or certification, running to a deadline. No
-  sessions, no leaderboard, no placings. Certificate on full completion only,
-  carrying a public verification code printed on the certificate itself.
+  sessions, no leaderboard, no placings. Every learner is **graded** on their
+  own performance, and a certificate is issued at 60% or more, printed with the
+  grade and a public verification code (see [Program grades](#program-grades)).
 
 Nothing is pre-selected: one click chooses the type **and** opens the form.
 
 > **The type can be changed until the event starts.** It is the first field on
 > the form, **Event type**: pick another and the form redraws for that type,
-> keeping the name, the start, the template and the challenges you ticked; if
+> keeping the name, the start, the template and the questions you ticked; if
 > you changed anything else, you are asked first, since the rest goes back to
 > the new type's defaults. It decides how the event runs — whether
 > it ranks, whether it has sessions, what its certificate attests — so it can be
@@ -944,45 +978,37 @@ Nothing is pre-selected: one click chooses the type **and** opens the form.
 
 The form opens with the essentials: **Event type**, **Event name**, **When it
 runs** (start, timezone, and a duration or a deadline; the end is shown beneath)
-and **How it plays** (reveal answers at the end, attempts per challenge). The
-settings most events never change are folded into **Advanced settings**: team
-leaderboard, staff can compete, time on platform, test / dry run, the sign-up
-form, late entries, the venue network, the qualifying questions and Checkmarx
-One. Folded or not, its heading line says whether Checkmarx One accounts will
-be created (**Checkmarx One accounts: on** or **off**, following the box and the
-type you picked), and the **Create** confirmation says it again. Every setting
+and **How it plays** (reveal answers at the end, attempts per question). The
+type is the one you picked on the New event page, shown as a chip: the form
+does not ask again. **Change type** opens the choice under it (with the
+confirmations described below), and is not offered once the type can no longer
+change. The settings most events never change are folded into **Advanced
+settings**, on an edit as on a create: team leaderboard, staff can compete,
+time on platform, dry run, the sign-up form, late entries, the venue network,
+the qualifying questions and Checkmarx One. Folded or not, its heading line says
+whether Checkmarx One accounts will be created (**Checkmarx One accounts: on**
+or **off**, following the box and the type you picked), and the **Create**
+confirmation says it again. A **Booth Event never creates Checkmarx One
+accounts** — its walk-ups never use the product — so its form has no Checkmarx
+One section at all. Every setting
 that is not obvious has a **?** beside it that explains it.
-**Create event** makes it; for a blank event, **Create and pick challenges**
-goes straight on to the Add challenges dialog.
-
-**Challenges** lets you pick the challenges the event starts with while you
-create it. Type in the search box (it matches a challenge's title, difficulty or
-any tag, `category:web` and plain `web` alike), or press the **tag chips** under
-it: each tag and category in the library is a chip, and pressing several shows
-challenges carrying any of them. Tick the ones you want; **Tick all shown** ticks
-every challenge on screen, and the count says how many are ticked. Only published
-challenges you may use are listed (qualifying questions are not: the event gets
-its own through **Add the qualifying questions**), and the platform's own markers
-(`needs:` tags, `public-domain`, `test/dry run`) are never chips. The ticked
-challenges are added once the event exists. A challenge that does not fit the
-event's type (a Booth Event refuses file answers and `needs:` tags), or that is
-locked, is left out and named in the message, and the rest are added. From a template, the
-template's challenges are already ticked, marked **From the template**, and come
-with it; tick more to add them as well.
+**Create event** makes it. The form picks no questions: a blank event gets them
+afterwards from its **Questions** section (**+ Add from bank**), and an event made
+from a template gets the template's questions with it.
 
 **Add the qualifying questions** (under Advanced settings) is offered on every
 create, from a template too, ticked by default for a Booth Event. It cannot be
-combined with **Staff can compete**, whose events hold sealed challenges only:
+combined with **Staff can compete**, whose events hold sealed questions only:
 a qualifying question (an **Any answer** question) can never be sealed, so such
 an event asks none.
 
 **The form carries only the settings the type you picked can actually use.** A
-Program has no Schedule toggle and no Leaderboard Mode, because it has no
+Program has no Schedule toggle and no Ranking choice, because it has no
 sessions; a Booth Event has no *Record time on platform*, because its window is
 too short for the measurement to say anything. This is not the form hiding
 things from you — those settings do not exist for that type, and the server
 refuses almost all of them if something else tries to set them. Two are simply
-inert rather than refused — Leaderboard Mode on a type with no sessions, and the
+inert rather than refused — the ranking mode on a type with no sessions, and the
 tie-break basis on a Program — because there are no sessions to rank against
 each other and no placings to break ties for.
 
@@ -996,24 +1022,25 @@ Here is the whole matrix, so you know what to expect before you click:
 | **Schedule** toggle (single / multiple sessions) | — | ● | — |
 | **Duration** (the end is shown beneath) | ● | ● | — |
 | **Deadline** (with *No fixed deadline*) | — | — | ● |
-| **Leaderboard Mode** (per session / global) | — | ● | — |
+| **Ranking** (per session / overall / both, and percentages) | — | ● | — |
 | **Reveal correct answers** when it ends | ● | ● | — |
 | **Group (team) leaderboard** | ● | ● | — |
 | **Record time on platform** | — | ● | ● |
 | **Break score ties on time spent** | — | ● | — |
+| **Start each participant's clock** | ● | ● | — |
 | **Staff can compete** | ● | ● | ● |
-| **Attempt limit per challenge** | ● | ● | ● |
-| **Mark as test / dry run** | ● | ● | ● |
+| **Attempt limit per question** | ● | ● | ● |
+| **Dry run** | ● | ● | ● |
 | **Trusted network IPs** | ● | ● | — |
 | **Sign-up form** (what a new participant is asked for) | ● | ● | ● |
 | **Late entries** | ● | — | — |
-| **CxOne integration** | ● | ● | ● |
+| **CxOne integration** | — | ● | ● |
 
 Why the gaps are where they are:
 
 - **Sessions** — only a Competition has them. A Booth Event is one room for one
   afternoon; a Program is rolling enrolment against a deadline. Since neither has
-  sessions, neither has a **Leaderboard Mode** either: that setting decides how
+  sessions, neither has a **Ranking** choice either: that setting decides how
   sessions are ranked against each other, and with no sessions it names nothing.
 - **Duration vs deadline** — a Booth Event and a Competition run for a *length of
   time* from their start. A Program runs *until a date*, so it asks for a
@@ -1029,7 +1056,7 @@ Why the gaps are where they are:
   show that date or count down to it say **No fixed deadline** instead: a
   participant's event card (as the end of its dates, with no time left shown;
   one not started yet still counts down to its start), the
-  header and a challenge's play bar; the **End** and
+  header and a question's play bar; the **End** and
   **Duration** columns of the Events list, the event workspace's dates,
   status chip and time tile, and the deadline **Start now** says it keeps; and
   the end in the assignment and invitation emails.
@@ -1037,8 +1064,8 @@ Why the gaps are where they are:
   ranked, so it has no placings to break ties for and no team board to enable.
   Publishing the answer key on a certification would also let anyone who saw it
   earn a verifiable certificate, so a Program never reveals answers, and its
-  participants never see the stored explanation for a challenge either. Where a
-  Program needs to teach, put the teaching in the challenge itself.
+  participants never see the stored explanation for a question either. Where a
+  Program needs to teach, put the teaching in the question itself.
 - **Record time on platform** — refused for a Booth Event. Over a 45-minute
   window there are only nine five-minute blocks, so everyone who stayed the
   course would tie and the number would tell you nothing. A Program may record it
@@ -1063,15 +1090,24 @@ Why the gaps are where they are:
   Checkmarx One account minted for every attendee. Untick it if yours does.
 
 For a multi-session Competition, add sessions with **+ Add Session** — each has
-its own name, start time, timezone and duration — and choose a **Leaderboard
-Mode**:
+its own name, start time, timezone and duration — and choose its **Ranking**:
 
-- **Per Session** — each session ranked independently.
-- **Global** — everyone competes on one combined leaderboard.
+- **A winner per session** — each session ranked on its own board.
+- **One overall winner** — everyone ranked together on one board.
+- **Both: a winner per session and overall** — each session's board, and an
+  overall board beside them.
+
+The overall board ranks by score, and time breaks a tie. Because each session can
+hold its own questions (see [Questions per session](#questions-per-session)), a
+session with more or harder questions has more points on offer; tick **Rank the
+overall board by percentages** to rank everyone by the share of their own
+session's points they earned instead (a wrong answer or a hint still counts
+against it, and two percentages are compared exactly, never as the rounded figure
+shown). The box is offered only where there is an overall board.
 
 ![New Competition — multiple sessions](../screenshots/admin/20-competition-create-multi.png)
 
-The leaderboard mode locks once any session starts.
+The ranking and the percentages box lock once any session starts.
 
 **Editing uses the same form.** Opening an existing event goes straight to it,
 with **Advanced settings** open and, again, only the settings the event's type
@@ -1081,11 +1117,11 @@ from there — see [Changing the event type](#changing-the-event-type).
 ### Limiting attempts
 
 An event can cap how many times each participant may submit an answer to each of
-its challenges. There are two places to set it, and the more specific one wins:
+its questions. There are two places to set it, and the more specific one wins:
 
-- **Attempt limit per challenge** on the event form applies to every challenge
+- **Attempt limit per question** on the event form applies to every question
   in that event.
-- **Attempts** in the challenge editor applies to that one challenge, and
+- **Attempts** in the question editor applies to that one question, and
   **overrides whatever its event says**.
 
 Leave both blank for no limit at all, which is the default.
@@ -1095,7 +1131,7 @@ participant sees honest: a double-click that re-sends the same answer, or a
 submission the platform throttles, never reaches storage and so costs nothing.
 **Revealing a hint costs no attempt either** — it already costs points.
 
-A participant watches the budget run down on the challenge itself: *"2 of 3
+A participant watches the budget run down on the question itself: *"2 of 3
 attempts left"*, then a **Last attempt** warning, then a locked **No attempts
 left** panel in place of the answer box. The hint offer goes with the answer
 box, because a hint cannot help somebody who can no longer answer, and that
@@ -1105,8 +1141,8 @@ time because the reply to the first never arrived on the venue wi-fi: the
 participant is told it was already submitted and was not correct, that it was
 not counted twice, and how many attempts remain.
 
-**Granting more attempts.** On the **Challenges** tab, the three-dot menu of any
-challenge that sits in at least one attempt-limited event carries **Grant
+**Granting more attempts.** On the **Questions** tab, the three-dot menu of any
+question that sits in at least one attempt-limited event carries **Grant
 Attempts**. Pick the event, pick the participant, and say how many extra
 attempts to add — grants **add to** whatever that participant already has,
 rather than setting a total. Any admin can do it.
@@ -1134,13 +1170,13 @@ a claim someone shows an employer, so publishing the answer key — which reache
 *every* enrollee, not just those who finished — would let anyone who saw it earn
 a verifiable certificate afterwards. Nothing is revealed on a Program at the
 end, explanations included, so write anything a learner is meant to take away
-into the challenge itself rather than into its explanation.
+into the question itself rather than into its explanation.
 
-**A sealed challenge is left out of the reveal, whatever the checkbox says.**
+**A sealed question is left out of the reveal, whatever the checkbox says.**
 Participants see *Answer not shown* on it, with the reason, and its
 explanation and its hint stay hidden as well — a hint a participant paid for
 during the event stays theirs. See
-[Sealing a challenge answer](#sealing-a-challenge-answer).
+[Sealing a question answer](#sealing-a-question-answer).
 
 ### Letting staff compete
 
@@ -1193,14 +1229,14 @@ member who already holds a place in such an event — enrolled before they were
 tagged — keeps it, and is not reported as skipped.) With the switch on, a
 staff row gets the same **Invite to …** item and checkbox as everybody else,
 and a bound group enrols its staff members with the rest. Two limits remain. Any organiser can enrol **themselves** (unless they wrote one
-of its challenges — below), but enrolling another admin or superadmin account
+of its questions — below), but enrolling another admin or superadmin account
 is a superadmin's job, like every other action on a
 privileged account: with such an event open a regular admin is not offered
 **Invite to …** on an admin's row, and reaching it through the selection bar or
 the **Invite** dialog is skipped with *"N admin account(s) skipped — only a
 superadmin can enrol an admin"*. A bound group is the one route that does not
 ask: its live sync enrols every member it holds, admin accounts included. The
-Groups tab and the participant row's group chips guard that route — both refuse
+Groups page and the participant row's group chips guard that route — both refuse
 to put an admin account into a group for anyone but a superadmin — and the
 **Invite** dialog's **Add to Groups** picker skips the address with *"N admin
 account(s) not added to the selected group(s) — only a superadmin can put an
@@ -1226,8 +1262,8 @@ enrols no staff member by itself: a `staff`-tagged participant is asked the
 question once signed in, and an admin-tier account, an event admin included,
 lands in the admin panel enrolled in nothing. An event admin — who is not
 tagged — who opens the link from participant view is enrolled at once. The one
-person no door enrols is the author of a challenge the event holds: joining
-from inside {{platformName}} refuses them, naming the challenge, while signing
+person no door enrols is the author of a question the event holds: joining
+from inside {{platformName}} refuses them, naming the question, while signing
 in from the link's page simply leaves them unenrolled, with nothing said.
 Having joined, the self-service **Leave this event** control is offered on the waiting screen only, so once the event is live
 the way out is an organiser removing them — an admin-tier competitor can do that
@@ -1235,44 +1271,44 @@ for themselves with **Remove from …** on their own row (see [The competitor
 lock](#the-competitor-lock)); a staff member with no admin tier has no
 Participants tab, so for them it is an organiser or nothing.
 
-**Only sealed challenges can be assigned, and never one whose author
-competes.** A competing admin can still open the Challenges tab, so an
-unsealed challenge in the event would hand them the answer key. An event with
-the switch on therefore admits only challenges whose answer is **sealed** (see
-[Sealing a challenge answer](#sealing-a-challenge-answer)) — which rules out
-every *Any answer* challenge, since those cannot be sealed. A sealed answer is
-still readable by its author, so a challenge cannot go into an event its author
-is enrolled in, and the author of an assigned challenge cannot be enrolled:
-whichever you try second is refused, naming the challenge and the person. (A
-superadmin's recorded reveal is refused on any challenge held by an event they
+**Only sealed questions can be assigned, and never one whose author
+competes.** A competing admin can still open the Questions tab, so an
+unsealed question in the event would hand them the answer key. An event with
+the switch on therefore admits only questions whose answer is **sealed** (see
+[Sealing a question answer](#sealing-a-question-answer)) — which rules out
+every *Any answer* question, since those cannot be sealed. A sealed answer is
+still readable by its author, so a question cannot go into an event its author
+is enrolled in, and the author of an assigned question cannot be enrolled:
+whichever you try second is refused, naming the question and the person. (A
+superadmin's recorded reveal is refused on any question held by an event they
 compete in, for the same reason.) In practice:
 
-- **Assign Challenges** on the event says so at the top, greys out any
-  unsealed challenge that is not already in the event and marks it *Not
+- **+ Add from bank** on the event says so at the top, greys out any
+  unsealed question that is not already in the event and marks it *Not
   sealed*. If the save still has to be refused — the author rule is decided at
-  Save, since the form cannot see who wrote a challenge — a dialog headed
-  **Some challenges were not added** names each refused challenge and why. The
-  refused ones are left out; every other challenge you ticked is still added
+  Save, since the form cannot see who wrote a question — a dialog headed
+  **Some questions were not added** names each refused question and why. The
+  refused ones are left out; every other question you ticked is still added
   (or removed), so read the list before assuming the event is unchanged.
-- The per-challenge **Assign to Events** dialog greys out such an event for an
-  unsealed challenge and marks it *Sealed only*; where the author rule refuses
+- A single question's **Add to events** dialog greys out such an event for an
+  unsealed question and marks it *Sealed only*; where the author rule refuses
   the save, nothing changes on any of the ticked events, and the dialog names
   every event that refused, not just the first. The bulk **Assign to
-  Events** picker marks such events *Sealed challenges only* but leaves them
-  tickable, because your selection may mix sealed and unsealed challenges: the
+  Events** picker marks such events *Sealed questions only* but leaves them
+  tickable, because your selection may mix sealed and unsealed questions: the
   unsealed ones are skipped there and the toast counts them — *N not sealed (the
   event lets staff compete)*, *N whose author competes in the event* — while a
   dialog names each refused pair.
-- Turning the switch **on** while an unsealed challenge is already assigned is
-  refused, and a dialog headed **Seal these challenges first** lists them.
+- Turning the switch **on** while an unsealed question is already assigned is
+  refused, and a dialog headed **Seal these questions first** lists them.
   Seal a new copy of each, or take it out of the event, then try again.
 - Turning the switch **on** is refused, too, while somebody already enrolled in
-  the event wrote a challenge assigned to it — the ordinary case being an event
+  the event wrote a question assigned to it — the ordinary case being an event
   admin, or a participant promoted after enrolling, who authored one of its
-  challenges. A dialog headed **Remove these authors first** names each person
-  with their challenge(s). Remove the person from the event (**Manage
-  Participants**) or take the challenge out of it, then tick again.
-- **Unsealing** a challenge is refused while it sits in an event that lets
+  questions. A dialog headed **Remove these authors first** names each person
+  with their question(s). Remove the person from the event (**Manage
+  Participants**) or take the question out of it, then tick again.
+- **Unsealing** a question is refused while it sits in an event that lets
   staff compete — at any stage of that event, finished included, because every
   kind of end can be undone (a manual end plus an extension, a time-expired
   event extended, a new session, a new assignment) and nothing on the way back
@@ -1280,21 +1316,21 @@ compete in, for the same reason.) In practice:
   tick and says why, naming the holding events it can name — an event admin
   sees only the events they organise, and any others are counted (*N events
   outside your events*) rather than named. While none of those events has
-  finished — nor any session of one — the remedy is to take the challenge out
+  finished — nor any session of one — the remedy is to take the question out
   first, or leave the answer sealed; once one of them has finished, or one of
-  its sessions has, its challenge list can no longer be changed, so the answer
-  stays sealed for as long as the challenge stays assigned — which costs the
+  its sessions has, its question list can no longer be changed, so the answer
+  stays sealed for as long as the question stays assigned — which costs the
   author nothing they hold, since they still read and edit it. An event the
-  author does not organise is not theirs to take the challenge out of, so with
+  author does not organise is not theirs to take the question out of, so with
   one of those the note names that event's organiser instead.
-- Enrolling the author of an assigned challenge is skipped, and a dialog headed
-  **Not enrolled — they wrote a challenge in this event** names them and the
-  challenge. The **Invite** dialog and the participant import count such a skip
+- Enrolling the author of an assigned question is skipped, and a dialog headed
+  **Not enrolled — they wrote a question in this event** names them and the
+  question. The **Invite** dialog and the participant import count such a skip
   rather than name it; joining from inside {{platformName}} through the event's
-  link refuses the author outright, naming the challenge, and a code requested from the link's page
+  link refuses the author outright, naming the question, and a code requested from the link's page
   leaves them unenrolled with nothing said (above).
 
-Taking an unsealed challenge *out* of such an event is never refused on the
+Taking an unsealed question *out* of such an event is never refused on the
 seal's account — it is the remedy — though the ordinary rules still apply: not
 once a session of the event has ended, and not by someone competing in it.
 
@@ -1307,35 +1343,36 @@ before the start. Turning it **off** while the event is still upcoming has a
 refusal of its own: with anyone carrying the `staff` tag enrolled it is refused,
 and a dialog headed **Remove these staff members first** names them. Remove
 them from the event (**Manage Participants**), then untick. (Turning it **on**
-has the two refusals listed above — unsealed challenges, and enrolled authors.)
+has the two refusals listed above — unsealed questions, and enrolled authors.)
 
 #### The competitor lock
 
 **If you are enrolled in an event that lets staff compete, you cannot edit
-it — or any challenge assigned to it — for as long as you are enrolled,
+it — or any question assigned to it — for as long as you are enrolled,
 whatever your admin tier.** A competitor who can change the event, its
-schedule or its challenges is a competitor who can change the result, so
+schedule or its questions is a competitor who can change the result, so
 {{platformName}} treats you as a participant of that event and refuses every
 change to it. Superadmins are bound too — the [Superadmin
 guide](superadmin.md#the-competitor-lock-binds-you-too) says what that costs
 them.
 
-On the **Events** tab the row tells you so: its three-dot menu opens with the
-note *You are competing in this event — you can view it, not change it*, and
-withholds **Edit**, **Assign Challenges**, **Manage Participants**, **Close late
-entries now**, **Start Now**, **End Now** and **Delete**, along with the tag
-controls on the row.
-What stays is everything that only *looks*: **History**,
-**Organisers**, **Email Delivery**, **Export Activity (CSV)** once the event is
-live or ended, as on any event, and **Join Link**, which opens **read-only**:
+In the event's workspace the **⋯** menu opens with the note *You are competing
+in this event — you can view it, not change it*, and withholds **Edit
+settings**, **Clone**, **Close late entries now**, **Start
+now**, **End now** and **Delete event**; the header offers no **Invite**. On the
+**Events** tab the row's menu holds the same note instead of **Delete event**,
+and the row's tag controls are withheld too.
+What stays is everything that only *looks*: **History**, **Email delivery**,
+**Export activity (CSV)** once the event is live or ended, as on any event, and
+**Join-link settings**, which opens **read-only**:
 the link, the QR code and the short event code are there to copy and print (an organiser competing in their own event still needs them on the
 signage), while its toggle is disabled and **Regenerate link** is
 withheld, with a note saying why. Ask another organiser to change those.
 
-![An event's row menu for an admin who is competing in it — the competing note at the top, and only the viewing actions left](../screenshots/admin/61-competitor-locked-event.png)
+![An event's ⋯ menu for an admin who is competing in it — the competing note at the top, and only the viewing actions left](../screenshots/admin/61-competitor-locked-event.png)
 
-On the **Challenges** tab, every challenge in that event carries the same note
-— *You are competing in "…", which holds this challenge — you can view it, not
+On the **Questions** tab, every question in that event carries the same note
+— *You are competing in "…", which holds this question — you can view it, not
 change it* — and:
 
 - **Edit** is not offered on the row, and a form reached some other way is
@@ -1343,16 +1380,16 @@ change it* — and:
   off, with the same reason under them. The answer, the explanation and the
   **hint** are all withheld from you — a participant pays 30% of the points to
   see a hint, and so would you — and the hint field is simply absent from the
-  form. The **JSON export** of challenges withholds the hint from you in the
+  form. The **JSON export** of questions withholds the hint from you in the
   same way, marking it withheld rather than empty, so importing that file back
   does not blank a hint you were never shown. Publish, Hide/Show, the tag
   controls, Lock, Recalculate Scores and Delete are withheld too.
-- **View** (the participant preview) shows the challenge as your fellow
+- **View** (the participant preview) shows the question as your fellow
   competitors see it, with *Withheld — you are competing …* where the hint
   would be, and no answer or explanation.
 - **History** lists every version, blanks the answer, explanation and hint out
   of each snapshot, and offers *Not while competing* in place of **Restore**.
-- Assigning the challenge to that event, or taking it out, is refused; so is
+- Assigning the question to that event, or taking it out, is refused; so is
   adding it to any other event you compete in. Every other event of yours is
   untouched. **Grant Attempts** stays, though the event you compete in is not
   offered inside it; on an event where staff compete, its roster includes the
@@ -1363,7 +1400,7 @@ change it* — and:
 The workspace withholds the same doors: its header carries a **You are
 competing** chip, its **⋯** menu offers no **End now** or **Close late entries
 now**, nor **Clone**, **Save as template** or **Export everything** (a copy or a
-template would carry the event's challenges into an event you organise, and the
+template would carry the event's questions into an event you organise, and the
 export holds every rival's answers), and the Overview's **Sessions** card offers
 no session **Start now** or **End now**. Anything reached some other way — an old tab,
 a script — is refused by the server with the same message, naming the event.
@@ -1420,12 +1457,12 @@ certificate from that event. If you are already impersonating somebody when a
 colleague enrols you into an event they compete in, your next change made as
 them is refused too; leaving the impersonation still works.
 
-What the lock does not touch: other events, other challenges, groups not bound
+What the lock does not touch: other events, other questions, groups not bound
 to an event you compete in, the Participants tab beyond that event's own roster
 and your rivals' rows (where you can only remove yourself, and where the **At
 the desk** shortcut is refused while that event is open), Submissions,
 Rankings, Analytics, Logs, Settings, and every superadmin action that is not
-on that event, its challenges or its participants.
+on that event, its questions or its participants.
 
 **In participant view** an account tagged `staff` sees two sections on the
 events page: **Your Events** — the ones you are enrolled in, with a
@@ -1564,8 +1601,8 @@ a date you type is never ambiguous about which clock it means.
   open** badge for as long as the window lasts, instead of dropping it in with
   finished events — so a stand that is still taking walk-ups stays in front of
   you. It has its own filter chip.
-- **The Challenges and Participants tabs** keep showing the event's badge on
-  every challenge assigned to it and every participant enrolled in it, in the
+- **The Questions and Participants tabs** keep showing the event's badge on
+  every question assigned to it and every participant enrolled in it, in the
   same late-entry colour. Both columns hide other finished events.
 - **The rankings CSV** gets a **Late Entrant** column. You need it: the file
   flattens both sections into one sheet, so rank 1 appears twice — once for the
@@ -1585,7 +1622,8 @@ The join link is not the only way in while the window is open: you can add
 people yourself, and every way of doing it offers the event — **Invite to …**
 on a participant's row with the event open, the selection bar's
 **Assign to "…"**, the bulk **Assign to Events** picker, the **Invite** dialog,
-**At the desk**, and binding a group to it from the group's **Events** button.
+the desk sign-up (the workspace's **Invite** menu), and binding a group to it
+from the group's **Events** button.
 Wherever the event is listed it carries a **Late entry open** badge, and each
 route tells you before anything is saved that the person joins as a **late
 entrant** — ranked in the separate Late entrants section and able to play until
@@ -1598,7 +1636,8 @@ the late-entry deadline rather than a start and an end that have already passed.
 
 **Somebody who took part before the end cannot come back as a late entrant.**
 If a person submitted an answer, revealed a hint or entered the event while it
-was running — even if they have left it or been removed since — adding them now
+was running (whether or not they opened a question, on either way of starting
+the clock) — even if they have left it or been removed since — adding them now
 is skipped, and the confirmation says why: *they took part before the event
 ended, so they cannot rejoin it as late entrants*. Letting them back in would let
 them play on after the official results were settled. The join link refuses them
@@ -1679,7 +1718,7 @@ From that moment:
 
 - its **join link, QR code and short code** stop admitting anyone, and you can no
   longer add people to it or remove them from it;
-- **late entrants** can no longer answer challenges or reveal hints — their screen
+- **late entrants** can no longer answer questions or reveal hints — their screen
   shows the event as ended within about fifteen seconds;
 - the **Late entrants** section of the leaderboard becomes final, so those of its
   top three with points above zero can collect a **placing** certificate — unless
@@ -1867,10 +1906,10 @@ reason shown in its place:
   become one of them. Deleting a session is a real decision about people's
   schedules, so the platform will not do it for you as a side effect.
 
-One more refusal you may meet: if a challenge already assigned to the event
+One more refusal you may meet: if a question already assigned to the event
 **could not be answered at the new type** — a file upload, or one tagged as
 needing Checkmarx One or a desktop, at a Booth Event — the change is refused and
-the challenge is named. Unassign it, or change the challenge, and try again.
+the question is named. Unassign it, or change the question, and try again.
 
 For multi-session events each session has its own row, and what you can
 change on it depends on where that session is:
@@ -1912,52 +1951,79 @@ says how many): if the new results change someone's placing, a superadmin
 revokes that certificate and issues it again from the event's **Certificates**
 section.
 
-### Choosing an event's challenges
+### Choosing an event's questions
 
-From the event's three-dot menu on the Events list, click **Assign Challenges**
-(**Add challenges** in its workspace's **⋯** menu), or press **Create and pick
-challenges** when you create a blank event.
+**One door puts bank questions into an event: + Add from bank**, in the event's
+**Questions** section (the Overview's *Ready to start?* checklist offers the same
+door while the event has none). From the Question bank itself, tick questions and
+press **Add to events** on the selection bar (see below).
 
-![Task picker — assign challenges to an event](../screenshots/admin/23-task-picker.png)
+![Task picker — assign questions to an event](../screenshots/admin/23-task-picker.png)
 
-**The ticks show what is in the event right now.** Challenges already
-assigned open ticked and are marked *In this event*; the rest open
+**The ticks show what is in the event right now.** Questions already
+in the event open ticked and are marked *In this event*; the rest open
 unticked. Tick to add, untick to remove, then click **Save Changes** — so this
 one dialog is where you both add and take away, and it always shows you the
-event's actual challenge list.
+event's actual question list. Each row shows its difficulty and its topic; a
+qualifying question is marked *Quick question*.
 
-Use the **search box** and the **Easy / Medium / Hard** filters (they combine)
-to narrow the list; your ticks are kept as you change filters, and the counter
+Use the **search box** (title, difficulty or topic), the **Easy / Medium / Hard**
+filters and the **Topic** filter, the same one as on the Question bank (they
+combine), to narrow the list; your ticks are kept as you change filters, and the counter
 above the list tells you what Save is about to do — how many to add and how
 many to remove.
 
 **Before anything happens you get a confirmation** with a count for each side
-and the challenges named — up to the first 40 on each side, with anything beyond
-that shown as a running total. Removing a challenge takes it
+and the questions named — up to the first 40 on each side, with anything beyond
+that shown as a running total. Removing a question takes it
 off the event for everyone: points already scored on it are kept, but it
 stops counting toward the leaderboard and participants can no longer open it.
 If the event is live, the confirmation says so — changes take effect
 immediately.
 
-> **Select All Shown** and **Unselect All Shown** apply to the challenges
+> **Select all shown** and **Unselect all shown** apply to the questions
 > currently *visible*, which is what the labels say. With a filter active they
 > leave everything hidden by that filter exactly as it was.
+
+#### Questions per session
+
+On a Competition with two or more sessions, each session can hold its own set
+of questions. In the event's **Questions** section every question of the event
+shows a **Sessions** chip (**All sessions**, or the sessions it is in); press it
+to tick the sessions that ask it, then **Save**. A participant sees, answers and
+finishes only their own session's questions, so an all-solved early end, a
+participant's finish time and a percentage ranking all count their own session's
+set. A question in no chosen session is in every session, which is also how every
+question starts. Three rules hold it steady:
+
+- **A session's questions are fixed once it starts**, so everyone in it answers
+  the same set: the box of a session that has started is greyed out, with the
+  reason.
+- **Quick (qualifying) questions stay in every session**: they are asked of
+  everyone.
+- **A question must be in at least one session.** To take it out of the event,
+  remove it from the event.
+
+Each change is recorded on the event's History. Deleting a session a question was
+chosen for leaves it in the sessions still chosen; if none is left it is back in
+every session. Cloning an event keeps each question's sessions, matched by the
+sessions' order; a template does not record them.
 
 Three things the dialog will not let you do, and tells you why rather than
 failing at Save:
 
-- **A locked challenge** can only be moved by a superadmin, so for everyone
+- **A locked question** can only be moved by a superadmin, so for everyone
   else its row is greyed out, outlined with dashes and marked *Locked*.
-- **An event with a finished session** has a frozen challenge list. The
+- **An event with a finished session** has a frozen question list. The
   dialog says so and Save is disabled. Unassigning it is refused too, for the
   same reason — reopening the event is a superadmin action, and for a
   multi-session event every finished session has to be reopened.
-- **An unsealed challenge, on an event that lets staff compete**, is greyed out,
-  outlined with dashes and marked *Not sealed* — such an event only admits sealed challenges (see
+- **An unsealed question, on an event that lets staff compete**, is greyed out,
+  outlined with dashes and marked *Not sealed* — such an event only admits sealed questions (see
   [Letting staff compete](#letting-staff-compete)). And if you are competing
   in the event yourself, the dialog is not offered at all.
 
-Assigned challenges that have since been turned back into **drafts** are not
+Assigned questions that have since been turned back into **drafts** are not
 listed here, and this dialog never touches them; a note tells you how many
 there are.
 
@@ -1965,7 +2031,7 @@ there are.
 
 A participant is asked to choose an event **once**. When they pick one, the
 platform remembers it on their account, and their next sign-in takes them
-straight in — to the challenges if it is running, or to the countdown screen if
+straight in — to the questions if it is running, or to the countdown screen if
 it has not started yet. It follows the account, not the browser, so it survives
 a different device, and it applies however they sign in — with an emailed
 code or with their password.
@@ -2011,44 +2077,44 @@ not prove the holder opened it (the PDF is attached to the email anyway). When t
 holder was signed in, it reads *from the email link, by its holder*. The **Audit**
 page words these downloads the same way.
 
-### Export challenge activity
+### Export question activity
 
-**⋮ → Export Activity (CSV)** downloads a spreadsheet of how every participant
-got on with every challenge in that event. It appears for **live and
+**Export activity (CSV)**, in the event's **⋯** menu, downloads a spreadsheet of how every participant
+got on with every question in that event. It appears for **live and
 ended** events only — nothing has happened yet in one that has not
 started.
 
 ![Events three-dot menu with Export Activity (CSV)](../screenshots/admin/43-competition-activity-export.png)
 
-The file has **one row per participant per challenge**, so an event with
-40 people and 12 challenges gives 480 rows. Rows are sorted by nickname, then by
-**challenge number** — the same order the challenges are in for the people who
+The file has **one row per participant per question**, so an event with
+40 people and 12 questions gives 480 rows. Rows are sorted by nickname, then by
+**question number** — the same order the questions are in for the people who
 sat the event. The columns are:
 
 | Column | Meaning |
 | --- | --- |
 | Nickname, First Name, Last Name, Company | Who |
-| Challenge ID | The challenge's number in *this* event — the `1.02` participants see on their own screen |
+| Challenge ID | The question's number in *this* event — the `1.02` participants see on their own screen |
 | Challenge | Its title |
 | Difficulty | `easy`, `medium` or `hard` |
-| Points | What the challenge was **worth** — 50 / 100 / 150. Not what this participant scored on it: wrong answers and hints change a score, and none of that changes what the challenge was worth |
+| Points | What the question was **worth** — 50 / 100 / 150. Not what this participant scored on it: wrong answers and hints change a score, and none of that changes what the question was worth |
 | Solved | `Yes` if they have a submission that currently grades as correct |
 | Hint Revealed | `Yes` if they opened the hint |
 | Incorrect Submissions | How many of their submissions currently grade as incorrect |
-| Navigated Away | How many times they left the challenge **before solving it** — moving to another page, switching browser tab, or closing it. Once they solve it, it stops counting |
+| Navigated Away | How many times they left the question **before solving it** — moving to another page, switching browser tab, or closing it. Once they solve it, it stops counting |
 
-A participant who never touched a challenge still gets a row for it, reading
+A participant who never touched a question still gets a row for it, reading
 `No, No, 0, 0` in the four activity columns — that is what makes the file a
 complete grid you can pivot on rather than a list of things that happened.
 
 **What an Any answer participant wrote is not in this file.** For an Any answer
-challenge, Solved reads `Yes` for everyone who answered, Incorrect Submissions is
+question, Solved reads `Yes` for everyone who answered, Incorrect Submissions is
 always `0` and Hint Revealed is always `No`. The response text itself comes with
 the Participants tab's **Export CSV** while the event is open; see
 [Participants](#participants).
 
-A challenge number belongs to a challenge **within one event**, so the
-same challenge reused elsewhere has a different number there. That is what makes
+A question number belongs to a question **within one event**, so the
+same question reused elsewhere has a different number there. That is what makes
 this column the right thing to sort on: it is the event's own ordering.
 
 Notes worth knowing before you draw conclusions from it:
@@ -2059,24 +2125,24 @@ Notes worth knowing before you draw conclusions from it:
   competing, so they get rows like anyone else (see [Letting staff
   compete](#letting-staff-compete)). Participants tagged `benchmark` **are**
   included — a reference score is usually the thing you want to compare against.
-- **Every challenge assigned to the event gets rows**, including one you
-  have since hidden or unpublished. That is deliberate: a challenge people
+- **Every question assigned to the event gets rows**, including one you
+  have since hidden or unpublished. That is deliberate: a question people
   solved before you hid it still has real results, and dropping it would lose
   them.
 - **Solved and Incorrect Submissions describe how the answers grade *now*.**
-  If you [recalculate a challenge](superadmin.md#recalculating-challenge-scores)
+  If you [recalculate a question](superadmin.md#recalculating-question-scores)
   after fixing its answer, answers that are now right stop counting as wrong —
   and a cell can move the other way too, from `Yes` to `No`, if the correction
   made a previously-accepted answer wrong. That is the same basis the
   leaderboard scored on, so the two always agree.
-- **"Navigated Away" counts walking away from a challenge they had not solved.**
-  It is the *bounce* signal: how often someone opened this challenge, left it,
+- **"Navigated Away" counts walking away from a question they had not solved.**
+  It is the *bounce* signal: how often someone opened this question, left it,
   and had not cracked it yet. Solving it does not count, and neither does going
-  back afterwards to re-read it — so a challenge everyone solved first time
+  back afterwards to re-read it — so a question everyone solved first time
   reads `0`, and a high number means people kept giving up on it.
   - It **does** count switching to another browser tab and back, which people do
     constantly while working, so read it as attention-switching rather than as
-    outright abandonment. Comparing challenges is more useful than reading any
+    outright abandonment. Comparing questions is more useful than reading any
     one number on its own.
 - **Actions taken while [impersonating](#impersonating-a-participant) a
   participant** count towards Solved, Hint Revealed and Incorrect, because those
@@ -2093,11 +2159,11 @@ participants' names and companies.
 ### Full event export
 
 The **full event export** is one ZIP file holding everything about one event, as
-a set of CSV files: the participants with every profile field, the challenges,
+a set of CSV files: the participants with every profile field, the questions,
 every submitted answer (with whether it was right, the points it moved and its
 attempt number), hints taken, time spent (the solve clock, and time on platform
 where the event records it), the final rankings (main board, late entrants and
-team board), certificates issued, challenge ratings and how often each person
+team board), certificates issued, question ratings and how often each person
 navigated away. A `README.txt` inside explains the files; **User ID** and
 **Challenge Ref** columns join them. It works for an event in any state.
 
@@ -2109,9 +2175,9 @@ the API reference). The rules:
   and was later removed. Staff are left out unless the event lets staff compete;
   benchmark accounts are in, and tagged. The certificates file lists every
   certificate issued in the event, whoever holds it now.
-- **Sealed answers stay sealed.** An answer submitted to a sealed challenge reads
-  *(sealed …)* unless you wrote that challenge, because it would give the key
-  away. No file carries a challenge's answer key, a certificate's link or code,
+- **Sealed answers stay sealed.** An answer submitted to a sealed question reads
+  *(sealed …)* unless you wrote that question, because it would give the key
+  away. No file carries a question's answer key, a certificate's link or code,
   or a join link.
 - **Spreadsheet-safe.** Any cell starting with `=`, `+`, `-`, `@`, a tab or a
   carriage return gets a leading apostrophe, numbers such as a `-5` penalty
@@ -2127,9 +2193,8 @@ one-to-many: a single secret link (and QR code) that lets people add
 *themselves* to one event — ideal for an in-person event where you put
 a QR code on a screen and let the room scan it.
 
-Open it from the event's **⋮** menu on the Events list → **Join Link**, or, in
-the event's workspace, from **Join-link settings** (in the **⋯** menu and at the
-foot of the join pill's panel). The join pill itself shows the code and the QR
+Open it in the event's workspace, from **Join-link settings** (in the **⋯** menu
+and at the foot of the join pill's panel). The join pill itself shows the code and the QR
 for your signage — see [The event workspace](#the-event-workspace):
 
 ![Self-enrollment link dialog](../screenshots/admin/33-self-enroll-dialog.png)
@@ -2150,8 +2215,8 @@ form, and what the sign-up form behind the link asks for.
   without that code joining them to your event, even if you have switched the
   link back on by then. While the link is on they can still join through it,
   like anyone who opens it. Once the event
-  has ended the link, the QR and the code stop working and the **Join Link**
-  item leaves the ⋮ menu — except on a Booth Event still taking
+  has ended the link, the QR and the code stop working and the **Join-link
+  settings** item leaves the ⋯ menu — except on a Booth Event still taking
   [late entries](#late-entries). There the item stays, and — while **Enable
   self-enrollment** is on — the link, the QR and the code keep working until the
   late-entry deadline, or until somebody closes late entries early, because your
@@ -2175,6 +2240,36 @@ form, and what the sign-up form behind the link asks for.
   - On a Competition with quick questions, ending early also waits until
     everyone in it has answered them all, so nobody's are cut off; the answer
     that completes the last person ends it, and a changed answer does not.
+- **Start each participant's clock** — a setting on the **event form**, in
+  its Advanced section, on a Booth Event and a Competition (a Program is not
+  ranked, so it always measures from entry). It decides when each
+  participant's **time to solve** — the tie-break between equal scores —
+  starts:
+  - **When they open their first question** (the default for every new Booth
+    Event and Competition): each participant's time starts the first time they
+    open a question that scores points, or answer one or ask for a hint before
+    opening anything. Entering the event, waiting in the lobby, reading the
+    list and opening a **Quick question** start nothing, so somebody who
+    arrives ten minutes late is not ten minutes behind. Until their clock has
+    started a participant is **not on the leaderboard** (Rankings, the
+    participant board and its exports), and *Time on platform*, where
+    recorded, counts nothing for them. The participants see a line on the
+    question list saying when their time starts.
+  - **When they enter the event**: their time starts as they enter the
+    running event (or its session). Every event created before this setting
+    existed keeps this rule, so no finished or running board changes.
+  - Either way the event's own countdown and end are unchanged; only each
+    person's starting point moves. Removing a participant and adding them back
+    keeps the starting point they had; a late entrant's starts at their first
+    open in the late window (or, on the entry rule, when they enter it); an
+    admin looking at a participant's view never starts it. Entering a live
+    session still locks the session choice, whether or not a question was
+    opened.
+  - **Decide it before the event goes live**: it is locked once the event, or
+    any session, has started (shown greyed with the reason), since every time
+    already measured would no longer compare with the rest. A copy of an event
+    keeps its source's choice; a template that does not state one gives each
+    new event its type's default.
 - **Record time on platform** — a setting on the **event form**, not a
   control in this dialog: open **Edit** on the event to reach it. Off by
   default. When on, the platform counts five-minute blocks in which each
@@ -2188,7 +2283,7 @@ form, and what the sign-up form behind the link asks for.
     Platform* might read 35 minutes. Either on its own is misleading.
   - **It measures presence in the browser, not effort.** The count comes from
     activity in the participant's own browser tab, so time spent working outside
-    it does not appear: someone who reads the challenge, switches to their IDE
+    it does not appear: someone who reads the question, switches to their IDE
     for forty minutes and comes back to submit banks almost nothing for that
     time. That is the ordinary way people work at a hackathon, so a low number is
     just as likely to mean *they were working elsewhere* as *they were not
@@ -2210,7 +2305,7 @@ form, and what the sign-up form behind the link asks for.
     *Record time on platform* itself stays editable while the event is upcoming
     or live, but not once it has ended.
   - It stops counting for a participant the moment they have finished (or run
-    out of attempts on) every challenge, so nobody gains by leaving the
+    out of attempts on) every question, so nobody gains by leaving the
     leaderboard open.
   - Not available on a Booth Event: over a 45-minute window there are only nine
     blocks, so everyone who stayed would tie and the number would say nothing.
@@ -2341,61 +2436,75 @@ cancels it everywhere the moment those browsers next load the site.
 
 ---
 
-## Challenges
+## Questions
 
-The **Challenges** tab lists every challenge in the pool, whatever
-events they're attached to.
+The **Question bank** (the sidebar item of that name) lists the bank of
+questions, whatever events use them, filed by [topic](#topics).
 
-![Challenges tab](../screenshots/admin/02-challenges.png)
+**A question added to an event lives in that event.** Adding a library
+question to an event gives the event its **own copy** of it — the question,
+answer, options, hint, explanation, tags, attachments and seal — and the event
+uses that copy from then on. Editing the event's copy (in the event's
+**Questions** section), its answer included, changes that event only; editing
+the library question changes no event at all, so a later fix to the library is
+not carried into an event that already has its copy. Cloning an event, or
+making one from a template, gives the new event fresh copies of its own. An
+event's own question cannot be added to another event: add the library
+question it was copied from instead. Events made before this change were given
+their own copies when the server was upgraded, with their answers, hints and
+results moved to them; scores and certificates are unchanged.
+
+![Questions tab](../screenshots/admin/02-challenges.png)
 
 Each row's **Attachments** badge shows how many downloadable bundles the
-challenge ships (a dash if none); the column is sortable, handy for
-spot-checking which challenges rely on downloadable material.
+question ships (a dash if none); the column is sortable, handy for
+spot-checking which questions rely on downloadable material.
 
-### Challenges a Booth Event cannot use
+### Questions a Booth Event cannot use
 
 A Booth Event is a walk-up at a stand: someone scans a QR with the phone in
-their hand and has a couple of minutes. Three kinds of challenge cannot be
+their hand and has a couple of minutes. Three kinds of question cannot be
 answered in that situation, so the platform **refuses to attach them to a
 Booth Event** and tells you which one it objected to:
 
 - an answer type of **File** — there is nothing to upload from a borrowed
   phone;
 - anything tagged **`needs:cxone`** — Booth Events don't create CxOne
-  accounts, so the account the challenge assumes won't exist;
+  accounts, so the account the question assumes won't exist;
 - anything tagged **`needs:desktop`** — an IDE, a terminal, a VPN client.
 
-An **Any answer** challenge is fine at a Booth Event — it asks for nothing a
+An **Any answer** question is fine at a Booth Event — it asks for nothing a
 phone cannot give.
 
-`needs:` is an ordinary tag, so you add and remove it exactly like any other,
-and it is **never shown to participants** (only `category:` tags are). Any
-`needs:` tag restricts, including one you invent — `needs:burp` will be
-refused at a Booth Event without anyone changing the platform.
+Tick what a question needs under **This question needs** in the editor's
+**Topic and sharing** row (a CxOne account, a desktop computer). It is **never
+shown to participants**. Any `needs:` marker restricts, including one added
+through the API or an import (`needs:burp` is refused at a Booth Event too); the
+editor lists such a marker by its own name so you can clear it.
 
 None of this applies to a Competition or a Program, which can use all three
-freely. The refusal also fires the other way round: if a challenge is already
+freely. The refusal also fires the other way round: if a question is already
 attached to a Booth Event that has not finished yet, you cannot change its answer type to File or
 add a `needs:` tag to it until you unassign it from that event — otherwise a
 visitor would be looking at something they cannot do.
 
 From this tab you can:
 - Export the catalogue to **JSON** — a complete copy you can re-import
-  exactly, with two exceptions: a challenge whose answer is **sealed** exports
+  exactly, with two exceptions: a question whose answer is **sealed** exports
   without its answer, its explanation or its hint (the hint marked withheld
   rather than empty) for anyone but its author or a superadmin who has revealed
   it, and is refused on import whoever exported it (see
-  [Sealing a challenge answer](#sealing-a-challenge-answer)); and a challenge
+  [Sealing a question answer](#sealing-a-question-answer)); and a question
   held by an event you compete in exports without its hint, marked withheld
   rather than empty, so re-importing the file does not blank the hint (see
   [The competitor lock](#the-competitor-lock)).
-- Create or edit a challenge — title, description, difficulty, **attempt
+- Create or edit a question — title, description, difficulty, **attempt
   limit**, **answer type**, correct answer, hint, **explanation**, attachment, and author. The
   **explanation** is the write-up participants see after the event ends
   (how it was meant to be solved). The **answer type** decides what a
   participant submits:
   - **Text** — plain text; matching ignores case and whitespace. A text
-    challenge can accept **several** answers — press **+ Accepted answer** under
+    question can accept **several** answers — press **+ Accepted answer** under
     the Correct Answer box and any of them counts.
   - **File** — participant uploads a file, graded as a single piece of text
     (case and whitespace ignored). Useful when the answer is too long or
@@ -2404,24 +2513,24 @@ From this tab you can:
     doesn't matter, list order does). Invalid JSON always fails.
   - **Multiple choice** — you supply the options and tick the ones that are
     correct; participants pick from a shuffled list. See
-    [Creating or editing a challenge](#creating-or-editing-a-challenge)
+    [Creating or editing a question](#creating-or-editing-a-question)
     below.
   - **Any answer (free response)** — every non-empty answer is accepted,
     exactly as typed. For reflections, feedback and open questions. Such a
-    challenge has **no hint** and participants see **no wrong-answer
+    question has **no hint** and participants see **no wrong-answer
     warning**; their responses export with the participants CSV (see
     [Participants](#participants)). Given two or more **Options**, it becomes a
     pick-one question: participants choose one, and every option is accepted.
-- Toggle a challenge's visibility so it stops appearing in events
+- Toggle a question's visibility so it stops appearing in events
   without losing its history.
 
-### Creating or editing a challenge
+### Creating or editing a question
 
-**+ New Challenge** (or **Edit** from a row's three-dot menu) replaces the
-challenge table with an inline form that fits on one screen. Cancel or Save
+**+ New question** (or **Edit** from a row's three-dot menu) replaces the
+question table with an inline form that fits on one screen. Cancel or Save
 brings the table back:
 
-![Challenge form](../screenshots/admin/17-challenge-form.png)
+![Question form](../screenshots/admin/17-challenge-form.png)
 
 The question is on the left: **Title**, **Description** and the **Answer** —
 its type and the correct answer. The settings are on the right: **Difficulty**
@@ -2431,74 +2540,74 @@ download — source code, data, logs — or a link) and **Author**. Click a row 
 open it in place; closed, a row shows what it holds, or *+ Add …* when it is
 empty. A small **?** beside a control explains it. The description's toolbar
 keeps the everyday commands in view; **⋯** (More formatting) shows
-strikethrough, colours, font, size and clear formatting. On a challenge you
+strikethrough, colours, font, size and clear formatting. On a question you
 cannot edit, the toolbar is switched off and a line under it says why. On a
 phone the form is one column, settings after the question.
 
 The **Cancel** and Save buttons stay pinned to the bottom of the window. On a
-**new** challenge, click **Save as draft** to keep it hidden while you work, or
-**Save & publish** to make it assignable. On an **existing** challenge the form
-offers a single **Save challenge** button instead — publishing is a one-way
-step, so there is no *Save as draft* here. To take a published challenge back to
+**new** question, click **Save as draft** to keep it hidden while you work, or
+**Save & publish** to make it assignable. On an **existing** question the form
+offers a single **Save question** button instead — publishing is a one-way
+step, so there is no *Save as draft* here. To take a published question back to
 draft, open **History** and restore a version from before it was published.
 
-If someone else changes the challenge while your form is open, **Save
-challenge** is refused instead of replacing their change. Close the form and open
+If someone else changes the question while your form is open, **Save
+question** is refused instead of replacing their change. Close the form and open
 it again to start from the latest version.
 
-**Attempts.** Leave it blank — the normal answer — and the challenge is
+**Attempts.** Leave it blank — the normal answer — and the question is
 uncapped, or takes whatever limit its event sets. A number here (1 to 1000)
 is the ceiling on how many submissions each participant may make on this
-challenge, and it **overrides** the event's own limit wherever the two
-disagree. Zero is refused: unpublish the challenge instead. Once a
+question, and it **overrides** the event's own limit wherever the two
+disagree. Zero is refused: unpublish the question instead. Once a
 participant has used up their attempts, an organiser can hand them more —
 see **Grant Attempts** below.
 
-**Sealing the answer.** A **new** challenge can be created with its answer
+**Sealing the answer.** A **new** question can be created with its answer
 sealed — turn on *Seal the answer — only I, or a superadmin on the record, can
 see or change it* (its **?** spells out what that means) and the correct answer, the explanation and the hint stay visible
 to your account alone (a participant competing in an event that holds it can
 still buy the hint there); the one exception is a superadmin who reveals them,
 on the record.
-Nobody else can edit, restore or recalculate the challenge either — although
+Nobody else can edit, restore or recalculate the question either — although
 sealing only narrows who may, it does not hand you a right you would not
-otherwise have. It can only be chosen while the challenge is being created.
-See [Sealing a challenge answer](#sealing-a-challenge-answer).
+otherwise have. It can only be chosen while the question is being created.
+See [Sealing a question answer](#sealing-a-question-answer).
 
-**Answer types.** A challenge is graded one of five ways. **Text** compares the
+**Answer types.** A question is graded one of five ways. **Text** compares the
 participant's answer ignoring case and spacing against one or more accepted
 answers. **JSON** checks a deep match, so key order doesn't matter. **File
 upload** takes a plain-text file, graded as one piece of text. **Multiple
 choice** presents a list of options. **Any answer (free response)** accepts
 every non-empty answer, or, given options, any one of them.
 
-**Several accepted answers.** On a Text challenge the **Correct answer** box is
+**Several accepted answers.** On a Text question the **Correct answer** box is
 the first accepted answer; **+ Accepted answer** adds a row for each
 alternative, and a participant who types any of them — in any case, with any
 spacing — solves it. Blank rows and duplicates are dropped when you save.
-Reopening the challenge shows the rows again, History shows the alternatives
+Reopening the question shows the rows again, History shows the alternatives
 separated by ` | `, and the participant's Solution box (where answers are
 revealed) lists every accepted answer.
 
-![A Text challenge with three accepted answers](../screenshots/admin/53-challenge-text-alternatives.png)
+![A Text question with three accepted answers](../screenshots/admin/53-challenge-text-alternatives.png)
 
 **Any answer (free response).** Choose it when there is no right answer to
 check — a reflection, a piece of feedback, an open question. There is no Correct
 answer box, and the **Hint** row disappears. Nothing written there is kept:
-switching an existing challenge to Any answer **removes its hint and its
+switching an existing question to Any answer **removes its hint and its
 accepted answers when you save**, and switching the type back later does not
 bring them back — copy them first if you want them. ({{platformName}} stores no
-hint on such a challenge by any route, because there is nothing to hint
+hint on such a question by any route, because there is nothing to hint
 towards.) What a
 participant types is stored exactly as typed (spacing and case preserved), every
 non-empty answer is correct, and an empty one is simply refused, so nobody is
 ever penalised. Two consequences follow from "every answer is correct": the
-challenge is **solved on the first answer** — it counts towards the all-solved
+question is **solved on the first answer** — it counts towards the all-solved
 rule that can end an event early, towards the **All Solved** mark and a
 completion certificate — and a participant **cannot answer it twice**. In
 Analytics everyone who answers it solves it, so its solve rate falls below 100%
 only through people who opened it and left without answering; they count as
-attempters exactly as on any other challenge. To read the responses, open the
+attempters exactly as on any other question. To read the responses, open the
 event and use **Export CSV** on its Participants section.
 
 **Options turn it into a pick-one question.** In place of the Correct answer
@@ -2519,12 +2628,12 @@ as a new option, since which line replaced which cannot be told.
 
 ![The editor with Any answer (free response) chosen — no Correct Answer box and no Hint field](../screenshots/admin/54-challenge-any-answer.png)
 
-For a multiple-choice challenge, type each option and tick the ones that are
+For a multiple-choice question, type each option and tick the ones that are
 correct — there's no separate "correct answer" box, because the answer *is* the
 set of ticks. Add up to 20 options with **+ Add choice**; two is the minimum.
-At twenty the button stops and says that is the most a challenge can have.
+At twenty the button stops and says that is the most a question can have.
 
-![Multiple-choice challenge editor](../screenshots/admin/41-challenge-multiple-choice.png)
+![Multiple-choice question editor](../screenshots/admin/41-challenge-multiple-choice.png)
 
 Two things follow automatically from how many you tick:
 
@@ -2541,7 +2650,7 @@ third one". The shuffle is stable for each person — refreshing doesn't reorder
 the list under them.
 
 **Changing the correct options during an event** is allowed until a session of
-an event holding the challenge has ended, and it re-scores nothing on its own.
+an event holding the question has ended, and it re-scores nothing on its own.
 Participants who already solved it keep the solve and its points, and their
 options stop being marked, with a short note saying why, so they are not shown
 the new answer while others are still answering. A superadmin can re-score the
@@ -2549,7 +2658,7 @@ earlier answers against the new set with **Recalculate Scores**.
 
 The editor refuses a question that can't work: fewer than two options, no
 correct option, *every* option correct (nothing left to get wrong), a duplicate
-option, or an empty one. Export and import carry multiple-choice challenges
+option, or an empty one. Export and import carry multiple-choice questions
 intact.
 
 Use **View** (or **View as Participant**) to check the question the way a
@@ -2561,7 +2670,7 @@ just the explanation.
 
 #### Multiple choice at a Booth Event
 
-At a **Booth Event**, a participant who opens a multiple-choice challenge on a
+At a **Booth Event**, a participant who opens a multiple-choice question on a
 phone (in either orientation), on most tablets held upright, or in a browser
 window 600px wide or less gets a layout built for one hand: the question fills
 the screen, each option is a large lettered tile, and the usual header, menu and
@@ -2575,7 +2684,7 @@ the left and the tiles on the right.
 - **A wrong single answer marks that tile** *Not correct*, and it cannot be
   picked again while the question is open (reopening the question clears the
   mark). Attempt limits and the last-attempt warning work exactly as on the
-  ordinary layout; a wrong last attempt locks the challenge.
+  ordinary layout; a wrong last attempt locks the question.
 - **With several correct options** participants tick tiles and press **Submit
   answers**. A wrong selection marks no tile.
 
@@ -2588,10 +2697,10 @@ options. Keep booth questions and options short and they will fit.
 
 The other event types — and, at a Booth Event, a laptop or desktop at full
 width, a tablet held sideways and the largest tablets even upright — keep the
-ordinary layout with radio buttons or checkboxes. A challenge the participant
+ordinary layout with radio buttons or checkboxes. A question the participant
 has already solved or can no longer answer is shown on the ordinary card,
 read-only, whatever the device. **View as Participant** shows the ordinary
-layout too; to see the booth one, open the challenge in a participant account
+layout too; to see the booth one, open the question in a participant account
 on a phone, or in a browser window narrowed to 600px or less.
 
 **Code blocks.** **Code Block** on the toolbar turns the selection into a block;
@@ -2599,7 +2708,7 @@ right-click the block to pick its language from a menu —
 including **Dockerfile**, Bash, YAML, JSON, PowerShell and the usual programming
 languages. Every entry in that menu really is highlighted; there are no
 decorative options. Code renders identically wherever it appears: the editor,
-the participant's challenge, and **View as Participant**. Code — a block or
+the participant's question, and **View as Participant**. Code — a block or
 inline code — shows exactly the characters typed: `=>`, `==`, `!=`, `--` and
 `://` stay separate characters rather than being drawn as one symbol, and the
 editor never auto-corrects inside code (Safari and iPads otherwise turn `--`
@@ -2617,7 +2726,7 @@ method. Coloured text you copy, paste or drag within the editor keeps its
 named colour. A colour pasted from Word or a web page becomes the nearest named
 colour (Word's dark red becomes red, its blue blue, a mid grey grey), and black,
 white and colours very close to them are left off, so that text follows the
-page's own text colour by day and at night. Colours already in a challenge, and
+page's own text colour by day and at night. Colours already in a question, and
 colours dragged in from another window, are kept as they were, so check how
 such text reads by day and at night, or select it and pick a named colour instead.
 
@@ -2636,7 +2745,7 @@ cursor is inside a table — to insert or delete rows and columns, or delete the
 whole table. The editing items only appear when the cursor is actually in a
 table, so the menu never offers an action that would do nothing.
 
-![Table menu in the challenge editor](../screenshots/admin/40-challenge-table-menu.png)
+![Table menu in the question editor](../screenshots/admin/40-challenge-table-menu.png)
 
 **You can paste tables in.** Copy a table from Word, Excel, Google Docs or a web
 page and paste it straight into any of the three fields. The editor keeps the
@@ -2652,15 +2761,15 @@ their alignment and colours (as named colours). Highlighting pasted from Word is
 the text and use **Highlight**.
 
 A few limits worth knowing. Very wide tables scroll sideways inside the
-challenge rather than stretching the page, so they stay readable on a phone.
+question rather than stretching the page, so they stay readable on a phone.
 Images inside a pasted table only survive if they're real web images — a picture
 pasted from a local Word file points at your own disk and is dropped rather than
 saved as a broken image; add it with the editor's image paste instead. And a
 merged cell spanning more than 64 rows or columns is trimmed to 64.
 
 **A pasted picture lives as long as something uses it.** A picture stays while
-a challenge, one of its saved versions, a participant's photo or a frozen team
-board shows it. Once nothing does (you deleted the only challenge that showed
+a question, one of its saved versions, a participant's photo or a frozen team
+board shows it. Once nothing does (you deleted the only question that showed
 it, say), the next daily clean-up removes it (never within a week of it being
 pasted), and a copy of its address you put in an outside page, an email or a
 slide stops working then. Paste a picture you
@@ -2669,7 +2778,7 @@ want to share outside {{platformName}} into that page or email itself.
 **About attachments.** Uploads you add in the form are **held back and
 invisible to participants until you click Save** — Cancel (or closing the
 form) discards them cleanly. Renaming or removing an attachment on an
-already-saved challenge takes effect immediately. To bring back a removed
+already-saved question takes effect immediately. To bring back a removed
 attachment, open **History** and restore a version that included it — the
 file stays on disk, so the restore re-links it.
 
@@ -2692,12 +2801,14 @@ if you are asked to sign in, do that first.* The second one does not say
 why the session ended, because {{platformName}} only knows that it did. Either way
 nothing from it is kept.
 
-- Manage **tags** — labels for grouping challenges; they drive the Analytics
-  filter and the challenge browser. Tags are **private to admins**, with one
-  deliberate exception — see [Categories](#categories) below.
-- Assign or un-assign the challenge to specific events.
+- File it under a **topic**, share it with every organiser and say what it
+  needs, in the editor's **Topic and sharing** row — see [Topics](#topics) below.
+- **Save to bank** (inside an event, on the event's own question) — copies it
+  into the Question bank as a new bank question; later changes to either one do
+  not reach the other.
+- Assign or un-assign the question to specific events.
 - View past versions and **restore** an earlier one from the three-dot menu.
-- **Grant Attempts** — offered from the three-dot menu where the challenge,
+- **Grant Attempts** — offered from the three-dot menu where the question,
   or an event it is in, carries an attempt limit: hand a named participant
   more tries on it in a chosen event. Grants add to what that participant
   already has rather than replacing it, so two organisers each granting one
@@ -2706,29 +2817,29 @@ nothing from it is kept.
   run out of attempts — but the grant does not reopen the event by itself: a
   superadmin still has to extend it, and the grant has to come first.
 
-  ![Granting extra attempts on a challenge](../screenshots/admin/48-grant-attempts.png)
+  ![Granting extra attempts on a question](../screenshots/admin/48-grant-attempts.png)
 
-- **View participant feedback** — participants rate each challenge 1–5 stars.
+- **View participant feedback** — participants rate each question 1–5 stars.
   The table's sortable **Feedback** column shows the average and the number
-  of ratings; to read who gave what, open the challenge for **Edit** — a
+  of ratings; to read who gave what, open the question for **Edit** — a
   **Feedback** section at the foot of the form lists each participant and
   their stars, and a superadmin can remove one rating there or clear them all
-  at once. There is no **Edit** entry on a locked challenge, so unlock it
+  at once. There is no **Edit** entry on a locked question, so unlock it
   first if you need the individual ratings.
 
-### Sealing a challenge answer
+### Sealing a question answer
 
-When you create a challenge you can turn on **Seal the answer — only I, or a superadmin on the record, can see or change it**. The correct answer,
+When you create a question you can turn on **Seal the answer — only I, or a superadmin on the record, can see or change it**. The correct answer,
 the explanation and the hint are then visible to exactly one account: yours, the
-one that created the challenge. Not other event admins, not other
+one that created the question. Not other event admins, not other
 administrators, and not participants — except that a participant competing in an
 event that holds it can still buy its hint there, as they could any hint. The one exception is a **superadmin**, who can reveal them to
 themselves — never silently: the reveal is an explicit act, confirmed first,
-and it is written into the challenge's History and the event log with their
+and it is written into the question's History and the event log with their
 name, so you will see that it happened (see [A superadmin can reveal it, on
 the record](#a-superadmin-can-reveal-it-on-the-record) below). Use the seal
 when the answer ought not to circulate among the organising team. It is also
-what an event where staff compete requires of every challenge in it, for the
+what an event where staff compete requires of every question in it, for the
 same reason — see [Letting staff compete](#letting-staff-compete).
 
 ![The Seal the answer checkbox on the new-challenge form, ticked, with the note explaining what it withholds](../screenshots/admin/56-challenge-answer-seal.png)
@@ -2739,30 +2850,30 @@ a seal to protect — and sealing one would hide the responses themselves from
 everyone but you, which is the opposite of what you collect them for. The form
 gates it from both ends: choose that answer type and the seal checkbox is
 disabled, tick the seal and that answer type is no longer offered, each with a
-line saying why. The same applies on an existing sealed challenge — its answer
+line saying why. The same applies on an existing sealed question — its answer
 type can still be changed to any of the others, just not to that one.
 
-![The seal checkbox disabled, with the note explaining that an Any answer challenge has no answer to seal](../screenshots/admin/58-challenge-seal-free-response.png)
+![The seal checkbox disabled, with the note explaining that an Any answer question has no answer to seal](../screenshots/admin/58-challenge-seal-free-response.png)
 
 **The hint is sealed with the answer.** Wherever the answer
-is withheld the hint is withheld too — the Challenges table, the editor (where
+is withheld the hint is withheld too — the Questions table, the editor (where
 the hint box is hidden rather than shown empty, so a save cannot wipe it), the
 preview, the History, the export and the reveal at the end of the event. A
-participant who pays 30% of the challenge's points for the hint during the
+participant who pays 30% of the question's points for the hint during the
 event still receives it: that is what a hint is for, and a seal does not take
 back something they bought. That is a *competing* participant's right, though,
 not an administrator's: in your own Participant View you are offered a sealed
-challenge's hint only if you are competing in the event, since a hint bought by
+question's hint only if you are competing in the event, since a hint bought by
 somebody who is not on the board would be a free read of a sealed field; and
 while you impersonate a participant who paid for it you see *Hint withheld*
-where it would be. On a multiple-choice challenge the option **text**
+where it would be. On a multiple-choice question the option **text**
 stays visible — that is the question. What is hidden is which of the options
 are correct.
 
 **What everybody else gets instead.** Wherever the answer would normally
 appear, {{platformName}} withholds it:
 
-- the **Challenges** table, and everything the admin screens build from it;
+- the **Questions** table, and everything the admin screens build from it;
 - the **editor** — there is no **Edit** entry on the row for anybody else,
   and a form reached some other way has an empty Correct Answer box, no hint
   box at all, every field read-only (the text boxes' formatting buttons
@@ -2773,8 +2884,8 @@ appear, {{platformName}} withholds it:
 - **History** — *every* snapshot in the version log is redacted, not only
   the most recent, so the log cannot be read backwards for the answer;
 - the **JSON export** — the answer and explanation come out empty, the hint
-  is marked withheld, and the challenge is marked as sealed;
-- **Submissions** — an answer somebody submitted to a sealed challenge shows
+  is marked withheld, and the question is marked as sealed;
+- **Submissions** — an answer somebody submitted to a sealed question shows
   as sealed rather than as text, and the search box will not match it either,
   so the stream cannot be used to confirm a guess;
 - the **event log and the History entries** — an edit is recorded as
@@ -2783,7 +2894,7 @@ appear, {{platformName}} withholds it:
 - the **answer reveal at the end of the event**, below.
 
 **Only you can change it — you, or a superadmin who has revealed it.**
-Editing the challenge, restoring an earlier version of it and recalculating
+Editing the question, restoring an earlier version of it and recalculating
 its scores are all refused for everybody else. Sealing narrows *who* may do
 those things; it never grants you a right you would not otherwise have. You
 still need whatever the action normally takes — recalculating scores is a
@@ -2792,69 +2903,69 @@ finished session freezes the scoring fields for you exactly as it does for
 anyone else.
 
 **Publishing, hiding and tagging go with it.** Those three change the
-challenge as surely as editing it does — publishing or hiding one moves what
-every event holding it counts as solved — so on a sealed challenge they are
+question as surely as editing it does — publishing or hiding one moves what
+every event holding it counts as solved — so on a sealed question they are
 the author's alone too (or a superadmin's, once they have revealed it), and
 the row simply does not offer them to anybody else. Attachments follow,
 because they are managed inside the editor. What
 stays open to everyone who can see the row is the *use* of it: assigning it
 to their own events, taking their own assignment back, granting attempts,
 reading its History, lock and unlock — and a superadmin can still delete it.
-So a sealed challenge is never stranded in somebody's event: they can
+So a sealed question is never stranded in somebody's event: they can
 unassign it without its author, and a superadmin can remove it outright.
 
-**A sealed challenge is left out of the answer reveal.** Even on an event
+**A sealed question is left out of the answer reveal.** Even on an event
 with *Reveal correct answers and explanations once the event ends* ticked,
-participants see *Answer not shown* on a sealed challenge, together with the
+participants see *Answer not shown* on a sealed question, together with the
 reason. Its explanation is not shown either, nor its hint (a hint a
 participant paid for during the event stays theirs) — so if there is
 something a participant is meant to take away afterwards, write it into the
-challenge description rather than into the explanation.
+question description rather than into the explanation.
 
-**Sealing is a one-way door.** You can only choose it while the challenge is
+**Sealing is a one-way door.** You can only choose it while the question is
 being created; there is no way to seal one that already exists, and
 {{platformName}} refuses if you try. You can **unseal** it later — the editor
 offers *Unseal this answer when I save*, to you and to a superadmin who has
-revealed the answer — and once you have, that challenge can never be sealed
+revealed the answer — and once you have, that question can never be sealed
 again. The reason is honest rather than technical: the
 answer has already been readable by administrators, and ticking a box cannot
 take that back. The one time the editor withholds that tick is while the
-challenge sits in an event where staff compete, which admits sealed challenges
+question sits in an event where staff compete, which admits sealed questions
 only — see [Letting staff compete](#letting-staff-compete) for what the note in
-its place says and when the challenge can be taken out.
+its place says and when the question can be taken out.
 
-![Reopening your own sealed challenge — the seal checkbox is gone, a note says the answer is sealed, and the only control is Remove the seal](../screenshots/admin/57-challenge-sealed-unseal.png)
+![Reopening your own sealed question — the seal checkbox is gone, a note says the answer is sealed, and the only control is Remove the seal](../screenshots/admin/57-challenge-sealed-unseal.png)
 
-**The built-in superadmin account cannot seal a challenge.** It has no user
-record behind it, so there would be no author — the challenge would end up
+**The built-in superadmin account cannot seal a question.** It has no user
+record behind it, so there would be no author — the question would end up
 readable and editable by nobody at all, for ever. The create is refused with
 that explanation. Sign in as a named admin account and create it from there.
 
-**Sealed challenges do not migrate.** The challenge import refuses any row
-marked as sealed, because an imported challenge would have no author on the
+**Sealed questions do not migrate.** The question import refuses any row
+marked as sealed, because an imported question would have no author on the
 receiving platform — and it refuses it whoever exported the file, your own
 export included. The import summary counts those rows as refused, so you know
-how many to recreate. Create a sealed challenge fresh on the new platform
-instead. An import cannot overwrite somebody else's sealed challenge either,
-nor make any sealed challenge, your own included, an **Any answer** challenge
+how many to recreate. Create a sealed question fresh on the new platform
+instead. An import cannot overwrite somebody else's sealed question either,
+nor make any sealed question, your own included, an **Any answer** question
 (which has no answer to seal): the summary counts those as not overwritten.
 
-A **Sealed** badge appears in the Status column of the Challenges table for
+A **Sealed** badge appears in the Status column of the Questions table for
 everyone who can see the row, you included, so it is plain at a glance which
-challenges are sealed and which are not.
+questions are sealed and which are not.
 
 #### A superadmin can reveal it, on the record
 
 A superadmin is the one person besides you who can read a sealed answer, and
-they cannot do it quietly. On a sealed challenge you created, their row menu
+they cannot do it quietly. On a sealed question you created, their row menu
 offers **Reveal sealed answer**, and the read-only editor a button reading
 **Reveal sealed answer and hint**; either opens a confirmation that says the
 reveal will be recorded before they press **Reveal and record**. From then on,
 for the rest of their session, they see the answer, the explanation and the
-hint as you do and can edit, restore, recalculate and unseal the challenge as
-you can. The reveal is written into the challenge's **History** as a *Record*
+hint as you do and can edit, restore, recalculate and unseal the question as
+you can. The reveal is written into the question's **History** as a *Record*
 row — a sentence saying which of the sealed answer, explanation and hint (the
-ones the challenge has) were revealed to a superadmin, with their name in the
+ones the question has) were revealed to a superadmin, with their name in the
 By column and, if they were looking through an organiser's impersonated panel,
 whose view they were in — and into the event log. It lasts only for that session: signing out, switching between Admin View
 and Participant View, signing in elsewhere, or entering or leaving an impersonation ends it, and a
@@ -2862,12 +2973,12 @@ later reveal is a new record. The record comes first: wherever a sealed answer
 or hint would be shown to a superadmin — through the reveal, or in their own
 participant view — it is shown only once the record has been written, and if it
 cannot be written nothing is shown. A superadmin competing in an event that holds
-the challenge cannot reveal it at all, because a competitor may not read the
-key of a challenge they are competing on. The [Superadmin
+the question cannot reveal it at all, because a competitor may not read the
+key of a question they are competing on. The [Superadmin
 guide](superadmin.md#sealed-answers) describes it from their side.
 
-**What sealing does not do.** It does not hide the challenge, its title or its
-description — to a participant a sealed challenge looks and behaves exactly
+**What sealing does not do.** It does not hide the question, its title or its
+description — to a participant a sealed question looks and behaves exactly
 like any other during the event, the hint they can buy included; only the
 reveal at the end leaves the hint out. It does not hide who solved it or what
 they scored. And anyone with direct access to the server's database or to its
@@ -2875,187 +2986,156 @@ backups can still read the answer: this is a control over {{platformName}}'s
 own screens and exports, not encryption at rest. Treat it as a way of keeping
 an answer out of the organising team's ordinary view, not as a secret store.
 
-### Once a session has finished, the challenge is frozen
+### Once a session has finished, the question is frozen
 
 When any session of an event has ended, that event's results are
-final — so {{platformName}} refuses every change to its challenges that could
-move them. That covers editing the answer, the answer type or the difficulty,
+final — so {{platformName}} refuses every change to its questions (the event's
+own copies) that could move them. That covers editing the answer, the answer type or the difficulty,
 **publishing or unpublishing**, **hiding or showing**, deleting, and overwriting
-the challenge through an import (which skips it and tells you how many were
+the question through an import (which skips it and tells you how many were
 skipped).
 
 It is worth knowing *why* hiding counts, because it is not obvious: a hidden
-challenge stops counting toward the total needed for "solved everything". Hide
+question stops counting toward the total needed for "solved everything". Hide
 one after the event and participants who never finished are suddenly recorded as
 having finished — which changes the tie-break, and so the final places, without
 changing a single point.
 
-If you genuinely need the challenge out of a finished event, the
+If you genuinely need the question out of a finished event, the
 event has to be **reopened first** — which is a superadmin action, and for
 a multi-session event means reopening *every* finished session, not just
 one. Unassigning is refused while the freeze holds, so it is not a way round it.
-Everything else about the challenge stays editable — its title, description,
+Everything else about the question stays editable — its title, description,
 hint, explanation and attachments are not scoring fields.
 
 **Recalculating** is the one exception, and it is scoped rather than blocked: it
 re-grades the events that are still open and leaves finished ones exactly
 as they are, telling you how many submissions it skipped for that reason. So you
-can still fix a mis-typed answer for a live event even when the same challenge
+can still fix a mis-typed answer for a live event even when the same question
 was used at an earlier one.
 
 **A sealed answer is a separate restriction, and it stacks with the freeze.**
-A challenge created with its answer sealed can only be edited, restored or
+A question created with its answer sealed can only be edited, restored or
 recalculated by the author who sealed it — or by a superadmin who has revealed
 it, on the record — whether or not any session has finished; and the freeze
 above still applies to them like anyone else, so once a session has ended
-they cannot change its scoring fields either. See [Sealing a challenge
-answer](#sealing-a-challenge-answer).
+they cannot change its scoring fields either. See [Sealing a question
+answer](#sealing-a-question-answer).
 
-### Categories
+### Topics
 
-Tags are normally an admin-only device — participants never see them, which is
-what makes them safe for workflow labels like `needs-review` or an author's
-name. **Categories are the one exception**, and they are opt-in per tag.
+The **Question bank** is organised by **topic**. A topic holds many questions,
+and a question belongs to at most one. Participants see a question's topic on
+its card and inside it, as its category label; nothing else about a topic
+reaches them, and it does not affect scoring, ordering or the leaderboard.
 
-Tag a challenge **`category:<name>`** and participants will see *<name>* on that
-challenge — on its card in the challenge grid, and again when they open it.
+- **Filter by topic** with the **Topic** box beside the search: every topic,
+  with how many of your bank questions it holds, or **No topic**.
+- **File a question under a topic** in the question editor: open its **Topic
+  and sharing** row and pick one, or press **+ New topic** to make one there.
+- **Manage topics** with **Topics** beside **Export**: add one, rename one (every
+  question filed under it, in the bank and inside events, shows the new name at
+  once), or delete one. A topic still holding questions asks where they go — to
+  another topic, or to none — before it is deleted; questions are never deleted
+  with it. An administrator can rename or delete any topic; an event admin only
+  the topics they made, and deletes one only once it is empty.
 
-```
-category:web          →  participants see    web
-category:crypto       →  participants see    crypto
-category:web security →  participants see    web security
-```
+**Tags are no longer shown or edited.** Questions used to carry free-form tags,
+and a tag written `category:<name>` was shown to participants. Each question's
+first such tag became its topic when the platform was updated; the tags
+themselves are kept, unseen, and a question with no topic still shows its old
+`category:` tags to participants. Exports carry a question's topic by name, and
+an import files it under the topic of that name, making it when missing.
 
-A challenge can carry as many as you like; each appears as its own label. A
-challenge with none looks exactly as it always has.
+#### Shared with all organisers
 
-**Things worth knowing**
+One switch changes who can use a bank question rather than describing it. In
+the editor's **Topic and sharing** row, turn on **Shared with all organisers**
+and every **event admin** on the platform may use the question in their own
+events, even though they did not create it and none of their events holds it
+yet. Without it an event admin sees only questions they created and questions
+one of their events already uses. Participants never see it.
 
-- **It is an ordinary tag.** Add and remove it the same way, from the same
-  dialog. It shows in the tag column, narrows the challenge search, feeds the
-  Analytics tag filter, and survives export/import — because it *is* just a tag
-  with an agreed name.
-- **Only the part after the colon is shown.** Participants never see the word
-  "category", the prefix, or any of your other tags.
-- **Tags are stored in lower case**, so `category:Web` and `category:web` are
-  the same tag and both display as *web*.
-- **`category:` on its own does nothing** — a category with no name is ignored
-  rather than shown as an empty label.
-- **Nothing else changes.** Categories do not affect scoring, ordering,
-  visibility or the leaderboard. They are a label, and only a label.
+**A shared question is badged `Shared`** in the Status column of the Question
+bank. Turn the switch off and the access goes with it, except for events that
+have already added the question — those keep their own copy, as they would any
+question they hold. A question inside an event belongs to that event and has no
+switch: save it to the bank and share the bank question instead.
 
-There is no separate list of categories to maintain: the set of categories is
-simply whichever `category:` tags exist. To rename one, remove the old tag and
-add the new one; to retire one, remove it from the challenges that carry it.
+Underneath, the switch writes the platform's reserved `public-domain` marker,
+spelled exactly. A question that carries a look-alike (`public domain` with a
+space, or one with an invisible character pasted in) is not shared, and the
+switch shows it off; turning it on adds the real marker.
 
-#### The shared pool: `public-domain`
+![The question editor's Topic and sharing row, open: the topic picker with + New topic, the Shared with all organisers switch and the needs choices](../screenshots/admin/52-public-domain-tag.png)
 
-One other tag changes behaviour rather than describing the challenge. Tag a
-challenge **`public-domain`** and every **event admin** on the platform may use
-it in their own events, even though they did not create it and none of their
-events holds it yet. Without the tag an event admin sees only challenges they
-created and challenges one of their events already uses, so this is how you
-publish a challenge to the shared pool. Participants never see it — it behaves
-like any other private tag to them.
-
-**Add it from the `+ tag` control rather than typing it.** The Add Tag dialog
-offers `public-domain` as a one-click chip with the explanation beside it,
-because the exact spelling is what does the work: **`public domain` with a space
-is an ordinary descriptive tag and grants nothing.** It is deliberately not
-treated as the same thing — a challenge somebody labelled "public domain" as a
-note to themselves should not silently become visible to every organiser on the
-platform. Casing does not matter, because tags are stored in lower case.
-
-**Type one of those spellings and the platform now refuses it**, and tells you the
-reserved one. Before, it accepted the tag, showed it on the challenge, and shared
-nothing — which is indistinguishable from a broken feature and was reported as one
-twice. The refusal covers every near miss, including the ones you cannot see: a
-non-breaking space, a soft hyphen or a zero-width space pasted from a document
-renders *identically* to `public-domain` on screen and would have shared nothing.
-The trade is that `public domain` is no longer available as an ordinary
-descriptive label; use different words if you meant it literally.
-
-**A challenge in the shared pool is badged `Shared`** in the Status column of the
-Challenges table, so you can see at a glance which of your challenges other
-organisers can use — without scrolling the table sideways to the Tags column.
-
-**A challenge that already carries one shows a warning triangle and a Fix link**
-in its Tags column. Fix applies the real `public-domain` and removes the inert
-tag; it asks first, because it puts the challenge in front of every organiser on
-the platform.
-
-Remove the tag and the access goes with it, except for events that have already
-assigned the challenge — those keep it, as they would any challenge they hold.
-
-![The Add Tag dialog offering public-domain as a one-click chip, with the explanation beneath it](../screenshots/admin/52-public-domain-tag.png)
-
-New challenges start as **Draft** — fully editable but invisible to
+New questions start as **Draft** — fully editable but invisible to
 participants and left out of event assignments. Publish when the
-content is ready. When a challenge is assigned to a live event it's
+content is ready. When a question is assigned to a live event it's
 numbered automatically (`1.01`, `1.02`, … grouped by difficulty); numbers
 already assigned never change.
 
-### Previewing a challenge as a participant
+### Previewing a question as a participant
 
 A row's **View** button (or **View as Participant** in the three-dot menu)
 shows the exact view a participant gets after the event ends — hint,
-correct answer, and explanation all revealed. For a Text challenge with several
+correct answer, and explanation all revealed. For a Text question with several
 accepted answers the Correct Answer line lists them all, separated by ` | `. An
-**Any answer** challenge has neither a hint nor an answer to reveal, so its
+**Any answer** question has neither a hint nor an answer to reveal, so its
 preview says *any answer is accepted* in the header and shows a short note in
 their place.
 
 ![View as Participant — preview dialog with hint & solution revealed](../screenshots/admin/24-challenge-view-as-participant.png)
 
-![Previewing an Any answer challenge — no hint, no answer, a note in their place](../screenshots/admin/55-challenge-any-preview.png)
+![Previewing an Any answer question — no hint, no answer, a note in their place](../screenshots/admin/55-challenge-any-preview.png)
 
-On a challenge whose answer is **sealed**, the preview shows no correct
+On a question whose answer is **sealed**, the preview shows no correct
 answer, no explanation and no hint unless you are the author who sealed it or
 a superadmin who has revealed it — the Solution box and the hint block each
 carry a short note in their place. See
-[Sealing a challenge answer](#sealing-a-challenge-answer).
+[Sealing a question answer](#sealing-a-question-answer).
 
 Use it to sanity-check formatting and confirm the answer matches your
 grading rules. The preview never counts as a submission and has no side
 effects.
 
-### Assigning a challenge to events
+### Adding questions to events from the bank
 
-From the Challenges tab's three-dot menu, **Assign to Events** picks
-one or more events for the current challenge.
+On the **Question bank**, tick the questions you want and press **Add to events**
+on the selection bar: the bank's one door into events. With **one** question
+ticked it opens that question's own dialog, which picks one or more events for it.
 
-![Assign to Events dialog — one challenge, many events](../screenshots/admin/26-challenge-assign-comps.png)
+![Assign to Events dialog — one question, many events](../screenshots/admin/26-challenge-assign-comps.png)
 
-Events that already have this challenge are pre-checked; unchecking
-removes it. Ended events are hidden — their assignments are frozen. An event
-where staff compete is also disabled for an unsealed challenge (*Sealed only*),
+Events that already have this question are pre-checked; ticking another event
+gives that event its own copy, and unchecking removes the event's copy from it. Ended events are hidden — their assignments are frozen. An event
+where staff compete is also disabled for an unsealed question (*Sealed only*),
 and one you are competing in is disabled outright (*You compete here*) — see
 [Letting staff compete](#letting-staff-compete). For a qualifying question, an
 event that already asks a question on its topic is disabled too (*Topic already
 asked*): an event asks each one once (see [Event team and lead
 reports](#event-team-and-lead-reports)).
 
-### Bulk-adding challenges to events
+### Bulk-adding questions to events
 
-To add **several challenges at once**, tick the checkbox at the start of each
-published challenge's row (or the header checkbox to select the whole page — only
-published challenges are selectable). An **Assign to Events** button then
-appears at the top of the tab **and** in a bar at the bottom (either works):
+To add **several questions at once**, tick the checkbox at the start of each
+published question's row (or the header checkbox to select the whole page — only
+published questions are selectable), then **Add to events** on the selection bar:
 
-![Bulk-select challenges with the Assign to Events button](../screenshots/admin/35-challenges-bulk-assign.png)
+![Bulk-select questions with the Assign to Events button](../screenshots/admin/35-challenges-bulk-assign.png)
 
-- If you are in an **event's workspace** (see [The event workspace](#the-event-workspace)), the button assigns the selected challenges straight to it — and challenges **already in** that event don't show a checkbox (nothing to add). The moment you tick a challenge, the open event's **+ Add Challenges** picker button gives way to **Assign to Events**, so you only ever see one — clear the selection to bring the picker back.
-- Otherwise it opens a picker to choose one or more events.
+It opens a picker to choose one or more events. Inside an event's workspace the
+rows carry no checkboxes: there the one door is **+ Add from bank**.
 
-Assignments are best-effort: drafts, and any challenge already in a chosen
+Assignments are best-effort: drafts, and any question already in a chosen
 event, are skipped, and ended events are left out — the toast tells
-you what went in and what was skipped. A challenge a Booth Event cannot use is
+you what went in and what was skipped. A question a Booth Event cannot use is
 skipped too, but the bulk toast does not name it — so if the count comes back
-lower than you expected with no reason listed, open that challenge's own
-**Assign to Events** dialog, which names the challenge, says what the objection is — a file answer,
+lower than you expected with no reason listed, tick that one question alone and press
+**Add to events**: its own dialog names the question, says what the objection is — a file answer,
 or a `needs:` tag — and names the kind of event that refuses it. It stops short
 of naming the event itself, so with two Booth Events ticked you may have to try
-them one at a time. On an event that lets staff compete, a challenge whose
+them one at a time. On an event that lets staff compete, a question whose
 answer is not sealed or whose author competes there is skipped as well — the
 toast counts those too, and a dialog names them — and an event you are
 competing in yourself is greyed out, with a dashed outline, in the picker as *You compete here* (see [Letting staff
@@ -3063,30 +3143,30 @@ compete](#letting-staff-compete)). A qualifying question on a topic the event
 already asks is skipped as well, and counted in the toast. The bulk flow here is the challenge-side
 mirror of the Participants tab's bulk **Assign to Events**.
 
-### Challenge history
+### Question history
 
 Every **Save** creates a version snapshot, as do publish, visibility toggle,
 lock/unlock, tag changes, restore, and import. Open **History** to see each
 version with its time, the admin who made the change, and what changed.
 
-![Challenge history dialog — version log with diff metadata](../screenshots/admin/25-challenge-history.png)
+![Question history dialog — version log with diff metadata](../screenshots/admin/25-challenge-history.png)
 
-**Restore** rolls a challenge back to a snapshot (itself recorded as a new
+**Restore** rolls a question back to a snapshot (itself recorded as a new
 entry).
 
-On a challenge with a **sealed** answer every snapshot in the version log is
+On a question with a **sealed** answer every snapshot in the version log is
 redacted for everybody but the author (or a superadmin who has revealed it),
 and only they can restore one. A superadmin's reveal appears in this log as a
 *Record* row — a sentence saying which of the sealed answer, explanation and
 hint were revealed to a superadmin, their name in the By column and, when they
 were impersonating, whose view they were in — rather than as a version of the
-challenge: it has no Restore, never counts as the current version and is never
+question: it has no Restore, never counts as the current version and is never
 diffed against. The person whose view it was is named only to a reader who
-could see that person anyway; an event admin who shares the challenge but not
+could see that person anyway; an event admin who shares the question but not
 an event with them reads *an account outside your events* instead, with no
 mention of which view it was. Once that account is deleted, every reader sees
 *an account that has since been deleted*.
-See [Sealing a challenge answer](#sealing-a-challenge-answer).
+See [Sealing a question answer](#sealing-a-question-answer).
 
 ---
 
@@ -3099,7 +3179,8 @@ are **multi-select** — combine them (e.g. Pending + Denied to triage everyone
 awaiting a decision).
 
 The toolbar holds **Invite** (the one primary button), **At the desk** (see [At
-the desk](#at-the-desk)), one **Export ▾** menu (**Export CSV**, **Export JSON**
+the desk](#at-the-desk)) — inside an event's workspace neither: the header's
+**Invite** holds both — one **Export ▾** menu (**Export CSV**, **Export JSON**
 and, for a superadmin or a custom role given the import permission, **Import
 JSON**) and **Columns**. The table shows six
 columns by default — **Participant**, **Company**, **Status**, **Score**, **Last
@@ -3231,18 +3312,18 @@ true of removing somebody from the event.
   fields — passwords, verification codes and sign-in codes — are never exported,
   and neither is how each person signs in.
   **With an event open**, the CSV also carries one **Response:** column per
-  **Any answer** challenge in that event — headed *Response:* followed by the
-  challenge's number and title — holding each participant's most recent response
+  **Any answer** question in that event — headed *Response:* followed by the
+  question's number and title — holding each participant's most recent response
   (blank for anyone who has not answered). Spacing and case are kept as typed;
   the one change is the protection every other free-text cell in the file gets:
   a response starting with `=`, `+`, `-` or `@` is written with a leading
   apostrophe so a spreadsheet reads it as text rather than as a formula. If
   those responses cannot be loaded the export is cancelled with a message rather
-  than saved without them. A challenge whose answer is **sealed** gets no
+  than saved without them. A question whose answer is **sealed** gets no
   column at all unless you are the author who sealed it, or a superadmin who
   has revealed it — dropped outright rather than left as a column of blanks,
-  which would read as nobody having answered (see [Sealing a challenge
-  answer](#sealing-a-challenge-answer)).
+  which would read as nobody having answered (see [Sealing a question
+  answer](#sealing-a-question-answer)).
 
 > **Import note.** Memberships are matched by **event name**, so an
 > export from one server can be imported to another. Any membership whose
@@ -3286,7 +3367,7 @@ invitee joins as one if they register before its late-entry deadline.
 > belongs to a `staff`-tagged account is skipped as well unless the ticked event
 > lets staff compete (see [Letting staff compete](#letting-staff-compete)), and
 > on an event that does, an admin's address is skipped unless you are a
-> superadmin or it is your own, and so is the author of a challenge in that
+> superadmin or it is your own, and so is the author of a question in that
 > event. An organiser limited to some events approves only an account their
 > invitation puts into one of those events: if every ticked event skipped it
 > (for one of the reasons below), it stays *Pending*, its address stays in the
@@ -3295,7 +3376,7 @@ invitee joins as one if they register before its late-entry deadline.
 > The
 > confirmation counts what was invited and assigned **and** what was skipped,
 > with the reason for each — blocked, unapproved, staff on an event where staff
-> do not compete, an admin account only a superadmin can enrol, a challenge
+> do not compete, an admin account only a superadmin can enrol, a question
 > author, or somebody who took part in a late-entry event before it ended — and
 > an address skipped for one of those reasons is not counted among
 > the "already assigned". An admin's address is likewise left out of any group
@@ -3322,7 +3403,7 @@ invitee joins as one if they register before its late-entry deadline.
 
 ### Searching and filtering
 
-Every list tab (Events, Challenges, Participants, Submissions, Logs)
+Every list tab (Events, Questions, Participants, Submissions, Logs)
 has a search box at the top. Type and the table narrows live — no Enter, no
 Apply button. Click **× Clear** to reset.
 
@@ -3348,8 +3429,8 @@ no figure at all:
 
 Search is plain, case-insensitive, and matches anywhere in the text, with no
 wildcards or operators — whatever you type is matched literally, except on
-**Challenges**, where each word is matched on its own and a challenge must match
-every word (`web hard` finds a hard challenge tagged `web`). What's searched
+**Questions**, where each word is matched on its own and a question must match
+every word (`web hard` finds a hard question tagged `web`). What's searched
 depends on the tab:
 
 - **Participants** — name, nickname, both emails, company and work title. It
@@ -3358,17 +3439,17 @@ depends on the tab:
   invited them — so `staff`, `pending`, or the name of an event all work as
   search terms.
 - **Events** — the name, the event's tags and its sessions' names.
-- **Challenges** — the title, difficulty and tags (`web` finds the category
-  `category:web`), the answer type, the status, the author, who last changed
-  it, and the names of the events it is in.
-- **Submissions** — participant, challenge, answer text, event/session,
+- **Question bank** — the title, difficulty, topic and the question's stored
+  tags (shown nowhere, still searched), the answer type, the status, the author,
+  who last changed it, and the names of the events it is in.
+- **Submissions** — participant, question, answer text, event/session,
   and **Activity** type (correct / wrong / hint).
 - **Logs** — anything in the entry, including participant names and emails
   (so `alice@acme.com` finds all her activity).
 
 Combine text with the chips under **Filters** beside the box (All / Pending / …
 on People, Status and Type on Events, difficulty tiers and Published / Draft in
-the Challenge library) to narrow by both text and category at once. Submissions
+the Question bank, beside its Topic box) to narrow by both text and category at once. Submissions
 has no chips, only its search box.
 
 ### Editing a profile
@@ -3458,8 +3539,14 @@ are more matches), then **Make organiser** to confirm: for a participant it says
 that their account becomes an event admin, which signs them out everywhere and
 takes them off every leaderboard. A role that may add organisers but not search
 people is told so and offered **Remove** only. Administrators are not offered — they already run every event.
+**Add a staff team as organisers**, under the search, makes every member of a
+[staff team](#staff-teams) whose address is an account an organiser in one step,
+exactly as picking each of them would; it warns first that a participant's
+account becomes an event admin, then lists who was made an organiser and who was
+skipped (no account, already an organiser, or an administrator), with the reason.
 Each organiser on the card has **Remove**, which asks first. You can also choose
-**Make event admin** on the participant's row with the event open. Their role changes to **Event admin** and their row badges the
+**Make event admin** on the participant's row with the event open. The card is
+the one place that lists who runs the event. Their role changes to **Event admin** and their row badges the
 events they organise, in the same colours the Events column beside it uses.
 
 **Only current events are badged** — live, upcoming, and any still inside a late
@@ -3471,10 +3558,6 @@ role is still theirs either way, and their full history is in the participant's
 own History dialog.
 
 Clicking a badge opens that event, exactly as it does in the Events column.
-
-You can also see an event's organisers from the event's own row menu, under
-**Organisers**; adding and removing them is done on the Overview's Organisers card
-or from the participant's row.
 
 Granting and revoking are **admin and superadmin only** — an event admin cannot
 make another one, which is what stops the role spreading on its own.
@@ -3511,7 +3594,7 @@ deleting and editing a profile are all reserved for superadmins when the target
 is itself an admin. It stops one admin locking a colleague out
 mid-event or taking over their account, and it's enforced by {{platformName}}
 itself — an admin who bypassed the menu would still be refused. The same holds
-for an account with a custom role from **Users & roles** that covers every
+for an account with a custom role from **Roles & permissions** that covers every
 event, and for one whose role can do something your own role cannot: it gets
 the same short menu.
 
@@ -3532,7 +3615,7 @@ it from there.
 Sometimes "it doesn't work for me" is impossible to reproduce from the admin
 side. **Impersonate** — in a participant row's three-dot menu — signs you into
 the platform *as that participant* so you see precisely what they see: their
-event list, their challenges, their hints, their score. For an event admin the
+event list, their questions, their hints, their score. For an event admin the
 confirmation also asks which of their two views to open — their participant
 view, or their admin panel.
 
@@ -3555,7 +3638,7 @@ banner stays on screen the whole time, so you can always get back.
 
 - **Admins** get a **read-only** session, with one deliberate exception. You
   can navigate anywhere the participant can — open their events, read
-  their challenges, view their leaderboard position — and you can **generate
+  their questions, view their leaderboard position — and you can **generate
   their certificate** for them (see below). Anything else that would change
   data (submitting an answer, revealing a hint, editing their profile) is
   refused with a *"This action is not allowed in impersonation mode"* message.
@@ -3584,7 +3667,7 @@ reason is below.
 
 Impersonate them, open the event, and use whichever offer their screen shows:
 
-- on a **Program**, **Your certificate is ready** at the top of the Challenges
+- on a **Program**, **Your certificate is ready** at the top of the Questions
   page, then **Get my certificate**;
 - on a **Competition** or **Booth Event**, **Generate or download certificate**
   under the leaderboard (**Generate certificate**, or **View certificate** once
@@ -3629,7 +3712,7 @@ she actually see on her side?" is the question that usually brings you here.
 ![Choosing which of an event admin's views to open](../screenshots/admin/62-impersonate-event-admin-dialog.png)
 
 Inside their panel you see exactly what they see, and nothing more: their
-events only, their challenges and participants, and no Logs, Settings or
+events only, their questions and participants, and no Logs, Settings or
 **+ New Event**, because those are not theirs. You gain nothing beyond what the
 organiser has — a superadmin looking through an organiser's panel is still
 looking at an organiser's panel. The banner stays across the top, naming both
@@ -3650,17 +3733,17 @@ may do there depends on your role, exactly as on the participant side:
 
 Two things are withheld through somebody else's panel, whoever is looking: a
 **sealed answer** the organiser wrote is not shown (a seal names a person, not a
-tier — see [Sealing a challenge answer](#sealing-a-challenge-answer); as a
+tier — see [Sealing a question answer](#sealing-a-question-answer); as a
 superadmin you can reveal it from their panel, behind the same confirmation as
 in your own, and the record then names you and the organiser's view you were in),
-and the seal control on a new challenge is disabled, with the reason beside it,
-because a seal cannot be set on their behalf. Your own sealed challenges stay
+and the seal control on a new question is disabled, with the reason beside it,
+because a seal cannot be set on their behalf. Your own sealed questions stay
 readable through their panel — the seal follows you, not the seat. And if you are
 yourself enrolled
 as a competitor in an event that organiser runs where staff compete, their panel
 is refused to you outright — their participant view still opens, and switching up
 to the panel from there is refused the same way. The rest of the competitor rule
-follows you into the seat too: an event you compete in, a challenge it holds and
+follows you into the seat too: an event you compete in, a question it holds and
 a rival on its board are all refused to you through anybody's panel, exactly as
 they are from your own.
 
@@ -3673,7 +3756,7 @@ they are from your own.
   session keeps working.
 - It doesn't skew your reporting. Anything done while impersonating is
   excluded from the Analytics tab, so a support session never pollutes
-  challenge statistics. That covers **browsing** — moving between challenges
+  question statistics. That covers **browsing** — moving between questions
   does not add to their navigated-away figures — and, for a superadmin, both a
   **correct and an incorrect** submitted answer, and a revealed hint. None of
   it counts the participant as having been active, either.
@@ -3699,7 +3782,7 @@ emails, and more.
 
 ![History dialog](../screenshots/admin/09-history-dialog.png)
 
-The same History dialog exists for events and challenges.
+The same History dialog exists for events and questions.
 
 Certificate entries say what happened in words: a certificate issued (and
 whether automatically or again after a revocation), downloaded, shared (and
@@ -3725,10 +3808,10 @@ It does not include the event team's lead record about them, their time on the
 platform or their navigation records; the full event export has time and
 navigation for each event.
 Passwords, sign-in and reset codes, invitation links and certificate links are
-never included, and answers to a sealed challenge you did not write are withheld.
+never included, and answers to a sealed question you did not write are withheld.
 For an event admin the file covers only the events they organise. Unlike the
 full event export, competing in an event does not stop you exporting a fellow
-competitor's data this way: the event's challenges are all sealed, so their
+competitor's data this way: the event's questions are all sealed, so their
 answers stay withheld. There is no button for this yet; it is
 `GET /api/admin/participants/{id}/export/full`. Each download is recorded in the
 audit log.
@@ -3785,11 +3868,11 @@ check, so sort out any overlap before you tick it.
 
 ### Managing groups
 
-The **Groups** tab lists every group with its member count and how many
+The **Groups** page lists every group with its member count and how many
 events it's bound to. Search by name, sort by any column, and page
 through the list — a mature instance accumulates a lot of groups.
 
-![Groups tab](../screenshots/admin/28-groups.png)
+![Groups page](../screenshots/admin/28-groups.png)
 
 From here you can:
 
@@ -3856,7 +3939,7 @@ with the group over time**, not just at the moment you bind it:
   the organisers you tagged `staff` unless the event lets staff compete. On an
   event that does, the group's staff members are enrolled with the rest — turn
   the switch on after binding and they are enrolled at that moment — except
-  for the author of a challenge the event holds, who is skipped just as silently
+  for the author of a question the event holds, who is skipped just as silently
   (see [Letting staff compete](#letting-staff-compete)).
 - Add someone to the group later and they're enrolled automatically.
 - Remove someone (or unbind the group) and they're removed automatically —
@@ -3895,32 +3978,33 @@ reveals are on the **Audit** page.
 
 ![The Submissions list](../screenshots/admin/04-submissions.png)
 
-Each row shows the participant, the challenge, the answer text, whether it was
+Each row shows the participant, the question, the answer text, whether it was
 correct, the points awarded or deducted, and the time — handy for
 investigating disputed submissions or auditing suspicious patterns.
 
-An answer submitted to a challenge whose answer is **sealed** shows as sealed
+An answer submitted to a question whose answer is **sealed** shows as sealed
 rather than as text for anyone but the author (or a superadmin who has revealed
 it), and the search box will not match it either, so the stream cannot be used
 to work out what the answer was. See
-[Sealing a challenge answer](#sealing-a-challenge-answer).
+[Sealing a question answer](#sealing-a-question-answer).
 
-**The participant and the challenge on each row are links.** Click the
+**The participant and the question on each row are links.** Click the
 participant to jump to the **Participants** tab with the list already filtered
 to them — their profile, history, tags and impersonation are all one click
-further. Click the challenge to jump to **Challenges**, filtered to that
-challenge. Any status or difficulty filters you had set, and any column filters,
+further. Click the question to jump to **Questions**, filtered to that
+question. Any status or difficulty filters you had set, and any column filters,
 are cleared first, and the Participants list widens to whoever it would otherwise
 leave out — inside an event, everyone on the platform (an organiser's own test
 answers come from someone who is not one of its participants); elsewhere, admin
-accounts (**Show admin accounts** is ticked) — so what you clicked is always what
+accounts, for that one visit (a note above the table says so; the next time you
+open People it lists participants again) — so what you clicked is always what
 you land on. Inside an
-event you stay in it: the person or challenge opens in the event's own
-**Participants** or **Challenges** section. This works on hint rows as well as
+event you stay in it: the person or question opens in the event's own
+**Participants** or **Questions** section. This works on hint rows as well as
 answer rows.
 
 **Sorting covers the whole event, not just the page you are looking at.** Click
-a column heading — participant, challenge, result, points, time — and the
+a column heading — participant, question, result, points, time — and the
 platform re-queries and re-orders everything that matches your current search
 and event scope, then puts you back on page 1. So sorting by points
 descending really does put the largest score change in the event at the top,
@@ -3945,8 +4029,11 @@ event, side by side.
 
 ![Rankings tab](../screenshots/admin/05-rankings.png)
 
-**Global** mode is one ranking for everyone regardless of session;
-**per-session** shows separate rankings side by side. Staff users are
+**One overall winner** is one ranking for everyone regardless of session; **a
+winner per session** shows separate rankings side by side; **both** adds the
+**Overall** board beside the sessions' boards. Where the overall board ranks by
+percentages, each row shows the percentage and, under it, the points out of the
+most that person's session offered. Staff users are
 excluded — unless the event lets staff compete, in which case the staff enrolled
 in it are ranked like anyone else (see [Letting staff
 compete](#letting-staff-compete)); benchmark users appear in a separate section.
@@ -3954,10 +4041,56 @@ compete](#letting-staff-compete)); benchmark users appear in a separate section.
 **A Program has no leaderboard.** It is not a ranked event — no rank, no
 placing — so opening one replaces the board with a **Progress** card that says
 why and where to look instead. Points still count: a participant sees each
-challenge's points and their total as they answer, but nobody is ranked by
+question's points and their total as they answer, but nobody is ranked by
 them. Per-participant progress is on the **Analytics** tab, and **Export
 Activity (CSV)** on that event's row gives one line per participant per
-challenge.
+question. Under it, **Grades** lists each learner's grade (see below).
+
+#### Program grades
+
+A Program grades every learner on their own performance (owner decision, 27 Nov
+2026). The grade is the points a learner holds out of the most the Program's
+questions can give (Easy 50, Medium 100, Hard 150 each): every wrong answer and
+every hint they reveal counts against it, it never goes below 0%, and Quick
+questions are left out of it.
+
+| Grade | Band | Certificate |
+|---|---|---|
+| 90% or more | Excellent | yes |
+| 80% to under 90% | Very good | yes |
+| 70% to under 80% | Good | yes |
+| 60% to under 70% | Satisfactory | yes |
+| under 60% | try the quiz again | **no** |
+
+**When it counts.** A grade counts once the learner has *finished*: every
+question solved, or out of attempts on it. A Program has no attempt limit unless
+you set one, so normally that means solved every question. The learner sees
+their grade so far at the top of their **Challenges** page all along.
+
+**At 60% or more** the certificate is issued (and emailed) as soon as they
+finish, printed with their band and percentage, which are fixed on it from then
+on. Certificates issued before grades existed keep printing **Completed**, as
+they always did.
+
+**Under 60%** there is no certificate: the learner is told to try the quiz again
+and offered **Try again**, which starts every question afresh and grades the new
+attempt alone. Their earlier answers and hints are kept (they move to the
+attempt's record, not deleted), their Quick question answers stay, and the
+retake is recorded on their **History**. Try again is open only while the
+Program is running and only below 60%: a learner who passed does not retake to
+improve.
+
+**Where you see grades.** **Rankings** on a Program shows **Grades**: each
+learner's grade (or grade so far, marked not finished), their attempt number and
+the certificate they hold. The event's **Certificates** list shows each graded
+certificate's band and percentage. The **full export** of a Program adds
+**grades.csv**, one line per attempt (closed ones and the current one).
+
+**Certificate wording.** In the certificate designer, **Medal wording** has an
+entry per grade band (**Excellent**, **Very good**, **Good**, **Satisfactory**)
+beside the tiers, and **Grade heading (Programs)** names the column the
+percentage prints under. A graded certificate keeps the completion seal and
+colours.
 
 Each row carries the participant's **first name**, **last name**, **company**
 and **email** alongside their nickname (first and last name are under
@@ -3967,7 +4100,7 @@ name and email — click it to put that value on your clipboard. It copies the
 whole value even when the column is too narrow to show all of it.
 
 An **All Solved** column marks each participant who has finished every
-challenge. Click any column heading — place, player, first name, last name,
+question. Click any column heading — place, player, first name, last name,
 company, email, score, time to solve, or all solved — to reorder the board, and
 click it again to reverse. A participant with no value in a column always sorts
 to the bottom, whichever way the arrow points, so the blanks never push the real
@@ -4019,7 +4152,7 @@ Two things deliberately do *not* follow it:
 already filtered to them — the quickest route from "this person is stuck at rank
 40" to their profile, history or an impersonation session. Any status filter you
 had set is cleared first, so the person you clicked is always the row you land
-on. On the **Group Rankings** board a group name takes you to the **Groups** tab
+on. On the **Group Rankings** board a group name takes you to the **Groups** page
 the same way, and a solo participant to **Participants**.
 
 ### Export a leaderboard to CSV
@@ -4095,33 +4228,34 @@ produced by the server and *are* recorded.)
 
 ## Analytics
 
-The **Analytics** tab shows how participants fared with the challenges. For
-every participant's interaction with a challenge it tracks four things —
+The **Analytics** tab shows how participants fared with the questions. For
+every participant's interaction with a question it tracks four things —
 **solved**, **incorrect**, **hint revealed**, and **navigated away** — and
 charts them.
 
 **"Navigated away" means they left without solving it.** It is the bounce
-signal, so it stops counting once a participant solves the challenge, and
-re-opening a solved challenge to re-read it does not add to it either. A
-challenge everyone got first time reads zero; a high number means people kept
+signal, so it stops counting once a participant solves the question, and
+re-opening a solved question to re-read it does not add to it either. A
+question everyone got first time reads zero; a high number means people kept
 walking away from it. (Switching browser tab and back does count — read it as
-attention-switching, and compare challenges against each other rather than
+attention-switching, and compare questions against each other rather than
 reading one number on its own.)
 
 ![Analytics tab](../screenshots/admin/06-analytics.png)
 
-The filter bar has three cards — **Scope**, **Challenges**, and
+The filter bar has three cards — **Scope**, **Questions**, and
 **Participants**:
 
 - **Scope** — Global (all events, optionally within a time window), a
   specific Event, or a Session. In Global mode you can also filter by
   event tags (default: exclude `test/dry run`).
 
-  **If you have an event open, Analytics opens on it.** Entering the
-  tab while an event's workspace is open selects that event here
-  too, and if you have a session open it narrows to that session — so you
-  are not asked to find today's event again in a list of every event you
-  have ever run. **With no event open, Analytics asks before it measures.** The first
+  **Inside an event, Analytics is that event.** The event's own
+  **Analytics** section measures that event only: its Scope card names the
+  event, with no Global/Event switch and no event picker, and offers **Whole
+  event** or one of its sessions where it has any (a session you had open is
+  chosen). The **Analytics** page in the sidebar is the one that compares
+  events, with the switch below. **With no event open, Analytics asks before it measures.** The first
   time you open the tab it shows a short *Choose what to measure* card with two
   buttons — **Pick an event** and **Show platform-wide** — and runs no query at
   all until you press one: no donut, no stat cards, and the per-challenge table
@@ -4135,14 +4269,14 @@ The filter bar has three cards — **Scope**, **Challenges**, and
 
   ![Analytics — choosing what to measure](../screenshots/admin/47-analytics-prompt.png)
 
-- **Challenges** — pick specific challenges, or filter by difficulty or tag.
+- **Questions** — pick specific questions, or filter by difficulty or tag.
   Qualifying questions are left out of Analytics, so neither they nor their
   `qualifying:` tags are offered here.
 
-**Click a challenge's name in the table** to jump to the **Challenges** tab with
+**Click a question's name in the table** to jump to the **Questions** tab with
 the list already filtered to it — the quickest route from "this one has a 12%
 solve rate" to editing it. Any difficulty or status filters you had set there are
-cleared first, so the challenge you clicked is always the row you land on.
+cleared first, so the question you clicked is always the row you land on.
 - **Participants** — filter by participant tag (default: exclude `staff`).
 
 Each tag filter has an **All / Exclude / Only** mode — All applies no
@@ -4152,25 +4286,25 @@ so its data appears.
 
 The view refreshes as you change filters — no Apply button. A donut chart and
 stat cards summarise the totals, and a per-challenge table below shows each
-challenge's activity mix, its **unique attempters**, and its **solve rate**.
+question's activity mix, its **unique attempters**, and its **solve rate**.
 Difficulty, tags and the separate activity counts (total, incorrect, hints,
 navigated away) are under **Columns**.
 
 ![Analytics — per-challenge breakdown](../screenshots/admin/44-analytics-breakdown.png)
 
-**Unique attempters** is how many distinct people the challenge saw any activity
+**Unique attempters** is how many distinct people the question saw any activity
 from — and it is the solve rate's denominator, which is why it sits immediately
 before it. A 43% solve rate over 7 attempters and one over 70 are very different
 claims, and the rate alone cannot tell you which you are looking at. Unlike the
 four event columns it counts **people, not events**, so it is deliberately left
 out of **Total**: someone who submits three wrong answers adds three to Total and
-one to this. A challenge nobody opened reads `0` here and `—` for its solve rate,
+one to this. A question nobody opened reads `0` here and `—` for its solve rate,
 because no-one attempting it is not the same as no-one succeeding.
 
 The table opens in the order that suits what you are looking at: with a
-**event or session** in scope it is sorted by **challenge number**, the
-same order participants met the challenges in; **globally** it is sorted by
-**challenge name**, because a number belongs to a challenge within one
+**event or session** in scope it is sorted by **question number**, the
+same order participants met the questions in; **globally** it is sorted by
+**question name**, because a number belongs to a question within one
 event and there isn't one to use. Click any column heading to sort by it
 instead — your choice then sticks, including when you change scope.
 
@@ -4186,12 +4320,12 @@ is still searchable.
 
 ![Analytics — event picker](../screenshots/admin/07-analytics-comp-picker.png)
 
-### Finding a challenge in the breakdown
+### Finding a question in the breakdown
 
-The per-challenge table has its own search box — type a challenge number, a
+The per-challenge table has its own search box — type a question number, a
 title fragment, a **difficulty** or a tag to narrow it — and pages 25 rows at a
 time. On an
-instance with a large challenge bank that also keeps the page responsive: each
+instance with a large question bank that also keeps the page responsive: each
 row draws its own mini activity chart, and only the rows actually on screen are
 drawn.
 
@@ -4201,43 +4335,107 @@ drawn.
 
 It writes **everything the current filters leave** — the search box and any
 column's filter — not just the page you are looking at: so if the table says
-"12 of 240 challenges match", you get 12 rows, and with nothing narrowed you get
+"12 of 240 questions match", you get 12 rows, and with nothing narrowed you get
 all 240. The order is the table's own. The file always has every column —
-challenge number, title, difficulty, tags, total activity, the four event
+question number, title, difficulty, tags, total activity, the four event
 counts, unique attempters and the solve rate, including any you have hidden
 under **Columns** — everything but the mini activity bar, which does not travel. The solve
 rate is written as a plain number rather than the table's "43%", so it adds up
 in a spreadsheet, and is left blank rather than zero when nobody attempted the
-challenge.
+question.
 
 Two things worth knowing before you open it:
 
-- **In Global scope the Challenge ID column is empty.** There is no number to
+- **In Global scope the Question ID column is empty.** There is no number to
   print, for the reason above. Scope to an event if you need it.
 - **Tags are complete here.** The table shows the first four and then `+3`;
   the file lists them all, separated by `; `.
 
 For per-participant results rather than per-challenge totals, use
-[Export challenge activity](#export-challenge-activity) on the Events tab
-— that one is a participant × challenge grid.
+[Export question activity](#export-question-activity) on the Events tab
+— that one is a participant × question grid.
 
-### Picking specific challenges
+### Picking specific questions
 
-The **Challenges** picker filters to a subset — each challenge is a card with
+The **Questions** picker filters to a subset — each question is a card with
 its title, difficulty, and tags, and the search box at the top matches **any of
 them**: part of a title, `hard`, or a tag. The count beside it says how many
 matched, and a search that matches nothing says so rather than leaving a blank
 grid.
 
-> Challenge *numbers* are not searchable here. A number belongs to a challenge
-> **within one event**, so a challenge used in three events has
+> Question *numbers* are not searchable here. A number belongs to a question
+> **within one event**, so a question used in three events has
 > three of them — and this picker spans all events. Use the number in the
 > per-challenge breakdown table below, which shows one once you have scoped to a
 > event or a session.
 
-![Analytics — challenge picker](../screenshots/admin/08-analytics-challenge-picker.png)
+![Analytics — question picker](../screenshots/admin/08-analytics-challenge-picker.png)
 
 ---
+
+## Marketing
+
+**Marketing** (in the sidebar, under *Manage*) says how the platform is doing
+across events: how many people the events reached, what they did, what they
+took away and what came of it for the event teams. Every figure is a **count of
+what the platform recorded**, shown with what it is out of; nothing is an
+estimate and nothing is compared with an outside benchmark. A figure only some
+events can answer says how many could. Each figure has a **?** saying exactly
+what it counts.
+
+It is for administrators: it adds up every event on the platform, so an event
+admin never sees it, and a custom role needs **See marketing analytics across
+every event**, which only a role acting on every event can hold.
+
+**Which events.** The page counts the events whose **start** falls in the range
+you choose (the last 30 or 90 days, the last 12 months, this year, any time, or
+between two dates, both included). An event counts in the range its start falls
+in, with everything its people did, whenever they did it, so the totals and the
+per-event table always add up. Events that have not started are not counted.
+Tick **Event types** to count only those types, or open **Events** to tick
+particular events. Dry runs (events tagged `test/dry run`) are never counted;
+the page says how many it left out.
+
+**Who counts.** In each event, the people its boards count: staff are left out
+unless the event lets staff compete, and so are benchmark accounts, event admins
+(and custom roles like theirs), and everything an administrator did while
+viewing as somebody.
+
+- **Reach** — **Events run** (by type), **People** (each once, however many
+  events they joined; the line under it gives the joins), **New accounts**
+  (people among them whose account was created inside the range, and how the
+  records say it came: by join link, by invitation, at the desk, or otherwise —
+  the sign-up form and an import look the same in the records), and the eight
+  most common **countries** and **companies** people gave on their profile.
+  A country is one row however it was spelled (the code a profile stores, the
+  country's name, or USA, U.S., UK, U.K., Great Britain), named as the profile
+  form names it; anything else is shown as typed. Companies are grouped ignoring
+  case and endings such as Inc or Ltd.
+- **Engagement** — **Played** (joins where the person answered anything, a
+  quick question included), **Answers** to scoring questions (quick questions
+  counted apart), **Solve rate** (of every question a person answered at least
+  once, the share they got right in the end), **Completion** (of the people who
+  played, the share who solved every scoring question the event shows now, in
+  events that have scoring questions), **Active time** (the median net active
+  time, only in events that measure it, saying how many did) and **Returning**
+  (people in more than one of the selected events). The bar chart follows the
+  joins down to the people who solved everything.
+- **Outcomes** — **Certificates** issued and not revoked, by what they record
+  (a top-three place, taking part, completing a Program); **Shared** (certificates whose holder pressed Share — whether a post followed
+  is not known to the platform); and the Programs' **Pass rate**: learners who
+  finished (every scoring question solved or out of attempts) with 60% or more,
+  out of those who finished, with the grade bands.
+- **Pipeline** — the leads the event team reports show (Hot, Warm, Cold, by the
+  reports' own rule), **Want follow-up** (the people who asked to be contacted) and those who said
+  no follow-up is needed (who are not leads), and the leads an organiser marked
+  contacted. Only events that asked the qualifying questions have leads, and the
+  section says how many those were.
+
+**Per event** lists the selected events: type, start, joined, solve rate,
+completion and hot leads (**Played** and **Certificates** are under
+**Columns**). Sort and filter from any heading; the filters cover every row,
+not only the page on screen. **Export CSV** saves exactly the rows the filters
+leave, on every page, in the order shown, with every column.
 
 ## The Audit page
 
@@ -4477,9 +4675,9 @@ the thresholds are deliberately biased towards notifying you when unsure.
 
 ---
 
-## Users & roles
+## Roles & permissions
 
-**Users & roles** lists the people who run the platform — every account whose
+**Roles & permissions** lists the people who run the platform — every account whose
 role is not Participant — with their role, the events a scoped role organises
 and when they last signed in (like the other admin tables, with **Columns** and
 a sort and filter on each heading), and the **Roles** view lists what each role
@@ -4500,10 +4698,11 @@ and participants sign in with an emailed code. Once a person has chosen, a role
 change leaves their choice alone.
 
 **People** lists participants and the organisers of events; admin and
-superadmin accounts appear there only with **Show admin accounts** ticked.
-The sidebar is grouped **Manage** (Events, New event and templates, Challenge
+superadmin accounts are on **Roles & permissions** (a link to one from a board
+still shows it in People, saying so).
+The sidebar is grouped **Manage** (Events, New event and templates, Question
 library, Live rankings, Analytics, Audit), **Participants** (People, Groups) and
-**Admin** (Users & roles, Settings). Submissions and the request logs are inside
+**Admin** (Roles & permissions, Settings). Submissions and the request logs are inside
 **Audit** (see [The Audit page](#the-audit-page)).
 
 Most controls whose purpose is not obvious from their label have a small **?**
@@ -4513,17 +4712,21 @@ beside them: press it for a one- or two-sentence explanation, or turn on
 ## Settings
 
 An administrator's **Settings** tab holds the platform **certificate design**,
-the **event history retention** and the open **blocked-address alerts** (and,
-read-only, the domains event team reports may go to); everything else on it is
+the **mail server** email goes through (read-only: only a superadmin can change
+it), the **event history retention**, the open **blocked-address alerts**, the
+**CxOne API audit** (every call the platform made to Checkmarx One, with its
+outcome), **About & health** (what is running and how the server is, without the
+details only a superadmin sees, and the newest release notes), the [staff
+teams](#staff-teams), which you may also change, and, read-only, the domains
+event team reports may go to; everything else on it is
 for superadmins and is not shown to you. Each card shows to whoever may use it,
 so a custom role sees the cards for the permissions it was given. An event admin
 has no Settings tab.
-Everything on it is platform-wide rather than event-specific, in sections listed
-down its left side (a **Section** picker on a phone): the platform name, sign-in
-and account approval, email (a test send and the list of people who have
-unsubscribed from bulk email), the certificate design, the default CxOne
-credentials and the Checkmarx One accounts waiting to be removed for
-participants who have been deleted, data retention, and open alerts.
+Everything on it is platform-wide rather than event-specific, in a list down its
+left side (a **Section** picker on a phone) grouped under **People** (Sign-in,
+[Staff teams](#staff-teams)), **Records** (CxOne API audit) and **System** (General, Branding, Email (SMTP) and
+About & health). The pages the sidebar opens are not repeated there, and the
+running version is at the foot of the sidebar.
 
 The one worth knowing about as an organiser is the **platform name**. It is not
 just a label — it is what recipients see as the **sender name** on every email
@@ -4536,6 +4739,23 @@ The settings you *do* control are per-event and live in the **Edit
 Event** dialog — including that event's own CxOne override.
 See the [**Superadmin guide →**](superadmin.md#platform-name) for the
 platform-wide view.
+
+### Staff teams
+
+**Settings → Staff teams** is a directory of the colleagues who run events
+together: each team has a name and its members, each a name, an email address
+and, optionally, the role they usually take on an event's team (Marketing, SDR, a
+manager…). Choose a team in the list to see its members. **New team**, **Rename**,
+**Delete**, **Add member**, **Edit** and **Remove** change it; a role that may see
+the teams but not change them reads them only. Where your role may see people,
+an **Account** column says whether the address signs in here: only those
+members can be made organisers. Members are a list of people, not accounts, and
+changing a team later changes no event it was added to. Deleting an account
+removes its address from every team (each removal is recorded on the Audit
+page, naming the team and the address's domain); another member of the same
+team stays. An event's **Team &
+reports** can add a whole team, and its Overview's **Organisers** card can make a
+whole team its organisers.
 
 ---
 
@@ -4550,7 +4770,8 @@ A few destructive operations and platform-wide overrides are reserved for
 Two shortcuts for running an event in person, when "check your email" is the
 answer that loses the visitor.
 
-- **At the desk** (Participants tab) — creates an account and shows a sign-in
+- **At the desk** (the People toolbar; inside an event, **Invite → Sign up at
+  the desk** in its header) — creates an account and shows a sign-in
   code straight away. No email is sent at any point, so it works even when mail
   is being greylisted or delayed. A work email is still required. If the
   address already has an account, nothing is created and the message says what
@@ -4565,18 +4786,17 @@ answer that loses the visitor.
   entries](#late-entries) can be the open event: the address prompt and the code
   dialog both say the new account joins it as a late entrant, until its
   late-entry deadline. A finished event that is not taking late entries cannot —
-  the shortcut says so before it asks for an address, so open another event, or
-  leave the event. While the open event is one you are competing in, the
-  shortcut is refused with that reason — leave the event to create somebody with
-  no event, or ask another organiser (see [The competitor
+  its header offers no **Invite** — so open another event, or leave the event.
+  Nor can an event you are competing in, for the same reason — leave the event
+  to create somebody with no event, or ask another organiser (see [The competitor
   lock](#the-competitor-lock)). The account is checked once more just before it
   is created: if your administrator access ended, or you started competing in
   that event, in the meantime, nothing is created and no code is shown. While
   **Require admin approval for new accounts** is on, a role that cannot approve
   accounts cannot use it, as an account made at the desk could not sign in: the
-  button says why when you hover over or press it, and so does the event's **⋯**
-  menu in place of **Sign up at the desk** — use **Invite** instead, or ask an
-  administrator. A
+  button says why when you hover over or press it, and so does the event's
+  **Invite** menu in place of **Sign up at the desk** — use **Email invitation**
+  instead, or ask an administrator. A
   colleague moving you to another administrator role, or you signing in
   somewhere else, at that moment ends it the same way — you are told *Your
   session ended before this finished, so nothing was saved*; try again. The open event

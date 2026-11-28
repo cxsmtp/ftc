@@ -75,10 +75,10 @@ async function makeFixture(api, csrf, { compCap = null, taskCaps = [null], peopl
     // test's cap and the failures pointed at the resolver instead of the fixture.
     const { id: tid } = await tr.json();
     expect(tid, "the create returns the new challenge's id").toBeTruthy();
-    const t = { id: tid, title };
-    tasks.push(t);
-    const asg = await api.post(`/api/admin/tasks/${t.id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+    const asg = await api.post(`/api/admin/tasks/${tid}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
     expect(asg.ok(), `assign task ${i}: ${await asg.text()}`).toBeTruthy();
+    const t = { id: (await asg.json()).copies[0].task_id, bankId: tid, title };   // the event's own copy (lib/event-copies.js): what its participants open and answer
+    tasks.push(t);
   }
 
   const users = [];
@@ -510,7 +510,7 @@ test.describe("v8.1.0 — attempt caps", () => {
     expect(arm, "the arm reads the field the server emits")
       .toMatch(/d\.exhausted_participants/);
     expect(arm, "…and still renders the ordinary sentence when nobody was exhausted")
-      .toMatch(/all participants solved all challenges/);
+      .toMatch(/all participants solved all questions/);
     expect(arm, "…and a different one when somebody was")
       .toMatch(/ran out of attempts/);
   });

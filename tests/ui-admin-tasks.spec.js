@@ -15,9 +15,7 @@ test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").openFi
 test.beforeEach(async ({ page }) => { await require("./ui-admin-helpers").showAllParticipantColumns(page); });
 const { registerPost } = require("./helpers");
 const { freshCtx, apiLogin, getSuperadminPass, PARTICIPANT_PASS, BASE, PORT_BASE, gradingHashFor } = require("./helpers");
-const {
-  login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin,
-  clickTab, openKebab, findSeededTaskRow, viewComp, narrowGroupsTable, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, narrowChallengesTable, narrowPeopleTable, narrowEventsTable } = require("./ui-admin-helpers");
+const { login, loginViaApi, saLoginRetry, filterComps, adminLogin, participantLogin, clickTab, openKebab, findSeededTaskRow, viewComp, narrowGroupsTable, CONFIRM_PROBE_MS, AxeBuilder, AXE_GATED_IMPACTS, narrowChallengesTable, narrowPeopleTable, narrowEventsTable, openRowEventEdit, openRowEventMenu } = require("./ui-admin-helpers");
 
 // Route every page.goto() + page.request.* to THIS worker's server.
 test.use({ baseURL: BASE });
@@ -135,22 +133,34 @@ test.describe("Admin — Competitions", () => {
     await expect(page.locator("text=Viewing").first()).toBeVisible({ timeout: 3000 });
   });
 
-  test("Assign Challenges available in kebab for live, absent for ended", async ({ page }) => {
+  // The event's one door into the bank is its Questions section's + Add from bank
+  // (Stage B, owner ruling, 27 Nov 2026), and the Events-row menu keeps only
+  // Delete event (owner's decision, 27 Nov 2026): neither menu offers it.
+  test("+ Add from bank is the Questions section's while live, absent once ended; neither menu offers it", async ({ page }) => {
     await adminLogin(page);
     await clickTab(page, "Events");
     await expect(page.locator(".status-badge.live").first()).toBeVisible({ timeout: 10000 });
     await filterComps(page, "Test Live");
     const liveRow = page.locator("#admin-comp-body tr:has-text('Test Live')");
-    // Assign Challenges is in the kebab menu and is marked as elevated (km-warning) for live competitions
-    await expect(liveRow.locator(".kebab-menu button.km-warning:has-text('Assign Challenges')")).toHaveCount(1);
-    // Edit on a live competition should also be elevated (warning)
-    await expect(liveRow.locator(".kebab-menu button.km-warning:has-text('Edit')")).toHaveCount(1);
+    await expect(liveRow.locator(".kebab-menu [data-action='comp-assign-challenges']"), "not on the row").toHaveCount(0);
+    let portal = await openRowEventMenu(page, liveRow);
+    await expect(portal.locator("[data-action='comp-edit']"), "CONTROL: the ⋯ menu is open with its doors").toHaveCount(1);
+    await expect(portal.locator("[data-action='comp-assign-challenges']"), "not in the ⋯ menu").toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await page.locator('#ws-tabs [data-section="admin-tasks-tab"]').first().evaluate((el) => el.click());
+    await expect(page.locator("#add-tasks-to-comp-btn"), "the Questions section's door, while live").toBeVisible({ timeout: 15000 });
     // Show ended competitions — wait for the filter re-render, not a fixed delay.
+    await clickTab(page, "Events");
     await page.locator("#comp-status-filters button[data-status='all']").click();
     await filterComps(page, "Test Ended");
     const endedRow = page.locator("#admin-comp-body tr:has-text('Test Ended')");
     await expect(endedRow).toBeVisible({ timeout: 5000 });
-    await expect(endedRow.locator(".kebab-menu button:has-text('Assign Challenges')")).toHaveCount(0);
+    portal = await openRowEventMenu(page, endedRow);
+    await expect(portal.locator("[data-action='comp-assign-challenges']")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await page.locator('#ws-tabs [data-section="admin-tasks-tab"]').first().evaluate((el) => el.click());
+    await expect(page.locator("#admin-tasks-tab"), "PRECONDITION: the ended event's Questions section is open").toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#add-tasks-to-comp-btn"), "an ended event's questions are frozen: no door").toBeHidden();
   });
 
   test("opening a second row's kebab while one is open keeps the new menu open (no flash-close)", async ({ page }) => {
@@ -172,7 +182,7 @@ test.describe("Admin — Competitions", () => {
     await page.keyboard.press("Escape");
   });
 
-  test("role promotion severity: km-warning for admin, km-danger for superadmin", async ({ page }) => {
+  test("the People row's role door is a link to Roles & permissions, never Promote/Demote", async ({ page }) => {
     // v7.21.35 — THIS TEST NOW OWNS ITS PARTICIPANT, and that is the actual fix.
     //
     // It flaked three times against the shared seeded `carol`. The v7.21.17 pass
@@ -249,25 +259,18 @@ test.describe("Admin — Competitions", () => {
       "which reads as a markup bug and is not one",
     ).toHaveCount(0, { timeout: 10000 });
 
-    // Promote to Admin → warning (elevated)
-    // Promote to Superadmin → danger (destructive escalation)
-    // Read BOTH labels in one pass so a failure reports what the kebab actually
-    // contained rather than a bare 0 — with the preconditions above already
-    // established, the label list is the only remaining unknown.
+    // Roles are changed on Roles & permissions only (owner's decision, 27 Nov
+    // 2026): the row's role door is ONE link there, and no Promote/Demote item
+    // (whose km-warning / km-danger severities were this test's subject).
+    // Read the labels in one pass so a failure reports what the kebab contained.
     const kebabLabels = async () =>
       (await carolRow.locator(".kebab-menu button").allInnerTexts()).map((t) => t.trim()).filter(Boolean);
     await expect
-      .poll(kebabLabels, {
-        timeout: 10000,
-        message: "Carol's kebab never rendered the participant-branch role buttons",
-      })
-      .toEqual(expect.arrayContaining([
-        expect.stringContaining("Promote to Admin"),
-        expect.stringContaining("Promote to Superadmin"),
-      ]));
-    // Severity classes are the actual subject of the test.
-    await expect(carolRow.locator(".kebab-menu button.km-warning:has-text('Promote to Admin')")).toHaveCount(1);
-    await expect(carolRow.locator(".kebab-menu button.km-danger:has-text('Promote to Superadmin')")).toHaveCount(1);
+      .poll(kebabLabels, { timeout: 10000, message: "the row never rendered its role link" })
+      .toEqual(expect.arrayContaining([expect.stringContaining("Change role on Roles & permissions")]));
+    const labels = await kebabLabels();
+    expect(labels.filter((l) => /Promote|Demote/.test(l)), "no Promote/Demote on the People row").toEqual([]);
+    await expect(carolRow.locator(".kebab-menu [data-action='participant-role']")).toHaveCount(0);
   });
 
   test("v6.16.0: reveal-answers checkbox toggles + persists + flows to /api/tasks/:id", async ({ page }) => {
@@ -289,9 +292,7 @@ test.describe("Admin — Competitions", () => {
     const liveRow = page.locator("#admin-comp-body tr:has-text('Test Live')");
     await expect(liveRow).toBeVisible({ timeout: 5000 });
     // Open edit modal.
-    await liveRow.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, liveRow);
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     // Default: checkbox unchecked for the seed comp.
     const cb = page.locator("#comp-reveal-answers");
@@ -306,9 +307,7 @@ test.describe("Admin — Competitions", () => {
     await page.locator("#modal-confirm-btn").click();
     await page.locator("#comp-form-overlay").waitFor({ state: "hidden", timeout: 5000 });
     // Re-open modal and confirm the box is now checked (PUT round-trip).
-    await liveRow.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, liveRow);
     await page.locator("#comp-form-overlay").waitFor({ state: "visible", timeout: 5000 });
     await expect(page.locator("#comp-reveal-answers")).toBeChecked();
     // Untick + Save (restore the seed default).
@@ -497,9 +496,7 @@ test.describe("audit v7.7.35 (T3) — modal dismissal contract", () => {
     await filterComps(page, "Test Live");
     const liveRow = page.locator("#admin-comp-body tr:has-text('Test Live')");
     await expect(liveRow).toBeVisible({ timeout: 5000 });
-    await liveRow.locator(".kebab-btn").click();
-    await page.locator("#kebab-portal").waitFor({ state: "visible", timeout: 3000 });
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
+    await openRowEventEdit(page, liveRow);
     const form = page.locator("#comp-form-overlay");
     await form.waitFor({ state: "visible", timeout: 5000 });
 
@@ -567,7 +564,8 @@ test.describe("v7.12.0 — bulk assign challenges to competitions (UI)", () => {
 
     const Database = require("better-sqlite3");
     const db = new Database(TEST_DB_PATH, { readonly: true });
-    let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks WHERE competition_id=? AND task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
+    // Each landed as the event's OWN copy of it (lib/event-copies.js).
+    let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=? AND t.owner_competition_id=ct.competition_id AND t.copied_from_task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
     expect(count, "both selected challenges landed in the competition").toBe(2);
   });
 
@@ -599,38 +597,57 @@ test.describe("v7.12.0 — bulk assign challenges to competitions (UI)", () => {
     await expect(page.locator("#challenges-selection-bar")).toBeHidden();
   });
 
-  test("v7.12.1: top 'Assign to Events' button appears on selection + assigns (no comp focused)", async ({ page }) => {
+  // Stage B (owner ruling, 27 Nov 2026) — ONE door into events from the bank (the
+  // selection bar's Add to events) and ONE into an event from inside it
+  // (+ Add from bank). The three tests below replace the top button's and the
+  // focused-event selection's: each door is pinned, and so is the absence of the
+  // ones the owner removed.
+  test("stage B: the bank's one door — one ticked question opens its own dialog, two the bulk picker; no top button", async ({ page }) => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     const saH = H(csrf);
     const mkTask = async (title) => (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
-    const t1title = uniq("TopBtn-A"), t2title = uniq("TopBtn-B");
+    const t1title = uniq("OneDoor-A"), t2title = uniq("OneDoor-B");
     const t1 = await mkTask(t1title), t2 = await mkTask(t2title);
-    const compName = uniq("TopBtn-Comp");
+    const compName = uniq("OneDoor-Comp");
     const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: compName, start_time: new Date(Date.now() + 3600_000).toISOString(), duration_minutes: 120 } })).json()).competition.id;
     await sa.dispose();
 
     await adminLogin(page);
     await clickTab(page, "Challenges");
-    await narrowChallengesTable(page, "TopBtn-");
-    const topBtn = page.locator("#assign-challenges-to-comp-btn");
-    await expect(topBtn, "top button hidden until a selection").toBeHidden();
-    await page.locator("#admin-task-body tr", { hasText: t1title }).locator("input[type=checkbox]").check();
-    await page.locator("#admin-task-body tr", { hasText: t2title }).locator("input[type=checkbox]").check();
-    await expect(topBtn).toBeVisible();
-    await expect(topBtn).toHaveText("Assign to Events"); // no comp focused → generic label
-    await topBtn.click();
+    await narrowChallengesTable(page, "OneDoor-");
+    await expect(page.locator("#assign-challenges-to-comp-btn"), "no top door").toHaveCount(0);
+    const r1 = page.locator("#admin-task-body tr", { hasText: t1title }), r2 = page.locator("#admin-task-body tr", { hasText: t2title });
+    await openKebab(page, r1.first());
+    await expect(page.locator('#kebab-portal [data-action="task-assign-to-comps"]'), "no per-row door").toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // One ticked: that question's own dialog.
+    await r1.locator("input[type=checkbox]").check();
+    const btn = page.locator("#challenge-selection-bar-assign-btn");
+    await expect(btn).toHaveText("Add to events");
+    await btn.click();
+    const single = page.locator("#assign-task-overlay");
+    await expect(single, "one question: its own dialog").toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#challenge-bulk-assign-overlay")).toHaveCount(0);
+    await single.locator("[data-action='overlay-close'], .btn.secondary").first().click();
+    await expect(single).toHaveCount(0, { timeout: 5000 });
+
+    // Two ticked: the bulk picker, and it assigns.
+    await r2.locator("input[type=checkbox]").check();
+    await expect(page.locator("#challenge-selection-count")).toHaveText("2 selected");
+    await btn.click();
     const overlay = page.locator("#challenge-bulk-assign-overlay");
-    await expect(overlay).toBeVisible();
+    await expect(overlay, "two questions: the bulk picker").toBeVisible();
     await overlay.locator(".picker-row", { hasText: compName }).locator("input[type=checkbox]").check();
     await overlay.locator("[data-action='challenge-bulk-assign-execute']").click();
-    await expect(topBtn, "selection cleared → top button hidden again").toBeHidden({ timeout: 8000 });
+    await expect(page.locator("#challenges-selection-bar"), "selection cleared").toBeHidden({ timeout: 8000 });
     const Database = require("better-sqlite3");
     const db = new Database(TEST_DB_PATH, { readonly: true });
-    let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks WHERE competition_id=? AND task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
+    let count; try { count = db.prepare("SELECT COUNT(*) c FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE ct.competition_id=? AND t.owner_competition_id=ct.competition_id AND t.copied_from_task_id IN (?,?)").get(compId, t1, t2).c; } finally { db.close(); }
     expect(count).toBe(2);
   });
 
-  test("v7.12.1: a challenge already in the FOCUSED competition carries no checkbox", async ({ page }) => {
+  test("stage B: inside an event no row carries a box; + Add from bank is the one door, and the ⋯ menu has none", async ({ page }) => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     const saH = H(csrf);
     const mkTask = async (title) => (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
@@ -638,53 +655,41 @@ test.describe("v7.12.0 — bulk assign challenges to competitions (UI)", () => {
     const tIn = await mkTask(inTitle); await mkTask(outTitle);
     const compName = uniq("Focus-Comp");
     const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: compName, start_time: new Date(Date.now() + 3600_000).toISOString(), duration_minutes: 120 } })).json()).competition.id;
-    await sa.post(`/api/admin/tasks/${tIn}/competitions`, { headers: saH, data: { competitionIds: [compId] } }); // tIn is IN the comp
+    await sa.post(`/api/admin/tasks/${tIn}/competitions`, { headers: saH, data: { competitionIds: [compId] } });
     await sa.dispose();
 
     await adminLogin(page);
-    await clickTab(page, "Events"); // load the comp list into state so the focus banner resolves
-    await page.evaluate(({ id, name }) => window.setAdminCompetitionScope(id, name), { id: compId, name: compName });
+    // CONTROL: on the bank's own page the same row carries its box.
     await clickTab(page, "Challenges");
-    await narrowChallengesTable(page, "Focus-");
-    const inRow = page.locator("#admin-task-body tr", { hasText: inTitle });
-    const outRow = page.locator("#admin-task-body tr", { hasText: outTitle });
-    await expect(outRow.locator("input[type=checkbox]"), "a challenge NOT in the focused comp still has a checkbox").toBeVisible();
-    await expect(inRow.locator("input[type=checkbox]"), "a challenge already in the focused comp has NO checkbox").toHaveCount(0);
-  });
+    await narrowChallengesTable(page, outTitle);
+    await expect(page.locator("#admin-task-body tr", { hasText: outTitle }).locator("input[type=checkbox]"), "CONTROL: the bank row has a box").toBeVisible();
 
-  test("v7.12.2: '+ Add Challenges' and the bulk Assign button never show together (one button when focused)", async ({ page }) => {
-    const { api: sa, csrf } = await apiLogin("superadmin");
-    const saH = H(csrf);
-    const mkTask = async (title) => (await (await sa.post("/api/admin/tasks", { headers: saH, data: { title, description: "<p>x</p>", difficulty: "easy", answer_type: "text", correct_answer: "a", status: "published" } })).json()).id;
-    const outTitle = uniq("Dup-Out");
-    await mkTask(outTitle);
-    const compName = uniq("Dup-Comp");
-    const compId = (await (await sa.post("/api/admin/competitions", { headers: saH, data: { name: compName, start_time: new Date(Date.now() + 3600_000).toISOString(), duration_minutes: 120 } })).json()).competition.id;
-    await sa.dispose();
-
-    await adminLogin(page);
     await clickTab(page, "Events");
     await page.evaluate(({ id, name }) => window.setAdminCompetitionScope(id, name), { id: compId, name: compName });
     await clickTab(page, "Challenges");
-    await narrowChallengesTable(page, "Dup-Out");
-    const addBtn = page.locator("#add-tasks-to-comp-btn");     // the picker button
-    const topBtn = page.locator("#assign-challenges-to-comp-btn"); // the bulk button
+    await narrowChallengesTable(page, "Focus-");
+    const outRow = page.locator("#admin-task-body tr", { hasText: outTitle });
+    await expect(outRow, "PRECONDITION: the bank question is listed in the event").toHaveCount(1);
+    await expect(page.locator("#admin-task-body input[type=checkbox]"), "no row carries a box inside an event").toHaveCount(0);
+    await expect(page.locator("#add-tasks-to-comp-btn"), "the one door").toBeVisible();
+    const menu = await page.evaluate((id) => window.wsMenuItemsHtml((window.adminCompetitionsData || []).find(c => c.id === id)), compId);
+    expect(menu, "the ⋯ menu offers no Add from bank").not.toContain("comp-assign-challenges");
+  });
 
-    // Focused + nothing selected → ONLY the picker button.
-    await expect(addBtn).toBeVisible();
-    await expect(topBtn).toBeHidden();
-
-    // Select a challenge → the picker button yields to the bulk "Assign to <comp>" (never both).
-    const cb = page.locator("#admin-task-body tr", { hasText: outTitle }).locator("input[type=checkbox]");
-    await cb.check();
-    await expect(topBtn).toBeVisible();
-    await expect(topBtn).toHaveText(`Assign to "${compName}"`);
-    await expect(addBtn, "no duplication — the picker button hides while a selection exists").toBeHidden();
-
-    // Clear the selection → the picker button returns.
-    await cb.uncheck();
-    await expect(addBtn).toBeVisible();
-    await expect(topBtn).toBeHidden();
+  test("stage B: the Overview checklist's Add from bank is the Questions section's own door", async ({ page }) => {
+    const { api: sa, csrf } = await apiLogin("superadmin");
+    const saH = H(csrf);
+    const compName = uniq("Empty-Comp");
+    await sa.post("/api/admin/competitions", { headers: saH, data: { name: compName, start_time: new Date(Date.now() + 3600_000).toISOString(), duration_minutes: 120 } });
+    await sa.dispose();
+    await adminLogin(page);
+    await viewComp(page, compName);
+    const door = page.locator('#ws-ov-ready [data-action="ws-add-from-bank"]');
+    await expect(door, "an event with no question offers it on its checklist").toBeVisible({ timeout: 15000 });
+    await expect(page.locator('#ws-ov-ready [data-action="comp-assign-challenges"]'), "never a second door").toHaveCount(0);
+    await door.click();
+    await expect(page.locator("#admin-tasks-tab"), "it opens the Questions section").toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#task-picker-overlay"), "…and that section's picker").toBeVisible({ timeout: 15000 });
   });
 });
 

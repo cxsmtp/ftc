@@ -6,16 +6,14 @@
 //
 //   * A template create whose settings PUT is refused stays the CREATE that
 //     made the event: "Finish creating" sends the settings to that event, then
-//     the ticked challenges and the Checkmarx One group, and never spawns twice.
+//     the Checkmarx One group, and never spawns twice.
 //     A refusal that carries a list keeps its modal. When the save's ANSWER is
 //     lost after it landed, the next press finishes on the token that save
 //     produced, and never overwrites a change someone else made meanwhile.
-//   * Tick all shown and Clear ticks act on what is listed; a ticked challenge
-//     the server refuses is named and the rest are added; a staff-compete
-//     create's refusal list reaches its modal.
+//   * Stage B (owner ruling, 27 Nov 2026): the form picks no questions; the
+//     event's one door, + Add from bank, names a refused question and adds the rest.
 //   * The template + staff compete + qualifying pre-check stops before anything
 //     is made, and the create route refuses the same pair by name.
-//   * "Create and pick challenges" opens the picker on the new event.
 //   * A template's "one board across sessions" survives the PUT after its spawn.
 //   * A Program's create confirmation names its deadline and how long it is open.
 //   * A clone's message names what it did not carry over, and its dialog says
@@ -26,7 +24,7 @@
 // Every fixture is the test's own and is written through the API before the
 // browser signs in (the built-in superadmin holds one session).
 const { test, expect } = require("./isolated-test");
-const { adminLogin, openCompCreateForm, openCompAdvanced, viewComp } = require("./ui-admin-helpers");
+const { adminLogin, openCompCreateForm, openCompAdvanced, viewComp, clickTab, pickFormKind } = require("./ui-admin-helpers");
 const { apiLogin, BASE, TEST_DB_PATH, PARTICIPANT_PASS } = require("./helpers");
 const { H, makeTask, makeParticipant } = require("./event-admin-helpers");
 const Database = require("better-sqlite3");
@@ -37,7 +35,9 @@ const uniq = (p) => `${p} ${Date.now().toString(36)}${Math.random().toString(36)
 const ro = () => new Database(TEST_DB_PATH, { readonly: true });
 const dbAll = (sql, ...a) => { const db = ro(); try { return db.prepare(sql).all(...a); } finally { db.close(); } };
 const dbGet = (sql, ...a) => { const db = ro(); try { return db.prepare(sql).get(...a); } finally { db.close(); } };
-const eventsOfTask = (taskId) => dbAll("SELECT competition_id FROM competition_tasks WHERE task_id=?", taskId).map((r) => r.competition_id);
+// The events holding a challenge: itself, or (a bank question) the event's own copy
+// of it, which is what a tick puts in (lib/event-copies.js).
+const eventsOfTask = (taskId) => dbAll("SELECT ct.competition_id FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id WHERE t.id=? OR (t.copied_from_task_id=? AND t.owner_competition_id=ct.competition_id)", taskId, taskId).map((r) => r.competition_id);
 const eventsNamed = (name) => dbAll("SELECT id FROM competitions WHERE name=?", name).map((r) => r.id);
 const dateIn = (days) => new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
 
@@ -54,10 +54,6 @@ async function openTemplateForm(page, tplName) {
   await expect(form.locator("#comp-name")).toBeVisible({ timeout: 15000 });
   return form;
 }
-async function tick(form, title) {
-  await form.locator("#comp-ch-search").fill(title);
-  await form.locator("#comp-ch-list .picker-row", { hasText: title }).locator('input[type="checkbox"]').check();
-}
 /** Press Save and answer the confirmation, asserting it is the one expected. */
 async function saveAndConfirm(page, titleRe) {
   await page.locator('#comp-form-overlay [data-action="comp-save"]').click();
@@ -67,15 +63,13 @@ async function saveAndConfirm(page, titleRe) {
 }
 
 test.describe("A template create whose settings save is refused", () => {
-  test("finishes the SAME event: the settings, the ticks and the Checkmarx One group all land, and nothing spawns twice", async ({ page }) => {
+  test("finishes the SAME event: the settings and the Checkmarx One group land, and nothing spawns twice", async ({ page }) => {
     test.setTimeout(120_000);
     const tplName = uniq("Finish tpl");
     const { api: sa, csrf } = await apiLogin("superadmin");
-    let inTpl, t1, t2;
+    let inTpl;
     try {
       inTpl = await makeTask(sa, csrf, "fin-in");
-      t1 = await makeTask(sa, csrf, "fin-one");
-      t2 = await makeTask(sa, csrf, "fin-two");
       await makeTemplate(sa, csrf, { name: tplName, event_kind: "tournament", settings: { duration_minutes: 60 }, task_ids: [inTpl.id] });
     } finally { await sa.dispose(); }
 
@@ -84,9 +78,6 @@ test.describe("A template create whose settings save is refused", () => {
     const evName = uniq("Finished from tpl");
     await form.locator("#comp-name").fill(evName);
     await form.locator("#comp-date").fill(dateIn(3));
-    await tick(form, t1.title);
-    await tick(form, t2.title);
-    await expect(form.locator("#comp-ch-count")).toContainText("2 ticked");
     await openCompAdvanced(page);
     const group = `grp-${Date.now().toString(36)}`;
     await form.locator("#comp-cxone-group").fill(group);
@@ -107,7 +98,7 @@ test.describe("A template create whose settings save is refused", () => {
 
     // The refusal keeps its list, says the event exists, and how to finish it.
     const modal = page.locator("#modal-overlay.open");
-    await expect(modal.locator("#modal-title"), "a refusal list keeps its modal").toHaveText("Seal these challenges first", { timeout: 15000 });
+    await expect(modal.locator("#modal-title"), "a refusal list keeps its modal").toHaveText("Seal these questions first", { timeout: 15000 });
     await expect(modal).toContainText(inTpl.title);
     await expect(modal).toContainText("was created from the template, but these settings were not saved");
     await expect(modal).toContainText("Finish creating");
@@ -122,7 +113,6 @@ test.describe("A template create whose settings save is refused", () => {
     expect(made.length, "PRECONDITION: the spawn made the event").toBe(1);
     const id = made[0];
     expect(seen.spawn).toBe(1);
-    expect(eventsOfTask(t1.id), "PRECONDITION: nothing ticked was sent with the refused save").not.toContain(id);
     expect(dbGet("SELECT cxone_group_name g FROM competitions WHERE id=?", id).g, "PRECONDITION: nor the group").toBeNull();
 
     // Fix the named problem and finish.
@@ -133,10 +123,8 @@ test.describe("A template create whose settings save is refused", () => {
     expect(seen.spawn, "nothing spawned twice").toBe(1);
     expect(eventsNamed(evName), "one event, the one the first press made").toEqual([id]);
     expect(seen.put, "two saves of the same event's settings: the refused one and the finishing one").toBe(2);
-    await expect.poll(() => eventsOfTask(t1.id), { timeout: 10000, message: "the first tick was added" }).toContain(id);
-    await expect.poll(() => eventsOfTask(t2.id), { timeout: 10000, message: "the second tick was added" }).toContain(id);
     expect(eventsOfTask(inTpl.id), "CONTROL: the template's own challenge came with the spawn").toContain(id);
-    expect(seen.assign.some((p) => p.includes(inTpl.id)), "the template's challenge is not sent again").toBe(false);
+    expect(seen.assign, "no question is assigned by the form (its one door is the event's Add from bank)").toEqual([]);
     expect(seen.cxone, "the Checkmarx One override is saved once").toBe(1);
     expect(dbGet("SELECT cxone_group_name g, staff_compete s FROM competitions WHERE id=?", id)).toEqual({ g: group, s: 0 });
   });
@@ -222,13 +210,11 @@ test.describe("An event create whose answer is lost after it landed", () => {
   }
   const lostToast = "so they may not have been saved. Press Finish creating";
 
-  test("the next press finishes it without saving the settings twice, and the ticks and the Checkmarx One group land", async ({ page }) => {
+  test("the next press finishes it without saving the settings twice, and the Checkmarx One group lands", async ({ page }) => {
     test.setTimeout(120_000);
     const tplName = uniq("Landed tpl");
     const { api: sa, csrf } = await apiLogin("superadmin");
-    let t1;
     try {
-      t1 = await makeTask(sa, csrf, "landed-one");
       await makeTemplate(sa, csrf, { name: tplName, event_kind: "tournament", settings: { duration_minutes: 60 }, task_ids: [] });
     } finally { await sa.dispose(); }
 
@@ -238,7 +224,6 @@ test.describe("An event create whose answer is lost after it landed", () => {
     await form.locator("#comp-name").fill(evName);
     await form.locator("#comp-date").fill(dateIn(3));
     await form.locator("#comp-attempt-cap").fill("3");
-    await tick(form, t1.title);
     await openCompAdvanced(page);
     const group = `grp-${Date.now().toString(36)}`;
     await form.locator("#comp-cxone-group").fill(group);
@@ -256,18 +241,16 @@ test.describe("An event create whose answer is lost after it landed", () => {
     const id = made[0];
     expect(dbGet("SELECT attempt_cap a, cxone_group_name g FROM competitions WHERE id=?", id),
       "PRECONDITION: the settings are stored; the group, sent after them, is not").toEqual({ a: 3, g: null });
-    expect(eventsOfTask(t1.id), "PRECONDITION: nor is the tick").not.toContain(id);
 
     await saveAndConfirm(page, /^Finish creating /);
     await expect(form, "the finished create closes the form").toHaveCount(0, { timeout: 20000 });
     expect(net.spawn, "nothing spawned twice").toBe(1);
     expect(net.sent, "the settings were not sent again: the event already held them").toBe(1);
     expect(net.answered, "so no save was answered at all, and none refused as a conflict").toEqual([]);
-    await expect.poll(() => eventsOfTask(t1.id), { timeout: 10000, message: "the tick was added" }).toContain(id);
+    expect(net.assign || [], "the form assigns no question (the event's one door is + Add from bank)").toEqual([]);
     expect(net.cxone, "the Checkmarx One group is saved once").toBe(1);
     expect(dbGet("SELECT attempt_cap a, cxone_group_name g FROM competitions WHERE id=?", id)).toEqual({ a: 3, g: group });
     expect(eventsNamed(evName), "one event, the one the first press made").toEqual([id]);
-    await expect(page.locator("#toast-stack")).toContainText("1 ticked challenge added");
   });
 
   test("a value changed since is sent with the token that lost save produced, for a Booth Event and a Program", async ({ page }) => {
@@ -292,6 +275,9 @@ test.describe("An event create whose answer is lost after it landed", () => {
         await form.locator("#comp-deadline-time").fill("18:00");
       }
       await form.locator("#comp-attempt-cap").fill("3");
+      // The previous kind's toast says the same words and may still be up (a
+      // toast lives up to 15 s): this kind's must be its own.
+      await page.evaluate(() => document.querySelectorAll("#toast-stack .toast").forEach((t) => t.remove()));
       const net = watchNet(page);
       await loseFirstAnswer(page, net);
       await saveAndConfirm(page, /^Create /);
@@ -386,7 +372,7 @@ test.describe("An event create whose answer is lost after it landed", () => {
 
     // The form re-renders for the new type (the attempt cap typed differs from
     // the form as opened, so it asks first); it is still the same create.
-    await page.locator('#comp-form-overlay label.kind-seg-opt:has(input[value="booth"])').click();
+    await pickFormKind(page, "booth");
     await expect(page.locator("#modal-overlay.open #modal-title")).toHaveText(/^Change type to /, { timeout: 10000 });
     await page.locator("#modal-confirm-btn").click();
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("booth");
@@ -458,9 +444,8 @@ test.describe("An event create whose answer is lost after it landed", () => {
     test.setTimeout(120_000);
     const tplName = uniq("Conflict tpl");
     const { api: sa, csrf } = await apiLogin("superadmin");
-    let t1, other;
+    let other;
     try {
-      t1 = await makeTask(sa, csrf, "conflict-one");
       await makeTemplate(sa, csrf, { name: tplName, event_kind: "tournament", settings: { duration_minutes: 60 }, task_ids: [] });
       other = await makeParticipant(sa, csrf, "other-admin");
       const pr = await sa.post(`/api/admin/participants/${other.id}/role`, { headers: H(csrf), data: { role: "admin" } });
@@ -474,7 +459,6 @@ test.describe("An event create whose answer is lost after it landed", () => {
       await form.locator("#comp-name").fill(evName);
       await form.locator("#comp-date").fill(dateIn(3));
       await form.locator("#comp-attempt-cap").fill("3");
-      await tick(form, t1.title);
       const net = watchNet(page);
       await loseFirstAnswer(page, net);
       await saveAndConfirm(page, /^Create /);
@@ -492,7 +476,6 @@ test.describe("An event create whose answer is lost after it landed", () => {
         .toContainText("the event was changed after it was created", { timeout: 15000 });
       expect(net.answered, "the press was refused as a conflict").toEqual([409]);
       expect(dbGet("SELECT attempt_cap a FROM competitions WHERE id=?", id).a, "their change stands").toBe(7);
-      expect(eventsOfTask(t1.id), "nothing ticked was added behind a refused save").not.toContain(id);
       await expect(form, "the form stays open, the admin's values on it").toBeVisible();
       expect(net.spawn, "nothing spawned twice").toBe(1);
       expect(eventsNamed(evName)).toEqual([id]);
@@ -500,94 +483,42 @@ test.describe("An event create whose answer is lost after it landed", () => {
   });
 });
 
-test.describe("The create form's Challenges section", () => {
-  test("Tick all shown and Clear ticks act on what is listed; a ticked challenge the server refuses is named and the rest are added", async ({ page }) => {
+// Stage B (owner ruling, 27 Nov 2026) — the create form picks no questions; the
+// event's one door is its Questions section's + Add from bank. Its partial
+// result is said, by name, as the form's own section used to say it.
+test.describe("The event's one door: + Add from bank", () => {
+  test("a question the event refuses is named and the rest are added; CONTROL: an unticked question is not", async ({ page }) => {
     test.setTimeout(120_000);
     const stem = `pf${Date.now().toString(36)}`;
     const { api: sa, csrf } = await apiLogin("superadmin");
-    let ok, file, decoy;
+    let ok, file, decoy, evName;
     try {
       ok = await makeTask(sa, csrf, `${stem} ok`);
-      // A Booth Event takes no file answer (lib/challenge-fit.js): that tick is
-      // refused once the event exists.
+      // A Booth Event takes no file answer (lib/challenge-fit.js).
       file = await makeTask(sa, csrf, `${stem} file`, { answer_type: "file", correct_answer: "flag" });
       decoy = await makeTask(sa, csrf, "pf-decoy");
+      evName = uniq("Added from bank");
+      const ev = await sa.post("/api/admin/competitions", { headers: { "x-csrf-token": csrf, "content-type": "application/json" }, data: {
+        name: evName, event_kind: "booth", start_time: new Date(Date.now() + 2 * 864e5).toISOString(), duration_minutes: 120 } });
+      expect(ev.ok(), `event: ${await ev.text()}`).toBeTruthy();
     } finally { await sa.dispose(); }
-
-    await adminLogin(page);
-    await openCompCreateForm(page, "booth", { advanced: false });
-    const form = page.locator("#comp-form-overlay");
-    const evName = uniq("Partly ticked");
-    await form.locator("#comp-name").fill(evName);
-    await form.locator("#comp-date").fill(dateIn(2));
-    await form.locator("#comp-ch-search").fill(stem);
-    const rows = form.locator("#comp-ch-list .picker-row");
-    await expect(rows, "PRECONDITION: the two matches are listed").toHaveCount(2, { timeout: 15000 });
-    const count = form.locator("#comp-ch-count");
-    await form.locator("#comp-ch-all").click();
-    await expect(count).toContainText("2 ticked");
-    await form.locator("#comp-ch-none").click();
-    await expect(count).toContainText("0 ticked");
-    await expect(rows.locator('input[type="checkbox"]:checked')).toHaveCount(0);
-    await form.locator("#comp-ch-all").click();
-    await expect(count).toContainText("2 ticked");
-    await expect(rows.locator('input[type="checkbox"]:checked')).toHaveCount(2);
-
-    await saveAndConfirm(page, /^Create /);
-    await expect(form).toHaveCount(0, { timeout: 20000 });
     const id = eventsNamed(evName)[0];
-    expect(id, "the event was made").toBeTruthy();
-    const toast = page.locator("#toast-stack");
-    await expect(toast, "the partial result is said").toContainText("Event created with 1 of 2 ticked challenges. 1 could not be added", { timeout: 15000 });
-    await expect(toast, "the refused challenge is named").toContainText(file.title);
-    await expect.poll(() => eventsOfTask(ok.id), { timeout: 10000 }).toContain(id);
-    expect(eventsOfTask(file.id), "the refused tick is not on the event").not.toContain(id);
-    expect(eventsOfTask(decoy.id), "CONTROL: an unlisted challenge is not on the event").not.toContain(id);
-  });
-
-  test("a staff-compete create lists the challenges it refused in their own dialog", async ({ page }) => {
-    test.setTimeout(120_000);
-    const { api: sa, csrf } = await apiLogin("superadmin");
-    let open;
-    try { open = await makeTask(sa, csrf, "sc-unsealed"); } finally { await sa.dispose(); }
+    expect(id, "PRECONDITION: the event exists").toBeTruthy();
 
     await adminLogin(page);
-    await openCompCreateForm(page, "tournament");
-    const form = page.locator("#comp-form-overlay");
-    const evName = uniq("Compete tick");
-    await form.locator("#comp-name").fill(evName);
-    await form.locator("#comp-date").fill(dateIn(2));
-    await form.locator("#comp-staff-compete").check();
-    await tick(form, open.title);
-    await saveAndConfirm(page, /^Create /);
-    const modal = page.locator("#modal-overlay.open");
-    await expect(modal.locator("#modal-title")).toHaveText("Some challenges were not added", { timeout: 20000 });
-    await expect(modal, "the refused challenge is listed").toContainText(open.title);
-    await expect(modal).toContainText(evName);
-    const id = eventsNamed(evName)[0];
-    expect(id, "the event was made").toBeTruthy();
-    expect(dbGet("SELECT staff_compete s FROM competitions WHERE id=?", id).s, "PRECONDITION: staff compete there").toBe(1);
-    expect(eventsOfTask(open.id), "the unsealed challenge was refused").not.toContain(id);
-    await expect(page.locator("#toast-stack")).toContainText("Event created with 0 of 1 ticked challenge. 1 could not be added");
-  });
-
-  test("Create and pick challenges opens the picker on the event it just made", async ({ page }) => {
-    test.setTimeout(90_000);
-    await adminLogin(page);
-    await openCompCreateForm(page, "tournament", { advanced: false });
-    const form = page.locator("#comp-form-overlay");
-    const evName = uniq("Then pick");
-    await form.locator("#comp-name").fill(evName);
-    await form.locator("#comp-date").fill(dateIn(2));
-    await form.locator('[data-action="comp-save-and-pick-tasks"]').click();
-    await expect(page.locator("#modal-overlay.open #modal-title")).toHaveText(/^Create /, { timeout: 10000 });
-    await page.locator("#modal-confirm-btn").click();
+    await viewComp(page, evName);
+    await clickTab(page, "Challenges");
+    await page.locator("#add-tasks-to-comp-btn").click();
     const picker = page.locator("#task-picker-overlay");
     await expect(picker).toBeVisible({ timeout: 20000 });
-    const id = eventsNamed(evName)[0];
-    expect(id, "the event was made").toBeTruthy();
-    await expect(picker.locator("#task-picker-title")).toHaveText(`Challenges in ${evName}`);
-    await expect(picker.locator("#task-picker-save"), "the picker saves to the new event").toHaveAttribute("data-comp-id", id);
+    await picker.locator("#task-picker-search").fill(stem);
+    for (const t of [ok, file]) await picker.locator("#task-picker-list .picker-row", { hasText: t.title }).locator('input[type="checkbox"]').check();
+    await picker.locator("#task-picker-save").click();
+    await page.locator("#modal-confirm-btn").click();
+    await expect.poll(() => eventsOfTask(ok.id), { timeout: 15000 }).toContain(id);
+    await expect(page.locator("#modal-overlay.open, #toast-stack").filter({ hasText: file.title }).first(), "the refused question is named").toBeVisible({ timeout: 15000 });
+    expect(eventsOfTask(file.id), "the refused question is not on the event").not.toContain(id);
+    expect(eventsOfTask(decoy.id), "CONTROL: an unticked question is not on the event").not.toContain(id);
   });
 });
 
@@ -610,7 +541,7 @@ test.describe("Staff compete and the built-in qualifying questions", () => {
     let spawned = 0;
     page.on("request", (r) => { if (r.method() === "POST" && /\/spawn$/.test(new URL(r.url()).pathname)) spawned++; });
     await form.locator('[data-action="comp-save"]').click();
-    await expect(page.locator("#toast-stack"), "the pair is refused by name").toContainText("holds sealed challenges only", { timeout: 10000 });
+    await expect(page.locator("#toast-stack"), "the pair is refused by name").toContainText("holds sealed questions only", { timeout: 10000 });
     await expect(page.locator("#modal-overlay.open"), "no confirmation: nothing would be made").toHaveCount(0);
     expect(spawned, "the template was not spawned").toBe(0);
     expect(eventsNamed(evName)).toEqual([]);

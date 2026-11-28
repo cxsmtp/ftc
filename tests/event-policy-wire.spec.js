@@ -76,10 +76,17 @@ const TAG = `pw${Date.now().toString(36)}`;
 // booth tap-to-answer card, features/choice-tap.js). "tap" | "standard", a
 // presentation choice the client tests POSITIVELY (=== "tap"), so an unknown
 // value keeps the standard card.
+//
+// `clock_start` ("allowed" | "never", owner decision, 27 Nov 2026) joins them with
+// the control it governs: the event form's "Start each participant's clock".
+// `cxone_provisioning` joins them with the control it governs (the event form's
+// Checkmarx One section): "forbidden" for a Booth Event, which never creates
+// Checkmarx One accounts (owner's decision, 27 Nov 2026), "allowed" otherwise.
+// Not `cxone_accounts`: the participant leak scanner's pattern matches "count".
 const POLICY_KEYS = ["sessions", "schedule", "ranking_enabled", "certificate",
   "registration_fields", "registration_fields_configurable",
   "reveal_answers", "group_leaderboard", "measure_presence", "trusted_networks",
-  "late_entry", "choice_layout"].sort();
+  "late_entry", "choice_layout", "clock_start", "cxone_provisioning"].sort();
 // The six configurable fields and the three legal states, imported rather than
 // retyped: a hand-written copy here would agree on the day it was written.
 const { REGISTRATION_FIELD_KEYS, FIELD_STATES } = require("../lib/registration-fields");
@@ -108,6 +115,8 @@ function expectPolicy(obj, where, kind) {
   // The discriminating assertion. Every "policy is present" check above is equally
   // satisfied by a constant object, so each attach point must also prove it resolved
   // THIS event's kind rather than a default.
+  expect(obj.policy.cxone_provisioning, `${where}: Checkmarx One accounts follow the kind`)
+    .toBe(kind === "booth" ? "forbidden" : "allowed");
   if (kind === "program") {
     expect(obj.policy.ranking_enabled, `${where}: a Program is not ranked`).toBe(false);
     expect(obj.policy.schedule, `${where}: a Program runs to a deadline`).toBe("deadline");
@@ -378,8 +387,12 @@ test.describe("v8.1.0 — the wire projection's two structural rules", () => {
       // (There is no instant-join seed: that switch was retired, operator ruling,
       // 14 Nov 2026.)
       expect(Object.keys(k.defaults || {}).sort(), `${k.value}: exactly the create-time seeds`)
-        .toEqual(["add_qualifying", "cxone_disabled", "late_entry_enabled", "self_enroll_enabled"]);
+        .toEqual(["add_qualifying", "clock_start", "cxone_disabled", "late_entry_enabled", "self_enroll_enabled"]);
       expect(k.defaults.add_qualifying, `${k.value}: the qualifying seed`).toBe(k.value === "booth");
+      // The clock-start seed: the first open for the two ranked kinds, entry for a
+      // Program (unranked), and never a value the kind's policy refuses.
+      expect(k.defaults.clock_start, `${k.value}: the clock-start seed`).toBe(k.value === "program" ? "entry" : "first_open");
+      expect(k.policy.clock_start, `${k.value}: the clock-start offer`).toBe(k.value === "program" ? "never" : "allowed");
       // The join-link seed is the server's own (`selfEnrollDefault`), so a
       // Booth Event's walk-up door is ON and the other kinds' OFF.
       const { eventPolicy } = require("../lib/event-policy");

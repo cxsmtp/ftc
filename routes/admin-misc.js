@@ -11,9 +11,12 @@ const db = require("../db");
 const { requireAdmin, requireSuperAdmin, csrfProtection, rateLimit, destructiveAdminLimit } = require("../lib/middleware");
 const { getAdminIdentity, recordOrphanedAuditEvent, recordSettingsEvent, recordUserEvent, reqContext, runTxnWithMirrorBuffer } = require("../lib/audit");
 const { swallowed } = require("../lib/best-effort");
-const { PLATFORM_VERSION } = require("../lib/config");
+const fs = require("fs");
+const { PLATFORM_VERSION, SERVER_STARTED_AT, DATA_DIR, UPLOADS_DIR } = require("../lib/config");
 const { decodeCxOneApiKey } = require("../lib/cxone");
-const { transporter, resolveSender, smtpHealthy, withSmtpSlot } = require("../lib/email");
+const { transporter, resolveSender, smtpHealthy, smtpLastCheck, withSmtpSlot } = require("../lib/email");
+const { BUILD_INFO } = require("../lib/build-info");
+const { backupStatus } = require("../lib/backup-status");
 const { getPlatformName } = require("../lib/settings");
 const { normaliseEmail, canonicaliseIp, ipAddressRange } = require("../lib/util");
 const { listOpenAlerts, ackAlert } = require("../lib/admin-alerts"); // v7.16.0 — operator alerts
@@ -59,7 +62,7 @@ const CXONE_WITHDRAWAL_ACTION_SCHEMA = {
 module.exports = function register(app, deps = {}) {
 // The instance-health gate (server.js `_instanceInService`), handed to the manual
 // retention purge so its image sweep holds exactly as the daily pass's does.
-const { isHealthy } = deps;
+const { isHealthy, healthState } = deps;
 // v7.7.17 — event-data retention. GET surfaces the configured window + the last
 // purge summary (in-process, resets on restart until the boot sweep runs) so an
 // operator can confirm the policy is active. The daily background purge runs
@@ -205,6 +208,65 @@ app.get("/api/admin/retention", requireAdmin, (req, res) => {
     tables: EVENT_TABLES.map(t => t.table),
     last_purge: lastPurge(),
   });
+});
+
+// SETTINGS → ABOUT & HEALTH. Coarse facts only (booleans, whole numbers,
+// rounded sizes, the version, times), never a path, a driver message or a
+// secret: the boot integrity and schema checks and maintenance mode come from
+// server.js's own state (`healthState`, the facts `_instanceInService` reads),
+// never re-derived here. `build` is what the image was built from
+// (lib/build-info.js; null parts when the build did not say), `backups` what the
+// app can see of the host's backups (lib/backup-status.js: nothing unless the
+// operator mounts them and names them in BACKUP_DIR), `smtp_checked_at` the
+// mail relay's last check. A superadmin also gets the database's size, the Node
+// version, the process start time and the newest backup's size; every other
+// reader gets the redacted shape, those keys absent. `settings.view` at the gate
+// (lib/rbac.js).
+const _GIB = 1024 * 1024 * 1024;
+function _freeGib(dir) {
+  try {
+    if (!dir || !fs.statfsSync) return null;
+    const s = fs.statfsSync(dir);
+    return Math.round((s.bavail * s.bsize / _GIB) * 10) / 10;
+  } catch (e) { swallowed("admin-misc:statfs", e); return null; }
+}
+app.get("/api/admin/system-health", requireAdmin, (req, res) => {
+  const h = typeof healthState === "function" ? healthState() : {};
+  const smtp = smtpHealthy();
+  const body = {
+    version: PLATFORM_VERSION,
+    database_integrity_ok: h.integrity === true,
+    database_schema_ok: h.schema === true,
+    maintenance: h.maintenance === true,
+    smtp_healthy: smtp === true ? true : smtp === false ? false : null,
+    smtp_checked_at: (smtpLastCheck() || {}).at || null,
+    build: { commit: BUILD_INFO.commit, built_at: BUILD_INFO.built_at, channel: BUILD_INFO.channel },
+    uptime_seconds: Math.floor(process.uptime()),
+    data_free_gib: _freeGib(DATA_DIR),
+    uploads_free_gib: _freeGib(UPLOADS_DIR),
+    event_retention_days: EVENT_RETENTION_DAYS,
+  };
+  const bk = backupStatus();
+  body.backups = bk.visible
+    ? { visible: true, count: bk.count, newest_at: bk.newest_at, newest_complete: bk.newest_complete }
+    : { visible: false, reason: bk.reason };
+  if (req.session.isSuperAdmin) {
+    if (bk.visible) { body.backups.newest_size_mib = bk.newest_size_mib; body.backups.newest_size_exact = bk.newest_size_exact; }
+    let size = null;
+    // The main file plus its write-ahead log, which holds every commit since the
+    // last checkpoint (the -shm index is a few KiB and left out).
+    try {
+      let bytes = fs.statSync(db.name).size;
+      try { bytes += fs.statSync(`${db.name}-wal`).size; }
+      catch (e) { if (e.code !== "ENOENT") throw e; }
+      size = Math.round(bytes / (1024 * 1024) * 10) / 10;
+    } catch (e) { swallowed("admin-misc:db-size", e); }
+    body.database_size_mib = size;
+    body.node_version = process.version;
+    body.started_at = SERVER_STARTED_AT;
+  }
+  res.set("Cache-Control", "no-store");
+  res.json(body);
 });
 
 // Superadmin-only manual purge — runs one sweep immediately (the same engine the

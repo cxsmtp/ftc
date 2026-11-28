@@ -57,6 +57,14 @@ tags:
       one from a template, and are made its organiser), change roles, or reach the
       platform's own logs, settings, metrics or alerts. Granting is admin-or-superadmin only, which is
       what stops the role self-propagating. See ROLES_AND_PERMISSIONS.md.
+  - name: Admin - Staff teams
+    description: >
+      The platform-wide directory of staff teams (Settings → People → Staff
+      teams): named lists of colleagues, each a name, an email address and an
+      optional default event-team role. Members are recipients, not accounts.
+      An event's Team & reports can add a whole team, and its Organisers card can
+      make a whole team its organisers. `teams.view` reads it and `teams.manage`
+      changes it, both platform-wide (never held by a role scoped to its events).
   - name: Admin - Groups
     description: >
       Participant groups — many-to-many, with live-synced event binding. Every
@@ -1354,6 +1362,13 @@ paths:
                             The derived policy for this event. The client's whole
                             suppression layer reads it: whether the event has a ranking at
                             all, what a certificate attests, whether sessions exist.
+                        clock_starts_at_first_open:
+                          type: boolean
+                          description: >-
+                            True when this event starts each participant's solve clock at
+                            their first open of a scoring challenge rather than on entry
+                            (the event's `clock_start`, a Program always false). The
+                            challenge list says so to the participant.
                         can_leave:
                           type: boolean
                           description: >-
@@ -2961,6 +2976,11 @@ paths:
                       allOf:
                         - $ref: '#/components/schemas/EventPolicy'
                       description: "the derived policy for this event."
+                    clock_starts_at_first_open:
+                      type: boolean
+                      description: >-
+                        True when this event starts each participant's solve clock at
+                        their first open of a scoring challenge rather than on entry.
                     can_leave:
                       type: boolean
                       description: >-
@@ -3161,9 +3181,11 @@ paths:
                       type: array
                       description: >-
                         The challenge's CATEGORY names, always present
-                        (`[]` when it has none). A category is an ordinary task
-                        tag written `category:<name>`; the participant is sent
-                        the parsed NAMES only.
+                        (`[]` when it has none). A question filed under a TOPIC
+                        (the Question bank's topics) has exactly one: the topic's
+                        name. A question with no topic falls back to its legacy
+                        category tags, written `category:<name>`; the participant
+                        is sent the parsed NAMES only.
 
 
                         This is the one and only task-tag information a
@@ -4010,6 +4032,30 @@ paths:
                   leaderboard_mode:
                     type: string
                     enum: [global, per_slot]
+                  ranking:
+                    type: string
+                    nullable: true
+                    enum: [per_session, overall, both, null]
+                    description: "How an event with two or more sessions ranks: a winner per session, one overall winner, or both. null for an event without sessions (or with one) and on an unranked kind."
+                  percent:
+                    type: boolean
+                    description: "The main `board` ranks by percentages (each row then carries `percent`)."
+                  sessionName:
+                    type: string
+                    nullable: true
+                    description: "The caller's session's name, labelling the main board, on an event that ranks per session."
+                  overallBoard:
+                    type: object
+                    nullable: true
+                    description: "On an event ranking 'both', a participant playing a session also gets the overall board, under the main board's rules: capped at `board_limit`, `me` resolved before the cap, no count. null otherwise."
+                    properties:
+                      board: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/LeaderboardEntry' } }
+                      me:
+                        nullable: true
+                        allOf:
+                          - $ref: '#/components/schemas/LeaderboardEntry'
+                      board_limit: { type: integer, format: int32, minimum: 0, maximum: 2147483647, example: 20 }
+                      percent: { type: boolean, description: "The overall board ranks by percentages." }
                   timeslot_id:
                     type: string
                     nullable: true
@@ -4052,10 +4098,17 @@ paths:
         certificate attests an ATTEMPT (`policy.certificate: "attempt"` — a Booth Event
         or an Event) the event must be fully ended, else 409: a PLACEMENT is
         not knowable until the board is final. For a COMPLETION kind (a Program) there is
-        no lifecycle gate at all — the trigger is the caller's own completion of every
-        assigned, active, published challenge, so a learner who finishes in the second
-        month of a year-long Program is not made to wait for the deadline. Running out of
-        attempts is not completing.
+        no lifecycle gate at all — the trigger is the caller FINISHING (every assigned,
+        active, published scoring challenge solved or out of attempts), so a learner who
+        finishes in the second month of a year-long Program is not made to wait for the
+        deadline. **A Program certificate is GRADED** (owner decision, 27 Nov 2026): the
+        grade is the points held (correct answers less wrong-answer penalties and hints,
+        floored at 0) over the face value of the scoring challenges (quick questions
+        excluded); 90% Excellent, 80% Very good, 70% Good, 60% Satisfactory, each
+        inclusive at its lower edge. Unfinished is 403 `not_completed`; finished under
+        60% is 403 `grade_below_pass` (the learner may try again:
+        `POST /api/competitions/{id}/program/retake`). The band and percentage are
+        frozen on the certificate (`grade`).
 
 
         **Idempotent, and the existing badge is returned BEFORE any LIFECYCLE refusal.**
@@ -4114,7 +4167,13 @@ paths:
                   withheld: { type: boolean, enum: [true], description: "Present, true, only while an admin who does not hold `certificates.lookup` views as the participant: the code, the token and every link built from it are left out." }
                   rank: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "The caller's real leaderboard rank at mint time (1-based)." }
                   placement: { type: boolean, description: "true for a placement certificate (a top-three place with points above zero); false for participation or completion." }
-                  rankLabel: { type: string, example: "1st Place", description: "'Nth Place' for a placement badge, 'Participant' for a participation badge, 'Completed' for a completion badge." }
+                  rankLabel: { type: string, example: "1st Place", description: "'Nth Place' for a placement badge, 'Participant' for a participation badge, 'Completed' for a completion badge. On an event with two or more sessions a placement names its board: '1st Place — Session A' or '1st Place — Overall'." }
+                  board: { type: string, description: "Present on a placement certificate of an event with two or more sessions: the board the place was won on (the session's name, frozen at mint, or 'Overall')." }
+                  also:
+                    type: array
+                    description: "On an event ranking a winner per session AND overall, the overall board's placement certificate this press also collected (or already held), in this same shape. Absent when there is none."
+                    items: { type: object, additionalProperties: true }
+                  grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
                   name_fallback:
                     type: boolean
                     description: >
@@ -4405,6 +4464,66 @@ paths:
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
         "429": { description: Rate limited — 30/min per IP. }
 
+  /api/competitions/{id}/program/retake:
+    post:
+      tags: [Competitions]
+      summary: Try a Program again (a learner who finished under 60%)
+      security: [{ sessionAuth: [] }]
+      description: >
+        Program grades (owner decision, 27 Nov 2026): a learner who FINISHED a Program
+        (every scoring challenge solved or out of attempts) with a grade under 60% gets
+        no certificate and may try again. This closes the current attempt: its grade is
+        recorded in `program_attempts`, and its answers and hints to the Program's
+        SCORING challenges move there with it (each row as stored; nothing is deleted),
+        so every score, solve, attempt count and hint reads the new attempt alone. Quick
+        (qualifying) answers stay. The analytics stream is untouched. Recorded on the
+        learner's History as `program_retake_started` with the request's context.
+
+
+        Refused while the Program is not live (409 `program_not_live`), to a non-member
+        (403 `not_member`), before the learner has finished (409 `program_not_finished`),
+        to a learner who passed (409 `program_passed`: a learner at 60% or more does not
+        retake to improve) or holds a certificate (409 `certificate_held`), for an event
+        that is not a Program (400 `not_a_program`), and under impersonation for every
+        tier (403 `impersonation_retake_refused`). Every condition is asked again inside
+        the write.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { description: "`not_member` or `impersonation_retake_refused` (also the CSRF refusal)." }
+        "404": { $ref: '#/components/responses/EventNotFound' }
+        "400": { description: "`not_a_program`, or a malformed body." }
+        "409": { description: "`program_not_live`, `program_not_finished`, `program_passed` or `certificate_held`." }
+        "200":
+          description: The new attempt has started.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  attempt: { $ref: '#/components/schemas/SafeInteger' }
+                  closed:
+                    type: object
+                    description: The attempt just closed and its grade.
+                    properties:
+                      attempt: { $ref: '#/components/schemas/SafeInteger' }
+                      points: { $ref: '#/components/schemas/SafeInteger' }
+                      max: { $ref: '#/components/schemas/SafeInteger' }
+                      permille: { $ref: '#/components/schemas/SafeInteger' }
+                      percent: { type: string, example: "55%" }
+                      band: { type: string, enum: [try_again] }
+                      label: { type: string }
   /api/me/certificates/{token}/linkedin-post:
     get:
       tags: [Badges]
@@ -4675,14 +4794,18 @@ paths:
         Per kind — `booth`: no `deadline_at` (`deadline_not_accepted`), no sessions
         (`POST .../timeslots` → `sessions_forbidden`), `measure_presence` and
         `time_basis:"presence"` refused (`measure_presence_forbidden` /
-        `time_basis_forbidden`); `cxone_disabled` and `self_enroll_enabled` default
-        to 1. `tournament`: everything applies; `trusted_network_ips` is accepted
+        `time_basis_forbidden`); `self_enroll_enabled` defaults to 1, and Checkmarx
+        One accounts are never created (`cxone_disabled` is stored 1; sending
+        `false` is 400 `cxone_provisioning_forbidden`); `clock_start` defaults to
+        `first_open`. `tournament`: everything applies (`clock_start` defaults to
+        `first_open`); `trusted_network_ips` is accepted
         while the event has a single session. `program`: `deadline_at` is REQUIRED
         and `duration_minutes` is derived from it, no sessions,
         `reveal_answers_on_end` and `group_leaderboard_enabled` refused
         (`reveal_answers_forbidden` / `group_leaderboard_forbidden`),
         `trusted_network_ips` refused (`trusted_networks_forbidden`),
-        `cxone_disabled` defaults to 1.
+        `cxone_disabled` defaults to 1, `clock_start` is `entry` and `first_open`
+        is refused (`clock_start_forbidden`).
 
 
         Booleans with a per-kind default (`cxone_disabled`, `self_enroll_enabled`)
@@ -4746,6 +4869,8 @@ paths:
                     deadline-kind editor sends both fields on every save, and
                     start is editable while the event is upcoming.
                 leaderboard_mode: { type: string, enum: [per_slot, global], description: "Multi-slot ranking mode. 'per_slot' (default) gives each timeslot its own ranked board; 'global' merges every slot into one. Locked once any slot has started." }
+                leaderboard_overall: { type: boolean, default: false, description: "With leaderboard_mode 'per_slot' on an event with two or more sessions, also rank everyone together on an overall board ('Both'). Refused 400 `leaderboard_overall_needs_per_session` with 'global', `leaderboard_ranking_forbidden` on a kind without sessions; locked once any session starts (`leaderboard_ranking_locked`)." }
+                leaderboard_percent: { type: boolean, default: false, description: "Rank the overall board ('global', or the overall board of 'Both') by each person's score as a percentage of the most their own session's questions could earn, compared exactly; time breaks ties. Refused 400 `leaderboard_percent_needs_overall` where there is no overall board; locked once any session starts." }
                 reveal_answers_on_end:
                   type: boolean
                   default: false
@@ -4762,6 +4887,7 @@ paths:
                 self_enroll_enabled: { type: boolean, description: "Opt the self-enroll join link on at create (the link exists but does nothing until enabled). Also settable via the PUT. **The default is the KIND's**: ON for a Booth Event, OFF for a Competition and a Program. OMIT the key to take it; sending `false` is honoured as an explicit choice." }
                 measure_presence: { type: boolean, default: false, description: "record NET ACTIVE TIME (five-minute buckets in which a request carried a user-intent header). Off by default; REFUSED (400) for a Booth Event, whose window is too short for the bucket to discriminate. Participants are told, per event." }
                 time_basis: { type: string, enum: [elapsed, presence], default: elapsed, description: "which time breaks a score tie. `presence` only takes effect with measure_presence on, and only separates participants who FINISHED everything: for anyone still going, less time on the platform means less work done, not more efficiency." }
+                clock_start: { type: string, enum: [first_open, entry], description: "WHEN each participant's solve clock (the time-to-solve tie-break) starts. `first_open` — at their first open of a scoring challenge (or their first stored answer or hint, if that comes first); entering the event, reading the list and opening a Quick (qualifying) question start nothing, and a participant whose clock has not started is not on the leaderboard. `entry` — when they enter the live event (the rule of every event created before this setting). ABSENT takes the kind's seed: `first_open` for a Booth Event and a Competition, `entry` for a Program; `first_open` on a Program is refused with `clock_start_forbidden` (it is unranked)." }
                 group_leaderboard_enabled: { type: boolean, default: false, description: "opt in to the group/team leaderboard (default off). Even when true, the board only renders once ≥2 non-empty groups (each with an on-board member) are assigned to the competition. Also settable via the PUT." }
                 cxone_disabled: { type: boolean, default: false, description: "opt OUT of CxOne (Checkmarx One) account creation for this competition (default off, i.e. accounts ARE created). When true, no CxOne accounts are provisioned for this competition's participants via any path (assign / self-enroll / invite / group-sync). Also settable via the PUT." }
                 attempt_cap:
@@ -5026,6 +5152,8 @@ paths:
                     deadline-kind editor sends both fields on every save, and
                     start is editable while the event is upcoming.
                 leaderboard_mode: { type: string, enum: [per_slot, global], description: "Locked once any slot has started." }
+                leaderboard_overall: { type: boolean, default: false, description: "With leaderboard_mode 'per_slot' on an event with two or more sessions, also rank everyone together on an overall board ('Both'). Refused 400 `leaderboard_overall_needs_per_session` with 'global', `leaderboard_ranking_forbidden` on a kind without sessions; locked once any session starts (`leaderboard_ranking_locked`)." }
+                leaderboard_percent: { type: boolean, default: false, description: "Rank the overall board ('global', or the overall board of 'Both') by each person's score as a percentage of the most their own session's questions could earn, compared exactly; time breaks ties. Refused 400 `leaderboard_percent_needs_overall` where there is no overall board; locked once any session starts." }
                 reveal_answers_on_end:
                   type: boolean
                   description: |
@@ -5071,9 +5199,21 @@ paths:
                     standings are final and any certificates already issued assert that
                     order. Echoing the stored value back is never a change.
                     `undefined` ⇒ no change.
+                clock_start:
+                  type: string
+                  enum: [first_open, entry]
+                  description: >-
+                    When each participant's solve clock starts (see the create body).
+                    Refused with 400 `clock_start_forbidden` when set to `first_open`
+                    on a kind that may not (a Program), and with 400
+                    `clock_start_locked` once the event or any of its sessions has
+                    started: every solve time is measured from this anchor, so a
+                    change mid-event would re-anchor some participants and not
+                    others. A kind change to a Program sets it to `entry`. Echoing the
+                    stored value back is never a change. `undefined` ⇒ no change.
                 cxone_disabled:
                   type: boolean
-                  description: "opt OUT of CxOne account creation for this event. When true, no CxOne accounts are provisioned for its participants — and a provisioning job already under way for it is abandoned at its next check (before it creates the account, or before it grants the event's group); anything it had already created is not removed. `undefined` ⇒ no change."
+                  description: "opt OUT of CxOne account creation for this event. When true, no CxOne accounts are provisioned for its participants — and a provisioning job already under way for it is abandoned at its next check (before it creates the account, or before it grants the event's group); anything it had already created is not removed. `undefined` ⇒ no change. A Booth Event (policy `cxone_provisioning: forbidden`) never creates accounts: `false` is 400 `cxone_provisioning_forbidden`, and a kind change to a Booth Event stores 1 (recorded in `edited`)."
                 trusted_network_ips:
                   type: string
                   nullable: true
@@ -5420,7 +5560,11 @@ paths:
         Emits a `source:"audit"` row to `app.jsonl` with `scope:"competition"`,
         `event_type:"deleted"`, and a `cascaded` object counting child rows
         removed in the same transaction (the competition_events table row can't
-        survive the cascade, so the audit trail lives in the log file). A
+        survive the cascade, so the audit trail lives in the log file). The
+        questions the event OWNS (its copies of bank questions, and any created
+        in it) are deleted too, with their attachment files no other row names
+        (`cascaded.owned_questions`); one an event template names is released
+        into the library instead (`cascaded.owned_questions_released`). A
         Checkmarx One provisioning job still in flight for the event stops at its
         next check; nothing already created in the realm is removed.
       parameters:
@@ -5726,8 +5870,10 @@ paths:
         tier, event admins included; for an event admin, challenge ids they may
         not view (not theirs, not used by one of their events, not public-domain)
         are withheld and counted in `withheld_task_count`. Three built-in
-        templates are seeded once on a new platform — "Booth quick-spin",
-        "Tournament (2 h)" and "Learning Program (30 days)" — with no challenges.
+        templates are seeded once on a new platform, one per kind and shown as
+        that kind's recommended setup on the New event page — "Booth day (8
+        hours)", "Competition (several sessions)" and "Learning program (30
+        days)" — with no challenges.
       responses:
         default: { $ref: '#/components/responses/UnexpectedError' }
         "500": { $ref: '#/components/responses/InternalError' }
@@ -5790,7 +5936,7 @@ paths:
             (`reveal_answers_forbidden`, `group_leaderboard_forbidden`,
             `measure_presence_forbidden`, `time_basis_forbidden`,
             `registration_fields_forbidden`,
-            `late_entry_forbidden`), `template_tasks_invalid` or a
+            `late_entry_forbidden`, `clock_start_forbidden`), `template_tasks_invalid` or a
             `template_task_*` code.
         "401": { description: Not signed in }
         "403": { description: "`template_task_competing` (`{error, code, task_id}`: a challenge in `task_ids` is held by an event the caller competes in; the message names that event only when the caller may see it), `event_admin_forbidden`, `csrf_invalid`, or a non-admin caller." }
@@ -5940,8 +6086,8 @@ paths:
       tags: [Admin - Competitions]
       summary: Recreate any missing built-in template
       description: >-
-        Admin or superadmin only. Recreates each built-in template (Booth
-        quick-spin, Tournament (2 h), Learning Program (30 days)) that no longer
+        Admin or superadmin only. Recreates each built-in template (Booth day
+        (8 hours), Competition (several sessions), Learning program (30 days)) that no longer
         exists, with its shipped settings; a name another template now holds gets
         " (built-in)" appended. Audited per row as `event_template` /
         `builtin_restored`.
@@ -6309,8 +6455,72 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
         "404": { description: No such competition or user. }
-        "409": { description: The target's role changed while the request was in flight. }
+        "409": { description: "`event_admin_role_changed`: the target's role changed while the request was in flight." }
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+  /api/admin/competitions/{id}/admins/staff-team:
+    post:
+      tags: [Admin - Event organisers]
+      summary: Make a whole staff team organisers of this event
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: |
+        Admin or superadmin only, as the single grant (an event admin is refused
+        403 `event_admin_forbidden`), refused to a competitor in the event, and
+        reading the team takes `teams.view` (403 `permission_denied` naming it).
+
+        Each member whose address is the PRIMARY address of an account is granted
+        exactly as the single grant grants (a `participant` becomes an
+        `event_admin`, recorded on both histories with `via: staff_team`). A
+        member is SKIPPED with its `code` and `reason` when no account signs in
+        with the address (`staff_member_no_account`), the account already
+        organises the event (`already_organiser`), it is an administrator
+        (`event_admin_target_privileged`) or its role changed meanwhile
+        (`event_admin_role_changed`).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId]
+              properties:
+                teamId: { type: string }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "404": { description: "No such event (`Event not found`), or `staff_team_not_found`." }
+        "403":
+          description: >-
+            `event_admin_forbidden`, `permission_denied` (no `teams.view`),
+            `competitor_cannot_edit`, or a refused CSRF token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "400": { description: "`staff_team_required` (no `teamId`), or a body that cannot be read." }
+        "200":
+          description: Who was made an organiser and who was skipped, each skip with its reason.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  team: { type: object, properties: { id: { type: string }, name: { type: string }, member_count: { type: integer } } }
+                  granted:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        staff_member_id: { type: string }
+                        name: { type: string }
+                        email: { type: string }
+                        user_id: { type: string }
+                        role_changed: { type: boolean, description: true when the account was promoted out of the participant role. }
+                  skipped: { type: array, items: { $ref: '#/components/schemas/StaffTeamSkip' } }
   /api/admin/competitions/{id}/overview-pulse:
     get:
       tags: [Admin - Event organisers]
@@ -6652,6 +6862,128 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /api/admin/competitions/{id}/task-sessions:
+    get:
+      tags: [Admin - Sessions]
+      summary: Which sessions each of an event's questions is in
+      description: >-
+        The Questions section's Sessions choice. `tasks` maps a question id to
+        the ids of the sessions it is in; a question with no entry is in every
+        session (the default, and what every question of an event created before
+        the choice existed reads as). `offered` is true only where the choice can
+        be used: a kind that runs sessions, with two or more of them. Each
+        session carries its derived `status`, as a session's questions are fixed
+        once it starts. Scoped like every event read (`events.view`).
+      security: [{ sessionAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/EventNotFound' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: "The event's sessions and each question's choice."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  offered: { type: boolean, description: "True only for a kind that runs sessions, with two or more." }
+                  timeslots:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        start_time: { type: string, format: date-time }
+                        status: { type: string, enum: [upcoming, live, ended] }
+                  tasks:
+                    type: object
+                    description: "Question id → the session ids it is in. A question with no entry is in every session."
+                    additionalProperties: { type: array, items: { type: string } }
+
+  /api/admin/competitions/{id}/tasks/{taskId}/sessions:
+    put:
+      tags: [Admin - Sessions]
+      summary: Choose the sessions one of an event's questions is in
+      description: >-
+        Each session of a Competition can hold its own set of questions. A
+        participant sees, answers and finishes only the questions of their own
+        session; a question in no chosen session is in every session.
+        `timeslotIds` is a list of this event's session ids, or null for every
+        session (an empty list is refused: to take a question out of the event,
+        remove it from the event). `expectedTimeslotIds` (optional, same shape)
+        is the choice the dialog was drawn from: a change made meanwhile answers
+        409 `task_sessions_changed`. Refused 400 `task_sessions_forbidden` on a
+        kind without sessions, `task_sessions_need_two` with fewer than two
+        sessions, `task_sessions_unknown` for an id that is not this event's,
+        `task_sessions_empty`, `task_sessions_qualifying` (a Quick question is
+        asked of everyone), `task_sessions_invalid` for a wrong-typed body; and
+        409 `task_sessions_locked` when a session the change adds the question
+        to or takes it from has started. The competitor lock is asked first,
+        then scope. Recorded as the event's `task_sessions_changed` with the
+        sessions before and after by name; an unchanged choice answers
+        `changed:false` and records nothing.
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: taskId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [timeslotIds]
+              properties:
+                timeslotIds:
+                  type: array
+                  nullable: true
+                  items: { type: string }
+                  description: "This event's session ids, or null for every session."
+                expectedTimeslotIds:
+                  type: array
+                  nullable: true
+                  items: { type: string }
+                  description: "The choice the caller last read (null for every session); a different stored choice answers 409."
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "200":
+          description: "Stored (or unchanged)."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  changed: { type: boolean }
+                  timeslotIds: { type: array, nullable: true, items: { type: string } }
+        "400": { description: "`task_sessions_invalid`, `task_sessions_forbidden`, `task_sessions_need_two`, `task_sessions_unknown`, `task_sessions_empty` or `task_sessions_qualifying` (see the description)." }
+        "403":
+          description: >-
+            `competitor_cannot_edit` — the caller competes in this event (asked
+            first, binding a superadmin too); or the caller's role does not
+            reach this event.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "404": { description: "Event not found, or the question is not in this event (`task_not_in_event`)." }
+        "409": { description: "`task_sessions_locked` — a session the change touches has started; or `task_sessions_changed` — the choice changed since the caller read it." }
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
 
   /api/admin/competitions/{id}/timeslots/bulk-delete:
@@ -7319,6 +7651,8 @@ paths:
                             withheld hint over a box that was always empty. Absent for
                             everybody else. A client tells the two reasons apart by
                             `competing_in`.
+                        topic_id: { type: string, nullable: true, description: "The question's topic (GET /api/admin/topics), or null." }
+                        topic_name: { type: string, nullable: true, description: "That topic's name, or null for no topic." }
                         qualifying_keys:
                           type: array
                           items: { type: string }
@@ -7404,11 +7738,22 @@ paths:
                       text:    { type: string }
                       correct: { type: boolean, description: "Multiple choice: marks a correct option; one sent without it is incorrect. Ignored on a pick-one question, whose every option is accepted." }
                 attempt_cap: { type: integer, format: int32, nullable: true, minimum: 1, maximum: 1000, description: "CHALLENGE-level ceiling on submissions per participant, per event. Null/absent means uncapped, and it OVERRIDES any event-level `attempt_cap`. An attempt is a stored submission row, so a de-duplicated re-send and a throttled 429 cost nothing. On a PUT, send `null` (or an empty string) to remove the cap; omit the field to leave it unchanged." }
+                topic_id: { type: string, nullable: true, description: "The question's TOPIC (GET /api/admin/topics): an existing topic's id, or null/empty for no topic. A topic id that names no topic is refused 400 `topic_not_found`, a value that is not text 400. Participants see the topic's name as the question's category." }
                 correct_answer: { type: string, maxLength: 65536, description: "Required for every answer type EXCEPT `choice`, where it is derived from the ticked options, and `any`, which has none (stored empty). For `text` it is a NEWLINE-separated list of accepted answers (v8.9.0): one line is the single answer it always was; each line is graded ignoring case and whitespace; the list is canonicalised on save (lines trimmed, blank lines and duplicates dropped, the first spelling kept), so an all-blank list is refused. A text challenge that already carried an embedded newline now accepts each line rather than the concatenation." }
                 explanation: { type: string }
                 hint: { type: string, description: "Refused with 400 on an `any` challenge when it carries real content; empty markup (`<p></p>`) is accepted and stored as no hint." }
                 attachment_url: { type: string }
                 status: { type: string, enum: [draft, published], default: draft }
+                competitionId:
+                  type: string
+                  description: >-
+                    CREATE THE QUESTION INSIDE THIS EVENT: it is the event's own
+                    question from birth (`owner_competition_id`, never a bank
+                    question), and a published one is assigned to the event at once.
+                    Asked as the assign doors ask: the competitor lock, the caller's
+                    scope (403), the event exists (404), no session of it has ended,
+                    the challenge fits the event's kind and, where staff compete, the
+                    seal invariant (400). Absent: a bank question, as before.
                 answer_sealed:
                   type: boolean
                   default: false
@@ -7620,6 +7965,7 @@ paths:
                 hint: { type: string, maxLength: 2000, description: "Refused with 400 on an `any` challenge when it carries real content. Omit it (or send empty markup) for that type; the row's hint is NULL either way." }
                 attachment_url: { type: string }
                 attempt_cap: { type: integer, format: int32, nullable: true, minimum: 1, maximum: 1000, description: "CHALLENGE-level ceiling on submissions per participant, per event. It OVERRIDES any event-level `attempt_cap` (most-specific-wins). Send `null` (or an empty string) to remove the cap; omit the field to leave it unchanged." }
+                topic_id: { type: string, nullable: true, description: "The question's topic: a topic id, null or empty for none, absent to leave it unchanged. 400 `topic_not_found` when it names no topic. History records the change by topic name. A version restore never changes it." }
                 active:
                   description: >-
                     Visibility. A PRESENT value must be `true`/`false` or `0`/`1`;
@@ -7947,6 +8293,16 @@ paths:
                       unsealed: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "(challenge, event) pairs skipped because the event lets staff compete and the challenge's answer is not SEALED — such an event admits only sealed challenges. Each is listed in `refused`." }
                       authorCompetes: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "(challenge, event) pairs skipped because the event lets staff compete and the challenge's AUTHOR is enrolled in it — a sealed answer is readable by its author. Each is listed in `refused`." }
                       qualifyingHeld: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "(challenge, event) pairs skipped because the challenge is a qualifying question and the event already asks one on its topic (its key): an event asks each one once." }
+                      ownedElsewhere: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "(challenge, event) pairs skipped because the challenge is ANOTHER event's own question; add the bank question it was copied from. Each assigned pair puts the event's own copy of a bank question in (see the single-assign door)." }
+                  copies:
+                    type: array
+                    description: "The question each assigned (challenge, event) pair put in: the event's own copy (`task_id`) of the named question (`from`)."
+                    items:
+                      type: object
+                      properties:
+                        competition_id: { type: string }
+                        task_id: { type: string }
+                        from: { type: string }
                   unfitReasons:
                     type: array
                     description: "Present only when `skipped.unfit` is non-zero. Up to five human-readable refusals, each naming the challenge and the event."
@@ -7984,6 +8340,18 @@ paths:
       summary: Assign challenge to events
       description: >-
         Assigns a published challenge to one or more events.
+
+
+        **A question added to an event lives in that event.** Naming a BANK
+        question (`owner_competition_id` null) puts each event's OWN copy of it
+        in: made now (every question field, the option ids, tags, attachments, the
+        seal and author, origin recorded in `copied_from_task_id`), or the copy an
+        earlier add made. Later edits of the bank question never reach a copy, and
+        an edit of a copy reaches its event only. Naming an event's own question
+        assigns it to that event; another event's question is refused
+        (`task_owned_by_other_event`): copying is the only way to share one.
+        Qualifying questions keep their own rule (below) and are assigned as they are.
+        `copies` names the question each event now holds.
         `assigned` counts the number of events the challenge was
         NEWLY added to — duplicates in `competitionIds` and events
         the challenge was already assigned to do NOT inflate the count
@@ -8026,8 +8394,18 @@ paths:
                 properties:
                   ok: { type: boolean }
                   assigned: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Count of NEW competition links created. Zero if every requested competition already had this challenge." }
+                  copies:
+                    type: array
+                    description: "One entry per named event: the question it now holds (its own copy of a bank question)."
+                    items:
+                      type: object
+                      properties:
+                        competition_id: { type: string }
+                        task_id: { type: string }
         "400":
           description: >-
+            `task_owned_by_other_event`: the challenge is another event's own
+            question (add the bank question it was copied from). Or
             `competitionIds` is not an array of strings (`competitionIds must be an
             array of strings`, asked before anything else reads the list); it names
             more than 1000 events (`Cannot assign a challenge to more than 1000 events
@@ -8054,7 +8432,7 @@ paths:
                 additionalProperties: true
                 properties:
                   error: { type: string }
-                  code: { type: string, enum: [staff_compete_unsealed, staff_compete_author_competes, qualifying_key_held], description: "Present on a seal refusal, and on qualifying_key_held (which carries no refused list)." }
+                  code: { type: string, enum: [staff_compete_unsealed, staff_compete_author_competes, qualifying_key_held, task_owned_by_other_event], description: "Present on a seal refusal, on qualifying_key_held (which carries no refused list), and on task_owned_by_other_event (another event's own question)." }
                   refused:
                     type: array
                     description: "Present with a seal `code`: EVERY refused (challenge, event) pair in the request, capped at 50 (`refused_total` is the uncapped count)."
@@ -8169,7 +8547,7 @@ paths:
                 additionalProperties: true
                 properties:
                   error: { type: string }
-                  code: { type: string, enum: [staff_compete_unsealed, staff_compete_author_competes, qualifying_key_held], description: "Present on a seal refusal, and on qualifying_key_held (which carries no refused list)." }
+                  code: { type: string, enum: [staff_compete_unsealed, staff_compete_author_competes, qualifying_key_held, task_owned_by_other_event], description: "Present on a seal refusal, on qualifying_key_held (which carries no refused list), and on task_owned_by_other_event (another event's own question)." }
                   refused:
                     type: array
                     description: "Present with `code`: EVERY refused (challenge, event) pair among the additions, capped at 50 (`refused_total` is the uncapped count). Additions only."
@@ -9014,6 +9392,13 @@ paths:
         never offers what the server will refuse.
 
 
+        `programs` (Program grades, owner decision 27 Nov 2026): for each Program the
+        participant is in, their grade now (`grade`, null with no scoring challenge),
+        whether it counts yet (`finished`: every scoring challenge solved or out of
+        attempts), the current attempt's number, the attempts closed with Try again and
+        `canRetake`, from the retake route's own predicate.
+
+
         While an admin views as the participant without holding `certificates.lookup`
         (read live from the acting admin, never the participant), each held certificate
         leaves out its `token`, `code`, `badgeUrl`, `imageUrl` and `pdfUrl` and carries
@@ -9060,8 +9445,11 @@ paths:
                         competitionId: { type: string, description: "the event this certificate belongs to. Match on THIS, never on `competitionName`: competition names carry no uniqueness constraint, so a recurring programme would otherwise render one event's issue date and credential code under another's heading." }
                         code: { type: string, description: "Grouped as printed. Absent on an older badge, which carries no code, and with `withheld`." }
                         tier: { type: string, enum: [gold, silver, bronze, participation, completion], description: "The variant the certificate renders as, from its frozen basis and rank." }
+                        grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
                         rank: { $ref: '#/components/schemas/SafeInteger' }
                         score: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, nullable: true, description: "The frozen score, on a placement certificate only." }
+                        scoreLabel: { type: string, nullable: true, description: "What the certificate prints in its score slot, frozen: the percentage a placement on an overall board ranked by percentages was ranked on ('75%'), else the points ('150 pts'); null without a place." }
+                        scorePercent: { type: number, format: double, nullable: true, minimum: -9007199254740991, maximum: 100, description: "The frozen percentage (one decimal, rounded down) of a placement on a board ranked by percentages; null on a points board or without a place." }
                         issuedAt: { type: string, format: date-time }
                         emailedAt: { type: string, format: date-time, nullable: true, description: "When the congratulations email carrying this certificate was delivered; null when it was never sent, was not delivered, or the address opted out." }
                         badgeUrl: { type: string, description: "Absent on a revoked certificate (every artefact route answers 404 for one), and with `withheld`." }
@@ -9075,6 +9463,33 @@ paths:
                         competitionId: { type: string }
                         competitionName: { type: string }
                         kind: { type: string, nullable: true }
+                  programs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        competitionId: { type: string }
+                        competitionName: { type: string }
+                        finished: { type: boolean }
+                        attempt: { $ref: '#/components/schemas/SafeInteger' }
+                        passPercent: { type: integer, enum: [60] }
+                        grade:
+                          allOf: [{ $ref: '#/components/schemas/ProgramGrade' }]
+                          nullable: true
+                        canRetake: { type: boolean }
+                        previousAttempts:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              attempt: { $ref: '#/components/schemas/SafeInteger' }
+                              points: { $ref: '#/components/schemas/SafeInteger' }
+                              max: { $ref: '#/components/schemas/SafeInteger' }
+                              permille: { $ref: '#/components/schemas/SafeInteger' }
+                              percent: { type: string, example: "55%" }
+                              band: { type: string, enum: [excellent, very_good, good, satisfactory, try_again] }
+                              label: { type: string }
+                              closedAt: { type: string, format: date-time }
 
   /api/admin/credential/{code}:
     get:
@@ -9211,6 +9626,7 @@ paths:
                   competitionName: { type: string }
                   dateLabel:       { type: string }
                   scoreLabel:      { type: string, nullable: true, description: "Absent for a completion certificate — that kind has no ranking." }
+                  grade:           { $ref: '#/components/schemas/FrozenProgramGrade' }
                   code:            { type: string, description: "The code, grouped as printed." }
         "429": { description: "A failure budget of this address is exhausted (30 wrong lookups an hour in all, or 10 for this code). Other addresses checking the same code are unaffected. Successes are never counted." }
   /api/admin/badges/{token}/revoke:
@@ -9486,8 +9902,9 @@ paths:
         inline. Useful after SMTP credential rotation, DNS changes, or to confirm outbound
         delivery during a live event without reading the log file. It resolves its sender
         through the same shared resolver as real mail, so the From header it produces is the
-        one every other email carries — platform name as the display name, EMAIL_FROM as the
-        address.
+        one every other email carries — platform name as the display name, the sender
+        address of the mail server in use (saved in Settings, else EMAIL_FROM) as the
+        address. To try values that are not saved, use POST /api/admin/smtp-settings/test.
       requestBody:
         required: true
         content:
@@ -9516,6 +9933,156 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true, properties: { ok: { type: boolean }, error: { type: string } } }
+
+  /api/admin/smtp-settings:
+    get:
+      tags: [Admin - Settings]
+      summary: The mail server in use and where it comes from (Settings, Email)
+      security: [{ sessionAuth: [] }]
+      description: >
+        The mail relay (SMTP) every email goes through: `in_use` is the relay in
+        force, `source` saying whether it was saved in the app (`app`) or comes from
+        the server's environment (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
+        EMAIL_FROM: `environment`). A relay saved in the app replaces the
+        environment's as a whole; with none saved the environment's is used. The
+        password is never sent, in any form: only `password_set`. `saved` is the
+        saved relay (null when none), `password_unreadable` true while its saved
+        password cannot be decrypted on this server (its key file is not part of
+        backups, so after a restore or a move to another server; mail then goes
+        through the environment's relay if it names one, until a superadmin enters
+        the password again). `health` is the relay's last check (null until one ran;
+        checks are skipped under NODE_ENV=test). `version` is the saved relay's
+        digest (null when none), sent back as `expectedVersion`. `can_edit`: the
+        caller may change it (superadmin only). Needs `settings.view`; never cached.
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: The mail server in use
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmtpSettingsView' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Admin - Settings]
+      summary: Save the mail server (superadmin)
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >
+        Saves the relay and swaps the platform's mail to it at once, with no restart:
+        mail already being sent finishes on the old relay. The password is stored
+        encrypted (AES-256-GCM under `DATA_DIR/.smtp-key`) and never returned. An
+        absent or empty `password` keeps the password in force only for the same
+        host and username, and only while this server can read it; otherwise it is
+        refused `smtp_password_required` (a saved password is never sent to another
+        host). No `username`: the relay takes mail without signing in.
+        `security`: `starttls` requires the STARTTLS upgrade (unless the server's
+        environment sets SMTP_ALLOW_PLAINTEXT=1, which the app cannot), `tls` is
+        TLS from the first byte (port 465). Needs `ops.smtp`, which only a
+        superadmin holds and no custom role can be given. Audited as the `smtp`
+        settings event naming which fields changed, with the old and new host,
+        port, security and sender (never the username or password).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/SmtpSettingsInput' }
+                - type: object
+                  properties:
+                    expectedVersion: { type: string, nullable: true, description: "The read's `version` (null when nothing was saved). Absent: unchecked." }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { description: "`smtp_key_unavailable`: the server could not write its key file; nothing was changed. Or an internal error." }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: Saved; the same shape as the read, plus `ok`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmtpSettingsView' }
+        "400": { description: "`smtp_field_invalid` (with `field`) or `smtp_password_required`." }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "409": { description: "`smtp_settings_changed`: `expectedVersion` is not the saved relay's." }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+    delete:
+      tags: [Admin - Settings]
+      summary: Remove the saved mail server (superadmin)
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >
+        Deletes the saved relay, its encrypted password included, and sends through
+        the environment's relay again at once. Refused while the environment names
+        no relay (SMTP_HOST), which would stop all mail. Nothing saved: 200 with
+        `changed: false`. Needs `ops.smtp`. Audited as the `smtp` settings event
+        `cleared`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                expectedVersion: { type: string, nullable: true }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: Removed (or nothing was saved); the read's shape plus `ok` and `changed`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SmtpSettingsView' }
+        "400": { description: "`smtp_field_invalid`: `expectedVersion` is not text or null." }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "409": { description: "`smtp_settings_changed`, or `smtp_environment_missing`: the environment names no relay." }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /api/admin/smtp-settings/test:
+    post:
+      tags: [Admin - Settings]
+      summary: Send a test through mail server values that are not saved (superadmin)
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >
+        Sends one message to `to` through the relay the body describes, on its own
+        short-lived connection: nothing is saved and the relay in force is
+        untouched. The From is the platform name with the body's `sender`. The
+        password rule is the save's. Needs `ops.smtp`. Audited as the orphaned
+        `test_email_sent` (`via: unsaved_settings`, the host, port, security and
+        outcome).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/SmtpSettingsInput' }
+                - type: object
+                  required: [to]
+                  properties:
+                    to: { type: string, format: email, maxLength: 254 }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: The relay accepted the test message
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: false, properties: { ok: { type: boolean } } }
+        "400": { description: "`smtp_test_recipient_invalid`, `smtp_field_invalid` (with `field`) or `smtp_password_required`." }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "502":
+          description: "`smtp_test_failed`: the relay refused or could not be reached; `error` is its answer (the password cut out)."
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true, properties: { ok: { type: boolean }, error: { type: string }, code: { type: string } } }
 
   /metrics:
     get:
@@ -9818,6 +10385,214 @@ paths:
               schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
 
+  /api/admin/topics:
+    get:
+      tags: [Admin - Challenges]
+      summary: List the Question bank's topics
+      security: [{ sessionAuth: [] }]
+      description: >-
+        Every topic, by name. A question belongs to at most one topic and a topic
+        holds many; participants see a question's topic as its category. Topic names
+        are platform-wide (any organiser may file a question under any topic), so
+        the list is not narrowed; `question_count` counts only the bank questions
+        this reader can see. `can_manage` says whether this reader may rename or
+        delete the topic (a global admin, or the organiser who made it), and
+        `manage_refusal` says why not.
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: "Every topic, in name order."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                    question_count: { type: integer }
+                    can_manage: { type: boolean }
+                    manage_refusal: { type: string }
+    post:
+      tags: [Admin - Challenges]
+      summary: Make a topic
+      description: >-
+        Makes a topic. The name is 1–60 characters with no control characters,
+        trimmed, and unique case-insensitively (409 `topic_exists`, naming the
+        existing topic's `id` and `name`). Any organiser holding `challenges.edit`
+        may make one. Audited as an orphaned `topic` event `created`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 60 }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "201":
+          description: "The topic was made."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string }
+                  name: { type: string }
+        "400": { description: "`topic_name_invalid`: the name is missing, not text, empty, over 60 characters or holds a control character." }
+        "409": { description: "`topic_exists`: a topic of that name exists (its `id` and `name` are in the body)." }
+  /api/admin/topics/{id}:
+    put:
+      tags: [Admin - Challenges]
+      summary: Rename a topic
+      description: >-
+        Renames the topic, under the name rules of the create. Only a global admin
+        or the organiser who made the topic (403 `topic_not_yours`). Every question
+        filed under it, events' own copies included, shows the new name at once.
+        Audited as an orphaned `topic` event `edited` with the old and new names.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 60 }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "200":
+          description: "Renamed (`changed` false when the name was already this one)."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string }
+                  name: { type: string }
+                  changed: { type: boolean }
+        "400": { description: "`topic_name_invalid` (see the create)." }
+        "403": { description: "`topic_not_yours`, or the CSRF token was refused (see CsrfRefused)." }
+        "404": { description: "`topic_not_found`." }
+        "409": { description: "`topic_exists`: another topic has that name." }
+    delete:
+      tags: [Admin - Challenges]
+      summary: Delete a topic
+      description: >-
+        Deletes the topic. Questions are never deleted with it. While any question
+        names it (a bank question or an event's own copy) the delete is refused
+        409 `topic_not_empty` with the count, unless `move_to` says where the
+        questions go first: another topic's id, or null for no topic. Only a global
+        admin may move questions (`can_move` in the refusal); the organiser who made
+        a topic may delete it only once it is empty. Only a global admin or the
+        topic's creator may delete it (403 `topic_not_yours`). Audited as an
+        orphaned `topic` event `deleted`, with how many questions moved and where.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              properties:
+                move_to: { type: string, nullable: true }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "200":
+          description: "Deleted; `moved` questions went to `moved_to` (null: no topic)."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  moved: { type: integer }
+                  moved_to: { type: object, nullable: true, additionalProperties: true }
+        "400": { description: "`topic_move_invalid` (move_to is not text or null, or names this topic) or `topic_not_found` (move_to names no topic)." }
+        "403": { description: "`topic_not_yours`, or the CSRF token was refused (see CsrfRefused)." }
+        "404": { description: "`topic_not_found`." }
+        "409": { description: "`topic_not_empty`: questions still name it (`questions`), and `can_move` says whether this caller may name `move_to`." }
+
+  /api/admin/tasks/{id}/save-to-bank:
+    post:
+      tags: [Admin - Challenges]
+      summary: Save an event's question to the Question bank
+      description: >-
+        Copies an event's own question into the Question bank as a NEW bank
+        question: never a link and never an overwrite of the bank question it was
+        copied from, so later edits to either reach neither. The copy takes the
+        question's wording, answer, options, topic, tags (never a `qualifying:`
+        one) and attachments (new rows naming the same files); it is not locked,
+        and it belongs to whoever saved it (`created_by_id`), or, when the answer
+        is sealed, to the source's author so the seal still names them. Refused
+        for a bank question (400 `save_to_bank_not_event`), a quick question (400
+        `save_to_bank_qualifying`), a caller who competes in an event holding it
+        (403 `competitor_cannot_edit`), an event admin for a question of an event
+        they do not organise (403), and a sealed answer the caller may not read
+        (403). Recorded as the new question's `created` version with `via:
+        save_to_bank`, naming the source (`saved_from`) and its event.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "200":
+          description: "The new bank question's id."
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string }
+                  title: { type: string }
+        "400": { description: "`save_to_bank_not_event` or `save_to_bank_qualifying`." }
+        "403":
+          description: >-
+            Out of scope, a sealed answer the caller may not read, the CSRF token
+            refused, or `competitor_cannot_edit` (see the CompetitorCannotEdit response).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "404": { description: Challenge not found }
+
   /api/admin/task-tags:
     get:
       tags: [Admin - Challenges]
@@ -10006,8 +10781,8 @@ paths:
           schema: { type: string }
         - name: kind
           in: query
-          description: "`participants` (default) — every account except those whose role acts on every event; `all` — every role (an event workspace's roster, and People with Show admin accounts)."
-          schema: { type: string, enum: [participants, all], default: participants }
+          description: "`participants` (default) — every account except those whose role acts on every event; `all` — every role (an event workspace's roster, and People reached through a link to an admin account); `admins` — only accounts holding a role other than Participant (the rows of Roles & permissions, which offers their account doors). Ignored with `competitionId`, whose roster is never narrowed by role."
+          schema: { type: string, enum: [participants, all, admins], default: participants }
         - name: page
           in: query
           schema: { type: integer, format: int32, default: 1, minimum: 1, maximum: 1000000000 }
@@ -11179,7 +11954,7 @@ paths:
   /api/admin/users/{id}/role:
     patch:
       tags: [Admin - Users and roles]
-      summary: Change an account's role (Users & roles)
+      summary: Change an account's role (Roles & permissions)
       description: >-
         The same handler as `POST /api/admin/participants/{id}/role`, behind the
         `users.manage` permission instead of the superadmin tier. The escalation
@@ -11365,7 +12140,7 @@ paths:
                         label: { type: string }
                         grantable: { type: boolean }
                         superadmin_only: { type: boolean }
-                        every_event_only: { type: boolean, description: "A permission whose routes reach beyond any one event (the raw logs, the alerts, platform settings, metrics, retention, test email and the unsubscribe list, every-event and settings exports, imports, event templates, certificate designs, Users & roles, deleting accounts, creating events, adding organisers): only a role whose scope is `all` may hold it." }
+                        every_event_only: { type: boolean, description: "A permission whose routes reach beyond any one event (the raw logs, the alerts, platform settings, metrics, retention, test email and the unsubscribe list, every-event and settings exports, imports, event templates, certificate designs, Roles & permissions, deleting accounts, creating events, adding organisers): only a role whose scope is `all` may hold it." }
         "400": { $ref: '#/components/responses/QueryParamRepeated' }
         "401": { description: Not authenticated }
         "403": { description: "`permission_denied` — the role lacks `users.view`." }
@@ -11586,6 +12361,249 @@ paths:
 
   # ── Participant groups ──────────────────────────────────────────
         "400": { $ref: '#/components/responses/QueryParamRepeated' }
+  /api/admin/staff-teams:
+    get:
+      tags: [Admin - Staff teams]
+      summary: Every staff team and its members
+      security: [{ sessionAuth: [] }]
+      description: >-
+        `teams.view`. Teams by name, each with its members. `has_account` (whether
+        the address is the primary address of an account here, read now, never
+        stored) is sent only to a caller holding `participants.view`
+        (`shows_accounts`). `can_manage`: whether the caller holds `teams.manage`.
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: The directory.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  teams: { type: array, items: { $ref: '#/components/schemas/StaffTeam' } }
+                  roles: { type: array, items: { type: object, properties: { id: { type: string }, label: { type: string } } } }
+                  can_manage: { type: boolean }
+                  shows_accounts: { type: boolean }
+                  limits: { type: object, properties: { teams: { type: integer }, members: { type: integer }, team_name: { type: integer }, member_name: { type: integer } } }
+    post:
+      tags: [Admin - Staff teams]
+      summary: Make a staff team
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. The name is trimmed, 1–80 characters with no control
+        character, and unique ignoring case (409 `staff_team_exists`, naming its
+        `id`); at most 200 teams (409 `staff_team_too_many`). Audited as an
+        orphaned `staff_team` event `staff_team_created`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 80 }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "400": { description: "`staff_team_name_required` or `staff_team_name_invalid` (too long, or a control character)." }
+        "409": { description: "`staff_team_exists` or `staff_team_too_many`." }
+        "201":
+          description: The team.
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, team: { $ref: '#/components/schemas/StaffTeam' } } }
+  /api/admin/staff-teams/{id}:
+    get:
+      tags: [Admin - Staff teams]
+      summary: One staff team
+      security: [{ sessionAuth: [] }]
+      description: "`teams.view`. As one entry of the list."
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: The team.
+          content:
+            application/json:
+              schema: { type: object, properties: { team: { $ref: '#/components/schemas/StaffTeam' } } }
+    put:
+      tags: [Admin - Staff teams]
+      summary: Rename a staff team
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. The create's name rules. `expectedUpdatedAt` (optional) is
+        the team's `updated_at` as read: a rename over a newer change is 409
+        `staff_team_changed`. Audited `staff_team_renamed` with the old and new names.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 80 }
+                expectedUpdatedAt: { type: string }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { description: "`staff_team_name_required`, `staff_team_name_invalid` or `staff_team_version_invalid`." }
+        "409": { description: "`staff_team_exists` or `staff_team_changed`." }
+        "200":
+          description: Renamed (`changed` false when the name was already that).
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, changed: { type: boolean }, team: { $ref: '#/components/schemas/StaffTeam' } } }
+    delete:
+      tags: [Admin - Staff teams]
+      summary: Delete a staff team and its members
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. Events the team was added to keep their team and
+        organisers. Audited `staff_team_deleted` with the member ids.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, members_removed: { type: integer } } }
+  /api/admin/staff-teams/{id}/members:
+    post:
+      tags: [Admin - Staff teams]
+      summary: Add a member to a staff team
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. A name (1–120 characters, no control character: 400
+        `profile_text_control_chars`), an address the platform accepts (lowered,
+        once per team: 409 `staff_member_exists`) and an optional default role.
+        The allowed domains are not asked here: an event's Team & reports asks
+        them when the team is added. At most 50 members (409 `staff_team_full`).
+        Audited `staff_team_member_added` with the member id and the address's
+        domain, never the address.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name: { type: string, maxLength: 120 }
+                email: { type: string, maxLength: 254 }
+                default_role: { type: string, nullable: true, enum: [se, marketing, sales, sdr, se_manager, marketing_manager, sales_manager, null] }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { description: "`staff_member_name_required`, `staff_member_name_invalid`, `profile_text_control_chars`, `staff_member_email_required`, `staff_member_email_invalid` or `staff_member_role_invalid`, with the `field`." }
+        "409": { description: "`staff_member_exists` or `staff_team_full`." }
+        "201":
+          description: The member.
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, member: { $ref: '#/components/schemas/StaffTeamMember' } } }
+  /api/admin/staff-teams/{id}/members/{memberId}:
+    put:
+      tags: [Admin - Staff teams]
+      summary: Edit a staff team member
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. The add's rules; `expectedUpdatedAt` (optional) is the
+        member's `updated_at` as read (409 `staff_member_changed` over a newer
+        change). Audited `staff_team_member_updated` with what changed (an address
+        by its domain only).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: memberId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name: { type: string, maxLength: 120 }
+                email: { type: string, maxLength: 254 }
+                default_role: { type: string, nullable: true, enum: [se, marketing, sales, sdr, se_manager, marketing_manager, sales_manager, null] }
+                expectedUpdatedAt: { type: string }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { description: "The add's refusals, or `staff_team_version_invalid`." }
+        "409": { description: "`staff_member_exists` or `staff_member_changed`." }
+        "200":
+          description: Saved (`changed` false when nothing differed).
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, changed: { type: boolean }, member: { $ref: '#/components/schemas/StaffTeamMember' } } }
+    delete:
+      tags: [Admin - Staff teams]
+      summary: Remove a staff team member
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: "`teams.manage`. Events the team was added to keep them. Audited `staff_team_member_removed`."
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: memberId, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
   /api/admin/groups:
     get:
       tags: [Admin - Groups]
@@ -11597,7 +12615,7 @@ paths:
         created plus the groups bound to one of their events (an organiser with no
         events sees only their own). Each row also carries THE ANSWER to what this
         caller may do with it — `can_write`, `can_bind`, `can_delete` and, when it
-        applies, `competing` — so the Groups pane and the pickers can withhold a
+        applies, `competing` — so the Groups page and the pickers can withhold a
         control with its reason instead of offering one the server refuses.
       responses:
         default: { $ref: '#/components/responses/UnexpectedError' }
@@ -11629,7 +12647,7 @@ paths:
                         (PUT /api/admin/groups/{id}) takes the scope half alone and
                         is never asked the competitor question — a rename changes no
                         membership — so a competing caller may still rename a group
-                        this flag is false for; the Groups pane disables Rename only
+                        this flag is false for; the Teams page disables Rename only
                         on the scope refusal (`competing` says which it was). The
                         invite dialog's group picker offers only groups with this set.
                     can_bind:
@@ -11656,7 +12674,7 @@ paths:
                         Present ONLY when the caller competes in an event this group
                         is bound to (a membership row on it while its "Staff can
                         compete" switch is on) — the first such event. `can_write`
-                        and `can_delete` are then false, and the Groups pane renders
+                        and `can_delete` are then false, and the Teams page renders
                         its Members dialog read-only and its Delete control
                         disabled, naming this event. Absent otherwise.
                       properties:
@@ -13037,6 +14055,188 @@ paths:
         "403": { description: "Not an admin." }
         "404": { description: "Competition or timeslot not found." }
 
+  /api/admin/analytics/marketing:
+    get:
+      tags: [Admin - Analytics]
+      summary: The platform's success figures across events (marketing analytics)
+      security: [{ sessionAuth: [] }]
+      description: >-
+        Counts of what the platform recorded, over the events whose START falls in
+        the range (`from` inclusive, `to` exclusive, and no later than now), less every
+        event tagged `test/dry run` (reported as `dry_run_excluded`), narrowed by
+        `kinds` and `events`. One basis for every figure: an event's people, answers,
+        certificates and leads belong to the range its start falls in. Nothing is
+        estimated, and every figure comes with its denominator.
+
+
+        **Who counts.** Per event, its members less the people its boards leave out
+        there: `staff`-tagged accounts (unless the event lets staff compete),
+        `benchmark` accounts and every role the boards leave out (the event admin and
+        any custom role of its class). Activity is read from `challenge_events` with
+        impersonated rows left out. Certificates count only unrevoked ones whose
+        holder is outside the same set.
+
+
+        **Figures.** `reach`: events by kind; `joined` (member rows, a person in two
+        events twice); `people` (distinct); `returning` (people in more than one of
+        the selected events); `new_accounts` (people whose account was created inside
+        the range, by `desk`, `invitation`, `join_link` or `other`: the records do not
+        tell a sign-up form from an import); the top eight `countries` and
+        `companies` (grouped ignoring case and company endings), with `other` and
+        `not_given`. `engagement`: `played` (joins whose person answered anything,
+        right or wrong, a quick question included); `answers` (to scoring questions)
+        and `quick_answers`; `answered_pairs` / `solved_pairs` (the solve rate: of the
+        (event, person, scoring question) pairs answered at least once, those with a
+        correct answer); `finished` / `finish_base` / `finish_events` (people who
+        played and solved every scoring question the event shows now, over those who
+        played, in events that have scoring questions); `presence` (the median net
+        active time in minutes of the people seen, only in events that measure it).
+        `outcomes`: `certificates` by stored basis (`not_recorded` for certificates
+        issued before the basis was stored) and `shared` (the holder pressed Share);
+        `programs` (Program learners' own grades: finished, graded, passed at 60% or
+        more, per band, with each band's words). `pipeline`: the event team reports'
+        leads, by their own rules (hot, warm, cold; the follow-up question's yes and
+        no, those saying no being no leads; leads marked contacted), only from events
+        that asked readable qualifying questions (`events_asked`). `events`: one row
+        per selected event, newest start first.
+
+
+        Permission `analytics.marketing`, platform-wide: the built-in admin and
+        superadmin hold it, an event admin never (403 `event_admin_forbidden`), and a
+        role scoped to its events cannot be given it. Answers are cached for 30 s per
+        query string.
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, example: "2026-01-01T00:00:00.000Z" }, description: "An ISO date or instant: the earliest event start counted. Absent: no lower bound." }
+        - { name: to, in: query, required: false, schema: { type: string, example: "2027-01-01T00:00:00.000Z" }, description: "An ISO date or instant: the end of the range, excluded. Absent: now." }
+        - { name: kinds, in: query, required: false, schema: { type: string, example: "booth,program" }, description: "Comma-separated event kinds (booth, tournament, program). Absent: every kind." }
+        - { name: events, in: query, required: false, schema: { type: string }, description: "Comma-separated event ids, at most 1000. Absent: every event in the range." }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "400": { description: "`marketing_query_invalid` (a field not given once as text), `marketing_range_invalid` (a date that cannot be read, or a start not before the end), `marketing_kind_unknown`, `marketing_event_invalid`, `marketing_too_many_events`, or `query_param_repeated` (a repeated query parameter)." }
+        "200":
+          description: The figures.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  generated_at: { type: string, format: date-time }
+                  range:
+                    type: object
+                    properties:
+                      from: { type: string, format: date-time, nullable: true }
+                      to: { type: string, format: date-time }
+                      basis: { type: string, enum: [event_start] }
+                  filters:
+                    type: object
+                    properties:
+                      kinds: { type: array, items: { type: string } }
+                      event_ids: { type: array, items: { type: string } }
+                  dry_run_excluded: { $ref: '#/components/schemas/SafeInteger' }
+                  reach:
+                    type: object
+                    properties:
+                      events: { $ref: '#/components/schemas/SafeInteger' }
+                      events_by_kind: { type: object, additionalProperties: { $ref: '#/components/schemas/SafeInteger' } }
+                      joined: { $ref: '#/components/schemas/SafeInteger' }
+                      people: { $ref: '#/components/schemas/SafeInteger' }
+                      returning: { $ref: '#/components/schemas/SafeInteger' }
+                      new_accounts:
+                        type: object
+                        properties:
+                          total: { $ref: '#/components/schemas/SafeInteger' }
+                          by_source:
+                            type: object
+                            properties:
+                              desk: { $ref: '#/components/schemas/SafeInteger' }
+                              invitation: { $ref: '#/components/schemas/SafeInteger' }
+                              join_link: { $ref: '#/components/schemas/SafeInteger' }
+                              other: { $ref: '#/components/schemas/SafeInteger' }
+                      countries: { $ref: '#/components/schemas/MarketingTopList' }
+                      companies: { $ref: '#/components/schemas/MarketingTopList' }
+                  engagement:
+                    type: object
+                    properties:
+                      joined: { $ref: '#/components/schemas/SafeInteger' }
+                      played: { $ref: '#/components/schemas/SafeInteger' }
+                      answers: { $ref: '#/components/schemas/SafeInteger' }
+                      quick_answers: { $ref: '#/components/schemas/SafeInteger' }
+                      answered_pairs: { $ref: '#/components/schemas/SafeInteger' }
+                      solved_pairs: { $ref: '#/components/schemas/SafeInteger' }
+                      finished: { $ref: '#/components/schemas/SafeInteger' }
+                      finish_base: { $ref: '#/components/schemas/SafeInteger' }
+                      finish_events: { $ref: '#/components/schemas/SafeInteger' }
+                      presence:
+                        type: object
+                        properties:
+                          events_measured: { $ref: '#/components/schemas/SafeInteger' }
+                          people_seen: { $ref: '#/components/schemas/SafeInteger' }
+                          median_minutes: { type: number, nullable: true }
+                  outcomes:
+                    type: object
+                    properties:
+                      certificates:
+                        type: object
+                        properties:
+                          placement: { $ref: '#/components/schemas/SafeInteger' }
+                          participation: { $ref: '#/components/schemas/SafeInteger' }
+                          completion: { $ref: '#/components/schemas/SafeInteger' }
+                          not_recorded: { $ref: '#/components/schemas/SafeInteger' }
+                          total: { $ref: '#/components/schemas/SafeInteger' }
+                          shared: { $ref: '#/components/schemas/SafeInteger' }
+                      programs:
+                        type: object
+                        properties:
+                          events: { $ref: '#/components/schemas/SafeInteger' }
+                          learners: { $ref: '#/components/schemas/SafeInteger' }
+                          finished: { $ref: '#/components/schemas/SafeInteger' }
+                          graded: { $ref: '#/components/schemas/SafeInteger' }
+                          passed: { $ref: '#/components/schemas/SafeInteger' }
+                          bands: { type: object, additionalProperties: { $ref: '#/components/schemas/SafeInteger' } }
+                          band_labels:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string, enum: [excellent, very_good, good, satisfactory, try_again] }
+                                label: { type: string }
+                  pipeline:
+                    type: object
+                    properties:
+                      events_asked: { $ref: '#/components/schemas/SafeInteger' }
+                      leads: { $ref: '#/components/schemas/SafeInteger' }
+                      hot: { $ref: '#/components/schemas/SafeInteger' }
+                      warm: { $ref: '#/components/schemas/SafeInteger' }
+                      cold: { $ref: '#/components/schemas/SafeInteger' }
+                      follow_up_yes: { $ref: '#/components/schemas/SafeInteger' }
+                      follow_up_no: { $ref: '#/components/schemas/SafeInteger' }
+                      contacted: { $ref: '#/components/schemas/SafeInteger' }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        kind: { type: string, enum: [booth, tournament, program] }
+                        start_time: { type: string, format: date-time }
+                        joined: { $ref: '#/components/schemas/SafeInteger' }
+                        played: { $ref: '#/components/schemas/SafeInteger' }
+                        answers: { $ref: '#/components/schemas/SafeInteger' }
+                        answered_pairs: { $ref: '#/components/schemas/SafeInteger' }
+                        solved_pairs: { $ref: '#/components/schemas/SafeInteger' }
+                        solve_rate: { type: number, nullable: true, minimum: 0, maximum: 1 }
+                        scoring_questions: { $ref: '#/components/schemas/SafeInteger' }
+                        finished: { type: integer, format: int64, nullable: true }
+                        completion: { type: number, nullable: true, minimum: 0, maximum: 1 }
+                        certificates: { $ref: '#/components/schemas/SafeInteger' }
+                        asked_qualifying: { type: boolean }
+                        hot_leads: { type: integer, format: int64, nullable: true }
   /api/admin/leaderboard:
     get:
       tags: [Admin - Submissions]
@@ -13497,6 +14697,71 @@ paths:
                 properties:
                   ok: { type: boolean }
                   member: { $ref: '#/components/schemas/EventTeamMember' }
+  /api/admin/competitions/{id}/team/staff-team:
+    post:
+      tags: [Admin - Event organisers]
+      summary: Add a whole staff team to the event's team
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        Each member of the staff team is added under the single add's own rules:
+        the address inside the allowed domains, the reports' data rule for the
+        member's role (Marketing and SDR need `export.data`), nobody twice in the
+        same role, and the team's 50-member cap. A member who fails one of them
+        is SKIPPED with its `code` and `reason` (`team_domain_not_allowed`,
+        `team_domain_list_empty`, `permission_denied`, `team_member_exists`,
+        `team_too_large`, or `staff_member_no_role` for a member with no default
+        role when no `role` is sent); the others are added. `role` (optional)
+        gives every member that role instead of their default role. Scoped as the
+        single add, refused to a competitor in the event, and reading the team
+        takes `teams.view` (403 `permission_denied` naming it). Each member added
+        is audited `team_member_added` with `via: staff_team`, the team, and the
+        address's domain, never the address.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId]
+              properties:
+                teamId: { type: string }
+                role: { type: string, nullable: true, enum: [se, marketing, sales, sdr, se_manager, marketing_manager, sales_manager, null] }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "404": { description: "No such event (`Event not found`), or `staff_team_not_found`." }
+        "403":
+          description: >-
+            `permission_denied` (no `teams.view`, or no `participants.view`, which
+            adding anybody takes), the caller's scope, `competitor_cannot_edit`,
+            or a refused CSRF token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "400": { description: "`staff_team_required` (no `teamId`), `team_role_invalid`, or a body that cannot be read." }
+        "200":
+          description: Who was added and who was skipped, each skip with its reason.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  team: { type: object, properties: { id: { type: string }, name: { type: string }, member_count: { type: integer } } }
+                  added:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: '#/components/schemas/EventTeamMember' }
+                        - type: object
+                          properties:
+                            staff_member_id: { type: string }
+                  skipped: { type: array, items: { $ref: '#/components/schemas/StaffTeamSkip' } }
   /api/admin/competitions/{id}/team/{memberId}:
     delete:
       tags: [Admin - Event organisers]
@@ -13931,7 +15196,7 @@ paths:
                   cxone_tenant: { type: string }
                   cxone_base_url: { type: string }
                   cxone_group_name: { type: string }
-        "400": { description: Invalid API key }
+        "400": { description: "Invalid API key, or `cxone_provisioning_forbidden`: a Booth Event never creates Checkmarx One accounts, so it takes no key override." }
         "404": { description: Competition not found }
         "403":
           description: >-
@@ -14187,7 +15452,7 @@ paths:
                   type: object
                   additionalProperties: false
                   properties:
-                    tier: { type: string, enum: [gold, silver, bronze, participation, completion], description: "Default gold." }
+                    tier: { type: string, enum: [gold, silver, bronze, participation, completion, excellent, very_good, good, satisfactory], description: "Default gold. A Program grade band previews a graded completion certificate at a sample percentage inside the band." }
                     name: { type: string, maxLength: 120 }
                     event: { type: string, maxLength: 120 }
                     score: { type: string, maxLength: 24, description: "Shown on podium tiers only." }
@@ -14331,6 +15596,60 @@ paths:
         "404": { description: Event not found }
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
 
+  /api/admin/competitions/{id}/grades:
+    get:
+      tags: [Admin - Competitions]
+      summary: Each learner's grade in a Program
+      security: [{ sessionAuth: [] }]
+      description: >
+        Program grades (owner decision, 27 Nov 2026): for every member of a Program the
+        boards would list (staff, benchmark and off-board roles left out), the current
+        attempt's grade (`grade`, null with no scoring challenge), whether it counts yet
+        (`finished`), the attempt number, how many attempts were closed with Try again
+        and the certificate held with its frozen grade. Highest grade first. The Rankings
+        pane's Progress card reads it. Permission `leaderboard.view`; an event admin reads
+        their own events only. 400 `not_a_program` for any other kind.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/EventNotFound' }
+        "400": { description: "`not_a_program` (the event is not a Program), or `query_param_repeated` (a repeated query parameter)." }
+        "200":
+          description: The grades.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passPercent: { type: integer, enum: [60] }
+                  maxPoints: { $ref: '#/components/schemas/SafeInteger' }
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId: { type: string }
+                        nickname: { type: string, nullable: true }
+                        firstName: { type: string, nullable: true }
+                        lastName: { type: string, nullable: true }
+                        email: { type: string, nullable: true }
+                        finished: { type: boolean }
+                        attempt: { $ref: '#/components/schemas/SafeInteger' }
+                        previousAttempts: { $ref: '#/components/schemas/SafeInteger' }
+                        grade:
+                          allOf: [{ $ref: '#/components/schemas/ProgramGrade' }]
+                          nullable: true
+                        certificate:
+                          type: object
+                          nullable: true
+                          properties:
+                            issuedAt: { type: string, format: date-time }
+                            grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
   /api/admin/competitions/{id}/certificates:
     get:
       tags: [Admin - Competitions]
@@ -14338,7 +15657,10 @@ paths:
       security: [{ sessionAuth: [] }]
       description: >
         Every certificate issued for the event, the top three first (revoked last),
-        with its holder, tier, rank, frozen score and the state of the
+        with its holder, tier, rank, frozen score (`scoreLabel` is what the
+        certificate prints: a placement on an overall board ranked by
+        percentages prints the percentage it was ranked on, `scorePercent`, never
+        its points) and the state of the
         congratulations email that carried it (`emailStatus`: `sent`, `failed` —
         retried automatically up to three times —, `suppressed` for an opted-out
         address, or `unknown` when a send was cut by a restart and is not retried;
@@ -14425,6 +15747,7 @@ paths:
                             holder by.
                         email: { type: string, nullable: true }
                         tier: { type: string, enum: [gold, silver, bronze, participation, completion] }
+                        grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
                         rank: { $ref: '#/components/schemas/SafeInteger' }
                         label: { type: string, example: 1st Place }
                         basis: { type: string, nullable: true }
@@ -14735,6 +16058,10 @@ paths:
               required: [userId]
               properties:
                 userId: { type: string }
+                board:
+                  type: string
+                  enum: [overall]
+                  description: "On an event ranking a winner per session AND overall, `overall` reissues the participant's overall-board certificate; left out, the certificate of their own board. Refused 400 `board_invalid` for any other value, `no_overall_board` where the event has no overall board beside its sessions."
       responses:
         default: { $ref: '#/components/responses/UnexpectedError' }
         "500": { $ref: '#/components/responses/InternalError' }
@@ -14758,11 +16085,13 @@ paths:
                       label: { type: string }
                       basis: { type: string, nullable: true }
                       score: { type: number, nullable: true }
+                      scoreLabel: { type: string, nullable: true, description: "What the certificate prints in its score slot, frozen: the percentage a placement on an overall board ranked by percentages was ranked on ('75%'), else the points ('150 pts'); null without a place." }
+                      scorePercent: { type: number, format: double, nullable: true, minimum: -9007199254740991, maximum: 100, description: "The frozen percentage (one decimal, rounded down) of a placement on a board ranked by percentages; null on a points board or without a place." }
                       lateEntrant: { type: boolean }
                       issuedAt: { type: string, format: date-time }
                       code: { type: string, description: "The new certificate's credential code, grouped as printed. Present only for a caller holding `certificates.lookup`." }
                   emailQueued: { type: boolean }
-        "400": { description: "`user_id_required`." }
+        "400": { description: "`user_id_required`, `board_invalid` or `no_overall_board`." }
         "401": { description: Not signed in }
         "403":
           description: >-
@@ -15126,6 +16455,10 @@ paths:
         `size_bytes`, `sha256`, `order_idx`) and, unless
         `include_attachment_content=0`, a `content_b64` field carrying the
         base64-encoded ZIP binary.
+
+        Each task carries its topic by NAME as `topic` (null for none): a topic
+        id means nothing on another server, so the import files the question
+        under the topic of that name, made there when missing.
 
         A total size cap of 96 MB across all attachments bounds the JSON
         body (worst-case ~128 MB after base64 inflation, matching the
@@ -16202,7 +17535,7 @@ paths:
                       privileged_skipped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows skipped whole because the importer is not a superadmin and the row would overwrite an account that is a privileged target for them (an unscoped role, or one holding a permission the importer lacks — lib/rbac.js privilegedTargetFor), or would give a role that can do more than the importer's own (the escalation rule, roleAssignDenied). Always 0 for a superadmin. Counted apart from `skipped`; a superadmin can import those rows." }
                       control_chars_skipped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows skipped whole, new or overwrite, because a single-line profile text field (first_name, last_name, company, title, city, country, job_function, personal_title, phone, certificate_given_name, certificate_family_name) holds a control character (C0, DEL or C1). Nothing in the row is applied; the client's import summary names the count." }
                       avatar_links_dropped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows whose `avatar` is a `/api/images/` link to no picture this installation holds (or a malformed one), or to a picture that is not the overwritten account's own current one (a new row may name none). The link is not stored: an OVERWRITE keeps the account's current avatar, a NEW row gets `default1`. The client's import summary names the count; a stopped import's `partial` carries it too." }
-                      invalid_roles_dropped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows whose `role` names no role in this installation (a built-in role, or a custom role from Users & roles, whose id the export carries) and was therefore IGNORED. `users.role` has no CHECK constraint, so an unrecognised value used to be stored verbatim and rendered as itself on the admin screen. The key is dropped rather than rewritten, which means a NEW row falls through to the `participant` default and an OVERWRITE leaves the account's current role untouched — a malformed file cannot demote an existing admin." }
+                      invalid_roles_dropped: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, description: "Rows whose `role` names no role in this installation (a built-in role, or a custom role from Roles & permissions, whose id the export carries) and was therefore IGNORED. `users.role` has no CHECK constraint, so an unrecognised value used to be stored verbatim and rendered as itself on the admin screen. The key is dropped rather than rewritten, which means a NEW row falls through to the `participant` default and an OVERWRITE leaves the account's current role untouched — a malformed file cannot demote an existing admin." }
         "400": { description: "Invalid format, too many participants, unsupported envelope version, a malformed email in any row, or a wrong-TYPED field in any row (the message names the row). Every field the importer binds is shape-checked, including the lifecycle and audit fields (`role`, `created_at`, `login_time`, `last_login_time`, `locked_until`, `first_verified_at`, the approval / denial / invitation ladders): a value that SQLite cannot bind — an object, an array, a boolean — means the FILE is malformed and is refused with the row named, rather than reaching the write transaction and 500ing a partially-committed import." }
         "401":
           description: >-
@@ -16269,6 +17602,8 @@ paths:
                         ended_at:               { type: string, format: date-time, nullable: true }
                         ended_manually:         { type: boolean }
                         leaderboard_mode:       { type: string, enum: [global, per_slot] }
+                        leaderboard_overall:    { type: boolean }
+                        leaderboard_percent:    { type: boolean }
                         reveal_answers_on_end:  { type: boolean }
                         cxone_group_name:       { type: string, nullable: true }
                         self_enroll_enabled:    { type: boolean, description: "Whether the event's join link is live." }
@@ -17108,6 +18443,73 @@ paths:
         "403":
           $ref: '#/components/responses/Forbidden'
 
+  /api/admin/system-health:
+    get:
+      tags: [Admin - Settings]
+      summary: Platform health for Settings, Backups and health
+      security: [{ sessionAuth: [] }]
+      description: >
+        What the Settings page's About and health section shows: the build the
+        image was made from, the boot
+        database integrity and schema checks, maintenance mode, the last mail-relay
+        probe, uptime, the version, the free space on the data and uploads volumes
+        (GiB, one decimal) and the event-history retention window. Coarse values
+        only: no path, driver message or secret. Needs `settings.view`. A
+        superadmin also gets the database file's size, the Node version and the
+        process start time; for every other reader those keys are absent. It
+        records nothing and is never cached (`Cache-Control: no-store`).
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "200":
+          description: The platform's health, redacted for readers other than a superadmin
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [version, database_integrity_ok, database_schema_ok, maintenance, smtp_healthy, smtp_checked_at, build, backups, uptime_seconds, data_free_gib, uploads_free_gib, event_retention_days]
+                properties:
+                  version: { type: string }
+                  database_integrity_ok: { type: boolean, description: "The boot integrity check passed" }
+                  database_schema_ok: { type: boolean, description: "Every column and index the app needs was there at boot" }
+                  maintenance: { type: boolean }
+                  smtp_healthy: { type: boolean, nullable: true, description: "The last mail-relay probe's answer; null until it has run" }
+                  smtp_checked_at: { type: string, format: date-time, nullable: true, description: "When the mail relay was last checked; null until a check ran (none under NODE_ENV=test)" }
+                  build:
+                    type: object
+                    additionalProperties: false
+                    description: "What the image was built from (the release workflow's build arguments, BUILD_COMMIT, BUILD_TIME, RELEASE_CHANNEL); each null when the build did not say or the value is malformed"
+                    properties:
+                      commit: { type: string, nullable: true, pattern: '^[0-9a-f]{7,40}$' }
+                      built_at: { type: string, format: date-time, nullable: true }
+                      channel: { type: string, nullable: true, description: "stable for main and v* tags, else dev" }
+                  backups:
+                    type: object
+                    additionalProperties: false
+                    description: "The host's backups as the app sees them: only a folder the operator mounts and names in BACKUP_DIR (the Podman installer does). `reason` when not visible: not_configured (no BACKUP_DIR) or unreadable. The newest backup's size is a superadmin's only. Never a path."
+                    properties:
+                      visible: { type: boolean }
+                      reason: { type: string, enum: [not_configured, unreadable] }
+                      count: { type: integer, minimum: 0, maximum: 9007199254740991 }
+                      newest_at: { type: string, format: date-time, nullable: true, description: "When the newest finished (its BACKUP_COMPLETE), else when its folder last changed" }
+                      newest_complete: { type: boolean, nullable: true, description: "false: no BACKUP_COMPLETE; null: the backup cannot be looked into" }
+                      newest_size_mib: { type: number, nullable: true, description: "Superadmin only" }
+                      newest_size_exact: { type: boolean, nullable: true, description: "Superadmin only: false when the size walk stopped at its bound (a floor)" }
+                  uptime_seconds: { type: integer, format: int64, minimum: 0, maximum: 9007199254740991 }
+                  data_free_gib: { type: number, nullable: true, description: "Free space on the data volume in GiB, one decimal; null when it cannot be read" }
+                  uploads_free_gib: { type: number, nullable: true, description: "Free space on the uploads volume in GiB, one decimal; null when it cannot be read" }
+                  event_retention_days: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+                  database_size_mib: { type: number, nullable: true, description: "Superadmin only: the database's size in MiB, one decimal: the main file plus its write-ahead log" }
+                  node_version: { type: string, description: "Superadmin only" }
+                  started_at: { type: string, format: date-time, description: "Superadmin only: when this server process started" }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+
   /api/admin/retention/purge:
     post:
       tags: [Admin - Settings]
@@ -17823,6 +19225,38 @@ components:
         email: { type: string }
         added_at: { type: string, format: date-time }
         allowed: { type: boolean, description: "Whether the address is inside the allowed domains now." }
+    StaffTeamMember:
+      type: object
+      description: One member of a staff team (a recipient, not an account).
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        domain: { type: string }
+        default_role: { type: string, nullable: true, enum: [se, marketing, sales, sdr, se_manager, marketing_manager, sales_manager, null] }
+        default_role_label: { type: string, nullable: true }
+        added_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        has_account: { type: boolean, description: "Whether the address is the primary address of an account here. Sent only to a caller holding `participants.view`." }
+    StaffTeam:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        updated_at: { type: string, format: date-time }
+        member_count: { type: integer }
+        members: { type: array, items: { $ref: '#/components/schemas/StaffTeamMember' } }
+    StaffTeamSkip:
+      type: object
+      description: A staff team member an event door left out, and why.
+      properties:
+        staff_member_id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string }
+        role_label: { type: string }
+        code: { type: string }
+        reason: { type: string }
     EventTeamFocus:
       type: object
       description: A persona's call to action and the reasons for it.
@@ -17861,6 +19295,24 @@ components:
         label: { type: string, nullable: true }
         scope_mode: { type: string, enum: [none, granted, all] }
         builtin: { type: boolean }
+    MarketingTopList:
+      description: >-
+        The most common values of a profile field among the people counted, once
+        per person (marketing analytics; a country is one row however it is
+        spelled, named as the profile form names it): the top eight, the rest summed as `other`
+        (`other_kinds` distinct values), and the people who gave none.
+      type: object
+      properties:
+        top:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              count: { $ref: '#/components/schemas/SafeInteger' }
+        other: { $ref: '#/components/schemas/SafeInteger' }
+        other_kinds: { $ref: '#/components/schemas/SafeInteger' }
+        not_given: { $ref: '#/components/schemas/SafeInteger' }
     SafeInteger:
       description: >-
         A whole number. The server is JavaScript, so every integer it reads or
@@ -18211,6 +19663,15 @@ components:
             address. Three states, not two: an Event qualifies only while it
             has no sessions, and a Program never does, because it can run for years
             and the bypass is deliberately time-bounded.
+        cxone_provisioning:
+          type: string
+          enum: [allowed, forbidden]
+          description: >
+            Whether this kind may create Checkmarx One accounts for its
+            participants. `forbidden` for a Booth Event: its form has no Checkmarx
+            One section, create, PUT, templates and the per-event key override
+            refuse turning accounts on (400 `cxone_provisioning_forbidden`), and the
+            provisioning gate never creates one whatever the stored column says.
         late_entry:
           type: string
           enum: [allowed, never]
@@ -18218,6 +19679,14 @@ components:
             Whether this kind may keep admitting people after it ends (the
             late-entry window). `allowed` only for a Booth Event, where it is also
             switched per event by `late_entry_enabled`; `never` for every other kind.
+        clock_start:
+          type: string
+          enum: [allowed, never]
+          description: >
+            Whether this kind may start each participant's solve clock at their
+            first open of a scoring challenge (`clock_start: first_open` on the
+            event). `allowed` for a Booth Event and a Competition; `never` for a
+            Program, which is unranked and always measures from entry.
         choice_layout:
           type: string
           enum: [tap, standard]
@@ -18415,6 +19884,8 @@ components:
           type: string
           enum: [global, per_slot]
           description: "'global' ranks every participant together; 'per_slot' renders a separate leaderboard per session. Locked once any session starts."
+        leaderboard_overall: { type: boolean, description: "'per_slot' plus an overall board (the form's 'Both')." }
+        leaderboard_percent: { type: boolean, description: "The overall board ranks by exact percentage of each person's own maximum." }
         reveal_answers_on_end:
           type: integer
           format: int32
@@ -18588,6 +20059,23 @@ components:
             from the same predicate the PUT refuses with, so a form withholds the
             control with its reason. Returned on the admin list and on every
             create / update / end-now response.
+        clock_start:
+          type: string
+          enum: [first_open, entry]
+          description: >-
+            When each participant's solve clock starts: `first_open` — their first
+            open of a scoring challenge (or first stored answer or hint); `entry` —
+            entering the live event. Every event created before this setting is
+            `entry`. A Program always measures from entry, whatever this holds.
+        clock_start_locked:
+          type: string
+          nullable: true
+          enum: [started]
+          description: >-
+            WHY `clock_start` may not be changed (`started`: the event or any of
+            its sessions has started, 400 `clock_start_locked`), or `null` when it
+            may. Computed from the same predicate the PUT refuses with. Returned on
+            the admin list and on every create / update / end-now response.
         competing:
           type: boolean
           description: >-
@@ -18620,12 +20108,15 @@ components:
       properties:
         duration_minutes: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
         leaderboard_mode: { type: string, enum: [per_slot, global] }
+        leaderboard_overall: { type: boolean }
+        leaderboard_percent: { type: boolean }
         reveal_answers_on_end: { type: boolean }
         self_enroll_enabled: { type: boolean }
         group_leaderboard_enabled: { type: boolean }
         attempt_cap: { type: integer, format: int32, minimum: 1, maximum: 1000, nullable: true }
         measure_presence: { type: boolean }
         time_basis: { type: string, enum: [elapsed, presence] }
+        clock_start: { type: string, enum: [first_open, entry], description: "Absent takes the kind's seed. `first_open` is refused for a Program (`clock_start_forbidden`)." }
         cxone_disabled: { type: boolean }
         registration_fields:
           type: object
@@ -18725,10 +20216,35 @@ components:
               reason: { type: string, enum: [ended_before_start, starts_before_event] }
         forced_settings:
           type: array
-          description: "Settings not carried to the new event as the source had them: forbidden by its kind (`sessions` included), never copied (`trusted_network_ips`, `cxone_group_name`), a pinned `late_entry_deadline_at` that does not fit the new end, or `cxone_disabled` when the source creates Checkmarx One accounts with its own key and the copy's accounts were turned off."
+          description: "Settings not carried to the new event as the source had them: forbidden by its kind (`sessions` included), never copied (`trusted_network_ips`, `cxone_group_name`), a pinned `late_entry_deadline_at` that does not fit the new end, `cxone_disabled` when the source creates Checkmarx One accounts with its own key and the copy's accounts were turned off, or `cxone_provisioning` when the new kind (a Booth Event) never creates them."
           items: { type: string }
         granted_organiser: { type: boolean, description: "True when an event admin was made the new event's organiser." }
         qualifying_questions: { $ref: '#/components/schemas/SafeInteger' }
+    ProgramGrade:
+      type: object
+      description: >
+        A Program learner's grade (owner decision, 27 Nov 2026): `points` (correct answers
+        less wrong-answer penalties and hints, floored at 0, capped at `max`) of `max` (the
+        face value of the Program's published scoring challenges; quick questions
+        excluded). `permille` is the share in tenths of a percent, rounded down; `band` is
+        decided on the exact fraction, inclusive at its lower edge.
+      properties:
+        points: { $ref: '#/components/schemas/SafeInteger' }
+        max: { $ref: '#/components/schemas/SafeInteger' }
+        permille: { type: integer, minimum: 0, maximum: 1000 }
+        percent: { type: string, example: "94%" }
+        band: { type: string, enum: [excellent, very_good, good, satisfactory, try_again] }
+        label: { type: string, example: "Excellent" }
+        passed: { type: boolean, description: "60% or more." }
+    FrozenProgramGrade:
+      type: object
+      nullable: true
+      description: "The grade a Program certificate was issued with, frozen at mint; null (or absent) on every other certificate, a completion certificate issued before grades included."
+      properties:
+        band: { type: string, enum: [excellent, very_good, good, satisfactory] }
+        label: { type: string, example: "Very good" }
+        permille: { type: integer, minimum: 600, maximum: 1000 }
+        percent: { type: string, example: "85%" }
     CertificateConfigLayer:
       type: object
       additionalProperties: false
@@ -18755,18 +20271,27 @@ components:
             footer_tagline: { type: string, maxLength: 80 }
             achievement_heading: { type: string, maxLength: 40 }
             score_heading: { type: string, maxLength: 24 }
+            grade_heading: { type: string, maxLength: 24, description: "Default GRADE: the heading over a graded Program certificate's percentage." }
             date_heading: { type: string, maxLength: 24 }
             id_heading: { type: string, maxLength: 32 }
         labels:
           type: object
           additionalProperties: false
-          description: "Per variant: `headline` (the large value) and `sub` (the caps line under it; empty hides it)."
+          description: >-
+            Per variant: `headline` (the large value) and `sub` (the caps line under it; empty hides it).
+            A graded Program certificate takes its grade band's wording (`excellent`, `very_good`,
+            `good`, `satisfactory`) and the completion tier's colours and seal; `completion` is
+            a completion certificate issued without a grade.
           properties:
             gold: { $ref: '#/components/schemas/CertificateTierLabel' }
             silver: { $ref: '#/components/schemas/CertificateTierLabel' }
             bronze: { $ref: '#/components/schemas/CertificateTierLabel' }
             participation: { $ref: '#/components/schemas/CertificateTierLabel' }
             completion: { $ref: '#/components/schemas/CertificateTierLabel' }
+            excellent: { $ref: '#/components/schemas/CertificateTierLabel' }
+            very_good: { $ref: '#/components/schemas/CertificateTierLabel' }
+            good: { $ref: '#/components/schemas/CertificateTierLabel' }
+            satisfactory: { $ref: '#/components/schemas/CertificateTierLabel' }
         colors:
           type: object
           additionalProperties: false
@@ -18829,6 +20354,61 @@ components:
         global: { $ref: '#/components/schemas/CertificateConfigLayer' }
         effective: { $ref: '#/components/schemas/CertificateConfigLayer' }
         version: { type: string, description: "The stored layer's version (a digest of it; empty when none is stored): send it back as the PUT's `expectedVersion`." }
+    SmtpSettingsInput:
+      type: object
+      description: A mail relay as the Settings form sends it. Every text value is refused with a control character.
+      additionalProperties: true
+      required: [host, port, security, username, sender]
+      properties:
+        host: { type: string, maxLength: 253, description: "A host name or an IP address: no scheme, port or spaces." }
+        port: { description: "1 to 65535, a number or its digits as text.", oneOf: [{ type: integer, minimum: 1, maximum: 65535 }, { type: string, pattern: '^[0-9]{1,5}$' }] }
+        security: { type: string, enum: [starttls, tls] }
+        username: { type: string, maxLength: 254, description: "Empty: the relay takes mail without signing in." }
+        password: { type: string, description: "Write-only, at most 512 characters. Absent or empty: keep the password in force (same host and username only)." }
+        sender: { type: string, format: email, maxLength: 254, description: "A bare address; the name shown is the platform name." }
+    SmtpSettingsView:
+      type: object
+      additionalProperties: false
+      required: [in_use, saved, password_unreadable, environment_relay, plaintext_allowed, health, version, can_edit]
+      properties:
+        ok: { type: boolean }
+        changed: { type: boolean, description: "DELETE only: whether a saved relay was removed." }
+        in_use:
+          type: object
+          nullable: true
+          additionalProperties: false
+          properties:
+            source: { type: string, enum: [app, environment] }
+            host: { type: string }
+            port: { type: integer, minimum: 1, maximum: 65535 }
+            security: { type: string, enum: [starttls, tls] }
+            username: { type: string }
+            sender: { type: string }
+            sender_source: { type: string, enum: [app, environment, default], description: "`default`: EMAIL_FROM gives no usable address." }
+            password_set: { type: boolean }
+        saved:
+          type: object
+          nullable: true
+          additionalProperties: false
+          properties:
+            host: { type: string }
+            port: { type: integer, minimum: 1, maximum: 65535 }
+            security: { type: string, enum: [starttls, tls] }
+            username: { type: string }
+            sender: { type: string }
+            password_set: { type: boolean }
+            saved_at: { type: string, format: date-time, nullable: true }
+        password_unreadable: { type: boolean }
+        environment_relay: { type: boolean, description: "The server's environment names a relay (SMTP_HOST)." }
+        plaintext_allowed: { type: boolean, description: "SMTP_ALLOW_PLAINTEXT=1 in the environment: STARTTLS is not required." }
+        health:
+          type: object
+          additionalProperties: false
+          properties:
+            state: { type: boolean, nullable: true }
+            checked_at: { type: string, format: date-time, nullable: true }
+        version: { type: string, nullable: true }
+        can_edit: { type: boolean }
     PlatformLook:
       type: object
       additionalProperties: true
@@ -19387,6 +20967,12 @@ components:
         allSolved: { type: boolean }
         rank: { type: integer, format: int32, nullable: true, minimum: 1, maximum: 2147483647 }
         isBenchmark: { type: boolean }
+        percent:
+          type: number
+          format: double
+          minimum: -9007199254740991
+          maximum: 100
+          description: "Present only on a board that ranks by percentages: the score as a percentage of the most this person's own session's questions could earn, rounded DOWN to one decimal place for display. The ranking compares the exact fractions, never this figure. A negative score reads below 0; nothing earnable reads 0."
 
     SettingsEventRecord:
       allOf:

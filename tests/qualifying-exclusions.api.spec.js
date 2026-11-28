@@ -130,8 +130,8 @@ test.describe("A quick answer never moves the tie-break finish time", () => {
     const quick = quickOf(ev.id);
     expect(quick.length, "PRECONDITION: the four quick questions").toBe(4);
     const s1 = await makeTask(sa, saCsrf, "tb-s1"), s2 = await makeTask(sa, saCsrf, "tb-s2");
-    await assignTask(sa, saCsrf, s1.id, [ev.id]);
-    await assignTask(sa, saCsrf, s2.id, [ev.id]);
+    s1.id = (await assignTask(sa, saCsrf, s1.id, [ev.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+    s2.id = (await assignTask(sa, saCsrf, s2.id, [ev.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     const A = await makeParticipant(sa, saCsrf, "tb-quick"), B = await makeParticipant(sa, saCsrf, "tb-later");
     const D = await makeParticipant(sa, saCsrf, "tb-scoring"), E = await makeParticipant(sa, saCsrf, "tb-idle");
     // E never plays: an unfinished member keeps the all-solved end away (fixture item 1).
@@ -177,12 +177,14 @@ test.describe("A quick answer never moves the tie-break finish time", () => {
 
 test.describe("A quick answer alone is not taking part", () => {
   test("no participation certificate is offered or minted for it; a wrong scoring answer earns one (control)", async () => {
-    const ev = await makeCompetition(sa, saCsrf, "tookpart", { start_time: iso(Date.now() - HOUR), duration_minutes: 600, add_qualifying: true });
+    // The entry clock: each of the three is on the board by ENTERING it (on a
+    // first-open clock a quick answer alone leaves its author off the board).
+    const ev = await makeCompetition(sa, saCsrf, "tookpart", { start_time: iso(Date.now() - HOUR), duration_minutes: 600, add_qualifying: true, clock_start: "entry" });
     const quick = quickOf(ev.id);
     expect(quick.length, "PRECONDITION: the four quick questions").toBe(4);
     const s1 = await makeTask(sa, saCsrf, "tp-s1"), s2 = await makeTask(sa, saCsrf, "tp-s2");
-    await assignTask(sa, saCsrf, s1.id, [ev.id]);
-    await assignTask(sa, saCsrf, s2.id, [ev.id]);
+    s1.id = (await assignTask(sa, saCsrf, s1.id, [ev.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+    s2.id = (await assignTask(sa, saCsrf, s2.id, [ev.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     const Q = await makeParticipant(sa, saCsrf, "tp-quickonly"), W = await makeParticipant(sa, saCsrf, "tp-wrong");
     const C = await makeParticipant(sa, saCsrf, "tp-scorer");
     await enrol(sa, saCsrf, ev.id, [Q.id, W.id, C.id]);
@@ -210,7 +212,7 @@ test.describe("A quick answer alone is not taking part", () => {
   });
 
   test("a hint revealed on an older qualifying question alone is not taking part; a hint on a scoring challenge is (control)", async () => {
-    const ev = await makeCompetition(sa, saCsrf, "hinted", { start_time: iso(Date.now() - HOUR), duration_minutes: 600, add_qualifying: false });
+    const ev = await makeCompetition(sa, saCsrf, "hinted", { start_time: iso(Date.now() - HOUR), duration_minutes: 600, add_qualifying: false, clock_start: "entry" });
     // An older qualifying challenge of another type, which may still carry a
     // hint: the tag written as a release before the pick-one rule left it (no
     // route tags a text challenge now: tests/qualifying-pick-one.spec.js).
@@ -218,8 +220,8 @@ test.describe("A quick answer alone is not taking part", () => {
     const key = `hq${uniq("k").replace(/[^a-z0-9]/gi, "").toLowerCase()}`.slice(0, 40);
     write(db => db.prepare("INSERT INTO task_tags (task_id, tag) VALUES (?,?)").run(QH.id, `qualifying:${key}`));
     const SH = await makeTask(sa, saCsrf, "hs-scoring", { hint: "<p>Look right</p>" });
-    await assignTask(sa, saCsrf, QH.id, [ev.id]);
-    await assignTask(sa, saCsrf, SH.id, [ev.id]);
+    QH.id = (await assignTask(sa, saCsrf, QH.id, [ev.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+    SH.id = (await assignTask(sa, saCsrf, SH.id, [ev.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     expect(quickOf(ev.id).map(q => [q.id, q.key]), "PRECONDITION: the event's one quick question is the planted one").toEqual([[QH.id, key]]);
     const HQ = await makeParticipant(sa, saCsrf, "hq-hintonly"), HS = await makeParticipant(sa, saCsrf, "hs-hintonly");
     await enrol(sa, saCsrf, ev.id, [HQ.id, HS.id]);
@@ -259,7 +261,7 @@ test.describe("Recalculate scores a qualifying question 0", () => {
     const key = `rc${uniq("k").replace(/[^a-z0-9]/gi, "").toLowerCase()}`.slice(0, 40);
     const tg = await sa.post(`/api/admin/tasks/${Q.id}/tags`, { headers: H(saCsrf), data: { tag: `qualifying:${key}` } });
     expect(tg.ok(), `tag: ${tg.status()} ${await tg.text()}`).toBeTruthy();
-    for (const t of [Q, P, X]) await assignTask(sa, saCsrf, t.id, [ev.id]);
+    for (const t of [Q, P, X]) t.id = (await assignTask(sa, saCsrf, t.id, [ev.id])).copies[0].task_id;   // the event's own copies
     const p = await makeParticipant(sa, saCsrf, "rc-p"), w = await makeParticipant(sa, saCsrf, "rc-empty");
     await enrol(sa, saCsrf, ev.id, [p.id, w.id]);
     await enter(p, ev.id);
@@ -324,8 +326,8 @@ test.describe("A malformed qualifying tag an older import stored", () => {
   test("the challenge list and the challenge itself both call it a quick question, as scoring does; an untagged one neither (control)", async () => {
     const ev = await makeCompetition(sa, saCsrf, "badtag");
     const Q = await makeTask(sa, saCsrf, "badtag-q", PICK_ONE), T = await makeTask(sa, saCsrf, "badtag-t");
-    await assignTask(sa, saCsrf, Q.id, [ev.id]);
-    await assignTask(sa, saCsrf, T.id, [ev.id]);
+    Q.id = (await assignTask(sa, saCsrf, Q.id, [ev.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
+    T.id = (await assignTask(sa, saCsrf, T.id, [ev.id])).copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     // The shape an import stored before it refused a malformed key: no route adds one now.
     write(db => db.prepare("INSERT INTO task_tags (task_id, tag) VALUES (?, ?)").run(Q.id, "qualifying:bad key!"));
     const P = await makeParticipant(sa, saCsrf, "badtag-p");

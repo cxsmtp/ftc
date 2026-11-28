@@ -36,11 +36,46 @@ const ROOT = path.join(__dirname, "..");
 // colour mapped to its nearest name, the signed-in header's first-paint hint, the
 // template editor's library door and refusal note, the bulk wizard's kept filter,
 // the retention card's picture count); then gzip 348400 -> 348460 and brotli
-// 304600 -> 304700 (9.2.18: the import summary's dropped-photo-link line).
+// 304600 -> 304700 (9.2.18: the import summary's dropped-photo-link line); then
+// gzip 348460 -> 348880 and brotli 304700 -> 305040 (the New event page's one
+// card per type: its recommended setup, Start blank and the built-in's menu);
+// then gzip 348880 -> 350700 and brotli 305040 -> 306560 (the regrouped Settings
+// menu, merged beside the New event page: the grouped section list with its link
+// items, and the Updates, Backups & health and About cards with their loaders);
+// then gzip 350700 -> 350960 and brotli 306560 -> 306820 (event-owned questions: the
+// library/workspace/picker row filters in ui/task-search.js and the bulk toast's
+// "belonging to another event" skip line); then gzip 350960 -> 353400 and
+// brotli 306820 -> 308900 (the mail server card in Settings → Email (SMTP): its
+// facts with their sources, its form, test, save and remove; about +2.4 KB gzip
+// and +2.2 KB brotli on the bundle); then gzip 353400 -> 354600 and brotli
+// 308900 -> 310100 (Settings regrouped: the CxOne API audit table with its
+// pager, About & health from the route, the newest release notes inline, the
+// version at the sidebar's foot; the link items removed; about +1.2 KB each);
+// then gzip 354600 -> 354900 and brotli 310100 -> 310400 (the mail server
+// card's one test send, the Outbound email card folded into it); then gzip
+// 354900 -> 356880 and brotli 310400 -> 312000 (Program grades: measured +1938 B
+// gzip and +1550 B brotli on its own branch, the learner's grade card and Try
+// again, the organisers' Grades list, the designer's grade bands, plus rounding);
+// then gzip 356880 -> 357920 and brotli 312000 -> 312940 (the first-open solve
+// clock: measured +1031 B gzip and +935 B brotli on its own branch, the event
+// form's "Start each participant's clock" choice, the template editor's select,
+// its help tip and the challenge list's clock note); then script gzip 357920 ->
+// 359960 and brotli 312940 -> 315200, page gzip 33262 -> 33907 and brotli
+// 31062 -> 31536 (stage B, measured as the delta over its base: the Question
+// bank's topics module and dialog, the editor's Topic and sharing row, Save to
+// bank, the page's Topic filter and sharing markup); then, on the integration of
+// the settings-smtp, program-grades, first-touch-timer, stage-b and declutter
+// branches (27 Nov 2026), every figure RE-MEASURED with this spec's own procedure
+// on the merged tree rather than summed from the branches' deltas (which double
+// counted shared markup and missed the merge's own changes): stylesheet gzip
+// 56241 -> 57673 and brotli 52368 -> 53783, page gzip 33907 -> 35569 and brotli
+// 31536 -> 33165, script gzip 359960 -> 375387 and brotli 315200 -> 328925
+// (the declutter screens, the template editor's Topic filter, the account doors
+// on Roles & permissions and the dialog toast placement included).
 const AT_RULING = {
-  stylesheet: { gzip: 56241, br: 52368 },
-  page: { gzip: 33262, br: 31062 },
-  script: { gzip: 348460, br: 304700 },
+  stylesheet: { gzip: 57673, br: 53783 },
+  page: { gzip: 35569, br: 33165 },
+  script: { gzip: 375387, br: 328925 },
 };
 const BUDGET = Object.fromEntries(Object.entries(AT_RULING).map(([k, v]) =>
   [k, { gzip: Math.ceil(v.gzip * 1.05), br: Math.ceil(v.br * 1.05) }]));

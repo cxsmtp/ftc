@@ -204,7 +204,7 @@ test.describe("v7.20.10 — the admin tables count what matched", () => {
     // and the missing case is covered by its own test rather than skipped, so
     // this is not a guard that can switch a check off.
     { tab: "Events", pane: "competitions", search: "#comp-search", count: "#comp-search-count", noun: "events", hit: "Live", zeroWording: false },
-    { tab: "Challenges", pane: "tasks", search: "#task-search", count: "#task-search-count", noun: "challenges", hit: "hard1", zeroWording: true },
+    { tab: "Challenges", pane: "tasks", search: "#task-search", count: "#task-search-count", noun: "questions", hit: "hard1", zeroWording: true },
     { tab: "Participants", pane: "participants", search: "#participants-search", count: "#participants-search-count", noun: "participants", hit: "alice", zeroWording: true },
   ];
 
@@ -573,8 +573,9 @@ test.describe("v7.20.11 — the participant challenge list counts", () => {
           answer_type: "text", correct_answer: ANSWER, status: "published",
         }})).json()).id;
         expect(id, `challenge ${n} created`).toBeTruthy();
-        await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: SH, data: { competitionIds: [live.id] } });
-        myTasks.push(id);
+        const ar = await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: SH, data: { competitionIds: [live.id] } });
+        expect(ar.ok(), await ar.text()).toBeTruthy();
+        myTasks.push((await ar.json()).copies[0].task_id);   // the event's own copy (lib/event-copies.js): what its participants open and answer
       }
       expect((await registerPost(sa, "/api/register", { headers: SH, data: {
         firstName: "Lc", lastName: "Solve", nickname: `lc_${tag}`, email,

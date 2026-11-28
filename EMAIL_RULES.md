@@ -24,7 +24,7 @@ Every account has up to two email slots:
 
 **Printable-ASCII only (v7.7.12).** `isValidEmailFormat` (`lib/util.js`) — the
 single shared validator every email write path calls (register, `PUT /api/me`,
-admin edit, import, Users & roles → Add user (`POST /api/admin/users`), and **`POST /api/admin/participants/desk-invite`** — the v8.1.0 at-desk shortcut,
+admin edit, import, Roles & permissions → Add user (`POST /api/admin/users`), and **`POST /api/admin/participants/desk-invite`** — the v8.1.0 at-desk shortcut,
 which creates a `users` row with an email and is the entry most easily forgotten
 in a list like this; both the primary and secondary slots) — **rejects any address containing a
 non-printable-ASCII character** (`/^[\x20-\x7E]+$/`). A Unicode address is
@@ -86,7 +86,7 @@ as a secondary by name (§3 *Secondary email*).
 - `POST /api/admin/import/participants` (overwrite re-validates the secondary)
 - `POST /api/admin/participants/desk-invite` — **twice**: a pre-check, and an
   in-transaction re-check, because two desks can process one queue (v8.1.7)
-- `POST /api/admin/users` (Users & roles → Add user), inside its write
+- `POST /api/admin/users` (Roles & permissions → Add user), inside its write
   transaction; an address held as a secondary is refused as `email_is_secondary`
   (§3)
 - `POST /confirm-email` re-checks **at confirm time** (see §3)
@@ -206,7 +206,7 @@ any address no account holds. So:
   enrolled and nothing is mailed. An invitation stored for it could never be
   redeemed (sign-up refuses a taken address), and enrolling the secondary's holder
   would hand the event to whoever claimed the address.
-- **Users & roles → Add user (`POST /api/admin/users`) refuses it** with 409
+- **Roles & permissions → Add user (`POST /api/admin/users`) refuses it** with 409
   `email_is_secondary` and no account id, so the client offers no "give that
   account the role": that would hand an admin role to whoever claimed the address.
 
@@ -297,7 +297,7 @@ address through:
 3. the **participant import**, which does not enforce the rule at all —
    `isFreeEmail` runs *after* the INSERT on the create branch purely to stamp
    that same audit flag, and not at all on an overwrite;
-4. **Users & roles → Add user** (`POST /api/admin/users`), which creates an
+4. **Roles & permissions → Add user** (`POST /api/admin/users`), which creates an
    account with an admin role (any role but participant) for any valid address,
    stores no secondary, and records `bypassed_free_email_rule: true` on its
    `user_added` when the address is a personal one (operator ruling, 24 Nov
@@ -417,10 +417,13 @@ unsubscribe URL is in the mail body" both survived in this file.
 **One pipeline.** Every mail goes through `sendEmailLogged` (`lib/email.js`),
 which resolves the sender, waits for a free relay connection, asks whether the
 recipient still exists, applies the opt-out gate, sends, and records
-`email_sent`. The single exception is `POST /api/admin/test-email`, the SMTP
-diagnostic, which skips the recipient checks and the `email_sent` record on
+`email_sent`. The exceptions are the two SMTP diagnostics. `POST
+/api/admin/test-email` skips the recipient checks and the `email_sent` record on
 purpose (it reports the relay's own answer), but still waits for a free relay
-connection like every send.
+connection like every send. `POST /api/admin/smtp-settings/test` (Settings →
+Email (SMTP), "Test with these values") sends through a relay that is NOT saved,
+on its own short-lived connection outside the pool, and records the orphaned
+`test_email_sent` (`via: unsaved_settings`) instead.
 
 **EVERY SEND IS RECORDED, WITH OR WITHOUT A USER ROW (v8.7.6).** The record went
 to `user_events.email_sent` **only `if (userId)`** — and at the time exactly two
@@ -464,9 +467,12 @@ reasons the code really passes, in BOTH directions, so a new mail must be
 exercised or exempted with a reason: seven of these had no spec naming them at
 all before it, and it is what found the missing record above.
 
-**The sender is two halves from two places (v7.26.0):** the **address** from
-`EMAIL_FROM`, resolved once at boot — it is what SPF authenticates and where
-bounces return; the **display name** from Settings → Platform Name, read per
+**The sender is two halves from two places (v7.26.0):** the **address** of
+the mail server in force — `EMAIL_FROM`, resolved once at boot, or the bare
+address a superadmin saved with the mail server in Settings → Email (SMTP),
+which replaces the environment's relay as a whole and takes effect at once — it
+is what SPF authenticates and where bounces return, so only a superadmin sets
+it, never the free-text platform name; the **display name** from Settings → Platform Name, read per
 send, so a rebrand needs no redeploy. Never compose this header by
 concatenation: nodemailer re-parses a string and an embedded angle-addr wins,
 which made an admin-settable field able to take over the visible From *and* the
@@ -497,7 +503,7 @@ therefore **suppressible** and carries `List-Unsubscribe` headers.
 | competition removal / group-sync remove | `removed_from_competition` | both | ✉ |
 | the 30-second reminder dispatcher (held, rows untouched, while maintenance mode is on or the database failed its boot integrity or schema check; a reminder already due when a restore's step 4 chose mark-sent counts as sent; the lead time is computed at SEND time, rounded to the nearest minute, in three bands, subject / body: 55 minutes or more "starts in 1 hour" / "starts in about 1 hour"; 2–54 minutes "starts in N minutes" / "starts in about N minutes"; 1 minute or less "starts in a minute" / "starts in about a minute". A reminder is not sent once the start has passed: one whose event or session has started by the time it is claimed is settled without a mail (History `reminder_skipped`), and one cannot be set in the last minute before the start, 400 `start_reminder_too_late`) | `reminder` | both | ✉ |
 | IP-ban alert | `ip_ban_alert` | one superadmin per call | — |
-| an event fully ends (End Now, the scheduler's time expiry, the all-solved auto-end, the last session ending, Close late entries now), about five minutes later; a Program participant's completing answer, about a minute later; an admin's Resend (`POST /api/admin/competitions/:id/certificates/resend`; refused for a holder whose account is blocked, denied or not approved); a superadmin's Issue again of a revoked certificate (`POST /api/admin/competitions/:id/certificates/reissue`, at once, with the event's email switch on). After a restore whose step 4 chose mark-sent (`scripts/restore-mail.sh`), nothing about an end before the restore is sent automatically — the congratulations email: a warm thank-you paragraph per tier (1st, 2nd, 3rd, participation, completion; editable as `email.message_<tier>`), **the certificate PDF attached**, a download link, the verification code, and a **Copy my LinkedIn post** button to a one-time, seven-day share page that needs no sign-in | `certificate_awarded` | both | ✉ |
+| an event fully ends (End Now, the scheduler's time expiry, the all-solved auto-end, the last session ending, Close late entries now), about five minutes later; a Program learner's finishing answer (every scoring challenge solved or out of attempts) when their grade is 60% or more, about a minute later (under 60% nothing is issued or sent); an admin's Resend (`POST /api/admin/competitions/:id/certificates/resend`; refused for a holder whose account is blocked, denied or not approved); a superadmin's Issue again of a revoked certificate (`POST /api/admin/competitions/:id/certificates/reissue`, at once, with the event's email switch on). After a restore whose step 4 chose mark-sent (`scripts/restore-mail.sh`), nothing about an end before the restore is sent automatically — the congratulations email: a warm thank-you paragraph per tier (1st, 2nd, 3rd, participation, completion; editable as `email.message_<tier>`), **the certificate PDF attached**, a download link, the verification code, a Program certificate's grade (band and percentage, from the certificate), and a **Copy my LinkedIn post** button to a one-time, seven-day share page that needs no sign-in | `certificate_awarded` | both | ✉ |
 | an event with a team fully ends, 15 minutes later (revived meanwhile: nothing; after a restore whose step 4 chose mark-sent, nothing about an end before the restore, nor that week's Monday digest); Close late entries now, the late window lapsing or a re-end after an extension (only the new leads); a running Program, weekly on Monday, then at its deadline; 48 hours after a wrap-up (nothing while the event is open again; once it ends again, 48 hours after that end's report, unless a reminder has already reached somebody for the event: one that ran with nobody waiting does not count), only to owners of hot leads not marked contacted who have not opted out (nothing when only opted-out ones wait), with a count to Marketing; an admin's Send now (`POST /api/admin/competitions/:id/team-report/send`; answered within 10 s, the rest carrying on, and refused while one is still going out) — one report per role, each opening with one call to action, a button only for a recipient whose address is an account able to open the event (anyone else is told the next step in words they can act on without the page, with no link); Marketing's carries the CRM CSV (none while nobody has taken part), and each SDR's lists every lead's address and carries a CSV of their own leads (not the 48-hour reminder). A failed send of an automatic report is tried again for that recipient (after 5 and 30 minutes, three passes in all) and never to anyone already sent it; a pass that fails before it can send (the report cannot be built) is tried after 30 minutes and given up after the third, recorded as `team_report_given_up` on the event's History | `event_team_report` | **the team member's address only** (no user row: an orphaned email event that records the address's domain and a `tm_` fingerprint, never the address; once the member is removed from the event's team, the event's send ledger keeps only that domain and fingerprint too, and the same address added back is never sent a report it already received). Internal staff mail, so transactional: no unsubscribe link or header, and no suppression; every report's footer (both parts, not a link) says "To stop receiving these, ask the event's organiser to remove you." (operator ruling, 24 Nov 2026). The address must be on the allowed-domain list at send time | — |
 
 **v8.3.20 — the IP-ban alert BODY is rendered PER RECIPIENT.** It was the only outbound mail on the platform still hand-rolling a UTC date format; `git grep` for a hand-rolled date across `lib/`, `routes/` and `server.js` returned exactly that one line, while all eight other mail sites already used `formatEmailDate(d, user.timezone)`. The block deadline now lands in each superadmin's own profile timezone and NAMES it (`22 Aug 2026 17:45:00 (Europe/London)`), falling back to a UTC string that also names its zone when the profile timezone is NULL, empty or unrecognised — so a recipient is never skipped over a formatting input. The fan-out was already one message per recipient, so this costs no extra messages; `deliverAlert` now owns that loop so `alertCopy` stays the single source of the words. It also means `emailed` counts REAL deliveries: `sendEmailLogged` catches its own SMTP error and returns false rather than throwing, so the old shape recorded N deliveries into the `ip_ban_alert_raised` audit event whenever the relay was down.

@@ -30,7 +30,7 @@
 import { S } from "../core/state.js";
 import { csrfHeaders, fetchJsonList, fetchJsonObject } from "../core/api.js";
 import { setSafeHtml } from "../core/trusted-types.js";
-import { esc, fmtDt, eventKindLabel, eventKindChipHtml, DRY_RUN_TAG, policyOrDefault, NO_FIXED_DEADLINE, eventEndText } from "../ui/format.js";
+import { esc, fmtDt, eventKindLabel, eventKindChipHtml, DRY_RUN_TAG, policyOrDefault, NO_FIXED_DEADLINE, eventEndText, rankingWords } from "../ui/format.js";
 import { ICO, DIFF_PTS } from "../ui/icons.js";
 import { overlayDismiss, showModal } from "../ui/modal.js";
 import { showToast } from "../ui/toast.js";
@@ -46,12 +46,13 @@ import { pStatus, renderParticipants } from "./participants-admin.js";
 import { _ensureQrLib, _renderQrInto, joinQrDataUri } from "./self-enroll.js";
 import { renderCertificateWizard, renderIssuedCertificates } from "./certificate-wizard.js";
 import { eventLookCardHtml, eventLookFormState, eventLookShown, setEventLookForm } from "./look-admin.js";
+import { openStaffTeamAsOrganisers } from "./staff-teams.js";
 
 const OVERVIEW = 'admin-event-overview-tab';
 const SECTION_LABELS = {
   'admin-event-overview-tab': 'Overview',
   'admin-participants-tab': 'Participants',
-  'admin-tasks-tab': 'Challenges',
+  'admin-tasks-tab': 'Questions',
   'admin-rankings-tab': 'Rankings',
   'admin-submissions-tab': 'Activity',
   'admin-analytics-tab': 'Analytics',
@@ -376,15 +377,16 @@ function _renderRecord(c) {
     slots.length ? `<span class="ws-fact">${slots.length} session${slots.length === 1 ? '' : 's'}</span>` : '',
     _organiserText() ? `<span class="ws-fact">Run by ${esc(_organiserText())}</span>` : '',
   ].filter(Boolean).join('<span class="ws-facts-sep" aria-hidden="true">·</span>');
-  // ONE primary action (Invite), the approval queue only while somebody waits,
-  // and everything else in ⋯. Each is offered from the same predicates the
-  // Events-row menu uses (the server re-checks every one): a competitor gets
-  // none of the writes, an ended event no roster changes outside its late window.
+  // ONE primary action (Invite, which holds both ways of adding people: an
+  // email invitation and a sign-up at the desk), the approval queue only while
+  // somebody waits, and everything else in ⋯. Each is offered from its route's
+  // predicate (the server re-checks every one): a competitor gets none of the
+  // writes, an ended event no roster changes outside its late window.
   const canRoster = wsInviteOffered(c);
   // Approve opens the event's Participants section on the waiting people.
   const pending = adminCan('participants.approve') && adminCan('participants.view') ? wsPendingCount(c.id) : 0;
   const q = [];
-  if (canRoster) q.push(`<button type="button" class="btn" data-action="ws-invite">${ICO.userPlus} Invite</button>`);
+  if (canRoster) q.push(`<button type="button" class="btn ws-invite-btn" data-action="kebab-toggle" aria-label="Invite — add people to ${esc(c.name)}">${ICO.userPlus} Invite ${ICO.chevronDown}</button><div class="kebab-menu">${wsInviteItemsHtml(c)}</div>`);
   if (pending > 0) q.push(`<button type="button" class="btn secondary" data-action="ws-review-pending">${ICO.userCheck} Approve <span class="ws-badge" aria-label="${pending} waiting">${pending}</span></button>`);
   q.push(`<button type="button" class="btn secondary ws-more-btn" data-action="kebab-toggle" aria-label="More actions for ${esc(c.name)}">${ICO.more}<span class="ws-more-label">More</span></button><div class="kebab-menu">${wsMenuItemsHtml(c)}</div>`);
   const joinHtml = _joinPillHtml(c);
@@ -462,20 +464,38 @@ function _refocusHeaderControl(prev) {
  * The header's Invite: offered while the event takes new members (live,
  * upcoming, or ended with its late-entry window open: the invite dialog lists
  * exactly those), the viewer does not compete in it, and the role may invite
- * (`participants.enrol`, the route's permission). The ONE predicate for every
- * door that stands for it (the header button, the command palette).
+ * (`participants.enrol`, the route's permission of both its choices). The ONE
+ * predicate for every door that stands for it (the header button, its two
+ * choices, the command palette).
  */
 export function wsInviteOffered(c) {
   return !!c && compAcceptsNewMembers(c) && !c.competing && adminCan('participants.enrol');
 }
 
 /**
- * The header's ⋯ menu: every event door in ONE place, in the order organisers
- * reach for them, read-only doors next, and the irreversible ones LAST, quiet
- * (`km-danger`) and each behind its own confirm. A second builder beside the
- * Events-row menu (`compMenuItemsHtml`): the doors both offer take the same
- * predicates, locked equal by tests/menu-door-parity.spec.js, so change a
- * shared one in both; the server re-checks every door.
+ * The header Invite's two choices (owner's decision, 27 Nov 2026: ONE control
+ * for adding people, where the header's Invite, the ⋯ menu's "Sign up at the
+ * desk" and the Participants section's Invite and At the desk were four doors to
+ * two acts). Both take `wsInviteOffered`; the desk sign-up is withheld WITH THE
+ * REASON while approval is required and this role cannot approve the account it
+ * would make (sweep #501).
+ */
+export function wsInviteItemsHtml(c) {
+  if (!wsInviteOffered(c)) return '';
+  const id = esc(c.id), nm = esc(c.name);
+  const desk = deskApprovalWithheld()
+    ? `<div class="kebab-note" role="presentation">${ICO.lock} ${esc(DESK_APPROVAL_REASON)}</div>`
+    : `<button data-action="desk-invite" data-comp-id="${id}" data-comp-name="${nm}">${ICO.userCheck} Sign up at the desk</button>`;
+  return `<button data-action="ws-invite" data-comp-id="${id}" data-comp-name="${nm}">${ICO.send} Email invitation</button>${desk}`;
+}
+
+/**
+ * The header's ⋯ menu: every event door in ONE place (the people doors are the
+ * header's Invite), in the order organisers reach for them, read-only doors
+ * next, and the irreversible ones LAST, quiet (`km-danger`) and each behind its
+ * own confirm. The Events-row menu (`compMenuItemsHtml`) keeps only Delete
+ * event, with this menu's predicate, locked equal by
+ * tests/menu-door-parity.spec.js; the server re-checks every door.
  */
 export function wsMenuItemsHtml(c) {
   const status = computeCompStatus(c);
@@ -490,16 +510,12 @@ export function wsMenuItemsHtml(c) {
   const b = (action, icon, label, extra = '') => `<button data-action="${action}" data-comp-id="${id}" data-comp-name="${nm}"${extra}>${icon} ${esc(label)}</button>`;
   const items = [];
   if (competing) items.push(`<div class="kebab-note" role="presentation">${ICO.lock} You are competing in this event — you can view it, not change it</div>`);
-  if (status !== 'ended' && !competing && adminCan('challenges.assign') && adminCan('challenges.view')) items.push(b('comp-assign-challenges', ICO.clipboardCheck, 'Add challenges'));
+  // Stage B — no Add from bank here: the event's one door into the bank is its
+  // Questions section's + Add from bank (owner ruling, 27 Nov 2026).
   if (!competing && adminCan('events.clone')) items.push(b('ws-clone', ICO.copy, 'Clone'));
   // The full export needs `export.data` (the route's permission).
   if (!competing && adminCan('export.data')) items.push(b('ws-export-zip', ICO.download, 'Export everything'));
   if ((status === 'live' || status === 'ended') && adminCan('export.data')) items.push(b('comp-export-activity', ICO.download, 'Export activity (CSV)'));
-  if ((status !== 'ended' || late) && !competing && adminCan('participants.enrol')) {
-    // Sweep #501: withheld with the reason while approval is required and this
-    // role cannot approve the account it would make.
-    items.push(deskApprovalWithheld() ? `<div class="kebab-note" role="presentation">${ICO.lock} ${esc(DESK_APPROVAL_REASON)}</div>` : b('desk-invite', ICO.userCheck, 'Sign up at the desk'));
-  }
   // `templates.manage`, which the built-in event admin does not hold (the
   // server tells them "You can clone your own event instead"). Withheld from a
   // competitor as Clone is, by the same `!competing` and with the menu's note
@@ -508,7 +524,8 @@ export function wsMenuItemsHtml(c) {
   if ((status !== 'ended' || late) && adminCan('events.join_link')) items.push(b('comp-self-enroll', ICO.link, 'Join-link settings'));
   if (canEdit) items.push(b('comp-edit', ICO.edit, 'Edit settings'));
   items.push(b('comp-history', ICO.clock, 'History'));
-  items.push(b('comp-organisers', ICO.users, 'Organisers'));
+  // No Organisers item: the Overview's Organisers card is the one place for
+  // who runs the event (owner's decision, 27 Nov 2026).
   items.push(b('comp-delivery', ICO.mailCheck, 'Email delivery'));
   if (status === 'upcoming' && !(c.timeslots || []).length && !competing && adminCan('events.edit')) items.push(b('comp-start-now', ICO.play, 'Start now'));
   const danger = [];
@@ -597,7 +614,7 @@ function _renderKpis(c) {
     const scoring = _scoringTasks(c);
     const tasksN = scoring ? scoring.length : null;
     const unready = scoring ? scoring.filter(_notVisible).length : 0;
-    tiles.push({ key: 'tasks', label: 'Challenges', n: tasksN, text: '—',
+    tiles.push({ key: 'tasks', label: 'Questions', n: tasksN, text: '—',
       sub: scoring === null ? pending : (!tasksN ? 'none yet' : (unready ? `${unready} not visible yet` : 'all published')) });
   } else if (m.ranked && pt && pt.answers > 0) {
     // Only once there are answers: a zero here says nothing the attention row
@@ -1155,7 +1172,7 @@ function _actionKey(a) {
   return `[data-action="${CSS.escape(act)}"]${tgt ? `[data-target="${CSS.escape(tgt)}"]` : ''}`;
 }
 
-function _detailLabel(open) { return `${open ? 'Hide' : 'Show'} challenges, activity and organisers`; }
+function _detailLabel(open) { return `${open ? 'Hide' : 'Show'} questions, activity and organisers`; }
 
 // The selector that finds the same control in a rebuilt Overview: its id, else
 // its action and the thing it acts on. '' when it has neither (the fallback).
@@ -1215,7 +1232,7 @@ export async function loadEventOverview() {
   const top3 = top3Offered(c) ? `<button type="button" class="btn sm gold ws-top3-btn" data-action="comp-top3" data-comp-id="${esc(compId)}">${ICO.download} Download top 3 certificates</button>` : '';
   const ratesOnFace = status !== 'upcoming';
   const progress = ratesOnFace
-    ? _card('Progress', `<div id="ws-ov-progress"><p class="ws-empty">Loading…</p></div><h4 class="ws-sub-h">Solved, challenge by challenge</h4><div id="ws-ov-rates"><p class="ws-empty">Loading…</p></div>`,
+    ? _card('Progress', `<div id="ws-ov-progress"><p class="ws-empty">Loading…</p></div><h4 class="ws-sub-h">Solved, question by question</h4><div id="ws-ov-rates"><p class="ws-empty">Loading…</p></div>`,
       openLink('admin-analytics-tab', 'Open Analytics'), 'ws.progress', 'ws-progress-card ws-wide')
     : '';
   const rates = ratesOnFace ? '' : _card('Solve rate', '<div id="ws-ov-rates"><p class="ws-empty">Loading…</p></div>', '', 'ws.rates');
@@ -1225,8 +1242,8 @@ export async function loadEventOverview() {
   const chart = _card('Activity over time', '<div id="ws-ov-chart"><p class="ws-empty">Loading…</p></div>', '', 'ws.activity', 'ws-chart-card ws-wide');
   // The challenge set (from the Challenges model, which may still be loading),
   // each row opening its key facts in place.
-  const tasks = _card(`Challenges · ${c.task_count ?? 0}`, `<div id="ws-ov-tasks"><p class="ws-empty">Loading…</p></div>${_moreBtn('tasks', 'ws-ov-tasks')}`,
-    openLink('admin-tasks-tab', 'Open Challenges'), 'ws.challenges');
+  const tasks = _card(`Questions · ${c.task_count ?? 0}`, `<div id="ws-ov-tasks"><p class="ws-empty">Loading…</p></div>${_moreBtn('tasks', 'ws-ov-tasks')}`,
+    openLink('admin-tasks-tab', 'Open Questions'), 'ws.challenges');
   // Organisers: the list (Remove per row), its toggle, the outcome line, and the
   // add picker — four siblings, so a repaint of one never takes another's focus.
   const orgs = _card('Organisers', `<div id="ws-ov-orgs">${_organisersListHtml(c)}</div>${_moreBtn('orgs', 'ws-ov-orgs')}<p id="ws-ov-orgs-msg" class="ws-orgs-msg" role="status"></p><div id="ws-ov-orgs-add"></div>`,
@@ -1335,7 +1352,7 @@ export function wsTaskFacts(el) {
 /** "Show me": move focus to the header control that does this (Invite, the
  *  join pill) instead of repeating it on the page. */
 export function wsPoint(el) {
-  const sel = el && el.dataset.target === 'join' ? '#ws-join .ws-join-pill' : '#ws-quick [data-action="ws-invite"]';
+  const sel = el && el.dataset.target === 'join' ? '#ws-join .ws-join-pill' : '#ws-quick .ws-invite-btn';
   const t = document.querySelector(sel);
   if (!t) return;
   const calm = _reducedMotion();
@@ -1376,8 +1393,8 @@ function _renderOverviewAttn(c) {
     const tasks = p.tasks || [];
     const hidden = tasks.filter(t => t.status !== 'published' || !t.active).length;
     if (hidden) {
-      items.push(`<div class="ws-attn ws-attn-warn">${ICO.eyeOff}<span><b>${hidden} ${hidden === 1 ? 'challenge is' : 'challenges are'} not visible to participants.</b> Drafts and hidden challenges are not played.</span>`
-        + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Challenges</button>' : '') + '</div>');
+      items.push(`<div class="ws-attn ws-attn-warn">${ICO.eyeOff}<span><b>${hidden} ${hidden === 1 ? 'question is' : 'questions are'} not visible to participants.</b> Drafts and hidden questions are not played.</span>`
+        + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Questions</button>' : '') + '</div>');
     }
     // Nobody ENROLLED (`_joinedCount`, the roster): an organiser playing an
     // event where staff do not compete has joined it, though the live figures
@@ -1396,7 +1413,7 @@ function _renderOverviewAttn(c) {
       .sort((a, b) => b.attempters - a.attempters);
     if (stuck.length) {
       const names = stuck.slice(0, 2).map(t => `${t.task_number ? `#${t.task_number} ` : ''}${t.title} (${t.attempters} tried)`).join(', ');
-      items.push(`<div class="ws-attn ws-attn-info">${ICO.alertTriangle}<span><b>Nobody has solved ${stuck.length === 1 ? 'this challenge' : `${stuck.length} challenges`} yet:</b> ${esc(names)}${stuck.length > 2 ? ` and ${stuck.length - 2} more` : ''}.</span></div>`);
+      items.push(`<div class="ws-attn ws-attn-info">${ICO.alertTriangle}<span><b>Nobody has solved ${stuck.length === 1 ? 'this question' : `${stuck.length} questions`} yet:</b> ${esc(names)}${stuck.length > 2 ? ` and ${stuck.length - 2} more` : ''}.</span></div>`);
     }
   }
   let html = items.join('');
@@ -1428,21 +1445,21 @@ function _paintReady(c) {
   const n = scoring ? scoring.length : 0;
   const unready = scoring ? scoring.filter(_notVisible).length : 0;
   if (!p) {
-    if (competing) items.push(`${info('Challenges', 'Whether participants can see them is kept off this page while you compete.')}</li>`);
+    if (competing) items.push(`${info('Questions', 'Whether participants can see them is kept off this page while you compete.')}</li>`);
     else if (_pulse && _pulse.compId === c.id && _pulse.failed) {
       open++;
-      items.push(todo('Could not check the challenges', 'Nothing is known about them until the check succeeds.')
+      items.push(todo('Could not check the questions', 'Nothing is known about them until the check succeeds.')
         + '<button type="button" class="btn sm secondary" data-action="ws-pulse-retry">Try again</button></li>');
-    } else items.push(`${info('Checking the challenges…', '')}</li>`);
+    } else items.push(`${info('Checking the questions…', '')}</li>`);
   } else if (!n) {
     open++;
-    items.push(todo('No challenges yet', 'Participants need at least one to play.')
-      + (competing || !adminCan('challenges.assign') || !adminCan('challenges.view') ? '' : `<button type="button" class="btn sm secondary" data-action="comp-assign-challenges" data-comp-id="${id}" data-comp-name="${nm}">Add challenges</button>`) + '</li>');
+    items.push(todo('No questions yet', 'Participants need at least one to play.')
+      + (competing || !adminCan('challenges.assign') || !adminCan('challenges.view') ? '' : `<button type="button" class="btn sm secondary" data-action="ws-add-from-bank">Add from bank</button>`) + '</li>');
   } else if (unready) {
     open++;
-    items.push(todo(`${unready} of ${n} challenges are not visible to participants`, 'Drafts and hidden challenges are not played.')
-      + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Challenges</button>' : '') + '</li>');
-  } else items.push(`${ok(`${n} ${n === 1 ? 'challenge' : 'challenges'} published`, '')}</li>`);
+    items.push(todo(`${unready} of ${n} questions are not visible to participants`, 'Drafts and hidden questions are not played.')
+      + (wsSectionOffered('admin-tasks-tab') ? '<button type="button" class="btn sm secondary" data-action="ws-tab" data-section="admin-tasks-tab">Open Questions</button>' : '') + '</li>');
+  } else items.push(`${ok(`${n} ${n === 1 ? 'question' : 'questions'} published`, '')}</li>`);
   const canJoinLink = adminCan('events.join_link');
   if (c.self_enroll_enabled) items.push(`${ok('Join link is on', 'Walk-ups join with the event code.')}${canJoinLink ? showMe('join') : ''}</li>`);
   else {
@@ -1497,7 +1514,7 @@ function _paintProgress(c) {
   const fin = Number(t.finished || 0);
   const pct = Math.round((fin / joined) * 1000) / 10;
   const started = Number(t.solvers || 0);
-  const html = `<p class="ws-prog-fig"><span class="bignum ws-prog-num">${esc(String(fin))}</span><span class="ws-prog-of">of ${esc(String(joined))} solved every challenge</span></p>`
+  const html = `<p class="ws-prog-fig"><span class="bignum ws-prog-num">${esc(String(fin))}</span><span class="ws-prog-of">of ${esc(String(joined))} solved every question</span></p>`
     + `<span class="ws-bar-track ws-prog-track" aria-hidden="true"><span class="ws-bar-fill ws-prog-fill" data-pct="${pct}"></span></span>`
     + `<p class="ws-prog-sub">${esc(String(started))} of ${esc(String(joined))} have solved at least one.</p>`;
   if (!_paintKeepingFocus(el, html, () => null)) return;
@@ -1638,11 +1655,14 @@ function _renderOverviewTasks(c) {
   // hiding the pressed toggle would drop focus to <body>.
   if (more && document.activeElement !== more) more.hidden = true;
   const status = computeCompStatus(c);
-  const tasks = (S.adminTasksData || []).filter(t => (t.competitions || []).some(x => x.id === c.id));
+  // The questions the event holds: its own copies (and a row it holds itself). A
+  // bank question's entry naming the event's copy (`copy_id`) stands for that copy,
+  // which is listed in its own right (lib/event-copies.js): never list both.
+  const tasks = (S.adminTasksData || []).filter(t => (t.competitions || []).some(x => x.id === c.id && !x.copy_id));
   const focusKey = a => { const id = a.closest('[data-task-id]')?.dataset.taskId; return id ? `[data-action="ws-task-facts"][data-task-id="${CSS.escape(id)}"]` : null; };
   if (!tasks.length && (c.task_count || 0) > 0) { _paintKeepingFocus(el, '<p class="ws-empty">Loading…</p>', focusKey); return; }
   if (!tasks.length) {
-    _paintKeepingFocus(el, `<p class="ws-empty">No challenges yet.${status !== 'ended' && !c.competing ? ' Add some from the library.' : ''}</p>`, focusKey);
+    _paintKeepingFocus(el, `<p class="ws-empty">No questions yet.${status !== 'ended' && !c.competing ? ' Add some from the bank.' : ''}</p>`, focusKey);
     return;
   }
   tasks.sort((a, b) => String(_taskNum(a, c.id)).localeCompare(String(_taskNum(b, c.id)), undefined, { numeric: true }) || String(a.title).localeCompare(String(b.title)));
@@ -1820,7 +1840,7 @@ function _paintTicker(c) {
     const fresh = seen !== null && !seen.has(key);
     const who = esc(it.nickname || 'A participant');
     const what = it.type === 'solved'
-      ? `solved <span class="ws-tk-task">${it.task_number ? `#${esc(String(it.task_number))} ` : ''}${esc(it.task_title || 'a challenge')}</span>`
+      ? `solved <span class="ws-tk-task">${it.task_number ? `#${esc(String(it.task_number))} ` : ''}${esc(it.task_title || 'a question')}</span>`
       : 'joined';
     const solvedRow = it.type === 'solved';
     const mark = solvedRow ? ICO.check : ICO.userPlus;
@@ -1842,8 +1862,8 @@ function _paintSolveRates(c) {
   // so its bar would read 100% and measure nothing (Analytics leaves it out too).
   const tasks = [...(_pulse.data.tasks || [])].filter(t => !t.qualifying).sort((a, b) =>
     String(a.task_number || '').localeCompare(String(b.task_number || ''), undefined, { numeric: true }) || String(a.title).localeCompare(String(b.title)));
-  if (!tasks.length) { _paintKeepingFocus(el, '<p class="ws-empty">No challenges yet.</p>', () => null); return; }
-  const html = `<ol class="ws-bars" aria-label="Solve rate by challenge">${tasks.map(t => {
+  if (!tasks.length) { _paintKeepingFocus(el, '<p class="ws-empty">No questions yet.</p>', () => null); return; }
+  const html = `<ol class="ws-bars" aria-label="Solve rate by question">${tasks.map(t => {
     const rate = t.attempters ? t.solvers / t.attempters : null;
     const pct = rate == null ? 0 : Math.round(rate * 1000) / 10;
     const val = rate == null ? 'no attempts yet' : `${t.solvers} of ${t.attempters} · ${Math.round(rate * 100)}%`;
@@ -1897,17 +1917,34 @@ function _organisersListHtml(c) {
   }).join('')}</ul>`;
 }
 
+// A whole staff team as organisers (features/staff-teams.js): offered where the
+// grant route's own predicate allows (`_canManageOrganisers`) and the role may
+// read the staff teams (`teams.view`). A sibling of the search box, which a face
+// rebuild carries over by itself.
+function _orgTeamDoorHtml(c) {
+  if (!_canManageOrganisers(c) || !adminCan('teams.view')) return '';
+  return `<div class="ws-org-team help-label-row"><button type="button" class="btn secondary sm" data-action="ws-org-add-team">Add a staff team as organisers</button><span data-help="ws.organisers-team" data-help-label="Add a staff team as organisers"></span></div>`;
+}
+
 function _paintOrgAdd(c) {
   const el = document.getElementById('ws-ov-orgs-add');
   if (!el) return;
   if (!_canAddOrganisers(c)) {
-    setSafeHtml(el, `<p class="ws-org-reason">${esc(_orgAddReason(c))}</p>`);
+    setSafeHtml(el, `<p class="ws-org-reason">${esc(_orgAddReason(c))}</p>${_orgTeamDoorHtml(c)}`);
     return;
   }
   setSafeHtml(el, `<div class="ws-org-add"><label class="ws-org-add-label" for="ws-org-search">Add an organiser</label>`
     + `<input id="ws-org-search" class="ws-org-search" type="text" autocomplete="off" spellcheck="false" maxlength="80" placeholder="Name, nickname or email" data-input-action="ws-org-search" aria-describedby="ws-org-hint">`
     + `<p id="ws-org-hint" class="ws-org-hint">Type at least two letters. Picking someone makes them an event admin of this event.</p>`
-    + `<div id="ws-org-results"></div></div>`);
+    + `<div id="ws-org-results"></div></div>${_orgTeamDoorHtml(c)}`);
+}
+
+/** Add a staff team as organisers: the dialog (features/staff-teams.js), then re-read the card. */
+export async function wsOrgAddTeam() {
+  const c = _comp();
+  if (!c) return;
+  if (!_canManageOrganisers(c) || !adminCan('teams.view')) { _orgFail(_orgManageReason(c) || 'Your role cannot read the staff teams.'); return; }
+  await openStaffTeamAsOrganisers({ comp: c, onDone: () => { if (S.adminSelectedCompetitionId === c.id) _reloadOrganisers(c.id); } });
 }
 
 let _orgSearchSeq = 0;
@@ -1996,7 +2033,7 @@ export async function wsOrgAdd(el) {
   try {
     ok = await showModal({
       title: 'Make organiser?',
-      message: `<p><strong>${esc(name)}</strong> will organise <strong>${esc(c.name)}</strong> — its challenges, its participants and its rankings.</p>${roleLine}`,
+      message: `<p><strong>${esc(name)}</strong> will organise <strong>${esc(c.name)}</strong> — its questions, its participants and its rankings.</p>${roleLine}`,
       confirmText: 'Make organiser',
       confirmClass: 'warning',
     });
@@ -2147,13 +2184,13 @@ export function loadEventSettings() {
     row('Schedule', esc(_scheduleText(c))),
     row('Sessions', slots.length ? esc(slots.map(t => t.name).join(', ')) : 'None — one sitting'),
     row('Join link', yes(c.self_enroll_enabled) + (c.self_enroll_enabled ? ` · ${esc(_JOIN_RULE_TEXT)}` : '')),
-    pol.ranking_enabled !== false ? row('Leaderboard', esc(c.leaderboard_mode === 'global' ? 'One board across sessions' : 'Per session')) : '',
-    row('Attempts per challenge', c.attempt_cap ? esc(String(c.attempt_cap)) : 'Unlimited'),
+    pol.ranking_enabled !== false && pol.sessions === 'many' ? row('Ranking', esc(rankingWords(c))) : '',
+    row('Attempts per question', c.attempt_cap ? esc(String(c.attempt_cap)) : 'Unlimited'),
     pol.reveal_answers !== 'forbidden' ? row('Show answers when it ends', yes(c.reveal_answers_on_end)) : '',
     pol.group_leaderboard !== 'forbidden' ? row('Team leaderboard', yes(c.group_leaderboard_enabled)) : '',
     pol.late_entry === 'allowed' ? row('Late entry', yes(c.late_entry_enabled)) : '',
     row('Staff compete', yes(c.staff_compete)),
-    row('Checkmarx One accounts', c.cxone_disabled ? 'Not created' : 'Created on enrolment'),
+    row('Checkmarx One accounts', policyOrDefault(c.policy).cxone_provisioning !== 'allowed' ? 'Never created for this type of event' : c.cxone_disabled ? 'Not created' : 'Created on enrolment'),
     row('Tags', (c.tags || []).length ? (c.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join(' ') : '—'),
   ].join('');
   // One place per action: this pane's only door is Edit settings. History,
@@ -2299,7 +2336,7 @@ export function wsClone() {
   const start = new Date(Date.now() + 24 * 3600e3); start.setMinutes(0, 0, 0);
   const n = Number(c.task_count || 0);
   _formDialog('ws-clone-dialog', 'Clone event', `
-    <p class="ws-dialog-lede">Copies the settings and ${n} challenge${n === 1 ? '' : 's'}. Participants, scores, the join link, the event team and its lead targets, the event's look and its own certificate design are not copied. The new event starts empty.</p>
+    <p class="ws-dialog-lede">Copies the settings and ${n} question${n === 1 ? '' : 's'}. Participants, scores, the join link, the event team and its lead targets, the event's look and its own certificate design are not copied. The new event starts empty.</p>
     ${_ownKeyAccountsOffNote(c, 'copy')}
     <div class="form-group"><label for="ws-clone-name">Name</label><input id="ws-clone-name" type="text" maxlength="120" required value="${esc(`${c.name} (copy)`.slice(0, 120))}"/></div>
     <div class="form-group"><label for="ws-clone-start">Starts</label><input id="ws-clone-start" type="datetime-local" value="${esc(_localInputValue(start))}"/><p class="settings-hint">Your local time.</p></div>
@@ -2324,7 +2361,7 @@ export function wsClone() {
     close();
     const skippedList = Array.isArray(d.skipped_challenges) ? d.skipped_challenges : [];
     const notCarried = notCarriedSummary(d.forced_settings, d.skipped_sessions);
-    showToast(`Created “${d.competition.name}” with ${d.assigned_challenges || 0} challenge${d.assigned_challenges === 1 ? '' : 's'}${d.sessions_copied ? ` and ${d.sessions_copied} session${d.sessions_copied === 1 ? '' : 's'}` : ''}.${skippedSummary(skippedList)}${notCarried}`, skippedList.length || notCarried ? 'info' : 'success');
+    showToast(`Created “${d.competition.name}” with ${d.assigned_challenges || 0} question${d.assigned_challenges === 1 ? '' : 's'}${d.sessions_copied ? ` and ${d.sessions_copied} session${d.sessions_copied === 1 ? '' : 's'}` : ''}.${skippedSummary(skippedList)}${notCarried}`, skippedList.length || notCarried ? 'info' : 'success');
     await loadAdminCompetitions();
     openEventWorkspace(d.competition.id, d.competition.name, { tab: OVERVIEW });
   });
@@ -2347,7 +2384,7 @@ export function skippedSummary(list) {
   if (!Array.isArray(list) || !list.length) return '';
   // A challenge the actor may not view comes with no title (`not_visible`): it
   // is counted as "a challenge", never captioned as if that were its name.
-  const shown = list.slice(0, 3).map(s => `${s.title ? `“${s.title}”` : 'a challenge'} (${s.message || SKIP_REASON_TEXT[s.reason] || 'it could not be copied'})`);
+  const shown = list.slice(0, 3).map(s => `${s.title ? `“${s.title}”` : 'a question'} (${s.message || SKIP_REASON_TEXT[s.reason] || 'it could not be copied'})`);
   return ` Not copied: ${shown.join('; ')}${list.length > 3 ? ` and ${list.length - 3} more` : ''}.`;
 }
 
@@ -2370,6 +2407,7 @@ function _ownKeyAccountsOffNote(c, target) {
 const FORCED_TEXT = {
   trusted_network_ips: 'trusted network IPs (a venue address is never copied)',
   cxone_disabled: 'Checkmarx One accounts (turned off: the event used its own Checkmarx One key, which is never copied)',
+  cxone_provisioning: 'Checkmarx One accounts (turned off: the new type never creates them)',
   cxone_group_name: 'the Checkmarx One group (it belonged to the event\'s own key)',
   late_entry_deadline_at: 'the pinned late-entry deadline (it did not fit the new end)',
   late_entry_closed: 'the early close of late entries (the copy takes late entries for the usual time after its end)',
@@ -2390,7 +2428,7 @@ export function wsSaveTemplate() {
   const c = _comp();
   if (!c) return;
   _formDialog('ws-tpl-dialog', 'Save as template', `
-    <p class="ws-dialog-lede">Keeps this event's type, settings, tags and challenges so anyone can spin up the same event in a minute. People, scores and dates are not kept.</p>
+    <p class="ws-dialog-lede">Keeps this event's type, settings, tags and questions so anyone can spin up the same event in a minute. People, scores and dates are not kept.</p>
     ${_ownKeyAccountsOffNote(c, 'template')}
     <div class="form-group"><label for="ws-tpl-name">Template name</label><input id="ws-tpl-name" type="text" maxlength="120" required value="${esc(c.name.slice(0, 120))}"/></div>
     <div class="form-group"><label for="ws-tpl-desc">Description <span class="muted">(optional)</span></label><textarea id="ws-tpl-desc" rows="2" maxlength="500"></textarea></div>`,

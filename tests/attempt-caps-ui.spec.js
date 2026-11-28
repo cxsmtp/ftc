@@ -40,10 +40,11 @@ async function fixture(api, csrf, cap) {
             correct_answer: "correct-one", status: "published", attempt_cap: cap },
   });
   expect(tr.ok(), await tr.text()).toBeTruthy();
-  const taskId = (await tr.json()).id;
-  expect(taskId).toBeTruthy();
-  const asg = await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+  const bankId = (await tr.json()).id;
+  expect(bankId).toBeTruthy();
+  const asg = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
   expect(asg.ok(), await asg.text()).toBeTruthy();
+  const taskId = (await asg.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
 
   // Two participants: the second never submits, so the all-solved auto-end
   // cannot end the competition underneath the test.
@@ -270,8 +271,10 @@ test.describe("v8.1.0 — the attempt budget on the participant's screen", () =>
         data: { title: `${uniq()} Uncapped`, description: "d", difficulty: "easy", answer_type: "text",
                 correct_answer: "correct-one", status: "published" },
       });
-      const taskId = (await tr.json()).id;
-      await api.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+      const bankId = (await tr.json()).id;
+      const tAsg = await api.post(`/api/admin/tasks/${bankId}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
+      expect(tAsg.ok(), await tAsg.text()).toBeTruthy();
+      const taskId = (await tAsg.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what its participants open and answer
       const label = uniq(); const email = `${label}@company.example`;
       await registerPost(api, "/api/register", {
         headers: H(csrf),

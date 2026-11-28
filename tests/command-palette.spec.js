@@ -9,7 +9,7 @@
 //     press inside it does not;
 //   • ROLE GATING, by value: a participant's palette holds no organiser page or
 //     action; an event admin's holds no superadmin page (Settings), no
-//     global-admin page (Users & roles) and no global-admin action (New event,
+//     global-admin page (Roles & permissions) and no global-admin action (New event,
 //     New template, the platform exports), and lists only their own event — each
 //     beside a superadmin CONTROL that does see them, so an empty or broken
 //     palette cannot pass the negative arms;
@@ -23,7 +23,7 @@
 //     filter hides its card (an ended event), and from inside another event the
 //     leave is answered before the new event is selected;
 //   • Ctrl+K does nothing while the profile-completion gate is up;
-//   • Enter on "Challenge library" navigates there (asserted by the pane shown
+//   • Enter on "Question bank" navigates there (asserted by the pane shown
 //     and the sidebar's aria-current, with the Events pane as the start state);
 //   • a Help result opens the help drawer AT that heading (the heading is in
 //     the drawer's viewport and the drawer is not at its top);
@@ -127,14 +127,14 @@ test.describe("command palette", () => {
     await expect(overlay, "a press outside the panel closes it").toHaveCount(0);
   });
 
-  test("Enter on 'Challenge library' goes there", async ({ page }) => {
+  test("Enter on 'Question bank' goes there", async ({ page }) => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await signInSuperadmin(page);
     await expect(page.locator("#admin-tasks-tab"), "PRECONDITION: the library is not already showing").toBeHidden();
     await openPalette(page);
-    const opts = await options(page, "challenge lib");
-    expect(labels(opts, "Go to")[0], `the best match first: ${JSON.stringify(opts)}`).toBe("Challenge library");
+    const opts = await options(page, "question bank");
+    expect(labels(opts, "Go to")[0], `the best match first: ${JSON.stringify(opts)}`).toBe("Question bank");
     await page.keyboard.press("Enter");
     await expect(page.locator("#command-palette-overlay")).toHaveCount(0);
     await expect(page.locator("#admin-tasks-tab")).toBeVisible({ timeout: 15000 });
@@ -151,10 +151,10 @@ test.describe("command palette", () => {
       await signInSuperadmin(sp);
       await openPalette(sp);
       const all = await options(sp, "");
-      // RBAC sidebar — Logs has no sidebar item (Audit's Raw logs); Users & roles
+      // RBAC sidebar — Logs has no sidebar item (Audit's Raw logs); Roles & permissions
       // carries the same tier signal (every global admin, never an event admin).
-      for (const want of ["Settings", "Users & roles", "Challenge library", "People"]) expect(labels(all, "Go to"), `CONTROL: the superadmin's Go to has ${want}`).toContain(want);
-      for (const want of ["New event", "New template", "Export people (CSV)", "New challenge"]) expect(labels(all, "Actions"), `CONTROL: the superadmin's Actions has ${want}`).toContain(want);
+      for (const want of ["Settings", "Roles & permissions", "Question bank", "People"]) expect(labels(all, "Go to"), `CONTROL: the superadmin's Go to has ${want}`).toContain(want);
+      for (const want of ["New event", "New template", "Export people (CSV)", "New question"]) expect(labels(all, "Actions"), `CONTROL: the superadmin's Actions has ${want}`).toContain(want);
       const ev = await options(sp, W.theirs.name);
       expect(labels(ev, "Events"), "CONTROL: the superadmin finds the decoy event").toContain(W.theirs.name);
     } finally { await ctx.close(); }
@@ -164,15 +164,15 @@ test.describe("command palette", () => {
     const opts = await options(page, "");
     const go = labels(opts, "Go to"), acts = labels(opts, "Actions");
     expect(go, "POSITIVE: the event admin's own pages are offered").toContain("Events");
-    expect(go).toContain("Challenge library");
-    expect(acts, "POSITIVE: an action they may take").toContain("New challenge");
-    for (const gone of ["Settings", "Users & roles"]) expect(go, `${gone} is not an event admin's page`).not.toContain(gone);
-    for (const gone of ["New event", "New template", "Export people (CSV)", "Export challenges"]) expect(acts, `${gone} is not an event admin's action`).not.toContain(gone);
+    expect(go).toContain("Question bank");
+    expect(acts, "POSITIVE: an action they may take").toContain("New question");
+    for (const gone of ["Settings", "Roles & permissions"]) expect(go, `${gone} is not an event admin's page`).not.toContain(gone);
+    for (const gone of ["New event", "New template", "Export people (CSV)", "Export questions"]) expect(acts, `${gone} is not an event admin's action`).not.toContain(gone);
     // Typing never surfaces them either (they are not merely ranked out).
     // "New event" is ALSO the sidebar page where every event starts; an event
     // admin legitimately goes there (they start events from templates), so for
     // the two create doors only the Actions entry is withheld.
-    for (const [q, door, sections] of [["settings", "Settings", ["Go to", "Actions"]], ["users", "Users & roles", ["Go to", "Actions"]], ["new event", "New event", ["Actions"]], ["new template", "New template", ["Go to", "Actions"]]]) {
+    for (const [q, door, sections] of [["settings", "Settings", ["Go to", "Actions"]], ["roles", "Roles & permissions", ["Go to", "Actions"]], ["new event", "New event", ["Actions"]], ["new template", "New template", ["Go to", "Actions"]]]) {
       const hit = await options(page, q);
       expect(hit.filter((o) => sections.includes(o.section)).map((o) => o.label), `"${q}" finds no ${door}`).not.toContain(door);
     }
@@ -190,7 +190,7 @@ test.describe("command palette", () => {
     const opts = await options(page, "");
     expect(labels(opts, "Go to"), "POSITIVE: the participant's pages").toEqual(expect.arrayContaining(["Events", "Profile", "Appearance"]));
     const all = opts.map((o) => o.label);
-    for (const gone of ["Challenge library", "People", "Settings", "Users & roles", "Templates", "Groups", "Live rankings", "New event", "New challenge", "Invite people", "Sign up at the desk", "Switch to Participant View", "Switch to Admin View"]) {
+    for (const gone of ["Question bank", "People", "Settings", "Roles & permissions", "Templates", "Groups", "Teams", "Live rankings", "New event", "New question", "Invite people", "Sign up at the desk", "Switch to Participant View", "Switch to Admin View"]) {
       expect(all, `${gone} is not a participant's`).not.toContain(gone);
     }
     for (const q of ["library", "settings", "new event", "invite"]) {
@@ -348,10 +348,16 @@ test.describe("command palette — inside an event, a participant's jumps, and t
       expect((await offered(page, sec, "Go to")).filter((o) => o.hint === here).map((o) => o.label), `the workspace's ${sec} section`).toContain(sec);
     }
     expect((await offered(page, "invite", "Actions")).find((o) => o.label === "Invite people"), "Invite, to this event").toMatchObject({ hint: `To ${X.live.name}` });
-    for (const door of ["Add challenges", "Edit settings", "History", "Clone"]) {
+    // The header Invite's second choice (the desk sign-up moved there from the ⋯
+    // menu), and no Organisers door (the Overview's card is the one place).
+    expect((await offered(page, "desk", "Actions")).find((o) => o.label === "Sign up at the desk"), "the desk sign-up, in this event").toMatchObject({ hint: here });
+    expect((await offered(page, "organisers", "Actions")).map((o) => o.label), "no Organisers door").not.toContain("Organisers");
+    for (const door of ["Edit settings", "History", "Clone"]) {
       expect((await offered(page, door, "Actions")).filter((o) => o.hint === here).map((o) => o.label), `the ⋯ menu's ${door}`).toContain(door);
     }
-    for (const door of ["End now", "Delete event"]) {
+    // Stage B (owner ruling, 27 Nov 2026) — the ⋯ menu has no Add from bank (the
+    // event's one door is its Questions section's), so neither does the palette.
+    for (const door of ["End now", "Delete event", "Add from bank"]) {
       expect((await offered(page, door, "Actions")).map((o) => o.label), `${door} is never offered`).not.toContain(door);
     }
     // An Actions item RUNS: History opens the event's history.
@@ -367,13 +373,13 @@ test.describe("command palette — inside an event, a participant's jumps, and t
     await page.setViewportSize({ width: 1440, height: 900 });
     await signInSuperadmin(page);
     await openWorkspace(page, X.ended);
-    await expect(page.locator('#ws-quick [data-action="ws-invite"]'), "PRECONDITION: the header offers no Invite on an ended event").toHaveCount(0);
+    await expect(page.locator('#ws-quick .ws-invite-btn'), "PRECONDITION: the header offers no Invite on an ended event").toHaveCount(0);
     await openPalette(page);
     expect((await offered(page, "history", "Actions")).map((o) => o.label), "POSITIVE: the ended event's own doors are offered").toContain("History");
     expect((await offered(page, "invite", "Actions")).map((o) => o.label), "no Invite to an event that takes no new members").not.toContain("Invite people");
     await page.keyboard.press("Escape");
     await openWorkspace(page, X.live);
-    await expect(page.locator('#ws-quick [data-action="ws-invite"]'), "CONTROL: a live event's header offers Invite").toHaveCount(1);
+    await expect(page.locator('#ws-quick .ws-invite-btn'), "CONTROL: a live event's header offers Invite").toHaveCount(1);
     await openPalette(page);
     expect((await offered(page, "invite", "Actions")).map((o) => o.label), "CONTROL: and so does the palette").toContain("Invite people");
     // Each event's status, by the one table the Events list uses.
@@ -392,7 +398,7 @@ test.describe("command palette — inside an event, a participant's jumps, and t
       await signInSuperadmin(sp);
       await openWorkspace(sp, X.compete);
       await openPalette(sp);
-      for (const door of ["Invite people", "Add challenges", "Edit settings"]) {
+      for (const door of ["Invite people", "Edit settings"]) {
         expect((await offered(sp, door, "Actions")).map((o) => o.label), `CONTROL: the superadmin (not competing) is offered ${door}`).toContain(door);
       }
     } finally { await ctx.close(); }
@@ -402,7 +408,7 @@ test.describe("command palette — inside an event, a participant's jumps, and t
     await openWorkspace(page, X.compete);
     await openPalette(page);
     expect((await offered(page, "history", "Actions")).map((o) => o.label), "POSITIVE: a read-only door is still offered").toContain("History");
-    for (const gone of ["Invite people", "Add challenges", "Edit settings", "Clone", "Sign up at the desk"]) {
+    for (const gone of ["Invite people", "Add from bank", "Edit settings", "Clone", "Sign up at the desk"]) {
       expect((await offered(page, gone, "Actions")).map((o) => o.label), `${gone} is not a competitor's`).not.toContain(gone);
     }
   });
@@ -419,7 +425,7 @@ test.describe("command palette — inside an event, a participant's jumps, and t
       await signInSuperadmin(sp);
       await openPalette(sp);
       const r = await recent(sp);
-      expect(r, "CONTROL: the superadmin's recents come back").toEqual(expect.arrayContaining(["Settings", "New event", "Challenge library"]));
+      expect(r, "CONTROL: the superadmin's recents come back").toEqual(expect.arrayContaining(["Settings", "New event", "Question bank"]));
       expect(r, "an irreversible door is never an item, so never a recent").not.toContain("Delete event");
     } finally { await ctx.close(); }
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -427,7 +433,7 @@ test.describe("command palette — inside an event, a participant's jumps, and t
     await signInEventAdmin(page);
     await openPalette(page);
     const r = await recent(page);
-    expect(r, "POSITIVE: a recent the event admin may use").toContain("Challenge library");
+    expect(r, "POSITIVE: a recent the event admin may use").toContain("Question bank");
     for (const gone of ["Settings", "New event", "Delete event"]) expect(r, `${gone} is not brought back for an event admin`).not.toContain(gone);
   });
 

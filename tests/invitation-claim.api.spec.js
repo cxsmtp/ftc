@@ -202,7 +202,8 @@ test.describe("an existing account's emailed-code sign-in claims its live invita
   test("somebody removed from the event and invited back gets their join time and solve-clock anchor back, as at every re-add", async () => {
     // Re-anchoring a returning player at the claim would restart their clock
     // (CLAUDE.md, *Solve clock*: a rejoin restores the saved anchor).
-    const E = await makeCompetition(sa, saCsrf, "ic-readd");
+    // `entry`: entering is what stamps the anchor this test restores.
+    const E = await makeCompetition(sa, saCsrf, "ic-readd", { clock_start: "entry" });
     const p = await makeParticipant(sa, saCsrf, "icreadd");
     await enrol(sa, saCsrf, E.id, [p.id]);
     const pc = await participantCtx(p.email, E.id);   // they enter: the anchor is stamped

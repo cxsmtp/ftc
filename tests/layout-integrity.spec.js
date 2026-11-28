@@ -274,7 +274,8 @@ test.describe("v7.23.0 — benchmark rankings row contrast", () => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     const H = { "x-csrf-token": csrf, "content-type": "application/json" };
     const compId = (await (await sa.post("/api/admin/competitions", { headers: H, data: {
-      name: `BenchAA ${t}`, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 180,
+      // The entry clock: the benchmark row is on the board from ENTERING it.
+      name: `BenchAA ${t}`, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 180, clock_start: "entry",
     }})).json()).competition.id;
 
     // Its own participant — a shared fixture's tags are set by other files.
@@ -468,10 +469,13 @@ test.describe("Picker dialog action row (v7.23.3)", () => {
       if (await burger.isVisible().catch(() => false) && !(await page.locator("#admin-sidebar.mobile-open").count())) await burger.click();
       await page.locator("button.admin-nav-item[data-tab-id=\"admin-competitions-tab\"]").first().evaluate((el) => el.click());
       await page.locator("#admin-comp-body tr").first().waitFor({ state: "visible", timeout: 20000 });
-      await page.locator("#admin-comp-body tr").first().locator(".kebab-btn").click();
-      await page.locator("#kebab-portal.open").waitFor({ state: "visible", timeout: 10000 });
-      const item = page.locator("#kebab-portal [data-action=comp-assign-challenges]");
-      expect(await item.count(), "the assign-challenges kebab item must exist, or this test is vacuous").toBeGreaterThan(0);
+      // The event's one door into the bank: its Questions section's + Add from
+      // bank (Stage B, owner ruling, 27 Nov 2026; neither event menu offers one).
+      await page.locator("#admin-comp-body tr").first().locator('[data-action="comp-open"]').first().click();
+      await page.locator("#ws-record").waitFor({ state: "visible", timeout: 20000 });
+      await page.locator('#ws-tabs [data-section="admin-tasks-tab"]').first().evaluate((el) => el.click());
+      const item = page.locator("#add-tasks-to-comp-btn");
+      await expect(item, "the + Add from bank door must be offered, or this test is vacuous").toBeVisible({ timeout: 15000 });
       await item.click();
       await page.locator(".picker-modal").waitFor({ state: "visible", timeout: 15000 });
 

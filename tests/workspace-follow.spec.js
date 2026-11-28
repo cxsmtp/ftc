@@ -172,7 +172,7 @@ test("Settings and the section tabs' counts follow a reload of the events model"
   const p = await makeParticipant(sa.api, sa.csrf, "wsfcount");
   await enrol(sa.api, sa.csrf, ev.id, [p.id]);
   await reloadModel(page);
-  await expect(page.locator("#ws-settings .ws-kv").filter({ hasText: "Attempts per challenge" }), "the Settings facts follow").toContainText("3", { timeout: 10000 });
+  await expect(page.locator("#ws-settings .ws-kv").filter({ hasText: "Attempts per question" }), "the Settings facts follow").toContainText("3", { timeout: 10000 });
   await expect(count, "the Participants tab's count follows").toHaveText("1", { timeout: 10000 });
 });
 
@@ -248,7 +248,7 @@ test("Settings keeps a look choice not yet saved through every repaint, and foll
   const put = await sa.api.put(`/api/admin/competitions/${ev.id}`, { headers: H(sa.csrf), data: { attempt_cap: 4, expectedUpdatedAt: row.updated_at } });
   expect(put.ok(), await put.text()).toBeTruthy();
   await reloadModel(page);
-  await expect(page.locator("#ws-settings .ws-kv").filter({ hasText: "Attempts per challenge" }), "PRECONDITION: the facts were repainted").toContainText("4", { timeout: 10000 });
+  await expect(page.locator("#ws-settings .ws-kv").filter({ hasText: "Attempts per question" }), "PRECONDITION: the facts were repainted").toContainText("4", { timeout: 10000 });
   await expect(L.look, "the choice not yet saved is still on screen").toHaveValue("");
   await L.saveAnd("Event look removed");
   expect(await L.stored(), "Save look stored what the person chose").toEqual({ look: "", locked: false });

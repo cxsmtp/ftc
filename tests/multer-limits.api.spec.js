@@ -294,7 +294,7 @@ test.describe("the multipart routes, end to end", () => {
       const { id } = await tr.json();
       const at = await api.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: [comp.id] } });
       expect(at.ok(), `assign task: ${await at.text()}`).toBeTruthy();
-      return id;
+      return (await at.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is answered in it
     };
     // Correct answers no test sends: nobody solves, so nothing auto-ends.
     const fileTaskId = await mkTask({ title: `${uniq()} File`, description: "d", difficulty: "easy", status: "published", answer_type: "file", correct_answer: "the-right-content" });

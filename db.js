@@ -340,6 +340,25 @@ db.exec(`
     created_at       TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_timeslots_comp ON competition_timeslots(competition_id);
+
+  /* PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026). A Competition's
+     question is in EVERY session unless it has rows here, which name the
+     sessions it is in. No rows is the default and what every event that
+     predates this table keeps, so an event nobody narrows behaves exactly as
+     before. Read through lib/session-tasks.js (inSessionSql), never directly.
+     Keyed to the ASSIGNMENT (competition_tasks), so taking a question out of
+     the event takes its choice with it; ON UPDATE CASCADE so the event-copies
+     migration, which moves an assignment to the event's own copy, moves its
+     sessions too. Deleting a session deletes its rows: a question left with
+     none is back in every session. */
+  CREATE TABLE IF NOT EXISTS competition_task_sessions (
+    competition_id TEXT NOT NULL,
+    task_id        TEXT NOT NULL,
+    timeslot_id    TEXT NOT NULL REFERENCES competition_timeslots(id) ON DELETE CASCADE,
+    PRIMARY KEY (competition_id, task_id, timeslot_id),
+    FOREIGN KEY (competition_id, task_id) REFERENCES competition_tasks(competition_id, task_id) ON DELETE CASCADE ON UPDATE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_competition_task_sessions_slot ON competition_task_sessions(timeslot_id);
 `);
 
 
@@ -1212,6 +1231,31 @@ try {
   //
   // DEFAULT 0, which is every badge minted before this release and is true of them.
   if (!abCols.includes("late_entrant")) db.exec("ALTER TABLE achievement_badges ADD COLUMN late_entrant INTEGER NOT NULL DEFAULT 0");
+  // PROGRAM GRADES (owner decision, 27 Nov 2026) — the grade a Program
+  // certificate was issued with, FROZEN at mint for the reason `basis` and
+  // `score_snapshot` are: the learner's score, the challenge set or its points
+  // can move afterwards, and a certificate must keep saying what it said.
+  // `grade_band` is one of lib/program-grade.js GRADE_BANDS' keys (excellent,
+  // very_good, good, satisfactory); `grade_permille` the share of the maximum
+  // points, in tenths of a percent, rounded down. NULL on every certificate that
+  // is not a graded Program certificate, completion certificates issued before
+  // grades included: those print as they always did.
+  if (!abCols.includes("grade_band")) db.exec("ALTER TABLE achievement_badges ADD COLUMN grade_band TEXT");
+  if (!abCols.includes("grade_permille")) db.exec("ALTER TABLE achievement_badges ADD COLUMN grade_permille INTEGER");
+  // THE BOARD A PLACE WAS ON (owner decision, 27 Nov 2026): a Competition with
+  // sessions ranks per session, overall, or both, so a "1st Place" must say
+  // which. `board_kind` is 'session' or 'overall'; `board_name` the session's
+  // name AS IT WAS at mint (a rename afterwards must not relabel a certificate
+  // already filed). Both NULL on every certificate of an event with fewer than
+  // two sessions, and on every certificate issued before this column: those
+  // print as they always did.
+  if (!abCols.includes("board_kind")) db.exec("ALTER TABLE achievement_badges ADD COLUMN board_kind TEXT");
+  if (!abCols.includes("board_name")) db.exec("ALTER TABLE achievement_badges ADD COLUMN board_name TEXT");
+  // THE PERCENTAGE A PLACE WAS RANKED ON: a placement on an overall board that
+  // ranks by percentages (`leaderboard_percent`) prints what that board ranked
+  // on, never the raw points. Tenths of a percent, rounded down, exactly the
+  // figure the board showed (`scorePercent`); NULL on every other certificate.
+  if (!abCols.includes("score_permille")) db.exec("ALTER TABLE achievement_badges ADD COLUMN score_permille INTEGER");
   // NOT PARTIAL, deliberately, and the asymmetry with the index below is the
   // point: a REVOKED code must still resolve, or the credential page cannot
   // answer "revoked" and a revoked certificate becomes indistinguishable from a
@@ -2076,6 +2120,28 @@ try {
   // choice there. Written by PUT .../look, so inside this fatal block.
   add("event_look", "event_look TEXT");
   add("event_look_locked", "event_look_locked INTEGER NOT NULL DEFAULT 0");
+  // WHEN A PARTICIPANT'S SOLVE CLOCK STARTS (owner decision, 27 Nov 2026):
+  // `first_open` — at their first open of a scoring challenge (or first answer or
+  // hint, if earlier), so time spent arriving and reading the list is not
+  // counted; `entry` — when they enter the live event, the rule every event
+  // before this column ran on. THE DEFAULT IS ITS BACKFILL: every existing row
+  // becomes `entry`, so no finished or running board changes its ranking basis.
+  // A new Booth Event or Competition is created `first_open` from the kind's
+  // seed (lib/event-policy.js `clockStartDefault`). Inside this fatal block
+  // because the create INSERT names it.
+  add("clock_start", "clock_start TEXT NOT NULL DEFAULT 'entry' CHECK(clock_start IN ('first_open','entry'))");
+  // THE RANKING OF A COMPETITION WITH SESSIONS (owner decision, 27 Nov 2026).
+  // `leaderboard_mode` keeps its two stored meanings (`per_slot`: a winner per
+  // session; `global`: one overall board), so every reader of it stays right.
+  // `leaderboard_overall` = 1 adds the overall board BESIDE the per-session
+  // boards ("both"); it means something only with `per_slot`. And
+  // `leaderboard_percent` = 1 ranks the overall board by each participant's
+  // points as a share of their own session's maximum, so sessions with
+  // different question sets compare fairly; it means something only where an
+  // overall board exists. DEFAULT 0 is every existing row's backfill: no board
+  // changes. Inside this fatal block because the create INSERT names both.
+  add("leaderboard_overall", "leaderboard_overall INTEGER NOT NULL DEFAULT 0");
+  add("leaderboard_percent", "leaderboard_percent INTEGER NOT NULL DEFAULT 0");
 
   // Three ALTERs are three autocommit statements, so VERIFY rather than assume.
   // A partial apply is the same wrong state as a total failure, and only a
@@ -2084,7 +2150,7 @@ try {
   const missing = ["event_kind", "registration_field_policy", "linkedin_signup_enabled",
     "deadline_at", "time_basis",
     "measure_presence", "auto_end_on_all_solved", "attempt_cap",
-    "join_code", "late_entry_enabled", "late_entry_deadline_at", "staff_compete", "certificate_config", "event_look", "event_look_locked"].filter(c => !after.includes(c));
+    "join_code", "late_entry_enabled", "late_entry_deadline_at", "staff_compete", "certificate_config", "event_look", "event_look_locked", "clock_start", "leaderboard_overall", "leaderboard_percent"].filter(c => !after.includes(c));
   if (missing.length) throw new Error(`columns absent after ALTER: ${missing.join(", ")}`);
   const bad = db.prepare(
     "SELECT COUNT(*) c FROM competitions WHERE event_kind IS NULL OR event_kind NOT IN ('booth','tournament','program')"
@@ -2160,7 +2226,8 @@ try {
     "  ALTER TABLE competitions ADD COLUMN event_kind TEXT NOT NULL DEFAULT 'tournament';",
     "  (and likewise registration_field_policy, linkedin_signup_enabled, deadline_at,",
     "   time_basis, measure_presence, auto_end_on_all_solved, attempt_cap, join_code,",
-    "   late_entry_enabled, late_entry_deadline_at, staff_compete)",
+    "   late_entry_enabled, late_entry_deadline_at, staff_compete, clock_start,",
+    "   leaderboard_overall, leaderboard_percent)",
   ].join("\n"));
   process.exit(1);
 }
@@ -2912,7 +2979,9 @@ try {
     const { BUILTIN_TEMPLATES } = require("./lib/event-template-builtins");
     db.transaction(() => {
       for (const b of BUILTIN_TEMPLATES) {
-        db.prepare("UPDATE event_templates SET builtin_key=? WHERE is_builtin=1 AND builtin_key IS NULL AND name=? AND event_kind=?").run(b.key, b.name, b.kind);
+        // A row this old carries the first name (`previous`), which the rename
+        // below (marker `event_templates_renamed_at`) then moves on.
+        db.prepare("UPDATE event_templates SET builtin_key=? WHERE is_builtin=1 AND builtin_key IS NULL AND name IN (?, ?) AND event_kind=?").run(b.key, b.name, (b.previous && b.previous.name) || b.name, b.kind);
       }
       db.prepare("INSERT INTO settings (key, value) VALUES ('event_templates_builtin_key_at', ?) ON CONFLICT(key) DO NOTHING").run(new Date().toISOString());
     }).immediate();
@@ -2982,6 +3051,34 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_certificate_share_links_badge ON certificate_share_links(badge_token);
   CREATE INDEX IF NOT EXISTS idx_certificate_share_links_expires ON certificate_share_links(expires_at);
+`);
+// `program_attempts` — a Program learner's CLOSED attempts (owner decision,
+// 27 Nov 2026: under 60% a learner is told to try the quiz again and may). Try
+// again (lib/program-grade.js `startProgramRetake`) closes the current attempt:
+// its grade is written here, and its answers and hints to the Program's scoring
+// challenges MOVE here as JSON (`submissions_json`, `hints_json`: each row as
+// stored, every column), leaving the live tables to the new attempt. So every
+// reader of a score, a solve, an attempt count or a hint sees the current attempt
+// alone with no filter to forget, and nothing is deleted: the rows are here, the
+// analytics stream (`challenge_events`) is untouched, and the retake itself is a
+// `program_retake_started` user event. Quick (qualifying) answers stay live: they
+// are not graded and the event team's reports read them. Cascades with the
+// person and the event, as the live rows do.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS program_attempts (
+    id              TEXT PRIMARY KEY,
+    competition_id  TEXT NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+    user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attempt_no      INTEGER NOT NULL,
+    points          INTEGER NOT NULL,
+    max_points      INTEGER NOT NULL,
+    grade_permille  INTEGER NOT NULL,
+    grade_band      TEXT NOT NULL,
+    submissions_json TEXT NOT NULL,
+    hints_json      TEXT NOT NULL,
+    closed_at       TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS uq_program_attempts_no ON program_attempts(competition_id, user_id, attempt_no);
 `);
 // THE APPROVAL QUEUE SURVIVES AN UPGRADE FROM 8.14 (operator ruling, 15 Nov 2026).
 // 8.14 and earlier held every plain sign-up for an administrator's approval;
@@ -3191,6 +3288,52 @@ try {
   console.error("[migration] could not seed the built-in event templates (retrying next boot):", e.message);
 }
 
+// v9.3 — THE RECOMMENDED SETUPS. The built-ins became each kind's recommended
+// setup on the New event page, renamed and re-described (the booth one also
+// runs a full day, 480 minutes). A stored built-in moves to the current
+// definition (lib/event-template-builtins.js) only while it still equals the
+// definition it replaced (`previous`) field for field, with no challenges: an
+// administrator's edit is never overwritten. A new name another template holds
+// (the NOCASE unique index) leaves that row as it is, logged. One-shot behind
+// `event_templates_renamed_at`, written even when nothing moved; non-fatal,
+// retried at the next boot.
+try {
+  const done = db.prepare("SELECT value FROM settings WHERE key='event_templates_renamed_at'").get();
+  if (!done) {
+    const { BUILTIN_TEMPLATES } = require("./lib/event-template-builtins");
+    const canon = (v) => {
+      if (Array.isArray(v)) return v.map(canon);
+      if (v && typeof v === "object") return Object.keys(v).sort().reduce((o, k) => { o[k] = canon(v[k]); return o; }, {});
+      return v;
+    };
+    const sameSettings = (stored, want) => {
+      try { return JSON.stringify(canon(JSON.parse(stored))) === JSON.stringify(canon(want)); } catch (_) { return false; }
+    };
+    const at = new Date().toISOString();
+    db.transaction(() => {
+      for (const b of BUILTIN_TEMPLATES) {
+        const prev = b.previous;
+        if (!prev) continue;
+        const row = db.prepare("SELECT id, name, description, event_kind, settings, task_ids FROM event_templates WHERE is_builtin=1 AND builtin_key=? AND deleted_at IS NULL").get(b.key);
+        if (!row) continue;
+        let tasks = null; try { tasks = JSON.parse(row.task_ids); } catch (_) { tasks = null; }
+        const untouched = row.name === prev.name && row.description === prev.description && row.event_kind === b.kind
+          && sameSettings(row.settings, prev.settings) && Array.isArray(tasks) && tasks.length === 0;
+        if (!untouched) continue;
+        if (db.prepare("SELECT 1 FROM event_templates WHERE name = ? COLLATE NOCASE AND id <> ?").get(b.name, row.id)) {
+          console.error(`[migration] built-in template "${prev.name}" kept its name: another template is already called "${b.name}"`);
+          continue;
+        }
+        db.prepare("UPDATE event_templates SET name=?, description=?, settings=?, updated_at=? WHERE id=?")
+          .run(b.name, b.description, JSON.stringify(b.settings), at, row.id);
+      }
+      db.prepare("INSERT INTO settings (key, value) VALUES ('event_templates_renamed_at', ?) ON CONFLICT(key) DO NOTHING").run(at);
+    }).immediate();
+  }
+} catch (e) {
+  console.error("[migration] could not move the built-in event templates to their recommended setups (retrying next boot):", e.message);
+}
+
 // ROLES (lib/rbac.js). `users.role` stays the role KEY; the four built-in ids
 // are today's strings, so no account row changes. Built-in roles' PERMISSIONS
 // are a frozen code constant and never stored — their rows here exist so the
@@ -3327,6 +3470,43 @@ try {
   }
 }
 
+// One shot: a Booth Event never creates Checkmarx One accounts (owner's
+// decision, 27 Nov 2026; lib/event-policy.js `cxoneProvisioning`). The gate
+// refuses them whatever the column holds, so this changes nothing a participant
+// meets: it makes the DATA say what the platform does, so a booth row's form,
+// History and export cannot read "accounts on". Every booth event with accounts
+// on is turned off, each recorded as an `edited` event by "system" naming the
+// change and why; every booth template whose settings ask for accounts has the
+// setting dropped (the kind decides it), as a template save would refuse it.
+// The marker is written even when nothing changed.
+{
+  const done = db.prepare("SELECT value FROM settings WHERE key='booth_cxone_off_at'").get();
+  if (!done) {
+    db.transaction(() => {
+      const at = new Date().toISOString();
+      const rows = db.prepare("SELECT id FROM competitions WHERE event_kind='booth' AND cxone_disabled=0").all();
+      const ev = db.prepare("INSERT INTO competition_events (id, competition_id, event_type, changed_by, changed_at, details) VALUES (?,?,?,?,?,?)");
+      const off = db.prepare("UPDATE competitions SET cxone_disabled=1 WHERE id=?");
+      for (const r of rows) {
+        off.run(r.id);
+        ev.run(crypto.randomUUID(), r.id, "edited", "system", at,
+          JSON.stringify({ changes: { cxone_disabled: { from: false, to: true } }, reason: "booth_never_creates_cxone_accounts" }));
+      }
+      const tpls = db.prepare("SELECT id, settings FROM event_templates WHERE event_kind='booth'").all();
+      const upd = db.prepare("UPDATE event_templates SET settings=? WHERE id=?");
+      for (const t of tpls) {
+        let st = null;
+        try { st = JSON.parse(t.settings); } catch (e) { swallowed("db:booth-cxone-template", e); }
+        if (st && typeof st === "object" && st.cxone_disabled === false) {
+          delete st.cxone_disabled;
+          upd.run(JSON.stringify(st), t.id);
+        }
+      }
+      db.prepare("INSERT INTO settings (key, value) VALUES ('booth_cxone_off_at', ?) ON CONFLICT(key) DO NOTHING").run(at);
+    })();
+  }
+}
+
 // One shot: a PLATFORM-WIDE permission (lib/rbac.js PLATFORM_WIDE_PERMISSIONS)
 // is held only by a role of scope `all`. A grant stored on another custom role
 // before that rule grants nothing (`_readRoleDef` drops it); this removes the
@@ -3399,6 +3579,124 @@ try {
     })();
   }
 }
+
+// A QUESTION ADDED TO AN EVENT LIVES IN THAT EVENT (lib/event-copies.js).
+// `owner_competition_id`: the event owning this question (NULL = a bank
+// question). `copied_from_task_id`: the bank question it was copied from (NULL
+// for one created in its event). No foreign keys on purpose: a cascade would
+// erase the origin exactly when "copied from" must still be shown, and an event
+// deleted leaves its questions as rows nothing assigns. OUTSIDE try/catch: every
+// assign door writes both columns, so a swallowed ADD would fail each write.
+// Below every `tasks` rebuild, so neither the ALTERs nor the indexes are taken
+// by a DROP TABLE.
+{
+  const _cols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+  if (!_cols.includes("owner_competition_id")) db.exec("ALTER TABLE tasks ADD COLUMN owner_competition_id TEXT");
+  if (!_cols.includes("copied_from_task_id")) db.exec("ALTER TABLE tasks ADD COLUMN copied_from_task_id TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_owner_origin ON tasks(owner_competition_id, copied_from_task_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_copied_from ON tasks(copied_from_task_id)");
+}
+// One shot (owner decision, ended events included): every event gets its own
+// copy of every bank question it holds, and the event's answers, hints, grants,
+// analytics and assignment move to the copy (lib/event-copies.js says which
+// table goes where). One transaction per event, so an interrupted boot resumes
+// where it stopped; the marker is written once every event is done, even when
+// there was nothing to do. Preview it read-only first with
+// scripts/event-copies-dry-run.js.
+{
+  const done = db.prepare("SELECT value FROM settings WHERE key='event_owned_questions_migrated_at'").get();
+  if (!done) {
+    const at = new Date().toISOString();
+    const rep = require("./lib/event-copies").migrateSharedTasksToEventCopies(db, { nowIso: at });
+    db.prepare("INSERT INTO settings (key, value) VALUES ('event_owned_questions_migrated_at', ?) ON CONFLICT(key) DO NOTHING").run(at);
+    if (rep.questions) {
+      db.prepare("INSERT INTO settings_events (id, setting_key, event_type, changed_by, changed_at, details) VALUES (?,?,?,?,?,?)")
+        .run(crypto.randomUUID(), "event_owned_questions", "updated", "system", at,
+          JSON.stringify({ via: "migration", events: rep.events.length, questions: rep.questions, rows_moved: rep.rows }));
+      console.log(`[migration] event-owned questions: ${rep.questions} question(s) copied into ${rep.events.length} event(s)`);
+    }
+  }
+}
+
+// TOPICS (lib/topics.js): a question belongs to at most one topic, a topic holds
+// many. A base table (fatal, like every CREATE TABLE) and one column on `tasks`,
+// OUTSIDE try/catch: the task create and PUT write `topic_id`, so a swallowed ADD
+// would fail every save. Below every `tasks` rebuild, so neither the ALTER nor
+// the index is taken by a DROP TABLE. No foreign key: a topic is deleted only
+// once no question names it (the route moves them first), and an event's copy
+// names the topic its bank question had.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS topics (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    created_by TEXT,
+    created_by_id TEXT,
+    updated_at TEXT
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS uq_topics_name_nocase ON topics(name COLLATE NOCASE);
+`);
+{
+  const _cols = db.prepare("PRAGMA table_info(tasks)").all().map(c => c.name);
+  if (!_cols.includes("topic_id")) db.exec("ALTER TABLE tasks ADD COLUMN topic_id TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_tasks_topic ON tasks(topic_id)");
+}
+// One shot: each question's first `category:<name>` tag (the order the
+// participant wire used: lib/categories.js) becomes its topic, the topic made
+// once per name. The tags themselves are kept (owner rule: no stored tag is
+// deleted); a question with a topic shows the topic to participants, not its
+// tags. Questions that already have a topic are left alone. The marker is
+// written even when there was nothing to do.
+{
+  const done = db.prepare("SELECT value FROM settings WHERE key='topics_from_categories_at'").get();
+  if (!done) {
+    const at = new Date().toISOString();
+    const rep = require("./lib/topics").migrateCategoryTagsToTopics(db, { nowIso: at });
+    db.prepare("INSERT INTO settings (key, value) VALUES ('topics_from_categories_at', ?) ON CONFLICT(key) DO NOTHING").run(at);
+    if (rep.questions) {
+      db.prepare("INSERT INTO settings_events (id, setting_key, event_type, changed_by, changed_at, details) VALUES (?,?,?,?,?,?)")
+        .run(crypto.randomUUID(), "topics", "updated", "system", at,
+          JSON.stringify({ via: "migration", topics_created: rep.topicsCreated, questions: rep.questions }));
+      console.log(`[migration] topics: ${rep.questions} question(s) filed under ${rep.topicsCreated} new topic(s) from their category tags`);
+    }
+  }
+}
+
+// STAFF TEAMS (lib/staff-teams.js, routes/staff-teams.js): the platform-wide
+// directory of colleagues an event's Team & reports, or its organisers, take in
+// one step. Base CREATEs (fatal, like every base table). A member is a name, an
+// address and an optional default event-team role (the roles of
+// `event_team_members`, CHECKed the same way): a RECIPIENT, never a link to an
+// account — whether an address signs in as an account is read when it is shown
+// or used, never stored. The members cascade with their team. Names are unique
+// NOCASE (`uq_staff_teams_name_nocase`, lib/schema-required.js); an address once
+// per team. No `DATA_DIR` child (the backup covers the database).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS staff_teams (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS uq_staff_teams_name_nocase ON staff_teams(name COLLATE NOCASE);
+  CREATE TABLE IF NOT EXISTS staff_team_members (
+    id           TEXT PRIMARY KEY,
+    team_id      TEXT NOT NULL REFERENCES staff_teams(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    email        TEXT NOT NULL COLLATE NOCASE,
+    default_role TEXT CHECK(default_role IS NULL OR default_role IN ('se','marketing','sales','sdr','se_manager','marketing_manager','sales_manager')),
+    added_by     TEXT,
+    added_at     TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    UNIQUE (team_id, email)
+  );
+  CREATE INDEX IF NOT EXISTS idx_staff_team_members_team ON staff_team_members(team_id);
+  -- By address alone (the column is NOCASE): deleting an account removes its
+  -- primary address from every team (lib/account-reaper.js), an index search,
+  -- never a scan of every team's members.
+  CREATE INDEX IF NOT EXISTS idx_staff_team_members_email ON staff_team_members(email);
+`);
 
 // ── Prepared-statement memo (installed AFTER every migration above) ──────────
 //

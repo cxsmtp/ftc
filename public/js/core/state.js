@@ -72,6 +72,9 @@ export const S = {
   // page sort independently of one another.
   lbLateSortCol: null,
   lbLateSortAsc: true,
+  // Per-session question sets: the overall board's own column sort.
+  lbOverallSortCol: null,
+  lbOverallSortAsc: true,
   lbInterval: null,
   // v8.6.0 — is THIS participant playing on past the event's end, inside the
   // late-entry window? Read by the header chip; refreshed by every /api/status
@@ -99,6 +102,10 @@ export const S = {
   adminSelectedCompetitionName: null,
   // Workspace Participants: false = the event's own people, true = everyone (to add).
   pWsShowEveryone: false,
+  // People lists admin accounts only after a link to one (admin-crossnav.js
+  // widenPeopleToAdmins), until People is next entered.
+  pIncludeAdmins: false,
+  _pWidenOnce: false,
   // The platform's "Require admin approval for new accounts" switch, from
   // /api/admin/me. Approval UI (badges, Approve actions) is shown only while on.
   requireAccountApproval: false,
@@ -180,6 +187,9 @@ export const S = {
   _groupsSearchDebounce: undefined,
   _loadingCount: 0,
   adminTasksData: [],
+  // Per-session question sets: the open event's choices ({compId, offered,
+  // timeslots, tasks}) or null (features/task-sessions.js).
+  adminTaskSessions: null,
   // v7.19.0 — the multiple-choice editor's model. The DOM is a rendering of
   // this, so adding/removing a row cannot lose what was typed into the others.
   _tfChoices: [],
@@ -240,11 +250,16 @@ export const S = {
   tDiffFilters: new Set(),
   tStatusFilters: new Set(),
   tStateFilters: new Set(),
+  tTopicFilter: "",          // stage B — the Question bank's Topic filter ("" all, "__none__" none, else a topic id)
+  adminTopics: null,         // stage B — GET /api/admin/topics (features/topics-admin.js); null until read
   tPage: 1,
   tPageSize: 30,
   _histState: null,
   _pendingStagingAttachments: [],
   adminParticipantsData: [],
+  // The admin accounts Roles & permissions offers account doors on (People's rows
+  // for them, GET /api/admin/participants?kind=admins); null until read or on failure.
+  adminUserRows: null,
   pSortCol: 'name',
   pSortAsc: true,
   pPage: 1,
@@ -401,6 +416,10 @@ export const S = {
   // only stops requests that have not been SENT; once two are in flight the
   // network decides which the admin reads.
   _analyticsFetchSeq: 0,
+  // The Marketing page (features/marketing-admin.js): its stale-response guard
+  // and the debounce over its filter changes.
+  _mkFetchSeq: 0,
+  _mkDebounce: null,
   _analyticsCompCache: null,
   _analyticsTaskCache: null,
   _helpLastDoc: null,

@@ -428,7 +428,7 @@ test("a competing organiser's ended Overview shows the certificate counts, and k
   await expect.poll(() => page.evaluate((id) => ((window.adminCompetitionsData || []).find((c) => c.id === id) || {}).competing === true, comp.id),
     { timeout: 10000, message: "PRECONDITION: the Events model says they no longer compete" }).toBe(false);
   await openEndedOverview(page, comp);
-  await expect(page.locator("#ws-ov-progress"), "the live figures, from the pulse").toContainText("solved every challenge", { timeout: 15000 });
+  await expect(page.locator("#ws-ov-progress"), "the live figures, from the pulse").toContainText("solved every question", { timeout: 15000 });
   await expect(page.locator("#ws-ov-progress")).not.toContainText("kept off this page");
   expect(asked.pulse, "CONTROL: read for an organiser who does not compete").toBeGreaterThan(0);
 });

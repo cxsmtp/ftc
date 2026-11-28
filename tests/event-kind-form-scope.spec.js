@@ -22,7 +22,7 @@
 // first. Neither half alone is worth anything.
 const { test, expect } = require("./isolated-test");
 const { freshCtx, apiLogin, getSuperadminPass, BASE, settleFiniteAnimations, appearanceSettled } = require("./helpers");
-const { adminLogin, clickTab, openKebab, filterComps, openCompCreateForm, AxeBuilder, AXE_GATED_IMPACTS } = require("./ui-admin-helpers");
+const { adminLogin, clickTab, openKebab, filterComps, openCompCreateForm, AxeBuilder, AXE_GATED_IMPACTS, pickFormKind, openEventEdit } = require("./ui-admin-helpers");
 
 test.use({ baseURL: BASE });
 
@@ -55,6 +55,11 @@ const MATRIX = [
   // Use my current address goes wherever the field it fills goes (a superadmin
   // holds events.edit, the one other condition it renders on).
   { sel: "#comp-trusted-ips-mine",  kinds: ["booth", "tournament"],   why: "trusted_networks     → trusted_networks_forbidden" },
+  // A Booth Event never creates Checkmarx One accounts (owner's decision, 27 Nov
+  // 2026): the whole section goes, the box and the key override with it.
+  { sel: "#comp-cxone-disabled",    kinds: ["tournament", "program"], why: "cxone_provisioning   → cxone_provisioning_forbidden" },
+  { sel: "#comp-cxone-key",         kinds: ["tournament", "program"], why: "cxone_provisioning   → cxone_provisioning_forbidden" },
+  { sel: "#comp-cxone-group",       kinds: ["tournament", "program"], why: "cxone_provisioning   → cxone_provisioning_forbidden" },
 ];
 
 // Controls that must render for EVERY kind. Without these the matrix above is
@@ -66,8 +71,7 @@ const UNIVERSAL = ["#comp-name", "#comp-date", "#comp-time", "#comp-tz",
   // v8.12.0 — "Staff can compete" is a decision about WHO is on the board, which
   // every kind has (a Program's certificate rests on it as much as a board does),
   // so it renders for all three and carries no policy key.
-  "#comp-staff-compete",
-  "#comp-cxone-disabled", "#comp-cxone-key", "#comp-cxone-group"];
+  "#comp-staff-compete"];
 
 const KINDS = ["booth", "tournament", "program"];
 
@@ -99,6 +103,15 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     // hidden field every collector reads agrees with it.
     await expect(page.locator('#comp-form-overlay input[name="comp-kind-seg"][value="program"]')).toBeChecked();
     await expect(page.locator('#comp-form-overlay input[name="comp-kind-seg"]'), "one option per kind").toHaveCount(3);
+    // The kind card already asked (owner's decision, 27 Nov 2026): the form shows
+    // the type as a chip and does not ask again until Change type is pressed.
+    await expect(page.locator("#comp-form-overlay .comp-kind-current .kind-chip")).toHaveText("Program");
+    await expect(page.locator("#comp-form-overlay #comp-kind-seg-box"), "the choice is not asked again").toBeHidden();
+    const change = page.locator("#comp-form-overlay .comp-kind-change");
+    await expect(change).toHaveAttribute("aria-expanded", "false");
+    await change.click();
+    await expect(page.locator("#comp-form-overlay #comp-kind-seg-box"), "Change type opens it").toBeVisible();
+    await expect(change).toHaveAttribute("aria-expanded", "true");
     expect(await page.locator("#comp-kind").inputValue()).toBe("program");
     await expect(page.locator("#comp-form-title")).toHaveText("New event");
   });
@@ -112,7 +125,7 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await page.locator("#comp-time").fill("10:30");
     await expect(page.locator("#comp-dur-box"), "a Booth Event has a duration").toHaveCount(1);
 
-    await page.locator('#comp-form-overlay label.kind-seg-opt:has(input[value="program"])').click();
+    await pickFormKind(page, "program");
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("program");
     expect(await page.locator("#comp-form-overlay").count(), "the form is replaced, never stacked").toBe(1);
     // A different kind really does produce a different form...
@@ -124,7 +137,7 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await expect(page.locator("#comp-time")).toHaveValue("10:30");
   });
 
-  test("a change of type keeps the ticked challenges, and asks first when it would drop a setting the admin changed", async ({ page }) => {
+  test("a change of type keeps the name and date, and asks first when it would drop a setting the admin changed", async ({ page }) => {
     const { api, csrf } = await freshCtx();
     const lg = await api.post("/api/login", { headers: H(csrf), data: { email: "superadmin", password: getSuperadminPass() } });
     expect(lg.ok(), `superadmin login: ${lg.status()}`).toBeTruthy();
@@ -139,19 +152,17 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await openCompCreateForm(page, "tournament");
     await page.locator("#comp-name").fill(`${TAG} Ticks`);
     await page.locator("#comp-date").fill("2033-04-05");
-    await page.locator("#comp-ch-search").fill(title);
-    const box = page.locator("#comp-ch-list .picker-row", { hasText: title }).locator('input[type="checkbox"]');
-    await box.check();
-    await expect(page.locator("#comp-ch-count")).toContainText("1 ticked");
-    const pick = (k) => page.locator(`#comp-form-overlay label.kind-seg-opt:has(input[value="${k}"])`).click();
+    // Stage B — the form picks no questions, so what a change of type carries is
+    // the name, the date and the zone.
+    const pick = (k) => pickFormKind(page, k);
 
-    // Nothing the re-render would drop has changed: no question, and the tick
-    // goes with the new type.
+    // Nothing the re-render would drop has changed: no question, and the name
+    // and date go with the new type.
     await pick("booth");
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("booth");
     await expect(page.locator("#modal-overlay.open"), "an untouched form changes type without asking").toHaveCount(0);
-    await expect(page.locator("#comp-ch-count"), "the ticks are carried").toContainText("1 ticked", { timeout: 15000 });
-    await expect(page.locator("#comp-ch-list .picker-row", { hasText: title }).locator('input[type="checkbox"]')).toBeChecked();
+    await expect(page.locator("#comp-name"), "the name is carried").toHaveValue(`${TAG} Ticks`);
+    await expect(page.locator("#comp-date"), "and the date").toHaveValue("2033-04-05");
 
     // A setting the re-render WOULD drop: it asks, and Cancel keeps everything.
     await page.locator("#comp-attempt-cap").fill("3");
@@ -164,13 +175,12 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await expect(page.locator('#comp-form-overlay input[name="comp-kind-seg"][value="booth"]'), "and the control shows it").toBeChecked();
     await expect(page.locator("#comp-attempt-cap"), "and the setting").toHaveValue("3");
 
-    // Confirmed: the new type's defaults, the ticks still carried.
+    // Confirmed: the new type's defaults, the name still carried.
     await pick("program");
     await expect(modal.locator("#modal-title")).toHaveText("Change type to Program?", { timeout: 10000 });
     await page.locator("#modal-confirm-btn").click();
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("program");
     await expect(page.locator("#comp-attempt-cap"), "the dropped setting is back to its default").toHaveValue("");
-    await expect(page.locator("#comp-ch-count")).toContainText("1 ticked", { timeout: 15000 });
     await expect(page.locator("#comp-name")).toHaveValue(`${TAG} Ticks`);
   });
 
@@ -186,7 +196,7 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
       await page.locator("#comp-name").fill(`${TAG} From ${from}`);
       await page.locator("#comp-date").fill("2033-04-05");
       await page.locator("#comp-time").fill("10:30");
-      await page.locator(`#comp-form-overlay label.kind-seg-opt:has(input[value="${to}"])`).click();
+      await pickFormKind(page, to);
       await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000, message: `${from} → ${to}` }).toBe(to);
       await expect(page.locator("#modal-overlay.open"), `${from} → ${to}: nothing the admin set is dropped, so no question`).toHaveCount(0);
       await expect(page.locator("#comp-name"), `${from} → ${to}: the name is carried`).toHaveValue(`${TAG} From ${from}`);
@@ -261,13 +271,20 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await page.locator('#comp-form-overlay [data-action="overlay-close"]').first().click();
     await expect(page.locator("#comp-form-overlay")).toHaveCount(0);
 
-    // A Booth Event's seed is the other way round.
+    // A Booth Event never creates accounts (owner's decision, 27 Nov 2026): no
+    // line, no box, and nothing in the confirmation.
     await openCompCreateForm(page, "booth", { advanced: false });
-    await expect(line, "a Booth Event creates none").toHaveText("Checkmarx One accounts: off");
+    await expect(line, "a Booth Event has no Checkmarx One line").toHaveCount(0);
+    await expect(page.locator("#comp-form-overlay #comp-cxone-disabled"), "nor a box").toHaveCount(0);
     await fill(`${TAG} Cx booth`);
-    expect(await confirmCxone()).toBe("Checkmarx One accounts: off.");
+    await page.locator('#comp-form-overlay [data-action="comp-save"]').click();
+    const bm = page.locator("#modal-overlay.open");
+    await expect(bm.locator("#modal-title")).toHaveText(/^Create /, { timeout: 10000 });
+    await expect(bm.locator("#comp-confirm-cxone"), "nor a confirmation line").toHaveCount(0);
+    await page.locator("#modal-cancel-btn").click();
+    await expect(bm).toHaveCount(0);
     // A type change re-seeds the box, and the line follows it.
-    await page.locator('#comp-form-overlay label.kind-seg-opt:has(input[value="tournament"])').click();
+    await pickFormKind(page, "tournament");
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("tournament");
     await expect(line, "a Competition again: on").toHaveText("Checkmarx One accounts: on");
     await page.locator('#comp-form-overlay [data-action="overlay-close"]').first().click();
@@ -322,10 +339,10 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     };
     await scan("#admin-templates-tab", "New event page");
 
-    // Every starter's control is a real, focusable button: the title button of
-    // its card (the card itself holds a list, which no button may).
+    // Every starter's control is a real, focusable button in its card's foot
+    // (the card itself holds a list, which no button may).
     for (const k of KINDS) {
-      const ctl = page.locator(`#tpl-kind-cards [data-action="new-event-start"][data-kind="${k}"] button.card-open`);
+      const ctl = page.locator(`#tpl-kind-cards .tpl-kind[data-kind="${k}"] button[data-action="new-event-start"][data-kind="${k}"]`);
       await ctl.focus();
       expect(await ctl.evaluate((el) => el === document.activeElement),
         `${k}: the starter takes keyboard focus`).toBe(true);
@@ -346,36 +363,45 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
   // backgrounds… those tints are alpha composites, so you must composite them
   // against the actual surface before measuring").
   //
-  // So the rule is asserted directly: hovering a card must not change its
-  // background. Emphasis comes from the border and the tier-2 shadow instead,
-  // which is what §5 prescribes for an interactive picker tile anyway.
-  test("hovering a blank starter changes border and elevation, never the background", async ({ page }) => {
+  // A type card now holds TWO starts (Recommended setup, Start blank), so the
+  // card itself is no control: hovering it must not change its background or
+  // fade it, and must not lift it either (an affordance on something a press
+  // does nothing to). Its buttons carry the hover.
+  test("hovering a type card changes nothing on the card, never the background; its Start blank button answers the hover", async ({ page }) => {
     await adminLogin(page);
     await clickTab(page, "Events");
     await page.click('[data-action="open-competition-form"]');
     await page.locator("#admin-templates-tab").waitFor({ state: "visible", timeout: 15000 });
 
-    const card = page.locator('#tpl-kind-cards [data-action="new-event-start"][data-kind="program"]');
+    const card = page.locator('#tpl-kind-cards .tpl-kind[data-kind="program"]');
     await card.waitFor({ state: "visible", timeout: 5000 });
-    const read = () => card.evaluate((el) => {
+    const read = (loc) => loc.evaluate((el) => {
       const c = getComputedStyle(el);
-      return { bg: c.backgroundColor, border: c.borderTopColor, shadow: c.boxShadow, opacity: c.opacity };
+      return { bg: c.backgroundColor, border: c.borderTopColor, shadow: c.boxShadow, opacity: c.opacity, transform: c.transform };
     });
 
-    const rest = await read();
-    await card.hover();
-    // The transition is --duration-fast (150ms); wait past it before sampling,
-    // or this reads a frame mid-way and compares nothing meaningful.
+    const rest = await read(card);
+    await card.locator(".tpl-kind-art").hover();
+    // Wait past any transition before sampling, or this reads a frame mid-way
+    // and compares nothing meaningful.
     await page.waitForTimeout(400);
-    const hovered = await read();
+    const hovered = await read(card);
 
     expect(hovered.bg, "a hover tint would composite under the blurb and drop it below AA")
       .toBe(rest.bg);
-    expect(hovered.border, "hover is signalled by the border").not.toBe(rest.border);
-    expect(hovered.shadow, "and by tier-2 elevation").not.toBe(rest.shadow);
+    expect({ border: hovered.border, shadow: hovered.shadow, transform: hovered.transform },
+      "a card that is no control does not lift or light up under the pointer").toEqual({ border: rest.border, shadow: rest.shadow, transform: rest.transform });
     // The other way to silently break contrast (DESIGN_SYSTEM anti-pattern #1).
     expect(rest.opacity, "never dim a text-bearing surface with opacity").toBe("1");
     expect(hovered.opacity).toBe("1");
+    // CONTROL: the control on the card does answer the pointer.
+    const btn = card.locator('button[data-action="new-event-start"]');
+    const btnRest = await read(btn);
+    await btn.hover();
+    await page.waitForTimeout(400);
+    const btnHover = await read(btn);
+    expect(btnHover, "CONTROL: Start blank answers the hover").not.toEqual(btnRest);
+    expect(btnHover.opacity, "and is never faded").toBe("1");
   });
 
   // Every token this dialog uses must EXIST. A var() naming an undefined custom
@@ -398,6 +424,9 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
 
     // Resolved values, which is what catches a typo'd var(): an undefined
     // custom property voids the declaration and reads back as the initial value.
+    // The choice opens under the chip (Change type); its styling is read open.
+    await page.locator("#comp-form-overlay .comp-kind-change").click();
+    await expect(page.locator("#comp-form-overlay .kind-seg")).toBeVisible();
     const seg = await page.locator("#comp-form-overlay .kind-seg").evaluate((el) => {
       const c = getComputedStyle(el);
       return { display: c.display, radius: c.borderTopLeftRadius, border: c.borderTopStyle };
@@ -651,15 +680,16 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await clickTab(page, "Events");
 
     await openCompCreateForm(page, "booth");
+    // A Booth Event never provisions Checkmarx One accounts (owner's decision,
+    // 27 Nov 2026): no box to tick and no key override.
     await expect(page.locator("#comp-cxone-disabled"),
-      "a Booth Event does not provision Checkmarx One accounts by default").toBeChecked();
-    // The override fields follow the box, as they do on an edit.
-    await expect(page.locator("#comp-cxone-key")).toBeDisabled();
+      "a Booth Event has no Checkmarx One box at all").toHaveCount(0);
+    await expect(page.locator("#comp-cxone-key")).toHaveCount(0);
 
     // The control, which is what makes the assertion above a claim about the
-    // KIND rather than about the checkbox always being ticked.
+    // KIND rather than about the form never rendering the box.
     // Switching the type on the form re-seeds it from the NEW kind.
-    await page.locator('#comp-form-overlay label.kind-seg-opt:has(input[value="tournament"])').click();
+    await pickFormKind(page, "tournament");
     await expect.poll(() => page.locator("#comp-kind").inputValue(), { timeout: 10000 }).toBe("tournament");
     await expect(page.locator("#comp-cxone-disabled"),
       "a Competition still provisions them").not.toBeChecked();
@@ -686,22 +716,15 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     await api.dispose();
 
     await adminLogin(page);
-    await clickTab(page, "Events");
-    await filterComps(page, name);
-    // PRECONDITION, not decoration: the competitions table paginates and every
-    // spec on this worker shares one database, so an unnarrowed first row is
-    // whatever else happens to be there — and a Competition legitimately DOES
-    // render the controls this test asserts are absent. Without this the failure
-    // would read as a scoping regression when it is a fixture miss (v7.15.29).
-    await expect.poll(async () => page.locator("#admin-comp-body tr").count(),
-      { timeout: 5000 }).toBe(1);
-    await openKebab(page, page.locator("#admin-comp-body tr").first());
-    await page.locator("#kebab-portal button:has-text('Edit')").first().click();
-    await page.locator("#comp-name").waitFor({ state: "visible", timeout: 15000 });
+    // The event's own Edit settings (its workspace ⋯ menu; the Events row keeps
+    // only Delete event), narrowed to THIS event by name.
+    await openEventEdit(page, name);
     await expect(page.locator('#comp-form-overlay input[name="comp-kind-seg"][value="program"]'),
       "the form that opened really is the Program's").toBeChecked();
 
-    // An edit opens straight on the form (no New event page, no chooser).
+    // An edit opens straight on the form (no New event page, no chooser), with
+    // Advanced folded as on a create (owner's decision, 27 Nov 2026; the helper
+    // opened it, so it is asserted folded on a second open below).
     // Offering the type change is locked in tests/event-kind-change.spec.js.
     expect(await page.locator("#comp-kind-overlay").count(),
       "an edit opens on the form, never on a chooser").toBe(0);
@@ -715,6 +738,13 @@ test.describe("v8.2.0 — the create wizard scopes the form to the event kind", 
     }
     // The title names the KIND rather than saying "Competition" for all three.
     await expect(page.locator("#comp-form-title")).toHaveText(/Program/);
+    // Advanced is folded on an edit too: reopen without opening it.
+    await page.locator('#comp-form-overlay [data-action="overlay-close"]').first().click();
+    await expect(page.locator("#comp-form-overlay")).toHaveCount(0);
+    await page.locator('#ws-quick .ws-more-btn').click();
+    await page.locator('#kebab-portal.open [data-action="comp-edit"]').click();
+    await page.locator("#comp-name").waitFor({ state: "visible", timeout: 15000 });
+    expect(await page.locator("#comp-advanced").evaluate((el) => el.open), "Advanced is folded on an edit").toBe(false);
   });
 
   // The client must not re-derive which fields a kind has. If it did, that map

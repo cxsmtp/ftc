@@ -13,7 +13,7 @@ const { isGlobalClassRole: _isGlobalRole, roleClass: _roleClass, isBuiltinRole: 
 const { getAdminIdentity, recordCompetitionEvent, recordOrphanedAuditEvent, recordTimeslotEvent, recordUserEvent, reqContext, runTxnWithMirrorBuffer } = require("../lib/audit");
 const { swallowed } = require("../lib/best-effort");
 const { eventPolicy } = require("../lib/event-policy");
-const { scheduledEnd, _invalidateCompetitionCache, competitionStatus, competitionEffectiveEnd, getCompetition, getCompetitionTimeslots, getTimeslot, closeAbsenceAndRestoreAnchor, lateEntryWindowOpen, lateEntryJoinCutoff, lateEntryStateFor, competitionAdmission, lateWindowAdmissionDenied, lateWindowRemovalDenied, lateEntryMailLineFor, eventEndMailText } = require("../lib/competitions");
+const { scheduledEnd, _invalidateCompetitionCache, competitionStatus, competitionEffectiveEnd, getCompetition, getCompetitionTimeslots, getTimeslot, closeAbsenceAndRestoreAnchor, recordRemovalAbsence, lateEntryWindowOpen, lateEntryJoinCutoff, lateEntryStateFor, competitionAdmission, lateWindowAdmissionDenied, lateWindowRemovalDenied, lateEntryMailLineFor, eventEndMailText } = require("../lib/competitions");
 const { BASE_URL, BULK_ADMIN_MAX, PERF_SPAN_SLOW_MS } = require("../lib/config");
 const { enqueueCxOneProvision, requeueDeferredCxOneProvision } = require("../lib/cxone");
 const { emailIsTaken } = require("../lib/email-identity");
@@ -874,7 +874,7 @@ app.delete("/api/admin/competitions/:id/users/:uid", requireAdmin, csrfProtectio
   // change whether a member who had entered is a late entrant (one removed
   // before entering has no absence row, so a re-add through the late-entry
   // window makes them one).
-  const cuRow = db.prepare("SELECT timeslot_id, login_time, assigned_at FROM competition_users WHERE competition_id=? AND user_id=?").get(req.params.id, req.params.uid);
+  const cuRow = db.prepare("SELECT timeslot_id, login_time, last_login_time, assigned_at FROM competition_users WHERE competition_id=? AND user_id=?").get(req.params.id, req.params.uid);
   const chosenTs = cuRow?.timeslot_id ? getTimeslot(cuRow.timeslot_id) : null;
   const adminId = getAdminIdentity(req);
   // v6.20.0: if the participant is ALSO in a group bound to this competition,
@@ -889,17 +889,14 @@ app.delete("/api/admin/competitions/:id/users/:uid", requireAdmin, csrfProtectio
     // v6.12.0: open an absence row BEFORE the DELETE so the row's
     // timeslot_id survives (DELETE wipes it). Scope absence to the
     // user's slot so per_slot leaderboards subtract correctly.
-    if (cuRow && cuRow.login_time) {
-      // v8.1.0: the row also CARRIES the solve-clock anchor, because the DELETE
-      // below is what destroys `competition_users.login_time` and this is the
-      // only chance to record it. The re-add restores it
-      // (closeAbsenceAndRestoreAnchor); without it the lazy stamp re-anchors the
-      // clock to the re-add moment, which for a finisher clamps solveTimeMs to 0
-      // — the best possible value on the sole score tie-break.
-      db.prepare(
-        "INSERT INTO competition_user_absences (user_id, competition_id, timeslot_id, removed_at, returned_at, login_time, assigned_at) VALUES (?,?,?,?,NULL,?,?)"
-      ).run(req.params.uid, comp.id, cuRow.timeslot_id || null, now().toISOString(), cuRow.login_time, cuRow.assigned_at || null);
-    }
+    // v8.1.0: the row also CARRIES the solve-clock anchor, because the DELETE
+    // below is what destroys `competition_users.login_time` and this is the
+    // only chance to record it. The re-add restores it
+    // (closeAbsenceAndRestoreAnchor); without it the lazy stamp re-anchors the
+    // clock to the re-add moment, which for a finisher clamps solveTimeMs to 0
+    // — the best possible value on the sole score tie-break. Written for anybody
+    // who ENTERED, on either clock (lib/competitions.js `recordRemovalAbsence`).
+    recordRemovalAbsence(req.params.uid, comp.id, cuRow, now().toISOString());
     const r = db.prepare("DELETE FROM competition_users WHERE competition_id=? AND user_id=?").run(req.params.id, req.params.uid);
     didRemove = r.changes > 0;
     if (r.changes > 0) {
@@ -1223,9 +1220,12 @@ app.get("/api/admin/participants", requireAdmin, rateLimit(60_000, 120, "admin-p
   // of class `all` (see the SQL below) unless the caller asks for `?kind=all` (an event workspace does, so an event's roster keeps
   // the staff who compete in it). An event's own roster (`competitionId`) is
   // never narrowed by role. The kind is part of the cache key.
-  const _kind = req.query.kind === "all" ? "all" : "participants";
+  // `?kind=admins` — only the accounts holding a role other than Participant:
+  // the rows Roles & permissions offers their account doors on (owner decision,
+  // 27 Nov 2026), in the same shape and with the same per-row answers as People.
+  const _kind = req.query.kind === "all" ? "all" : req.query.kind === "admins" ? "admins" : "participants";
   const _mayDelete = _mayDeleteAccounts(req);
-  const _cacheActor = (competitorIds(req).join("+") || "builtin") + (_mayDelete ? ":del" : "") + `|k=${_kind === "all" ? "a" : "p"}`;
+  const _cacheActor = (competitorIds(req).join("+") || "builtin") + (_mayDelete ? ":del" : "") + `|k=${_kind === "all" ? "a" : _kind === "admins" ? "s" : "p"}`;
   const cachedBody = getCachedParticipantsPage(competitionId, page, limit, _cacheActor);
   if (cachedBody) return res.json(cachedBody);
 
@@ -1275,6 +1275,7 @@ app.get("/api/admin/participants", requireAdmin, rateLimit(60_000, 120, "admin-p
     // panel" door start from their People row. The unscoped (class `all`) admin
     // accounts are Users & roles only.
     const _vis = _kind === "all" ? _vis0
+      : _kind === "admins" ? { clause: (_vis0.clause ? `${_vis0.clause} AND` : " WHERE") + " COALESCE(users.role, 'participant') <> 'participant'", params: _vis0.params }
       : { clause: (_vis0.clause ? `${_vis0.clause} AND` : " WHERE") + " COALESCE(users.role, 'participant') NOT IN (SELECT value FROM json_each(?))",
           params: [..._vis0.params, JSON.stringify(_roleIdsOfClass("all"))] };
     total = db.prepare(`SELECT COUNT(*) as c FROM users${_vis.clause}`).get(..._vis.params).c;
@@ -3817,7 +3818,7 @@ app.delete("/api/admin/participants/:id", requireAdmin, requireSuperAdmin, destr
   // (`cxone_accounts_unrecorded`: removed in the tenant by hand), and set-up
   // records that cannot be read (`cxone_records_unreadable`: someone checks the
   // tenant). Each only when non-zero, counts only. The reaper records the same.
-  const { purgedSessions, cxoneCounts: _cxoneCounts } = deleteUserCascade(req.params.id);
+  const { purgedSessions, cxoneCounts: _cxoneCounts, staffTeamMembershipsRemoved: _staffRemoved } = deleteUserCascade(req.params.id, { actor: adminId, context: reqContext(req) });
   recordOrphanedAuditEvent("user", user.id, "deleted", adminId, {
     email: user.email,
     nickname: user.nickname,
@@ -3828,6 +3829,8 @@ app.delete("/api/admin/participants/:id", requireAdmin, requireSuperAdmin, destr
     cascaded: counts,
     purged_sessions: purgedSessions,
     ..._cxoneCounts,
+    // Owner decision, 28 Nov 2026: its primary address left every staff team.
+    ...(_staffRemoved ? { staff_team_memberships_removed: _staffRemoved } : {}),
     ...reqContext(req),
   });
   res.json({ ok: true, ..._cxoneCounts });

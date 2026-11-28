@@ -64,6 +64,15 @@ function parseMaybeJson(t) {
   try { return JSON.parse(t); } catch (_) { return t; }
 }
 
+/** Run `fn` with the assign doors putting the bank question itself into each
+ * event, as the release before event-owned questions did (lib/event-copies.js):
+ * the shape of an older database, where one row is held by several events. */
+async function legacyShared(sa, fn) {
+  const set = async (on) => { const r = await sa.post("/api/test/legacy-shared-assign", { on }, await sa.h()); expect(r.body && r.body.on, "the legacy switch took").toBe(on); };
+  await set(true);
+  try { return await fn(); } finally { await set(false); }
+}
+
 function client() {
   const jar = [];
   const call = async (method, p, data, headers = {}) => {
@@ -196,7 +205,10 @@ async function person(tag, { first = "Pat", last = null, company = "Acme", title
   return { c, email, id };
 }
 
-async function makeEvent(sa, { kind = "tournament", startAgoMs = 10 * 60_000, minutes = 600, extra = {}, tasks = 1 } = {}) {
+// `legacy`: the event holds the library questions themselves, as an older
+// database does (before event-owned questions, lib/event-copies.js) — the one
+// shape a challenge import's overwrite still reaches (it writes the library).
+async function makeEvent(sa, { kind = "tournament", startAgoMs = 10 * 60_000, minutes = 600, extra = {}, tasks = 1, legacy = false } = {}) {
   const data = { name: `Team ${kind} ${stamp()}`, event_kind: kind, start_time: new Date(Date.now() - startAgoMs).toISOString(), timezone: "UTC", ...extra };
   if (kind === "program") data.deadline_at = new Date(Date.now() + 90 * 86400e3).toISOString();
   else data.duration_minutes = minutes;
@@ -210,8 +222,17 @@ async function makeEvent(sa, { kind = "tournament", startAgoMs = 10 * 60_000, mi
       answer_type: "text", correct_answer: `right${i}`, status: "published",
     }, await sa.h());
     expect(tr.ok, tr.text).toBeTruthy();
-    expect((await sa.post(`/api/admin/tasks/${tr.body.id}/competitions`, { competitionIds: [comp.id] }, await sa.h())).ok).toBeTruthy();
-    taskIds.push(tr.body.id);
+    if (legacy) {
+      await legacyShared(sa, async () => {
+        const asg = await sa.post(`/api/admin/tasks/${tr.body.id}/competitions`, { competitionIds: [comp.id] }, await sa.h());
+        expect(asg.ok, asg.text).toBeTruthy();
+      });
+      taskIds.push(tr.body.id);
+      continue;
+    }
+    const asg = await sa.post(`/api/admin/tasks/${tr.body.id}/competitions`, { competitionIds: [comp.id] }, await sa.h());
+    expect(asg.ok, asg.text).toBeTruthy();
+    taskIds.push(asg.body.copies[0].task_id);   // the event's own copy (lib/event-copies.js): what its participants open and answer
   }
   return { comp, taskIds };
 }
@@ -1052,11 +1073,15 @@ test.describe("the other paths", () => {
     // one, so the answers query runs with a withheld question in the event.
     const { comp } = await makeEvent(sa, { kind: "booth", minutes: 120, tasks: 1 });
     const OPT = `SEALOPT${stamp()}`, FREE = `FREETEXT${stamp()}`;
-    const qid = await pickOne(sa, [`${OPT}-A`, `${OPT}-B`]);
+    let qid = await pickOne(sa, [`${OPT}-A`, `${OPT}-B`]);
     expect((await sa.post(`/api/admin/tasks/${qid}/tags`, { tag: "qualifying:sweep87" }, await sa.h())).ok).toBeTruthy();
     const fr = await sa.post("/api/admin/tasks", { title: `Free ${stamp()}`, description: "<p>d</p>", difficulty: "easy", answer_type: "any", status: "published" }, await sa.h());
     expect(fr.ok, fr.text).toBeTruthy();
-    for (const t of [qid, fr.body.id]) expect((await sa.post(`/api/admin/tasks/${t}/competitions`, { competitionIds: [comp.id] }, await sa.h())).ok).toBeTruthy();
+    // Each lands as the event's OWN copy (lib/event-copies.js): the rows its
+    // participants answer, and the ones sealed below.
+    const copyOf = async (t) => { const a = await sa.post(`/api/admin/tasks/${t}/competitions`, { competitionIds: [comp.id] }, await sa.h()); expect(a.ok, a.text).toBeTruthy(); return a.body.copies[0].task_id; };
+    qid = await copyOf(qid);
+    fr.body.id = await copyOf(fr.body.id);
     // Two leads answer everything; a third answers ONLY the soon-sealed question;
     // a fourth answers nothing (the "played" CONTROL).
     const ps = [await person("sq1", { company: "Seal Co" }), await person("sq2", { company: "Seal Co" })];
@@ -1364,7 +1389,9 @@ test.describe("the order of the qualifying questions", () => {
     // A scoring challenge added after they are numbered still comes before them.
     const late = await sa.post("/api/admin/tasks", { title: `Late ${stamp()}`, description: "<p>d</p>", difficulty: "hard", answer_type: "text", correct_answer: "x", status: "published" }, await sa.h());
     expect(late.ok, late.text).toBeTruthy();
-    expect((await sa.post(`/api/admin/tasks/${late.body.id}/competitions`, { competitionIds: [comp.id] }, await sa.h())).ok).toBeTruthy();
+    const lateAsg = await sa.post(`/api/admin/tasks/${late.body.id}/competitions`, { competitionIds: [comp.id] }, await sa.h());
+    expect(lateAsg.ok, lateAsg.text).toBeTruthy();
+    late.body.id = lateAsg.body.copies[0].task_id;   // the event's own copy (lib/event-copies.js)
     rows = await list();
     expect(rows.findIndex(t => t.id === late.body.id), "ahead of every qualifying question").toBe(2);
     expect(rows.find(t => t.id === late.body.id).task_number).toBe("3.01");
@@ -2647,8 +2674,10 @@ test.describe("an event asks each qualifying question once (operator ruling N7)"
   test("the tag route and restore refuse a topic an event holding the challenge already asks", async () => {
     const sa = await admin();
     const { comp: D } = await makeEvent(sa, { kind: "booth", minutes: 120, tasks: 0 });   // asks the four
-    const tid = await pickOne(sa, ["Lo", "Hi"]);
-    expect((await sa.post(`/api/admin/tasks/${tid}/competitions`, { competitionIds: [D.id] }, await sa.h())).ok).toBeTruthy();
+    let tid = await pickOne(sa, ["Lo", "Hi"]);
+    const tAsg = await sa.post(`/api/admin/tasks/${tid}/competitions`, { competitionIds: [D.id] }, await sa.h());
+    expect(tAsg.ok, tAsg.text).toBeTruthy();
+    tid = tAsg.body.copies[0].task_id;   // D's own copy (lib/event-copies.js): the question D holds
     const tags = (t) => sql(db => db.prepare("SELECT tag FROM task_tags WHERE task_id=? ORDER BY tag").all(t).map(x => x.tag));
     let r = await sa.post(`/api/admin/tasks/${tid}/tags`, { tag: "qualifying:developers" }, await sa.h());
     expect(r.status, r.text).toBe(409);
@@ -2664,9 +2693,11 @@ test.describe("an event asks each qualifying question once (operator ruling N7)"
     // challenge asks budget in D.
     r = await sa.del(`/api/admin/tasks/${tid}/tags/${encodeURIComponent("qualifying:budget")}`, await sa.h());
     expect(r.ok, r.text).toBeTruthy();
-    const u = await pickOne(sa, ["Small", "Large"]);
+    let u = await pickOne(sa, ["Small", "Large"]);
     expect((await sa.post(`/api/admin/tasks/${u}/tags`, { tag: "qualifying:budget" }, await sa.h())).ok).toBeTruthy();
-    expect((await sa.post(`/api/admin/tasks/${u}/competitions`, { competitionIds: [D.id] }, await sa.h())).ok, "PRECONDITION: D asks budget through u").toBeTruthy();
+    const uAsg = await sa.post(`/api/admin/tasks/${u}/competitions`, { competitionIds: [D.id] }, await sa.h());
+    expect(uAsg.ok, "PRECONDITION: D asks budget through u").toBeTruthy();
+    u = uAsg.body.copies[0].task_id;   // D's own copy of u
     const vs = (await sa.get(`/api/admin/tasks/${tid}/versions`)).body;
     const snapTags = (v) => { const s = typeof v.snapshot === "string" ? JSON.parse(v.snapshot) : (v.snapshot || {}); return s.tags || []; };
     const withBudget = vs.find(v => snapTags(v).includes("qualifying:budget"));
@@ -2751,8 +2782,13 @@ test.describe("an event asks each qualifying question once: what the refusal nam
     // by a superadmin, in another organiser's event that asks developers.
     const t = await eac.post("/api/admin/tasks", { title: `EA own ${stamp()}`, description: "<p>d</p>", difficulty: "easy", answer_type: "any", choices: [{ text: "Few" }, { text: "Many" }], status: "published" }, await eac.h());
     expect(t.ok, t.text).toBeTruthy();
-    expect((await eac.post(`/api/admin/tasks/${t.body.id}/competitions`, { competitionIds: [mine.id] }, await eac.h())).ok).toBeTruthy();
-    expect((await sa.post(`/api/admin/tasks/${t.body.id}/competitions`, { competitionIds: [theirs.id] }, await sa.h())).ok).toBeTruthy();
+    // ONE row held by both events, as an older database holds it (before
+    // event-owned questions, lib/event-copies.js): the gate under test is about
+    // a question another organiser's event holds.
+    await legacyShared(sa, async () => {
+      expect((await eac.post(`/api/admin/tasks/${t.body.id}/competitions`, { competitionIds: [mine.id] }, await eac.h())).ok).toBeTruthy();
+      expect((await sa.post(`/api/admin/tasks/${t.body.id}/competitions`, { competitionIds: [theirs.id] }, await sa.h())).ok).toBeTruthy();
+    });
     const heldTitle = qTasks(theirs.id).length && sql(db => db.prepare("SELECT title FROM tasks WHERE id=?").get(qTasks(theirs.id).find(x => x.key === "developers").id).title);
     // The event admin meets the scoring gate first (9.1.5: making a challenge
     // a qualifying question is a scoring change, refused while another
@@ -2802,7 +2838,9 @@ test.describe("an event asks each qualifying question once: what the refusal nam
     expect(own.ok, own.text).toBeTruthy();
     r = await eac.post(`/api/admin/tasks/${own.body.id}/tags`, { tag: `qualifying:ea${stamp()}`.toLowerCase().replace(/[^a-z0-9:_-]/g, "").slice(0, 51) }, await eac.h());
     expect(r.ok, r.text).toBeTruthy();
-    expect((await eac.post(`/api/admin/tasks/${own.body.id}/competitions`, { competitionIds: [mine.id] }, await eac.h())).ok).toBeTruthy();
+    const ownAsg = await eac.post(`/api/admin/tasks/${own.body.id}/competitions`, { competitionIds: [mine.id] }, await eac.h());
+    expect(ownAsg.ok, ownAsg.text).toBeTruthy();
+    own.body.id = ownAsg.body.copies[0].task_id;   // their event's own copy (lib/event-copies.js): what is answered there
     const p2 = await person("n7eap2");
     await assign(sa, mine.id, [p2]);
     await enter(p2, mine.id);
@@ -3027,7 +3065,11 @@ test.describe("a challenge import's overwrite keeps both qualifying rules (opera
     const { comp: D } = await makeEvent(sa, { kind: "booth", minutes: 120, tasks: 0 });   // asks the four
     const title = `Import N7 ${stamp()}`;
     const tid = await pickOne(sa, ["Few", "Many"], title);
-    expect((await sa.post(`/api/admin/tasks/${tid}/competitions`, { competitionIds: [D.id] }, await sa.h())).ok).toBeTruthy();
+    // The import overwrites the LIBRARY question, so D holds that row itself, as
+    // an older database does (before event-owned questions, lib/event-copies.js).
+    await legacyShared(sa, async () => {
+      expect((await sa.post(`/api/admin/tasks/${tid}/competitions`, { competitionIds: [D.id] }, await sa.h())).ok).toBeTruthy();
+    });
     const asksDevelopers = () => qTasks(D.id).filter(x => x.key === "developers").map(x => x.id);
     const before = asksDevelopers();
     expect(before.length, "PRECONDITION: D asks developers once, through its own").toBe(1);
@@ -3057,7 +3099,11 @@ test.describe("a challenge import's overwrite keeps both qualifying rules (opera
     const tid = await pickOne(sa, ["Yes", "No"], title);
     const key = `imp${stamp()}`.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
     expect((await sa.post(`/api/admin/tasks/${tid}/tags`, { tag: `qualifying:${key}` }, await sa.h())).ok).toBeTruthy();
-    expect((await sa.post(`/api/admin/tasks/${tid}/competitions`, { competitionIds: [comp.id] }, await sa.h())).ok).toBeTruthy();
+    // The import overwrites the LIBRARY question, so the event holds that row
+    // itself, as an older database does (lib/event-copies.js).
+    await legacyShared(sa, async () => {
+      expect((await sa.post(`/api/admin/tasks/${tid}/competitions`, { competitionIds: [comp.id] }, await sa.h())).ok).toBeTruthy();
+    });
     // A bystander who never plays keeps the event live (an ended one freezes the
     // challenges, which the import skips for that reason instead).
     const p = await person("imp84"), idle = await person("imp84idle");
@@ -3090,7 +3136,9 @@ test.describe("a challenge import's overwrite keeps both qualifying rules (opera
     // CONTROL, not a lead question: an answered ordinary pick-one question's options may move…
     const plainTitle = `Import 84 plain ${stamp()}`;
     const plain = await pickOne(sa, ["Red", "Green"], plainTitle);
-    expect((await sa.post(`/api/admin/tasks/${plain}/competitions`, { competitionIds: [comp.id] }, await sa.h())).ok).toBeTruthy();
+    await legacyShared(sa, async () => {
+      expect((await sa.post(`/api/admin/tasks/${plain}/competitions`, { competitionIds: [comp.id] }, await sa.h())).ok).toBeTruthy();
+    });
     const [red, green] = choicesOf(plain);
     expect((await submit(p, comp.id, plain, JSON.stringify([red.id]))).ok).toBeTruthy();
     const plainRow = await exportedRow(sa, plainTitle);
@@ -4180,7 +4228,8 @@ test.describe("a manager's comparison covers only the events their appointer may
 test.describe("a challenge import's overwrite completes Program learners as the challenge doors do", () => {
   test("an overwrite that hides a challenge queues the certificate of the learner it completed, and nobody else's", async () => {
     const sa = await admin();
-    const { comp, taskIds } = await makeEvent(sa, { kind: "program", tasks: 2 });
+    // The import overwrites the library, so the event holds the library rows (an older database's shape).
+    const { comp, taskIds } = await makeEvent(sa, { kind: "program", tasks: 2, legacy: true });
     const done = await person("impdone");
     const idle = await person("impidle");
     await assign(sa, comp.id, [done, idle]);

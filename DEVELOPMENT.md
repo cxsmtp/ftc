@@ -200,19 +200,20 @@ This means:
 server.js              # Backend bootstrap + middleware order + boot checks + shutdown
                        #   + the deliberately-inline routes (submit/import/submissions/
                        #   logs/metrics test pins, the superadmin login, analytics)
-lib/*.js               # 78 shared backend modules — regenerate this list from
+lib/*.js               # 85 shared backend modules — regenerate this list from
                        # `ls lib/` rather than appending by memory:
                        #   account-lookup, account-reaper, admin-alerts, answer-seal, attachments, attempts,
                        #   audit, badge, best-effort, categories, certificate-config, certificate-dispatch, certificate-share, challenge-fit, choices, comp-allowlist,
                        #   competitions, config, csv, cxone, cxone-identity, cxone-ledger,
                        #   cxone-withdraw, data-dir, email, email-identity, email-proof, event-admin,
-                       #   event-policy, event-retention, event-team, event-template-builtins, full-export, group-sync, http, human-code,
+                       #   event-copies, event-policy, event-retention, event-team, event-template-builtins, full-export, group-sync, http, human-code,
                        #   image-refs, image-sweep,
                        #   impersonation, invitation-claim, late-entry, leaderboard, lockout, log, log-sort,
-                       #   login-code, login-method, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
-                       #   qualifying, qualifying-rescore, query-plan, rbac, registration-fields, sanitise, scanner-classify, schema-required,
-                       #   scheduler, scoring, self-enroll, session-index, sessions, settings, staff-compete,
-                       #   task-fields, team-recipient, team-report-mail, team-reports, time, user-tags, util, validate, zip-writer —
+                       #   countries, login-code, login-method, marketing-analytics, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
+                       #   program-grade, qualifying, qualifying-rescore, query-plan, rbac, registration-fields, sanitise, scanner-classify, schema-required,
+                       #   scheduler, scoring, self-enroll, session-index, session-tasks, sessions, settings, smtp-settings, staff-compete, staff-teams,
+                       #   build-info, backup-status,
+                       #   task-fields, team-recipient, team-report-mail, team-reports, time, topics, user-tags, util, validate, zip-writer —
                        #   required directly; one process-global singleton each
 routes/<entity>.js     # One module per entity: module.exports = register(app[,deps])
 db.js                  # SQLite schema + migrations
@@ -338,7 +339,7 @@ There's a `CLAUDE.md` at the repo root that is the LLM-facing brief: architectur
 
 ## Submitting a PR
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the human-facing contribution workflow (scope, testing, versioning, what's in scope vs not).
+Open a draft pull request against `main`; the CI jobs and the release image workflow are described in CLAUDE.md, *Deployment and CI image*.
 
 <!-- DOC-REGISTRY
 # v8.3.24 — see AUTH_PATHS.md's registry for the design. The repository map

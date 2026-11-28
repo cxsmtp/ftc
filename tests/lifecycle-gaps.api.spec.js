@@ -132,7 +132,8 @@ test.describe("v8.12.4 — a session chosen in advance, entered once it is live"
   test("entering after the session starts anchors the solve clock and records first entry for THAT session", async () => {
     const { api: sa, csrf } = await apiLogin("superadmin");
     try {
-      const comp = await makeCompetition(sa, csrf, "advance", { start_time: new Date(Date.now() + 3_600_000).toISOString() });
+      // The entry clock: the subject is the anchor ENTERING the session stamps.
+      const comp = await makeCompetition(sa, csrf, "advance", { start_time: new Date(Date.now() + 3_600_000).toISOString(), clock_start: "entry" });
       // The session starts a few seconds from now: chosen while upcoming, entered once live.
       const startsAt = Date.now() + 4000;
       const ts = await sa.post(`/api/admin/competitions/${comp.id}/timeslots`, { headers: H(csrf), data: {

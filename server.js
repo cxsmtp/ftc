@@ -382,7 +382,7 @@ function _importRowShapeError(rows, noun, fields) {
       if (v === undefined || v === null) continue;
       if (!_IMPORT_FIELD_SHAPES[kind](v, r)) {
         const want = kind === "flag" ? "true/false, 0/1 or a number"
-          : kind === "answer" ? "text (or a list of option ids on a choice challenge)"
+          : kind === "answer" ? "text (or a list of option ids on a choice question)"
           : "text";
         return `${noun} #${i + 1} has an invalid "${name}". The file is malformed — expected ${want}.`;
       }
@@ -395,7 +395,7 @@ const { escapeHtml, sanitiseAvatar, sanitiseRichText, extractAndStoreImages, ric
 // v8.1.0 (PR 13) — the kind label table + the collective noun, pre-rendered once as
 // HTML-attribute-safe JSON for the SPA-shell substitution below. Source constants,
 // so there is nothing to recompute per request and nothing to go stale until deploy.
-const { eventKindsForWire, EVENT_COLLECTIVE, eventPolicy, autoEndOnAllSolvedApplies } = require("./lib/event-policy");
+const { eventKindsForWire, EVENT_COLLECTIVE, eventPolicy, autoEndOnAllSolvedApplies, clockStartsAtFirstOpen } = require("./lib/event-policy");
 const _EVENT_KINDS_ATTR = escapeHtml(JSON.stringify(eventKindsForWire()));
 const _EVENT_COLLECTIVE_ATTR = escapeHtml(JSON.stringify(EVENT_COLLECTIVE));
 // The emailed sign-in code's lifetime (LOGIN_CODE_TTL_MS, fixed at boot) rides
@@ -430,7 +430,7 @@ const { competitionAllowlistMatch, anyCompetitionLive,
 const { recordIpBanAlert, deliverAlert, _clearAllAlertsForTests } = require("./lib/admin-alerts");
 const { classifyHit, isProbeSignature, addPathBit, flattenPath, classifyScannerTraffic, probeEarlyBlockDue, PROBE_EARLY_THRESHOLD, PROBE_SAMPLE_MAX, PROBE_SAMPLE_PATH_MAX } = require("./lib/scanner-classify"); // v7.25.0 — scanner vs venue
 const { LOG_SORT_COLUMNS, makeLogComparator } = require("./lib/log-sort"); // v7.25.0 — global ordering for a FILTERED /api/admin/logs read
-const { setTestSelectTimeslotDelay, setTestAdminEmailDelay, setTestAdminCommitDelay, testAdminCommitDelay, testAdminCommitPark, releaseTestAdminCommitPark, rateLimit, _setTestRateLimitForceEnabled, _rateLimitBucketCount, _sweepRateLimitBuckets, _ageRateLimitBuckets, generateToken, csrfProtection, requireParticipant, requireAdmin, requireSuperAdmin, requireCompetitionContext, requireParticipantInCompetition, participantAuthzDenied, adminAuthzDenied, impersonatingHandDenied, sendImpersonationCommitDenial, participantSessionDenied, sendParticipantSessionDenial, _rateLimitAllowlisted } = require("./lib/middleware"); // v7.0.0: per-route middleware (rate-limit/CSRF/auth guards) extracted
+const { setTestSelectTimeslotDelay, setTestAdminEmailDelay, setTestAdminCommitDelay, testAdminCommitDelay, testAdminCommitPark, releaseTestAdminCommitPark, rateLimit, _setTestRateLimitForceEnabled, _rateLimitBucketCount, _sweepRateLimitBuckets, _ageRateLimitBuckets, generateToken, csrfProtection, requireParticipant, requireAdmin, requireSuperAdmin, requireCompetitionContext, requireParticipantInCompetition, participantAuthzDenied, adminAuthzDenied, impersonatingHandDenied, sendImpersonationCommitDenial, participantSessionDenied, sendParticipantSessionDenial, _rateLimitAllowlisted, stampClockOnFirstTouch } = require("./lib/middleware"); // v7.0.0: per-route middleware (rate-limit/CSRF/auth guards) extracted
 const { impersonationGuard, impersonationActor, impersonationEndedDetails, isImpersonating } = require("./lib/impersonation"); // v7.14.0 — participant impersonation (write gate + audit-actor helper)
 const { eventAdminGuard, actorId, actingAdminId, sealRevealSet, sealRevealedFor, competitorIds, competitionDenied, scopeFilterSql, scopedCompetitionIds, groupViewDenied } = require("./lib/event-admin"); // v8.7.0 — the default-deny route gate, plus the row-level scope predicates the inline reporting handlers below enforce
 // v8.10.0 — the sealed answer. Two consumers in this file: the admin submissions
@@ -3542,6 +3542,16 @@ function _recordPresenceIfActive(req) {
     : competitionStatus(comp) === "live";
   if (!live) return;
 
+  // ── A FIRST-OPEN CLOCK THAT HAS NOT STARTED ──────────────────────────────
+  //
+  // On an event whose solve clock starts at the participant's first open of a
+  // scoring challenge (lib/event-policy.js `clockStartsAtFirstOpen`), time
+  // spent before it is not theirs to be measured on: the solve clock does not
+  // count it, so neither does the platform clock, or "Time on Platform" would
+  // exceed "Time to Solve" for exactly the participant who read the list first.
+  if (clockStartsAtFirstOpen(comp)
+      && !db.prepare("SELECT 1 FROM competition_users WHERE competition_id=? AND user_id=? AND login_time IS NOT NULL").get(compId, userId)) return;
+
   // ── THE COMPLETION FREEZE ────────────────────────────────────────────────
   //
   // THIS IS THE RULE NOBODY WOULD WRITE UNPROMPTED, and without it the feature
@@ -3881,6 +3891,25 @@ if (process.env.NODE_ENV === "test") {
   app.post("/api/test/scheduler-tick", (req, res) => {
     try { runStatusSchedulerTick(); res.json({ ok: true }); }
     catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  // Event-owned questions (lib/event-copies.js). `legacy-shared-assign {on}`: the
+  // assign doors put the bank question itself into the event, as the previous
+  // release did, so a spec can build that database through the real doors.
+  // `event-copies-migrate {dryRun}`: run the boot's batch migration now (its
+  // marker is not consulted) and bust what it changes, after the commit.
+  app.post("/api/test/legacy-shared-assign", (req, res) => {
+    require("./lib/event-copies")._setLegacySharedAssignForTest(req.body?.on === true);
+    res.json({ ok: true, on: req.body?.on === true });
+  });
+  app.post("/api/test/event-copies-migrate", (req, res) => {
+    const rep = require("./lib/event-copies").migrateSharedTasksToEventCopies(db, { dryRun: req.body?.dryRun === true });
+    if (req.body?.dryRun !== true) {
+      const ids = rep.events.map(e => e.competition_id);
+      for (const cid of ids) { invalidateLeaderboardCache(cid); _invalidateTaskNumbersCache(cid); }
+      _invalidateMeCacheForComps(ids);
+      invalidateAdminParticipantsCache();
+    }
+    res.json({ ok: true, ...rep });
   });
   // v7.21.5 — drive ONE reminder-dispatcher tick on demand. The 30 s interval is
   // disabled under NODE_ENV=test, so without this the dispatcher is unreachable
@@ -4435,6 +4464,7 @@ const { now, formatEmailDate, reminderLeadTime } = require("./lib/time"); // v7.
 // projection's own member, equal to `attempts` whenever it is present.
 const { attemptState, participantsFinishedAll, participantsFinishedAllDetail,
         ATTEMPT_CAP_MIN, ATTEMPT_CAP_MAX } = require("./lib/attempts");
+const { inSessionSql } = require("./lib/session-tasks");   // per-session question sets
 const { taskConflictingEvent } = require("./lib/challenge-fit");
 const { recordPresence, presenceMs, presenceRowCount, BUCKET_MS } = require("./lib/presence");
 function attemptsWire(st) {
@@ -4483,6 +4513,21 @@ function _applyImportedTaskTags(taskId, tags) {
   const insertTag = db.prepare("INSERT OR IGNORE INTO task_tags (task_id, tag) VALUES (?,?)");
   // batch 5 — skip non-string tags (would 500 at tag.trim()).
   for (const tag of tags) if (typeof tag === "string" && tag.trim()) insertTag.run(taskId, tag.trim().toLowerCase());
+}
+// Stage B — the imported question's topic, by NAME (the file carries no topic
+// id: lib/topics.js). An existing topic of that name (case-insensitive) is used,
+// else one is made; null or "" files it under no topic; a name the topic rules
+// refuse leaves the question as it was. Inside the import's transaction.
+function _applyImportedTopic(taskId, name) {
+  const T = require("./lib/topics");
+  if (name === null || (typeof name === "string" && !name.trim())) {
+    db.prepare("UPDATE tasks SET topic_id=NULL WHERE id=?").run(taskId);
+    return;
+  }
+  if (typeof name !== "string" || T.topicNameError(name)) return;
+  const found = T.topicByName(db, name);
+  const topicId = found ? found.id : T.insertTopic(db, name, { createdBy: "import" });
+  db.prepare("UPDATE tasks SET topic_id=? WHERE id=?").run(topicId, taskId);
 }
 
 // v8.1.0 — the name and the zero-participant guard are unchanged (both are
@@ -4743,10 +4788,16 @@ require("./routes/badge")(app);
 require("./routes/certificate-config")(app);
 // The per-event look (routes/event-look.js; lib/platform-look.js).
 require("./routes/event-look")(app);
+// Stage B — the Question bank's topics (routes/topics.js; lib/topics.js).
+require("./routes/topics")(app);
 // The event workspace Overview's live read (routes/event-overview.js).
 require("./routes/event-overview")(app);
 // The event team and its persona reports (routes/event-team.js; lib/event-team.js, lib/team-reports.js).
 require("./routes/event-team")(app);
+// The staff-teams directory (routes/staff-teams.js; lib/staff-teams.js).
+require("./routes/staff-teams")(app);
+// Marketing analytics: the platform's success figures across events (routes/marketing-analytics.js; lib/marketing-analytics.js).
+require("./routes/marketing-analytics")(app);
 
 // Reminder email sender — runs every 30 seconds.
 //
@@ -5040,7 +5091,11 @@ const submitLimit = rateLimit(60_000, 120, "submit");
 // reads a byte of it, with the sentence an over-limit file gets (an honest client
 // only gets here by choosing too large a file).
 const _submitDeclaredLengthGate = declaredLengthGate(_SUBMIT_UPLOAD_LIMITS, _MULTER_TOO_LARGE.LIMIT_FILE_SIZE);
-app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompetitionContext, requireParticipantInCompetition, csrfProtection, _submitDeclaredLengthGate, upload.single("file"), async (req, res) => {
+// A bank question id named in the session's event means that event's own copy (lib/event-copies.js).
+// Per-session question sets: then a question outside the session the request
+// plays answers the same 404 an unassigned one does (lib/session-tasks.js).
+const _resolveEventTask = [require("./lib/event-copies").resolveEventTaskParam(db, "id"), require("./lib/session-tasks").requireTaskInSession(db, "id")];
+app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompetitionContext, requireParticipantInCompetition, _resolveEventTask, csrfProtection, _submitDeclaredLengthGate, upload.single("file"), async (req, res) => {
   // v6.13.14 — perf-span instrumentation. POST /api/tasks/:id/submit
   // is the hot write-path on the platform; v6.13.13's 4 h run logged
   // its p95 creeping 4.6 → 16.1 ms (3.5×). Stages worth splitting:
@@ -5158,6 +5213,10 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
   // `let`, not `const`: the file path re-reads this after its await and grades
   // against the fresh row (see the re-validation block below).
   let task = db.prepare("SELECT * FROM tasks WHERE id=? AND active=1 AND status='published'").get(req.params.id);
+  // Set once this request STORES an answer: only a stored answer may start a
+  // first-open solve clock (lib/middleware.js `stampClockOnFirstTouch`), never
+  // a refused or folded one.
+  let _answerStored = false;
   if (!task) { cleanupUpload(req); return res.status(404).json({ error: "Challenge not found" }); }
   // The locked flag was previously cosmetic — only blocked admin edits in the
   // UI. Honour it on submit too: a locked task is treated as frozen, so neither
@@ -5554,6 +5613,7 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
     const submittedAtIso = now().toISOString();
     db.prepare("INSERT INTO submissions (id,user_id,task_id,answer,is_correct,points_delta,submitted_at,competition_id,timeslot_id,updated_at,answer_canonical) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
       .run(uuid(), req.session.userId, task.id, answer, correct ? 1 : 0, pts, submittedAtIso, compId, tsId, submittedAtIso, answerCanonical);
+    _answerStored = true;
 
     // Audit trail — every submission attempt, correct or wrong.
     const evDetails = {
@@ -5707,6 +5767,12 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
         return { autoEndInfo: null, attempts: capAfter };
       }
       const totalTasks = publishedTaskCount(compId);
+      // PER-SESSION QUESTION SETS — the submitter finishes the questions of
+      // THEIR OWN session (their competition_users row's), so their fast-path
+      // count is measured against that set; `totalTasks` above stays the
+      // event's, the guard that anything counts at all.
+      const _mySlot = (db.prepare("SELECT timeslot_id FROM competition_users WHERE competition_id=? AND user_id=?").get(compId, req.session.userId) || {}).timeslot_id || null;
+      const myTotal = _mySlot ? publishedTaskCount(compId, _mySlot) : totalTasks;
       // v6.8.1 — cheap pre-filter: the current submitter can only be the
       // "last solver" if they themselves have now solved every task. If
       // their personal count is still below totalTasks, skip the full
@@ -5719,8 +5785,9 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
           `SELECT COUNT(DISTINCT s.task_id) as c FROM submissions s
            JOIN competition_tasks ct ON ct.task_id=s.task_id AND ct.competition_id=s.competition_id
            JOIN tasks t ON t.id=s.task_id
-           WHERE s.user_id=? AND s.competition_id=? AND s.is_correct=1 AND t.active=1 AND t.status='published' AND ${notQualifyingSql("t")}`
-        ).get(req.session.userId, compId).c;
+           WHERE s.user_id=? AND s.competition_id=? AND s.is_correct=1 AND t.active=1 AND t.status='published' AND ${notQualifyingSql("t")}
+             AND ${inSessionSql("ct.competition_id", "ct.task_id", "?")}`
+        ).get(req.session.userId, compId, _mySlot).c;
         // v8.1.0 — THE FAST PATH ENCODED THE SAME ASSUMPTION AS THE OUTER GATE,
         // one layer down, and fixing only the gate left it dead.
         //
@@ -5736,7 +5803,7 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
         // fast path exists for (a correct submit during a final-minute burst) is
         // unchanged. Only when a cap is actually in play do we ask the shared
         // predicate, and only about THIS ONE participant.
-        let mineFinished = mineSolved >= totalTasks;
+        let mineFinished = myTotal > 0 && mineSolved >= myTotal;
         if (!mineFinished && (freshComp?.attempt_cap != null || db.prepare(
           `SELECT 1 FROM competition_tasks ct JOIN tasks t ON t.id=ct.task_id
             WHERE ct.competition_id=? AND t.active=1 AND t.status='published' AND t.attempt_cap IS NOT NULL LIMIT 1`
@@ -5856,6 +5923,9 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
     });
   }
   invalidateLeaderboardCache(compId);
+  // An answer stored before any open (a client that never opened the challenge)
+  // starts a first-open clock at that answer; a no-op once an open has stamped it.
+  if (_answerStored) stampClockOnFirstTouch(req, task);
   // v8.1.7 — its OWN outcome tag, not folded into "rejected": the perf span
   // asserts by presence, so a terminal branch shipping under a neighbour's tag
   // would attribute a vanished-competition refusal to "the event has ended" in
@@ -5931,10 +6001,11 @@ app.post("/api/tasks/:id/submit", requireParticipant, submitLimit, requireCompet
       ...attemptsWire(result.attempts) });
   }
   outcome = correct ? "new_correct" : "new_wrong";
-  // v8.15.1 — a Program has no common end: the correct answer that completes a
-  // participant queues THEIR certificate and email. A no-op for any other kind
-  // (kind first) and for an answer that leaves something unsolved.
-  if (correct) enqueueCompletionCertificate(compId, req.session.userId);
+  // v8.15.1 — a Program has no common end: the answer that finishes a learner
+  // (correct, or spending their last attempt; Program grades, 27 Nov 2026) queues
+  // their certificate and email when they passed. A no-op for any other kind
+  // (kind first) and for an answer that leaves something unanswered.
+  if (correct || (result && result.attempts && result.attempts.exhausted)) enqueueCompletionCertificate(compId, req.session.userId);
   _invalidateMeCache(req.session.userId);
   // `qualifying`: the client thanks them instead of announcing a solve and a score.
   res.json({ correct, pointsDelta: pts, score: getParticipantScore(req.session.userId, compId, req.session.timeslotId),
@@ -6039,7 +6110,12 @@ require("./routes/users")(app); // RBAC — Users & roles (admin accounts, custo
 // Default-CxOne credential (get/set/clear), the operator SMTP test-email
 // diagnostic, and the unsubscribed-list view + re-subscribe now live in
 // routes/admin-misc.js, registered here in one call.
-require("./routes/admin-misc")(app, { isHealthy: _instanceInService });
+require("./routes/admin-misc")(app, { isHealthy: _instanceInService,
+  // Settings → Backups & health reads the same facts the gate does, each apart.
+  healthState: () => ({ integrity: _dbIntegrityOk, schema: _dbSchemaOk, maintenance: _maintenanceState().active }) });
+// Settings → Email (SMTP): the mail relay in force, saved in the app or from the
+// environment (routes/smtp-settings.js).
+require("./routes/smtp-settings")(app);
 
 // ── Admin participants ──────────────────────────────────────────────────────
 
@@ -6137,11 +6213,11 @@ require("./routes/export-import")(app);
 app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimiter, csrfProtection, _importJsonParser, async (req, res) => {
   const { data, resolutions } = req.body;
   if (!data || data.type !== "hackarena-tasks" || !Array.isArray(data.tasks))
-    return res.status(400).json({ error: "Invalid challenge export file" });
+    return res.status(400).json({ error: "Invalid question export file" });
   if (data.tasks.length > 10000)
-    return res.status(400).json({ error: `Too many challenges (${data.tasks.length}). Maximum is 10,000.` });
+    return res.status(400).json({ error: `Too many questions (${data.tasks.length}). Maximum is 10,000.` });
   {
-    const _shape = _importRowShapeError(data.tasks, "Challenge", {
+    const _shape = _importRowShapeError(data.tasks, "Question", {
       title: "str", description: "str", explanation: "str", hint: "str",
       status: "str", author_name: "str", author_linkedin: "str",
       attachment_url: "str", active: "flag", correct_answer: "answer",
@@ -6150,6 +6226,8 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
       // array would read as "not sealed" and quietly import a row the source
       // platform had sealed.
       answer_sealed: "flag",
+      // Stage B — the topic by name (lib/topics.js).
+      topic: "str",
     });
     if (_shape) return res.status(400).json({ error: _shape });
   }
@@ -6173,7 +6251,9 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
   // unindexed column, i.e. one statement compilation plus one full table scan per
   // imported row — O(rows x tasks), synchronously, on a single-process server.
   // Measured by the audit at 263 ms for 10 000 rows before a single write.
-  const _conflictStmt = db.prepare("SELECT id, title, locked FROM tasks WHERE title=?");
+  // The library is what a file overwrites: bank questions only, never an event's own
+  // (same-titled) copy of one (lib/event-copies.js).
+  const _conflictStmt = db.prepare("SELECT id, title, locked FROM tasks WHERE title=? AND owner_competition_id IS NULL");
   const conflicts = [];
   for (const [i, t] of tasks.entries()) {
     // v8.3.20 — TRIM, matching the create path's own `title.trim()` guard. A
@@ -6340,7 +6420,7 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
   // Sweep #413 — how many of the file's rows would overwrite each title (an
   // overwrite that could mean more than one challenge is refused in the txn).
   const _overwritesByTitle = new Map();
-  const _sameTitleStmt = db.prepare(`SELECT COUNT(*) AS n, COALESCE(MAX(${qualifyingSql("t")}), 0) AS q FROM tasks t WHERE t.title=?`);
+  const _sameTitleStmt = db.prepare(`SELECT COUNT(*) AS n, COALESCE(MAX(${qualifyingSql("t")}), 0) AS q FROM tasks t WHERE t.title=? AND t.owner_competition_id IS NULL`);
   const specsToPromote = []; // specs whose tmp file we'll move to ./data/attachments/
   for (const [i, t] of tasks.entries()) {
     if (typeof t.title !== "string" || !t.title.trim() || !t.difficulty || (answerTypeHasKey(t.answer_type) && !t.correct_answer)) continue;   // v8.3.20 — trim, as above; v8.9.0 — `any` has no key
@@ -6735,6 +6815,7 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
         targetTaskId = conflict.existingId;
         overwrittenTaskIds.add(conflict.existingId);
         if (_countsTowardFinish(conflict.existingId) !== _countedBefore) completionCountMoved.add(conflict.existingId);
+        if (t.topic !== undefined) _applyImportedTopic(conflict.existingId, t.topic);
         createTaskVersion(conflict.existingId, adminId, "import");
         overwritten++;
       } else {
@@ -6757,6 +6838,7 @@ app.post("/api/admin/import/tasks", requireAdmin, requireSuperAdmin, importLimit
         db.prepare("INSERT INTO tasks (id,title,description,difficulty,answer_type,correct_answer,choices,explanation,hint,attachment_url,author_name,author_linkedin,active,status,attempt_cap,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
           .run(newId, title, desc, t.difficulty, t.answer_type || "text", correctAnswer, _importChoices(t), expl, hint, normalisedAttachmentUrl, authorName, authorLinkedin, importedActive, importedStatus, importedCap, new Date().toISOString());
         if (Array.isArray(t.tags)) _applyImportedTaskTags(newId, t.tags);
+        if (t.topic != null) _applyImportedTopic(newId, t.topic);
         targetTaskId = newId;
         createTaskVersion(newId, adminId, "import");
         imported++;
@@ -8384,7 +8466,10 @@ app.post("/api/admin/perf/bulk-seed-history", requireAdmin, requireSuperAdmin, c
     insComp.run(compId, compName, startIso, durationMinutes, endedIso, startIso);
     compCount++;
 
-    const compTasks = sampleFrom(taskIdx, taskRows, effectiveTasksPer);
+    // Each event holds its OWN copy of the sampled questions (lib/event-copies.js),
+    // as every assign door now makes it; the history rows below name the copy.
+    const compTasks = sampleFrom(taskIdx, taskRows, effectiveTasksPer)
+      .map(t => ({ ...t, id: require("./lib/event-copies").copyTaskIntoEvent(db, t.id, compId, { changedBy: "perf-seed", via: "perf_seed", nowIso: startIso }) }));
     let tn = 1;
     for (const t of compTasks) insCompTask.run(compId, t.id, String(tn++), adminId, startIso);
 

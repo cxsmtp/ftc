@@ -265,6 +265,35 @@ module.exports = {
    * three challenges of which one is hidden: its "Ready to start?" checklist
    * shows a done, a to-do and an optional item. Returns { id, name }.
    */
+  async wsSessions({ page }) {
+    // PER-SESSION QUESTION SETS: an UPCOMING Competition with two sessions,
+    // ranking per session and overall by percentages, three questions, one of
+    // them only in the second session. Returns { id, name, narrowed }.
+    const adm = await pageAdmin(page);
+    const t = tag();
+    const made = { events: [], tasks: [] };
+    try {
+      const comp = await makeEvent(adm, { name: `Spring Cup ${t}`, event_kind: "tournament", add_qualifying: false,
+        start_time: iso(3 * HOUR), duration_minutes: 480, leaderboard_mode: "per_slot", leaderboard_overall: true, leaderboard_percent: true });
+      made.events.push(comp.id);
+      const slots = [];
+      for (const [i, n] of ["Morning cohort", "Evening cohort"].entries()) {
+        slots.push((await adm.must("POST", `/api/admin/competitions/${comp.id}/timeslots`, { name: n, start_time: iso(3 * HOUR + i * 4 * HOUR), duration_minutes: 120 })).timeslot.id);
+      }
+      made.tasks.push(await makeTask(adm, comp.id, { title: "Path traversal", difficulty: "easy", answer: "normalise" }));
+      made.tasks.push(await makeTask(adm, comp.id, { title: "SSRF via webhook", difficulty: "medium", answer: "deny-internal" }));
+      const bank = await adm.must("POST", "/api/admin/tasks", { title: "JWT none algorithm", difficulty: "hard", answer_type: "text", correct_answer: "pin-alg",
+        status: "published", description: "<p>JWT none algorithm: find the flaw and enter the answer.</p>" });
+      made.tasks.push(bank.id);
+      const copy = (await adm.must("POST", `/api/admin/tasks/${bank.id}/competitions`, { competitionIds: [comp.id] })).copies[0].task_id;
+      await adm.must("PUT", `/api/admin/competitions/${comp.id}/tasks/${copy}/sessions`, { timeslotIds: [slots[1]] });
+      return { id: comp.id, name: comp.name, narrowed: "JWT none algorithm", cleanup: teardown(page, adm, made) };
+    } catch (e) {
+      await teardown(page, adm, made)().catch(() => {});
+      throw e;
+    }
+  },
+
   async wsUpcoming({ page }) {
     const adm = await pageAdmin(page);
     const t = tag();

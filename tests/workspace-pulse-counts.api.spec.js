@@ -17,7 +17,7 @@
 //      for person as on the event's admin board; where staff compete they count.
 const { test, expect } = require("./isolated-test");
 const { apiLogin, PARTICIPANT_PASS, BASE, gradingHashFor, TEST_DB_PATH } = require("./helpers");
-const { H, makeParticipant, makeTask, assignTask, enrol, grantEventAdmin } = require("./event-admin-helpers");
+const { H, makeParticipant, makeTask, assignTask, enrol, grantEventAdmin, eventCopyOf, originOf } = require("./event-admin-helpers");
 
 test.use({ baseURL: BASE });
 test.describe.configure({ mode: "serial" });
@@ -92,9 +92,10 @@ test("qualifying questions and removed members never count toward solving or fin
   // A live Booth Event: it seeds the four qualifying questions and never
   // auto-ends on all-solved (fixture item 1), so the finisher keeps it live.
   const ev = await mk("PulseBooth", { event_kind: "booth", start_time: new Date(Date.now() - 5 * 60_000).toISOString(), duration_minutes: 120, add_qualifying: true });
-  const t1 = await makeTask(sa, saCsrf, "pc1", { correct_answer: KEY });
-  const t2 = await makeTask(sa, saCsrf, "pc2", { correct_answer: KEY });
-  for (const t of [t1, t2]) await assignTask(sa, saCsrf, t.id, [ev.id]);
+  // The event's own copies (lib/event-copies.js): what is played and what the pulse lists.
+  const own = async (t) => ({ ...t, id: (await assignTask(sa, saCsrf, t.id, [ev.id])).copies[0].task_id });
+  const t1 = await own(await makeTask(sa, saCsrf, "pc1", { correct_answer: KEY }));
+  const t2 = await own(await makeTask(sa, saCsrf, "pc2", { correct_answer: KEY }));
   const q = qualifyingOf(ev.id);
   expect(q.length, "PRECONDITION: the Booth Event holds its qualifying questions").toBeGreaterThan(0);
   const fin = await person("pcfin");
@@ -275,7 +276,7 @@ test("where staff compete, the staff taking part count; a staff spectator, and t
   expect(a.totals, "the staff member is a participant here; the spectator is nobody's figure").toMatchObject({
     joined: 2, answers: 2, correct: 1, solvers: 1, active_now: 2, finished: 1, visible_tasks: 1,
   });
-  const ta = a.tasks.find(t => t.id === task.id);
+  const ta = a.tasks.find(t => t.id === eventCopyOf(task.id, on.id));   // the compete event's own copy
   expect({ attempters: ta.attempters, solvers: ta.solvers, answerers: ta.answerers, answers: ta.answers }, "the challenge's own facts").toEqual({ attempters: 2, solvers: 1, answerers: 2, answers: 2 });
   expect(a.buckets.reduce((n, b) => n + b.answers, 0), "the chart holds the same answers").toBe(2);
   expect(a.buckets.reduce((n, b) => n + b.joins, 0), "and both joins").toBe(2);
@@ -415,7 +416,8 @@ test("where staff do not compete, event admins and custom roles of their class a
   expect(four.map(p => offBoard.has(p.id)), "where staff do not compete, the board lists the participant only (the global admin by the staff tag, the other two by role)").toEqual([true, false, false, false]);
 
   const facts = (d, t) => {
-    const x = d.tasks.find(r => r.id === t.id);
+    // Each event lists its OWN copy of the question (lib/event-copies.js): found by its origin.
+    const x = d.tasks.find(r => originOf(r.id) === t.id);
     expect(x, `the pulse has a row for ${t.title}`).toBeTruthy();
     return { attempters: x.attempters, solvers: x.solvers, answerers: x.answerers, answers: x.answers };
   };

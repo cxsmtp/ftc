@@ -470,7 +470,7 @@ test.describe("Challenge rich content — embedded links and images", () => {
       },
     });
     expect(create.ok()).toBeTruthy();
-    const taskId = (await create.json()).id;
+    let taskId = (await create.json()).id;
 
     // v8.3.5 — THIS TEST OWNS ITS COMPETITION, and that is the whole de-flake.
     //
@@ -547,6 +547,7 @@ test.describe("Challenge rich content — embedded links and images", () => {
       headers: h, data: { competitionIds: [liveComp.id] },
     });
     expect(asg.ok(), `assign the rich challenge: ${asg.status()} ${await asg.text()}`).toBeTruthy();
+    taskId = (await asg.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     await api.dispose();
 
     // Pre-select on the OWNED participant's session before the browser loads —
@@ -630,7 +631,7 @@ test.describe("Hint reveal — Trusted Types safe render", () => {
       },
     });
     expect(create.ok()).toBeTruthy();
-    const taskId = (await create.json()).id;
+    let taskId = (await create.json()).id;
 
     // v8.3.11 — THIS TEST OWNS ITS COMPETITION AND ITS PARTICIPANT. It was the
     // last borrower of the seeded "Test Live" + the shared Alice in this file, and
@@ -664,6 +665,7 @@ test.describe("Hint reveal — Trusted Types safe render", () => {
       headers: h, data: { competitionIds: [liveComp.id] },
     });
     expect(asg.ok(), `assign the hint challenge: ${asg.status()} ${await asg.text()}`).toBeTruthy();
+    taskId = (await asg.json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
 
     // The shared helper already registers, verifies, approves, sets the password
     // and enrols — the four steps a self-registration needs before the assign
@@ -760,12 +762,12 @@ test.describe("Hint reveal — Trusted Types safe render", () => {
       },
     });
     expect(create.ok()).toBeTruthy();
-    const taskId = (await create.json()).id;
+    let taskId = (await create.json()).id;
     const comps = await (await api.get("/api/admin/competitions")).json();
     const liveComp = comps.find(c => c.name === "Test Live");
-    await api.post(`/api/admin/tasks/${taskId}/competitions`, {
+    taskId = (await (await api.post(`/api/admin/tasks/${taskId}/competitions`, {
       headers: h, data: { competitionIds: [liveComp.id] },
-    });
+    })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     await api.dispose();
 
     const pageErrors = [];
@@ -1634,8 +1636,7 @@ test.describe("v7.15.0 — participant leaderboard columns + sorting", () => {
         title: `LbSortTask ${tag} ${n}`, description: "<p>x</p>", difficulty: n === 1 ? "easy" : "medium",
         answer_type: "text", correct_answer: `a${n}`, status: "published",
       }})).json()).id;
-      await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: jsonH, data: { competitionIds: [compId] } });
-      return id;
+      return (await (await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: jsonH, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     };
     const taskIds = [await mkTask(1), await mkTask(2)];
 
@@ -1860,11 +1861,11 @@ test.describe("v7.15.0 — participant leaderboard columns + sorting", () => {
     const compId = (await (await sa.post("/api/admin/competitions", { headers: jsonH, data: {
       name: `LbSolved-${stamp}`, start_time: new Date(Date.now() - 60_000).toISOString(), duration_minutes: 180,
     }})).json()).competition.id;
-    const taskId = (await (await sa.post("/api/admin/tasks", { headers: jsonH, data: {
+    let taskId = (await (await sa.post("/api/admin/tasks", { headers: jsonH, data: {
       title: `LbSolved Task ${stamp}`, description: "<p>x</p>", difficulty: "easy",
       answer_type: "text", correct_answer: "yes", explanation: "<p>e</p>", status: "published",
     }})).json()).id;
-    await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: jsonH, data: { competitionIds: [compId] } });
+    taskId = (await (await sa.post(`/api/admin/tasks/${taskId}/competitions`, { headers: jsonH, data: { competitionIds: [compId] } })).json()).copies[0].task_id;   // the event's own copy (lib/event-copies.js): what is opened and answered there
     const me = await createAssignedParticipant(sa, jsonH, compId);
     // A second enrolled participant who never solves anything. Without them the
     // all-solved auto-end fires the moment `me` finishes, the competition ends,

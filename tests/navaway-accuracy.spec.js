@@ -44,6 +44,7 @@ const { test, expect } = require("./isolated-test");
 const { registerPost } = require("./helpers");
 const { fillBreakGlass, submitLogin } = require("./ui-admin-helpers");
 const { freshCtx, apiLogin, gradingHashFor, PARTICIPANT_PASS, BASE, TEST_DB_PATH } = require("./helpers");
+const { withLegacySharedAssign } = require("./event-admin-helpers");
 const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
@@ -102,7 +103,10 @@ async function mkTask(sa, csrf, title, compIds) {
   const id = (await r.json()).id;
   const a = await sa.post(`/api/admin/tasks/${id}/competitions`, { headers: H(csrf), data: { competitionIds: compIds } });
   expect(a.status(), await a.text()).toBe(200);
-  return id;
+  // One event: the question it holds, its OWN copy (lib/event-copies.js). Several
+  // (only under the previous model's mode, below): the one row they all hold.
+  const copies = (await a.json()).copies || [];
+  return compIds.length === 1 ? copies[0].task_id : id;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -186,7 +190,9 @@ test.describe("v7.27.0 — a SOLVED challenge records no navigated_away", () => 
     const compB = await mkComp(sa, csrf, `NavScope B ${t}`);
     // ONE challenge, assigned to BOTH. This is the only arrangement in which a
     // gate that forgot its competition predicate differs from one that has it.
-    const shared = await mkTask(sa, csrf, `Shared ${t}`, [compA, compB]);
+    // (One row in both events exists only in a database from before event-owned
+    // copies, so it is built in the previous model's mode, through the test hook.)
+    const shared = await withLegacySharedAssign(sa, csrf, () => mkTask(sa, csrf, `Shared ${t}`, [compA, compB]));
     await mkTask(sa, csrf, `Filler A ${t}`, [compA]);
     await mkTask(sa, csrf, `Filler B ${t}`, [compB]);
     const p = await mkParticipant(sa, csrf, `g3${t}`);

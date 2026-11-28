@@ -33,7 +33,10 @@ test.beforeAll(async () => {
   test.setTimeout(120_000);
   const s = await apiLogin("superadmin");
   try {
-    const live = await makeCompetition(s.api, s.csrf, "looks-live");
+    // The entry clock: the participant's own row is on the board (the scan reads
+    // it) from entering, without opening a challenge; this file is about colour,
+    // not about when a clock starts.
+    const live = await makeCompetition(s.api, s.csrf, "looks-live", { clock_start: "entry" });
     const late = await makeCompetition(s.api, s.csrf, "looks-late", { event_kind: "booth" });
     const upcoming = await makeCompetition(s.api, s.csrf, "looks-upc", { start_time: new Date(Date.now() + 2 * 86_400_000).toISOString() });
     // Two challenges nobody solves keep the live event live (fixture item 1).

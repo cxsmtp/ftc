@@ -890,11 +890,12 @@ test.describe("The seal through the seat, in every direction (v8.12.1 review)", 
     // solves it from their OWN participant session (the control: `correct_answer`
     // present), then the superadmin impersonates them in participant view.
     const MC = uniq("mc");
-    const mc = await makeTask(W.eaApi, W.eaCsrf, "easealedmc", {
+    const mcBank = await makeTask(W.eaApi, W.eaCsrf, "easealedmc", {
       answer_type: "choice", answer_sealed: 1, explanation: `<p>MCWHY_${MC}</p>`,
       choices: [{ text: `RIGHT_${MC}`, correct: true }, { text: `WRONG_${MC}`, correct: false }],
     });
-    await assignTask(W.eaApi, W.eaCsrf, mc.id, [W.mine.id]);
+    // The event's own copy (lib/event-copies.js): what is solved there and where the reveal is recorded.
+    const mc = { ...mcBank, id: (await assignTask(W.eaApi, W.eaCsrf, mcBank.id, [W.mine.id])).copies[0].task_id };
     const { freshCtx, gradingHashFor } = require("./helpers");
     const { api: ea2, csrf: ea2c } = await freshCtx();
     try {

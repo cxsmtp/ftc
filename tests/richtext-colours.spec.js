@@ -579,6 +579,8 @@ test.describe("A named colour reaches every surface that renders the challenge",
     const live = await makeCompetition(page.request, csrf, "rtcolour");
     const asg = await page.request.post(`/api/admin/tasks/${taskId}/competitions`, { headers: H(csrf), data: { competitionIds: [live.id] } });
     expect(asg.ok(), `assign: ${await asg.text()}`).toBeTruthy();
+    // The event's own copy (lib/event-copies.js): the card its participant opens.
+    const heldId = (await asg.json()).copies[0].task_id;
     const reader = await makeParticipant(page.request, csrf, "rtcolour");
     await enrol(page.request, csrf, live.id, [reader.id]);
     const read = (root) => root.evaluate((el) => {
@@ -611,7 +613,7 @@ test.describe("A named colour reaches every surface that renders the challenge",
       await p2.goto("/");
       await p2.locator("#nav-challenges:not([aria-disabled=true])").waitFor({ state: "visible", timeout: 20000 });
       await p2.locator("#nav-challenges:not([aria-disabled=true])").click();
-      await p2.locator(`[data-action="task-open"][data-task-id="${taskId}"]`).click();
+      await p2.locator(`[data-action="task-open"][data-task-id="${heldId}"]`).click();
       await p2.locator("#task-detail-card .task-desc span").first().waitFor({ state: "visible", timeout: 15000 });
       expect(await read(p2.locator("#task-detail-card .task-desc"))).toEqual({
         named: rgbText(looks.ambient.dark.rtInk.green), legacy: "rgb(255, 77, 106)",

@@ -25,7 +25,7 @@
 const { test, expect } = require("./isolated-test");
 const path = require("path");
 const { apiLogin, freshCtx, findLogLine, PARTICIPANT_PASS, gradingHashFor, TEST_DB_PATH, TEST_DATA_DIR, codeLogin } = require("./helpers");
-const { H, uniq, makeParticipant, makeCompetition, assignTask, enrol, grantEventAdmin } = require("./event-admin-helpers");
+const { H, uniq, makeParticipant, makeCompetition, assignTask, enrol, grantEventAdmin, withLegacySharedAssign } = require("./event-admin-helpers");
 
 function withDb(fn, opts = { readonly: true }) {
   const Database = require("better-sqlite3");
@@ -70,6 +70,10 @@ async function makePair(owner, tag) {
   };
   return { sealedId: await mk(true), plainId: await mk(false) };
 }
+// The event's OWN copy of a bank question (lib/event-copies.js): what an assign
+// puts into the event, and so what its participants answer, buy hints on and are
+// revealed — a row of its own, sealed like its bank question.
+const ownCopy = async (owner, id, compId) => (await assignTask(owner.api, owner.csrf, id, [compId])).copies[0].task_id;
 const row = async (ctx, id) => (await (await ctx.api.get("/api/admin/tasks")).json()).find(x => x.id === id);
 const revealRows = id => dbGet("SELECT COUNT(*) c FROM task_versions WHERE task_id=? AND change_type='sealed_reveal'", id).c;
 const lastReveal = id => dbGet("SELECT changed_by, details, snapshot FROM task_versions WHERE task_id=? AND change_type='sealed_reveal' ORDER BY version_num DESC LIMIT 1", id);
@@ -220,7 +224,9 @@ test.describe("v8.12.2 (2)+(3) — the superadmin's reveal, and its record", () 
 
     // A participant has submitted the key, so the Submissions stream has a row to redact.
     const comp = await makeCompetition(sa, saCsrf, "revealsub", { duration_minutes: 60 });
-    await assignTask(author.api, author.csrf, sealedId, [comp.id]);
+    // The event holds its OWN copy of the challenge, so the solver's answer is
+    // the copy's, and the Submissions stream redacts it by the copy's seal.
+    const sealedCopy = await ownCopy(author, sealedId, comp.id);
     const solver = await makeParticipant(sa, saCsrf, "rvsolver");
     const stander = await makeParticipant(sa, saCsrf, "rvstander");
     await enrol(sa, saCsrf, comp.id, [solver.id, stander.id]);
@@ -287,6 +293,11 @@ test.describe("v8.12.2 (2)+(3) — the superadmin's reveal, and its record", () 
     const ex = await (await boss.api.get("/api/admin/export/tasks")).text();
     expect(ex, "the export carries the key and hint for a revealed superadmin").toContain(`SEALKEY_${TAG}`);
     expect(ex).toContain(`SEALHINT_${TAG}`);
+    // The bank question's reveal is that row's: the event's copy is revealed on
+    // its own record (a second reveal, of the row the submission is under).
+    const rvCopy = await reveal(boss, sealedCopy);
+    expect(rvCopy.status(), await rvCopy.text()).toBe(200);
+    expect(revealRows(sealedCopy), "the copy's reveal is on its own record").toBe(1);
     const subsAfter = await (await boss.api.get(`/api/admin/submissions?competitionId=${comp.id}`)).text();
     expect(subsAfter, "the submissions stream shows the submitted key").toContain(`SEALKEY_${TAG}`);
     const qAfter = await (await boss.api.get(`/api/admin/submissions?competitionId=${comp.id}&q=${encodeURIComponent(`SEALKEY_${TAG}`)}`)).json();
@@ -375,11 +386,12 @@ test.describe("v8.12.2 (2)+(3) — the superadmin's reveal, and its record", () 
   test("a revealed superadmin may UNSEAL (the author's power), and the v8.12.0 compete-event refusal still binds them", async () => {
     const UT = uniq("un").replace(/[^a-zA-Z0-9]/g, "");
     const { sealedId: u1, sealedId: _u, plainId: _p } = await makePair(author, UT);
-    const { sealedId: u2 } = await makePair(author, `${UT}b`);
-    // u2 sits in an event where staff compete: the unseal is refused there at
-    // any status, for a revealed superadmin exactly as for the author.
+    const { sealedId: u2bank } = await makePair(author, `${UT}b`);
+    // u2 — the event's own copy — sits in an event where staff compete: the
+    // unseal is refused there at any status, for a revealed superadmin exactly as
+    // for the author.
     const compete = await makeCompetition(sa, saCsrf, "unsealcompete", { staff_compete: true, duration_minutes: 60 });
-    await assignTask(author.api, author.csrf, u2, [compete.id]);
+    const u2 = await ownCopy(author, u2bank, compete.id);
     for (const id of [u1, u2]) {
       const rv = await reveal(boss, id);
       expect(rv.status(), await rv.text()).toBe(200);
@@ -491,12 +503,12 @@ test.describe("v8.12.2 pre-release review — the sealed hint in an admin's own 
 
   test("CONTROLS — the author in their own participant view, a COMPETING regular admin, and a non-competing superadmin (recorded) are each given the sealed hint", async () => {
     const T = tag("pvc");
-    const { sealedId: sT } = await makePair(author, T);
+    const { sealedId: sBank } = await makePair(author, T);
     const comp = await makeCompetition(sa, saCsrf, "pvhctl", { duration_minutes: 120 });
-    await assignTask(author.api, author.csrf, sT, [comp.id]);
-    const { sealedId: cT } = await makePair(author, `${T}c`);
+    const sT = await ownCopy(author, sBank, comp.id);
+    const { sealedId: cBank } = await makePair(author, `${T}c`);
     const compete = await makeCompetition(sa, saCsrf, "pvhcompete", { duration_minutes: 120, staff_compete: true });
-    await assignTask(author.api, author.csrf, cT, [compete.id]);
+    const cT = await ownCopy(author, cBank, compete.id);
     const stander = await makeParticipant(sa, saCsrf, "pvcstander");
     await enrol(sa, saCsrf, comp.id, [stander.id]);
     await enrol(sa, saCsrf, compete.id, [stander.id]);
@@ -540,9 +552,9 @@ test.describe("v8.12.2 pre-release review — the competitor, the blocked supera
 
   test("a superadmin who COMPETES in an event holding the challenge is shown nothing sealed after the end-of-event reveal, and nothing is recorded — while a non-competing superadmin on the same screen is shown it on the record (CONTROL)", async () => {
     const T = tag("cmp");
-    const { sealedId: sT } = await makePair(author, T);
+    const { sealedId: sBank } = await makePair(author, T);
     const ev = await makeCompetition(sa, saCsrf, "cmpend", { duration_minutes: 120, staff_compete: true, reveal_answers_on_end: true });
-    await assignTask(author.api, author.csrf, sT, [ev.id]);
+    const sT = await ownCopy(author, sBank, ev.id);
     const stander = await makeParticipant(sa, saCsrf, "cmpstander");
     const comp = await makeTier(sa, saCsrf, "cmpsup", "superadmin");
     const free = await makeTier(sa, saCsrf, "cmpfree", "superadmin");
@@ -569,9 +581,9 @@ test.describe("v8.12.2 pre-release review — the competitor, the blocked supera
 
   test("a superadmin BLOCKED out of band while impersonating a participant is shown nothing sealed and records nothing — the live lifecycle read, not the role alone", async () => {
     const T = tag("blk");
-    const { sealedId: sT } = await makePair(author, T);
+    const { sealedId: sBank } = await makePair(author, T);
     const ev = await makeCompetition(sa, saCsrf, "blkend", { duration_minutes: 120, reveal_answers_on_end: true });
-    await assignTask(author.api, author.csrf, sT, [ev.id]);
+    const sT = await ownCopy(author, sBank, ev.id);
     const target = await makeParticipant(sa, saCsrf, "blktarget");
     await enrol(sa, saCsrf, ev.id, [target.id]);
     const sup = await makeTier(sa, saCsrf, "blksup", "superadmin");
@@ -600,9 +612,11 @@ test.describe("v8.12.2 pre-release review — the competitor, the blocked supera
 
   test("a reveal made BEFORE enrolling in a compete event never widens the competitor's export — neither key, explanation nor hint — while the same session's export carried them before the enrolment (CONTROL)", async () => {
     const T = tag("exp");
-    const { sealedId: sT } = await makePair(author, T);
+    const { sealedId: sBank } = await makePair(author, T);
     const ev = await makeCompetition(sa, saCsrf, "expcompete", { duration_minutes: 120, staff_compete: true });
-    await assignTask(author.api, author.csrf, sT, [ev.id]);
+    // The event's own copy: what the rival answers, and (with `?competitionId=`)
+    // what the event's export carries.
+    const sT = await ownCopy(author, sBank, ev.id);
     // A rival on that board submits the key, so the Submissions stream and its
     // search have something a competitor must not read (final review: the
     // export was the only surface this rule was locked on).
@@ -626,7 +640,7 @@ test.describe("v8.12.2 pre-release review — the competitor, the blocked supera
     try {
       const rv = await reveal(sup, sT);
       expect(rv.status(), await rv.text()).toBe(200);
-      const before = await (await sup.api.get("/api/admin/export/tasks")).text();
+      const before = await (await sup.api.get(`/api/admin/export/tasks?competitionId=${ev.id}`)).text();
       expect(before, "CONTROL: revealed and not competing — the export carries the key").toContain(`SEALKEY_${T}`);
       expect(before).toContain(`SEALWHY_${T}`);
       expect(await subs(), "CONTROL: …the Submissions stream shows the rival's key").toContain(`SEALKEY_${T}`);
@@ -637,7 +651,7 @@ test.describe("v8.12.2 pre-release review — the competitor, the blocked supera
       expect(dbGet("SELECT 1 x FROM competition_users WHERE competition_id=? AND user_id=?", ev.id, sup.id), "the superadmin now competes").toBeTruthy();
       const r = await row(sup, sT);
       expect(r.competing_in.map(c => c.id), "the list agrees: a competitor").toContain(ev.id);
-      const after = await (await sup.api.get("/api/admin/export/tasks")).text();
+      const after = await (await sup.api.get(`/api/admin/export/tasks?competitionId=${ev.id}`)).text();
       expect(after, "no key to a competitor, whatever the marker says").not.toContain(`SEALKEY_${T}`);
       expect(after, "no explanation").not.toContain(`SEALWHY_${T}`);
       expect(after, "no hint").not.toContain(`SEALHINT_${T}`);
@@ -702,7 +716,11 @@ test.describe("v8.12.2 pre-release review — the record itself", () => {
     const { sealedId: sT } = await makePair(author, T);
     const mine = await makeCompetition(sa, saCsrf, "seatmine", { duration_minutes: 120 });
     const theirs = await makeCompetition(sa, saCsrf, "seattheirs", { duration_minutes: 120, reveal_answers_on_end: true });
-    await assignTask(author.api, author.csrf, sT, [mine.id, theirs.id]);
+    // ONE row held by both events (the previous model, through the test hook):
+    // the rule is about a reader of a challenge's History whose own event shares
+    // the challenge but not the participant — with event-owned copies each event's
+    // History is its own, so the shared row is built the way an older database holds it.
+    await withLegacySharedAssign(sa, saCsrf, () => assignTask(author.api, author.csrf, sT, [mine.id, theirs.id]));
     const eaP = await makeParticipant(sa, saCsrf, "seatea");
     await grantEventAdmin(sa, saCsrf, mine.id, eaP.id);
     const ea = { ...eaP, ...(await signIn(eaP.email)) };
@@ -787,10 +805,13 @@ test.describe("v8.12.2 second review — the participant surface asks about the 
     // participant of a compete event counted as a "competitor" and a superadmin
     // looking through one was shown nothing sealed, with a false 403.
     const T = tag("hand");
-    const { sealedId: sT } = await makePair(author, T);
+    const { sealedId: sBank } = await makePair(author, T);
     const E = await makeCompetition(sa, saCsrf, "handE", { duration_minutes: 120, staff_compete: true });
     const F = await makeCompetition(sa, saCsrf, "handF", { duration_minutes: 120 });
-    await assignTask(author.api, author.csrf, sT, [E.id, F.id]);
+    // Each event holds its OWN copy (sT in E, sF in F); the competitor lock
+    // follows the lineage, so competing in E withholds F's copy too.
+    const _cp = Object.fromEntries((await assignTask(author.api, author.csrf, sBank, [E.id, F.id])).copies.map(c => [c.competition_id, c.task_id]));
+    const sT = _cp[E.id], sF = _cp[F.id];
     const payer = await inEvent("handpayer", E.id);
     const unpaid = await inEvent("handunpaid", E.id);
     const pF = await inEvent("handpf", F.id);
@@ -818,17 +839,18 @@ test.describe("v8.12.2 second review — the participant surface asks about the 
       // CONTROL — the HAND competes: supC, in E, looks at F (which holds the same
       // challenge) through pF's account: withheld, and the reason is the lock.
       await impersonate(supC, pF.id, F.id);
-      const c = await (await supC.api.get(`/api/tasks/${sT}`)).json();
+      const c = await (await supC.api.get(`/api/tasks/${sF}`)).json();
       expect(c.hint, "CONTROL: a competing superadmin is shown no sealed hint anywhere").toBeUndefined();
       expect(c.hint_withheld).toBe(true);
       expect(c.hint_withheld_reason, "…and told the true reason").toBe("competing_elsewhere");
-      const cb = await supC.api.post(`/api/tasks/${sT}/hint`, { headers: H(supC.csrf) });
+      const cb = await supC.api.post(`/api/tasks/${sF}/hint`, { headers: H(supC.csrf) });
       expect(cb.status()).toBe(403);
       const cbj = await cb.json();
       expect(cbj.code).toBe("answer_sealed_not_author");
       expect(cbj.reason).toBe("competing_elsewhere");
       expect(cbj.error, "the refusal names the competitor lock, not 'here as staff'").toMatch(/competing in an event that holds this challenge/);
       expect(revealRows(sT), "nothing recorded for the competitor").toBe(n0 + 2);
+      expect(revealRows(sF), "…on F's copy either").toBe(0);
       await exitImp(supC);
     } finally { for (const c of [payer, unpaid, pF, sup, supC]) { try { await c.api.dispose(); } catch (_) {} } }
   });
@@ -866,11 +888,12 @@ test.describe("v8.12.2 second review — the participant surface asks about the 
         correct_answer: `ORDKEY_${T}`, status: "published", answer_sealed: true },
     });
     expect(mk.ok(), await mk.text()).toBeTruthy();
-    const noHint = (await mk.json()).id;
-    const { sealedId: locked } = await makePair(author, `${T}l`);
+    const noHintBank = (await mk.json()).id;
+    const { sealedId: lockedBank } = await makePair(author, `${T}l`);
     const comp = await makeCompetition(sa, saCsrf, "ordev", { duration_minutes: 120 });
-    await assignTask(author.api, author.csrf, noHint, [comp.id]);
-    await assignTask(author.api, author.csrf, locked, [comp.id]);
+    // The event's own copies: the lock below is the event's question's.
+    const noHint = await ownCopy(author, noHintBank, comp.id);
+    const locked = await ownCopy(author, lockedBank, comp.id);
     const adm = await makeTier(sa, saCsrf, "ordadm", "admin");
     const lk = await sa.post(`/api/admin/tasks/${locked}/lock`, { headers: H(saCsrf) });
     expect(lk.ok(), await lk.text()).toBeTruthy();
@@ -953,9 +976,9 @@ test.describe("v8.12.2 second review — the seat in History, per reader", () =>
     // the deletion removes, so asking visibility first told an organiser whose
     // own participant it had been that the seat was "outside your events".
     const T = tag("gone");
-    const { sealedId: sT } = await makePair(author, T);
+    const { sealedId: sBank } = await makePair(author, T);
     const mine = await makeCompetition(sa, saCsrf, "gonemine", { duration_minutes: 120, reveal_answers_on_end: true });
-    await assignTask(author.api, author.csrf, sT, [mine.id]);
+    const sT = await ownCopy(author, sBank, mine.id);   // the event's own copy: its History carries the seat
     const eaP = await makeParticipant(sa, saCsrf, "goneea");
     await grantEventAdmin(sa, saCsrf, mine.id, eaP.id);
     const seat = await makeParticipant(sa, saCsrf, "goneseat");

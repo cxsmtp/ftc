@@ -17,7 +17,8 @@ import { applyColumnFilters, applyColumnSort, columnSortActive, hasColumnFilters
 import { hideLoading, showLoading } from "../ui/loading.js";
 import { overlayDismiss, showModal } from "../ui/modal.js";
 import { showPrompt, showToast } from "../ui/toast.js";
-import { adminCan, deskApprovalWithheld, DESK_APPROVAL_REASON } from "../ui/nav.js"; // RBAC — the one permission predicate (read inside functions only)
+import { adminCan, adminPageOffered, deskApprovalWithheld, DESK_APPROVAL_REASON } from "../ui/nav.js";
+import { showUserInRoles } from "./users-admin.js"; // RBAC — the one permission predicate (read inside functions only)
 
 /**
  * v8.7.4 — ONE definition of "the acting admin may not manage this account".
@@ -183,9 +184,11 @@ export function isCompEffectivelyActive(comp){
   return false;
 }
 
+// The selection bar is the ONE door for acting on ticked people: assigning them
+// to events was also a toolbar button, the same action on the same selection
+// (owner's decision, 27 Nov 2026: removed).
 export function updateSelectionBar(){
   const bar=document.getElementById('participants-selection-bar');
-  const topBtn=document.getElementById('assign-to-comp-btn');
   const barBtn=document.getElementById('selection-bar-assign-btn');
   const count=S.selectedParticipants.size;
   const comp=S.adminSelectedCompetitionId?S.adminCompetitionsData.find(c=>c.id===S.adminSelectedCompetitionId):null;
@@ -209,9 +212,6 @@ export function updateSelectionBar(){
     // bottom-of-page focusables aren't trapped under it (see styles.css).
     document.body.classList.add('selection-bar-open');
     document.getElementById('selection-count').textContent=count+' selected';
-    topBtn.style.display=canAssign?'':'none';
-    topBtn.textContent=label;
-    topBtn.onclick=handler;
     barBtn.textContent=label;
     barBtn.onclick=handler;
     // Only show approve button if selected participants include pending users
@@ -233,7 +233,6 @@ export function updateSelectionBar(){
   }else{
     bar.style.display='none';
     document.body.classList.remove('selection-bar-open');
-    topBtn.style.display='none';
   }
 }
 
@@ -557,6 +556,98 @@ export function participantsInView(){
   return ps;
 }
 
+/**
+ * THE ACCOUNT DOORS a row offers — Edit/View profile, Block or Unblock, Unlock,
+ * Email sign-in code, and the note naming who manages a privileged account —
+ * ONE definition for People's row menu and the user rows of Roles & permissions
+ * (owner decision, 27 Nov 2026: admin accounts are no longer on People, so their
+ * own row there offers the doors People offered them). `p` is a People row (GET
+ * /api/admin/participants: `role`, `role_class`, `privileged_target`, `rival_in`,
+ * the status columns, `competitions`). Every door asks the predicate its route
+ * enforces; the server refuses regardless.
+ */
+export function accountDoors(p){
+  const st=pStatus(p);
+  const pRoleForPerm=p.role||'participant';
+  const targetPrivileged=targetPrivilegedFor(pRoleForPerm,p);
+  const _rival=(p.rival_in&&p.rival_in.id&&!(S.currentUser&&S.currentUser.id===p.id))?p.rival_in:null;
+  const isLocked=st==='locked';
+  // Regular admins can only block / unblock / unlock / reset non-privileged targets.
+  // Server enforces a 403 for admin/superadmin targets on each of those routes;
+  // hiding the buttons in the UI prevents the admin from even issuing the action.
+  // v8.7.0 — for an EVENT ADMIN, a fellow ORGANISER is a privileged target too.
+  // Two organisers sharing an event is the ordinary case this role was built
+  // for, so without this clause the menu would offer block / deny / reset /
+  // impersonate against a colleague the server then refuses
+  // (`event_admin_target_privileged`) — offering a control that is certain to
+  // fail is the v7.14.2 defect, and the note below is what makes the absence
+  // legible rather than looking like a broken feature.
+  //
+  // A GLOBAL admin is deliberately unaffected: they must be able to manage and
+  // demote an event admin, so `event_admin` is privileged only in this actor's
+  // eyes, which is exactly what the server's `participantDenied` decides.
+  const _canBlockBase=S.isSuperAdmin||!targetPrivileged;
+  // RBAC — each door asks the permission its route enforces: block and deny
+  // (`participants.block` / `participants.approve`), the emailed sign-in code
+  // (`participants.signin_codes`), unlock (`participants.edit`).
+  const canBlock=_canBlockBase&&!_rival&&adminCan('participants.block');
+  const canReset=_canBlockBase&&!_rival&&adminCan('participants.signin_codes');
+  const canUnlock=_canBlockBase&&adminCan('participants.edit');
+  // v7.14.2 — a regular admin acting on a PRIVILEGED peer is refused server-side
+  // (peer-admin doctrine: block/reset/role/delete/edit are all superadmin-only on
+  // admin+superadmin targets). The client correctly hid those items, but silently:
+  // the menu collapsed to Edit Profile + History with no reason given, which is
+  // indistinguishable from the feature being broken — and "Edit Profile" then
+  // opened a read-only dialog, so the one prominent item lied. Name the reason
+  // in the menu and relabel the item to match what it actually does.
+  const restrictedPeer=targetPrivileged&&!S.isSuperAdmin;
+  // v8.7.0 — the note must name the RIGHT tier and the RIGHT remedy. For an
+  // event admin looking at a fellow organiser the answer is "an administrator",
+  // not "a superadmin" — a note that sends them to the wrong person is the
+  // FROZEN_REMEDY failure (an instruction that is not true is worse than none).
+  // A custom role is named by its label. A regular admin's privileged row is
+  // a superadmin's to manage; an organiser's is an administrator's, unless it
+  // is unscoped (admin, superadmin, a custom role of class `all`).
+  const _peerName=pRoleForPerm==='superadmin'?'Superadmin':pRoleForPerm==='admin'?'Admin':pRoleForPerm==='event_admin'?'Event admin':(p.role_label||'Admin');
+  return {pRoleForPerm,targetPrivileged,_rival,isLocked,_canBlockBase,canBlock,canReset,canUnlock,restrictedPeer,_peerName};
+}
+
+/** The note naming who manages a privileged account (`accountDoors`), or ''. */
+export function accountPeerNoteHtml(p){
+  const d=accountDoors(p);
+  return d.restrictedPeer
+    ?((!S.isEventAdmin||isUnscopedAdminRow(d.pRoleForPerm,p))
+      ?`<div class="kebab-note" role="presentation">${ICO.lock} ${esc(d._peerName)} account — only superadmins can manage it</div>`
+      :`<div class="kebab-note" role="presentation">${ICO.lock} ${esc(d._peerName)} account — only an administrator can manage it</div>`)
+    :'';
+}
+/** "Edit Profile", or "View Profile" where the editor opens read-only. */
+export function accountProfileLabel(p){
+  return (accountDoors(p).restrictedPeer||!adminCan('participants.edit'))?'View Profile':'Edit Profile';
+}
+/** Block, Unblock or Unlock, as the row's state and the actor allow (`accountDoors`), or ''. */
+export function accountBlockDoorHtml(p){
+  const {_rival,canUnlock,canBlock,isLocked}=accountDoors(p);
+  // Is this user in any LIVE competition? Elevates Block from warning to danger
+  const userInLive=(p.competitions||[]).some(c=>c.status==='live');
+  const blockCls=userInLive?'km-danger':'km-warning';
+  // v6.14.0 — hide Unblock on denied rows. Unblocking a denied user
+  // without clearing denied_at would leave the row in a stale state
+  // (login passes the blocked gate, then shows pending_approval, but
+  // the operator can't actually approve them via /approve unless the
+  // row goes through the deny-reversal branch which requires
+  // denied_at to still be set). Approve (above) is the only correct
+  // path back from Denied; Unblock simply doesn't apply.
+  return (_rival&&canUnlock&&isLocked&&!p.blocked&&!p.denied_at)
+    ?`<button data-action="participant-unlock" data-user-id="${esc(p.id)}">${ICO.unlock} Unlock</button>`   // v8.12.0 — unlock is not a board input, so a rival keeps it
+    :!canBlock?'':p.denied_at
+    ?''
+    :p.blocked
+    ?`<button data-action="participant-block" data-user-id="${esc(p.id)}" data-blocked="true">${ICO.shieldOff} Unblock</button>`
+    :isLocked?(canUnlock?`<button data-action="participant-unlock" data-user-id="${esc(p.id)}">${ICO.unlock} Unlock</button>`:'')
+    :`<button class="${blockCls}" data-action="participant-block" data-user-id="${esc(p.id)}" data-blocked="false">${ICO.ban} Block</button>`;
+}
+
 export function renderParticipants(){
   // v8.12.6 (review) — WHICH STATE OF THE FOCUSED EVENT THESE ROWS WERE BUILT FOR.
   // Each row's Invite and Remove items, and its notes, read the focused event's
@@ -623,11 +714,11 @@ export function renderParticipants(){
     // audit v7.7.33 (AL13) — the remove-× spans get role=button+tabindex from the
     // a11y tagger but read only as "×"; add an aria-label naming the tag/group +
     // user so screen readers announce what will be removed. (24px hit target via CSS.)
-    const pRoleForPerm=p.role||'participant';
+    const {pRoleForPerm,targetPrivileged,_rival,isLocked,_canBlockBase,canBlock,canReset,canUnlock,restrictedPeer}=accountDoors(p);
+    const peerNoteKm=accountPeerNoteHtml(p), profileLabel=accountProfileLabel(p), blockKm=accountBlockDoorHtml(p);
     // v8.11.4 — HOISTED above the tag/group cells, which need the same answer.
     // It used to be computed thirty lines below them, which is why those two
     // cells were the only controls on this row with no tier gate at all.
-    const targetPrivileged=targetPrivilegedFor(pRoleForPerm,p);
     const _pn=esc(p.nickname||p.email||'user');
     // v8.11.4 — WITHHOLD THE CHIP CONTROLS WITH THEIR REASON on a privileged
     // target. Both routes refuse a non-superadmin here with a named 403
@@ -651,7 +742,6 @@ export function renderParticipants(){
     // change). Withheld WITH the reason, per v7.14.2; viewing (the profile
     // dialog, History) and every door that is not a board input stay. Never on
     // the actor's OWN row, which the server exempts too.
-    const _rival=(p.rival_in&&p.rival_in.id&&!(S.currentUser&&S.currentUser.id===p.id))?p.rival_in:null;
     // RBAC — the chip routes are `participants.edit` routes.
     // A waiting invitee in none of an organiser's events (sweep #501): nothing on
     // the row is theirs to change, and its menu says who approves.
@@ -666,68 +756,6 @@ export function renderParticipants(){
     const groupsHtml=(p.groups||[]).map(g=>`<span class="group-tag"${g.competing?' title="Bound to an event you compete in — its membership cannot be changed from here"':''}>${esc(g.name)}${(canManageChips&&!g.competing)?`<span class="tag-x" data-action="participant-group-remove" data-user-id="${esc(p.id)}" data-group-id="${esc(g.id)}" aria-label="Remove ${_pn} from group ${esc(g.name)}">×</span>`:''}</span>`).join('')
       // "+ group" first reads the group list (`groups.view`).
       +((canManageChips&&adminCan('groups.view'))?`<span class="tag-add" data-action="participant-group-add" data-user-id="${esc(p.id)}">+ group</span>`:'')+_chipNote;
-    const isLocked=st==='locked';
-    // Regular admins can only block / unblock / unlock / reset non-privileged targets.
-    // Server enforces a 403 for admin/superadmin targets on each of those routes;
-    // hiding the buttons in the UI prevents the admin from even issuing the action.
-    // v8.7.0 — for an EVENT ADMIN, a fellow ORGANISER is a privileged target too.
-    // Two organisers sharing an event is the ordinary case this role was built
-    // for, so without this clause the menu would offer block / deny / reset /
-    // impersonate against a colleague the server then refuses
-    // (`event_admin_target_privileged`) — offering a control that is certain to
-    // fail is the v7.14.2 defect, and the note below is what makes the absence
-    // legible rather than looking like a broken feature.
-    //
-    // A GLOBAL admin is deliberately unaffected: they must be able to manage and
-    // demote an event admin, so `event_admin` is privileged only in this actor's
-    // eyes, which is exactly what the server's `participantDenied` decides.
-    const _canBlockBase=S.isSuperAdmin||!targetPrivileged;
-    // RBAC — each door asks the permission its route enforces: block and deny
-    // (`participants.block` / `participants.approve`), the emailed sign-in code
-    // (`participants.signin_codes`), unlock (`participants.edit`).
-    const canBlock=_canBlockBase&&!_rival&&adminCan('participants.block');
-    const canReset=_canBlockBase&&!_rival&&adminCan('participants.signin_codes');
-    const canUnlock=_canBlockBase&&adminCan('participants.edit');
-    // v7.14.2 — a regular admin acting on a PRIVILEGED peer is refused server-side
-    // (peer-admin doctrine: block/reset/role/delete/edit are all superadmin-only on
-    // admin+superadmin targets). The client correctly hid those items, but silently:
-    // the menu collapsed to Edit Profile + History with no reason given, which is
-    // indistinguishable from the feature being broken — and "Edit Profile" then
-    // opened a read-only dialog, so the one prominent item lied. Name the reason
-    // in the menu and relabel the item to match what it actually does.
-    const restrictedPeer=targetPrivileged&&!S.isSuperAdmin;
-    // v8.7.0 — the note must name the RIGHT tier and the RIGHT remedy. For an
-    // event admin looking at a fellow organiser the answer is "an administrator",
-    // not "a superadmin" — a note that sends them to the wrong person is the
-    // FROZEN_REMEDY failure (an instruction that is not true is worse than none).
-    // A custom role is named by its label. A regular admin's privileged row is
-    // a superadmin's to manage; an organiser's is an administrator's, unless it
-    // is unscoped (admin, superadmin, a custom role of class `all`).
-    const _peerName=pRoleForPerm==='superadmin'?'Superadmin':pRoleForPerm==='admin'?'Admin':pRoleForPerm==='event_admin'?'Event admin':(p.role_label||'Admin');
-    const peerNoteKm=restrictedPeer
-      ?((!S.isEventAdmin||isUnscopedAdminRow(pRoleForPerm,p))
-        ?`<div class="kebab-note" role="presentation">${ICO.lock} ${esc(_peerName)} account — only superadmins can manage it</div>`
-        :`<div class="kebab-note" role="presentation">${ICO.lock} ${esc(_peerName)} account — only an administrator can manage it</div>`)
-      :'';
-    const profileLabel=(restrictedPeer||!adminCan('participants.edit'))?'View Profile':'Edit Profile';
-    // Is this user in any LIVE competition? Elevates Block from warning to danger
-    const userInLive=(p.competitions||[]).some(c=>c.status==='live');
-    const blockCls=userInLive?'km-danger':'km-warning';
-    // v6.14.0 — hide Unblock on denied rows. Unblocking a denied user
-    // without clearing denied_at would leave the row in a stale state
-    // (login passes the blocked gate, then shows pending_approval, but
-    // the operator can't actually approve them via /approve unless the
-    // row goes through the deny-reversal branch which requires
-    // denied_at to still be set). Approve (above) is the only correct
-    // path back from Denied; Unblock simply doesn't apply.
-    const blockKm=(_rival&&canUnlock&&isLocked&&!p.blocked&&!p.denied_at)
-      ?`<button data-action="participant-unlock" data-user-id="${esc(p.id)}">${ICO.unlock} Unlock</button>`   // v8.12.0 — unlock is not a board input, so a rival keeps it
-      :!canBlock?'':p.denied_at
-      ?''
-      :p.blocked
-      ?`<button data-action="participant-block" data-user-id="${esc(p.id)}" data-blocked="true">${ICO.shieldOff} Unblock</button>`
-      :isLocked?(canUnlock?`<button data-action="participant-unlock" data-user-id="${esc(p.id)}">${ICO.unlock} Unlock</button>`:'')
-      :`<button class="${blockCls}" data-action="participant-block" data-user-id="${esc(p.id)}" data-blocked="false">${ICO.ban} Block</button>`;
     // Verify action is superadmin-only (server enforces with 403). It's a
     // recovery tool for users who can't receive the verification email —
     // pair it with Show sign-in code, a one-time code the operator hands over
@@ -756,35 +784,15 @@ export function renderParticipants(){
       : '';
     const pRole=p.role||'participant';
     const isSelf=S.currentUser&&S.currentUser.id===p.id;
+    // ROLE CHANGES LIVE ON ROLES & PERMISSIONS ONLY (owner's decision, 27 Nov
+    // 2026): the row's Promote/Demote items are gone, and the row links there
+    // instead, for the viewer who could make the change (a superadmin, not on
+    // their own row, not on a rival's: the role route is a rival door). That page
+    // lists the admin accounts with Change role, and Add user gives an existing
+    // participant an admin role; it opens searched to this person.
     let roleKm='';
-    if(S.isSuperAdmin&&!isSelf&&!_rival){
-      if(pRole==='participant'){
-        roleKm=`<button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="admin" data-prev-role="${esc(pRole)}">${ICO.arrowUp} Promote to Admin</button><button class="km-danger" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="superadmin" data-prev-role="${esc(pRole)}">${ICO.star} Promote to Superadmin</button>`;
-      }else if(pRole==='admin'){
-        roleKm=`<button class="km-danger" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="superadmin" data-prev-role="${esc(pRole)}">${ICO.star} Promote to Superadmin</button><button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="participant" data-prev-role="${esc(pRole)}">${ICO.arrowDown} Demote to Participant</button>`;
-      }else if(pRole==='superadmin'){
-        roleKm=`<button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="admin" data-prev-role="${esc(pRole)}">${ICO.arrowDown} Demote to Admin</button><button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="participant" data-prev-role="${esc(pRole)}">${ICO.arrowDown} Demote to Participant</button>`;
-      }else if(pRole==='event_admin'){
-        // v8.7.4 — THE TIER HAD NO ROLE CONTROL AT ALL. The chain above had no
-        // `event_admin` branch and no `else`, so `roleKm` stayed empty and a
-        // superadmin had NO WAY to demote an event admin from any screen —
-        // while the role route accepts the move in both directions and cascades
-        // every grant away on the way out, and ROLES_AND_PERMISSIONS states the
-        // capability as one the operator requires. Reachable only with curl,
-        // which by this codebase's doctrine is not shipped at all.
-        //
-        // "Remove as event admin of <event>" is NOT a substitute and must not be
-        // read as one: it revokes ONE grant and deliberately leaves the role in
-        // place (the fail-closed zero-grant state). Demoting altogether is this
-        // control, and only this one.
-        //
-        // The tier is deliberately NOT offered as a promotion TARGET here: the
-        // scope is granted per EVENT, from the focused event's own kebab item,
-        // and a role-menu promotion would mint an organiser with nothing to
-        // organise. Every other role control is global; this one names an event,
-        // which is why it lives there rather than here.
-        roleKm=`<button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="admin" data-prev-role="${esc(pRole)}">${ICO.arrowUp} Promote to Admin</button><button class="km-danger" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="superadmin" data-prev-role="${esc(pRole)}">${ICO.star} Promote to Superadmin</button><button class="km-warning" data-action="participant-role" data-user-id="${esc(p.id)}" data-new-role="participant" data-prev-role="${esc(pRole)}">${ICO.arrowDown} Demote to Participant</button>`;
-      }
+    if(S.isSuperAdmin&&!isSelf&&!_rival&&adminPageOffered('admin-users-tab')){
+      roleKm=`<button data-action="participant-open-roles" data-user-id="${esc(p.id)}" data-email="${esc(p.email||'')}">${ICO.key} Change role on Roles &amp; permissions</button>`;
     }
     // v8.7.0 — MAKE / REMOVE EVENT ADMIN, for the focused event.
     //
@@ -1165,6 +1173,11 @@ export async function loadAdminParticipants(opts){
   // focused event changed state under an open table) keeps their page and their
   // ticked rows; every other caller is a navigation or an action and resets both.
   const _keepView=!!(opts&&opts.keepView===true);
+  // ADMIN ACCOUNTS ARE NOT PEOPLE (owner's decision, 27 Nov 2026: "Show admin
+  // accounts" is gone; admins live on Roles & permissions). Only a cross-page
+  // link to one (admin-crossnav.js `widenPeopleToAdmins`: a competing admin on a
+  // board) lists them, until People is next entered; the list says so.
+  if(opts&&opts.tabEntry){ S.pIncludeAdmins=!!S._pWidenOnce; S._pWidenOnce=false; }
   // RBAC — a role that may not read people sends no read (every refusal toasts
   // and counts towards the address's scanner block).
   if(!adminCan('participants.view'))return;
@@ -1220,9 +1233,8 @@ export async function loadAdminParticipants(opts){
     // RBAC — People is participants; an event workspace asks for every role so
     // the event's roster keeps the staff who compete in it.
     const _kind=(S.adminSelectedCompetitionId||S.pIncludeAdmins)?'&kind=all':'';
-    { const off=!!(S.adminSelectedCompetitionId||(S.isEventAdmin&&!S.pIncludeAdmins));
-      const sc=document.getElementById('p-admins-scope'); if(sc)sc.hidden=off;
-      const tip=document.getElementById('p-admins-scope-help'); if(tip)tip.hidden=off; }
+    { const note=document.getElementById('p-admins-note'); if(note)note.hidden=!!S.adminSelectedCompetitionId||!S.pIncludeAdmins;
+      const roles=document.getElementById('p-admins-note-roles'); if(roles)roles.hidden=!adminPageOffered('admin-users-tab'); }
     try{ const _r=await fetch(`/api/admin/participants?limit=5000&page=${page}${_kind}`); if(_r.ok) raw=await _r.json(); }catch(e){ console.warn('Could not load participants page',page,e); }
     if(raw===null){
       // v8.12.6 (review) — BOTH exits release the loading count this call took.
@@ -1263,7 +1275,11 @@ export async function loadAdminParticipants(opts){
   // them, `events.view`), At the desk (`participants.enrol`), the file exports
   // (`export.data`); the Export menu goes when it holds nothing, and a hidden
   // door's "?" tip goes with it.
-  { const enrol=adminCan('participants.enrol'), exp=adminCan('export.data');
+  // Inside an event's workspace neither people door is here: the workspace
+  // header's Invite holds both (an email invitation, a sign-up at the desk;
+  // owner's decision, 27 Nov 2026). The People page keeps its toolbar.
+  { const inWs=!!S.adminSelectedCompetitionId;
+    const enrol=adminCan('participants.enrol')&&!inWs, exp=adminCan('export.data');
     const show=(el,on)=>{ if(el)el.style.display=on?'':'none'; };
     show(document.getElementById('invite-participants-btn'),enrol&&(!S.isEventAdmin||adminCan('events.view')));
     show(document.getElementById('desk-invite-btn'),enrol);
@@ -1553,8 +1569,19 @@ export async function removeGroup(userId,groupId){
 // audit v7.7.33 (AL12) — name the target participant in destructive/action
 // confirms (nickname + email), matching denyUser + the entity-delete confirms.
 // These fire from a dense per-row kebab menu where a wrong-row misclick is easy.
+/** The row an account door acts on: People's list, else the admin accounts
+ *  Roles & permissions read for its own account doors (S.adminUserRows). */
+export function personRow(id){
+  return (S.adminParticipantsData||[]).find(u=>u.id===id)||(S.adminUserRows||[]).find(u=>u.id===id)||null;
+}
+/** After an account door changed an account: People reloads, and so does Roles
+ *  & permissions while it is on screen (users-admin.js listens). */
+function _accountChanged(){
+  loadAdminParticipants();
+  try{document.dispatchEvent(new CustomEvent('admin:account-changed'));}catch(_){/* no CustomEvent: the list reloads on its next open */}
+}
 function _pLabel(id){
-  const p=S.adminParticipantsData.find(u=>u.id===id);
+  const p=personRow(id);
   if(!p)return 'this user';
   const nm=p.nickname||[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'this user';
   return `<strong>${esc(nm)}</strong>${p.email?` (${esc(p.email)})`:''}`;
@@ -1572,47 +1599,13 @@ export async function verifyUser(id){
   loadAdminParticipants();showToast('User verified!','success');
 }
 
-export async function setUserRole(userId,role,currentRole){
-  // v8.7.4 — `event_admin` joins BOTH maps, and the rank one is not cosmetic.
-  // Without a label the confirm read "Promote to undefined"; without a rank the
-  // tier scored 0, the same as a participant, so demoting an organiser to
-  // participant compared 0 < 0 and announced itself as a PROMOTION. The tier
-  // sits between participant and admin — scoped to some events rather than all
-  // of them — which keeps every pre-existing transition's verb unchanged.
-  const labels={admin:'Admin',superadmin:'Superadmin',participant:'Participant',event_admin:'Event Admin'};
-  const rank={participant:0,event_admin:1,admin:2,superadmin:3};
-  const action=(rank[role]||0)<(rank[currentRole]||0)?'Demote':'Promote';
-  const isDemotion=action==='Demote';
-  const promotingToSuperadmin=!isDemotion&&role==='superadmin';
-  // Severity: demotion + promoting to superadmin = danger; other promotions = warning
-  const confirmClass=(isDemotion||promotingToSuperadmin)?'danger':'warning';
-  // LEAVING the event-admin tier drops every event grant, in the same
-  // transaction as the role write. That is what "demote altogether" means, and
-  // it is not recoverable by putting the role back — the grants are gone and
-  // must be re-issued per event. An operator must be told BEFORE clicking.
-  const leavingEventAdmin=currentRole==='event_admin'&&role!=='event_admin';
-  // The COUNT comes from the row the operator is looking at — `event_admin_for`
-  // rides the participant payload — because the superadmin guide promises the
-  // confirmation says how many events go. It is a poll old at worst, so the
-  // toast below reports the server's authoritative figure once it is known.
-  const _eaCount=leavingEventAdmin
-    ?((S.adminParticipantsData||[]).find(u=>u.id===userId)?.event_admin_for||[]).length
-    :0;
-  const extra=(promotingToSuperadmin?'<br><br><strong>Note:</strong> Superadmins have full control over the platform, including the ability to delete data and change other users\' roles.':'')
-    +(leavingEventAdmin?`<br><br><strong>Note:</strong> This also removes every event they organise${_eaCount?` (${_eaCount})`:''}. Putting the role back does not restore them — each event has to be granted again.`:'');
-  const ok=await showModal({title:`${action} to ${labels[role]}`,message:`This will change ${_pLabel(userId)}'s role to <strong>${labels[role]}</strong>.${extra}`,confirmText:action,confirmClass});
-  if(!ok)return;
-  const r=await fetch(`/api/admin/participants/${userId}/role`,{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({role})});
-  const d=await r.json();
-  if(!r.ok){showToast(d.error||'Failed.','error');return;}
-  // The server's own count, not the row's: a grant made between the render and
-  // the click would otherwise be cleared silently. A skip/clear counter with no
-  // human consumer is the v7.21.2 defect, and this one records an irreversible
-  // step — the grants have to be re-issued per event.
-  const _cleared=Number(d.event_admin_grants_cleared)||0;
-  showToast(`Role updated to ${labels[role]||role}.`
-    +(_cleared?` ${_cleared} event grant${_cleared===1?'':'s'} cleared.`:''),'success');
-  loadAdminParticipants();
+// The row's link to Roles & permissions, where a role is changed (the page
+// opens searched to this person's address).
+export function openRolesFor(email){
+  const item=document.querySelector('.admin-nav-item[data-tab-id="admin-users-tab"]');
+  if(!item){showToast('Your role cannot open Roles & permissions.','info');return;}
+  showUserInRoles(email);
+  item.click();
 }
 
 // v8.7.0 — GRANT / REVOKE the event-admin role for ONE event.
@@ -1632,7 +1625,7 @@ export async function grantEventAdmin(userId,compId,compName,nickname){
   const ok=await showModal({
     title:'Make event admin',
     message:`<strong>${esc(nickname||_pLabel(userId))}</strong> will be able to organise `
-      +`<strong>${esc(compName)}</strong> — its challenges, its participants, its rankings — `
+      +`<strong>${esc(compName)}</strong> — its questions, its participants, its rankings — `
       +`with the same powers you have on that event.<br><br>`
       +`They will see nothing outside the events they are given. They cannot create a blank event `
       +`(only from a template, or by cloning one of their own), change roles, or reach Logs and Settings.<br><br>`
@@ -1757,7 +1750,7 @@ export async function bulkApproveUsers(){
 
 export async function blockUser(id,currentlyBlocked){
   // Elevate severity to danger when the target user is in any live competition
-  const target=S.adminParticipantsData.find(p=>p.id===id);
+  const target=personRow(id);
   const userInLive=!!target&&(target.competitions||[]).some(c=>c.status==='live');
   const liveNote=userInLive?'<br><br><strong>Warning:</strong> this user is currently in a live event. Blocking them will immediately cut off their access.':'';
   const ok=await showModal(currentlyBlocked
@@ -1765,7 +1758,7 @@ export async function blockUser(id,currentlyBlocked){
     :{title:'Block User',message:`${_pLabel(id)} will be immediately logged out and unable to log in until unblocked.${liveNote}`,confirmText:'Block',confirmClass:userInLive?'danger':'warning'});
   if(!ok)return;
   const r=await fetch(`/api/admin/participants/${id}/block`,{method:'POST',headers:csrfHeaders()});
-  if(r.ok){showToast(currentlyBlocked?'User unblocked.':'User blocked.');loadAdminParticipants();}
+  if(r.ok){showToast(currentlyBlocked?'User unblocked.':'User blocked.');_accountChanged();}
   else showToast('Action failed.','error');
 }
 
@@ -1779,7 +1772,7 @@ export async function unlockUser(id){
     if(res.d.emailDelivered===false)showToast('User unlocked, but the notification email could NOT be delivered. Check SMTP.','error');
     else if(res.d.emailDeferred)showToast('User unlocked. The notification email is still being sent.','warning');
     else showToast('User unlocked.','success');
-    loadAdminParticipants();
+    _accountChanged();
   }else showToast('Action failed.','error');
 }
 
@@ -1799,7 +1792,7 @@ export async function emailSignInCodeForUser(id){
 }
 
 export function adminEditProfile(userId){
-  const p=S.adminParticipantsData.find(u=>u.id===userId);
+  const p=personRow(userId);
   if(!p)return;
   // Privileged targets: non-superadmins see a read-only view — no fields
   // editable. Normal users: non-superadmins can fill in blank fields only.
@@ -2035,7 +2028,7 @@ export async function saveAdminProfile(userId){
   } else {
     showToast('Profile updated.','success');
   }
-  loadAdminParticipants();
+  _accountChanged();
 }
 
 /**
@@ -2526,7 +2519,7 @@ export async function submitInvitations(){
   if(d.skippedStaff)msg.push(`${d.skippedStaff} staff enrolment(s) skipped — staff can only be added to events that let staff compete`);
   if(d.skippedPrivileged)msg.push(`${d.skippedPrivileged} admin account(s) skipped — only a superadmin can enrol an admin`);
   if(d.skippedPrivilegedGroups)msg.push(`${d.skippedPrivilegedGroups} admin account(s) not added to the selected group(s) — only a superadmin can put an admin into a group`);
-  if(d.skippedAuthors)msg.push(`${d.skippedAuthors} skipped because they created a challenge in the event`);
+  if(d.skippedAuthors)msg.push(`${d.skippedAuthors} skipped because they created a question in the event`);
   if(d.skippedBlocked)msg.push(`${d.skippedBlocked} blocked account(s) not enrolled`);
   if(d.skippedUnapproved)msg.push(`${d.skippedUnapproved} unapproved account(s) not enrolled`);
   // v8.12.6 — the late-entry window refuses a NEW row for anybody who took part
@@ -2628,7 +2621,7 @@ function _assignSkipNote(d){
   if(d.skippedPrivileged)parts.push(`${d.skippedPrivileged} admin account(s) skipped — only a superadmin can enrol an admin`);
   if(d.skippedBlocked)parts.push(`${d.skippedBlocked} blocked account(s) skipped`);
   if(d.skippedUnapproved)parts.push(`${d.skippedUnapproved} unapproved account(s) skipped`);
-  if(Array.isArray(d.skippedAuthors)&&d.skippedAuthors.length)parts.push(`${d.skippedAuthors.length} skipped because they created a challenge in the event`);
+  if(Array.isArray(d.skippedAuthors)&&d.skippedAuthors.length)parts.push(`${d.skippedAuthors.length} skipped because they created a question in the event`);
   // v8.12.6 — through a late-entry window the route skips anybody who took part
   // in the event before it ended (a new row would move them onto the late-entrant
   // list and let them play on past the end of an event whose results are final).
@@ -2661,8 +2654,8 @@ function _showSkippedAuthorsModal(d){
   if(!rows.length)return;
   const list=rows.map(r=>`<li><strong>${esc(r.nickname||r.userId)}</strong> — ${esc(r.competitionName||'')}: ${(r.tasks||[]).map(t=>`“${esc(t.title)}”`).join(', ')}</li>`).join('');
   showModal({
-    title:'Not enrolled — they wrote a challenge in this event',
-    message:`A challenge's answer is known to the person who created it, so its author cannot compete in an event it is assigned to. These were skipped:<ul style="margin:8px 0 0 18px">${list}</ul>Take the challenge out of the event, or leave them off the board.`,
+    title:'Not enrolled — they wrote a question in this event',
+    message:`A question's answer is known to the person who created it, so its author cannot compete in an event it is assigned to. These were skipped:<ul style="margin:8px 0 0 18px">${list}</ul>Take the question out of the event, or leave them off the board.`,
     confirmText:'OK',cancelText:null
   });
 }
@@ -2731,7 +2724,7 @@ export function _getAssignRevivalHints(comp){
     // the auto-end predicate is solved-OR-exhausted. This is the WORST-placed of
     // the five copies of that claim, because it is shown at the exact moment an
     // admin is following the remedy the other four name.
-    `<strong style="color:var(--yellow)">Revival warning:</strong> This event was auto-ended (every participant had finished every challenge — solved it, or run out of attempts). Adding new participants will make the following <strong>live</strong> again:` +
+    `<strong style="color:var(--yellow)">Revival warning:</strong> This event was auto-ended (every participant had finished every question — solved it, or run out of attempts). Adding new participants will make the following <strong>live</strong> again:` +
     `<ul style="margin:6px 0 0">${revivable.map(n=>'<li>'+esc(n)+'</li>').join('')}</ul>` +
     (certNote?`<p style="margin:8px 0 0">${esc(certNote)}</p>`:'') +
     `</div>`;

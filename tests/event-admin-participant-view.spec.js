@@ -125,7 +125,9 @@ test.describe("v8.7.3 — the participant view an event admin can actually use",
     // The reported symptom, asserted as an ABSENCE and by its cause. The status
     // code is what discriminates: "no toast" alone is equally true of a build
     // whose toast is merely broken.
-    expect(toasts, "the picker's own request must have succeeded").toContain("my-competitions -> 200");
+    // The participant nav paints before the picker's read answers, so wait for
+    // the response rather than read the list at once (it failed under load).
+    await expect.poll(() => toasts, { message: "the picker's own request must have succeeded" }).toContain("my-competitions -> 200");
     const grid = await page.locator("#comp-grid").innerText();
     expect(grid, "the reported sentence must be gone").not.toContain("did not respond correctly");
     expect(grid, "and their own event is listed").toContain(world.mine.name);
