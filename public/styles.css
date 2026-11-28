@@ -6322,7 +6322,7 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .help-label-row.cw-sub-row{margin:12px 0 4px}
 .ua-head>.help-label-row{margin:0 0 12px}
 #comp-form-overlay .help-label-row>h3,#comp-form-overlay .help-label-row>h4,.help-label-row>.cw-sub,.ua-head>.help-label-row>h2{margin:0}
-.lb-help-row{margin:0 0 12px}
+.lb-title-row{margin:0}
 
 /* -- CHALLENGE EDITOR (v8.17.0) -------------------------------------------
    The compact New / Edit Challenge form: the question on the left, a settings
