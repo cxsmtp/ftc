@@ -31,8 +31,8 @@ const ROOT = path.join(__dirname, "..");
 const TABLE_EXEMPT = [
   { file: "public/index.html", tag: '<table class="lb-table">', count: 1,
     why: "the participant leaderboard: the participant app, not an admin page" },
-  { file: "public/js/features/leaderboard.js", tag: '<table class="lb-table">', count: 5,
-    why: "the participant leaderboard and its late-entrant and team boards: the participant app" },
+  { file: "public/js/features/leaderboard.js", tag: '<table class="lb-table">', count: 7,
+    why: "the participant leaderboard and its overall, late-entrant and team boards: the participant app" },
   { file: "public/js/features/history.js", tag: "<table>", count: 1,
     why: "the History dialog: a table inside a dialog keeps its own search, sort and pages (operator ruling, 14 Nov 2026: the every-admin-table rule covers the admin pages); the component's popovers also sit on <body> at z-index 200, under the dialog's 3000 and outside its focus trap" },
   { file: "public/js/features/export-import.js", tag: '<table style="width:100%;border-collapse:collapse;font-size:var(--fs-13)">', count: 1,
