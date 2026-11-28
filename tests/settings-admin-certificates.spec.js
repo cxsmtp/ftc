@@ -93,7 +93,7 @@ test("a REGULAR admin opens the platform certificate designer from Settings, sav
     for (const h of SUPERADMIN_ONLY) expect(txt, `section ${key} shows no "${h}"`).not.toContain(h);
     expect(await page.locator("#settings-platform-name").isVisible(), `section ${key}: the platform name input is not on screen`).toBe(false);
   }
-  expect(listed, "only the sections this admin may use are listed").toEqual(["cxone-audit", "general", "branding", "email", "health"]);
+  expect(listed, "only the sections this admin may use are listed").toEqual(["staff-teams", "cxone-audit", "general", "branding", "email", "health"]);
 
   // Open the designer and save a design.
   const title = `ADMIN DESIGN ${Date.now() % 100000}`;
