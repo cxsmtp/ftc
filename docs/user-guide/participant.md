@@ -250,8 +250,10 @@ the event leaves the strip, even while later sessions are still to run.
 ranked: it has a leaderboard, a running score and placings. A **Booth Event** is
 a short walk-up session at a stand (on a phone, its multiple-choice questions are
 large tiles you tap). A **Program** is self-paced material running to a
-deadline: it has no leaderboard and no placings, and its certificate is issued as
-soon as you have solved every challenge rather than when the event finishes. Its
+deadline: it has no leaderboard and no placings. Once you have finished every
+challenge (solved it or used every attempt) you get a grade, and a grade of 60%
+or more earns your certificate straight away rather than when the event
+finishes (see *Your grade on a Program*). Its
 points still count — each challenge shows what it is worth, and answering one
 tells you your total — but the header, the play bar and the progress strip show
 no score.
