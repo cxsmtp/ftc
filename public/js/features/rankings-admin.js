@@ -788,6 +788,10 @@ export function exportRankingsCsv(key){
 // PER-SESSION QUESTION SETS (owner decision, 27 Nov 2026) — a row's score: its
 // points, or on an overall board ranking by percentages the percentage first,
 // with the points and the session's maximum it is a share of beside it.
+// What a top-three place's certificate prints in its score slot: the percentage
+// a board ranked by percentages placed it on (as the server freezes it at mint),
+// else its points.
+function _rkPlaceScore(r){return typeof r.percent==='number'?`${r.percent}%`:`${r.score ?? 0} pts`;}
 function _rkScoreCell(u){
   if(typeof u.percent!=='number')return `<td><strong>${u.score}</strong> pts</td>`;
   const pct=`${u.percent.toFixed(1).replace(/\.0$/,'')}%`;
@@ -1326,7 +1330,7 @@ function _rkRenderTopCerts(compId, board, { reread = true } = {}) {
       const [tier, label] = _RK_TIERS[r.rank];
       return `<li class="rk-cert" data-rank="${r.rank}">
         <figure class="rk-cert-fig"><img alt="" hidden data-rk-cert-img="${r.rank}"/><span class="rk-cert-medal rk-cert-${esc(tier)}" aria-hidden="true">${r.rank}</span></figure>
-        <div class="rk-cert-txt"><span class="eyebrow">${esc(label)}</span><b>${esc(name(r))}</b><small>${esc(r.nickname || '')} · ${esc(String(r.score ?? 0))} pts</small></div>
+        <div class="rk-cert-txt"><span class="eyebrow">${esc(label)}</span><b>${esc(name(r))}</b><small>${esc(r.nickname || '')} · ${esc(_rkPlaceScore(r))}</small></div>
         <div class="rk-cert-actions"><button type="button" class="btn sm secondary" data-action="rk-cert-preview" data-rank="${r.rank}">Preview</button><button type="button" class="btn sm${r.rank === 1 ? ' gold' : ''}" data-action="rk-cert-download" data-rank="${r.rank}">${ICO.download} PNG</button></div>
       </li>`;
     }).join('')}</ol>` : ''}`);
@@ -1383,7 +1387,7 @@ async function _rkCertPng(rank) {
   if (!r || !comp) return null;
   const [tier] = _RK_TIERS[rank];
   const nm = cutCodePoints(_rkCertName(r), 120);
-  const out = await renderCertificatePreview({ compId: comp.id, sample: { tier, name: nm, event: cutCodePoints(comp.name, 120), score: `${r.score ?? 0} pts` } });
+  const out = await renderCertificatePreview({ compId: comp.id, sample: { tier, name: nm, event: cutCodePoints(comp.name, 120), score: _rkPlaceScore(r) } });
   if (out.error) { showToast(out.error, 'error'); return null; }
   return { blob: out.blob, nm, comp };
 }

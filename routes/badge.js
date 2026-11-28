@@ -373,7 +373,7 @@ function _mintInputs(userId, comp, tsId, verdict) {
     // Placement badges show the score; participation AND completion badges are
     // score-less — for a completion kind that is not a style choice, it is the
     // same suppression PR 18 applied everywhere else.
-    scoreLabel: placement ? `${Math.round(me.score)} pts` : null,
+    scoreLabel: !placement ? null : (_placePermille(placement, me) != null ? _permilleText(_placePermille(placement, me)) : `${Math.round(me.score)} pts`),
     basis,
   });
   return { user, nickname, badgeName, nameFellBack, nameMatchParts, badgeEnd, svg };
@@ -393,7 +393,7 @@ const _NO_STORED_IMAGE = "";
 // participant's mint route and `_autoIssueCertificate`), so the frozen facts a
 // certificate carries cannot depend on who asked for it.
 const _BADGE_INSERT_SQL =
-  "INSERT INTO achievement_badges (token, user_id, competition_id, timeslot_id, rank, image_id, nickname_snapshot, score_snapshot, name_snapshot, basis, name_match_snapshot, public_code, date_snapshot, late_entrant, created_at, grade_band, grade_permille, board_kind, board_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+  "INSERT INTO achievement_badges (token, user_id, competition_id, timeslot_id, rank, image_id, nickname_snapshot, score_snapshot, name_snapshot, basis, name_match_snapshot, public_code, date_snapshot, late_entrant, created_at, grade_band, grade_permille, board_kind, board_name, score_permille) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 function _badgeInsertValues({ token, userId, comp, tsId, me, nickname, placement, badgeName, basis,
   nameMatchParts, publicCode, badgeEnd, lateEntrant, ts, grade = null }) {
   return [token, userId, comp.id, tsId, me.rank, _NO_STORED_IMAGE, nickname,
@@ -421,7 +421,32 @@ function _badgeInsertValues({ token, userId, comp, tsId, me, nickname, placement
     // THE BOARD THE PLACE WAS ON (owner decision, 27 Nov 2026): a session (its
     // name as it is now, frozen) or the overall board, for an event with two or
     // more sessions; NULL for one board. Frozen for the reason `basis` is.
-    ...(() => { const b = boardOfPlace(comp, tsId); return b ? [b.kind, b.kind === "session" ? (b.name || null) : null] : [null, null]; })()];
+    ...(() => { const b = boardOfPlace(comp, tsId); return b ? [b.kind, b.kind === "session" ? (b.name || null) : null] : [null, null]; })(),
+    // THE PERCENTAGE THE PLACE WAS RANKED ON: a placement on a board ranking by
+    // percentages (the board's own `percent`, tenths rounded down) is frozen,
+    // so the certificate prints what that board ranked on, never raw points.
+    _placePermille(placement, me)];
+}
+
+/** Tenths of a percent a placement's board ranked on, or null (a points board, or no place). */
+function _placePermille(placement, me) {
+  return placement && me && Number.isFinite(me.percent) ? Math.round(me.percent * 10) : null;
+}
+/** "100%", "87.5%": a frozen permille as the board showed it (lib/badge.js `permilleText`). */
+const _permilleText = (pm) => require("../lib/badge").permilleText(pm);
+/**
+ * The SCORE a certificate prints and every surface showing it repeats, from the
+ * FROZEN columns: the percentage a percentage board ranked the place on, else
+ * the points; null without a place. One definition for the artwork, the share
+ * card, the public page, /credential, both lists and the mail.
+ */
+function _frozenScoreLabel(row) {
+  if (!row || !isPlacementBasis(row.basis, row.rank)) return null;
+  if (Number.isFinite(row.score_permille)) return _permilleText(row.score_permille);
+  return Number.isFinite(row.score_snapshot) ? `${row.score_snapshot} pts` : null;
+}
+function _frozenScorePercent(row) {
+  return row && isPlacementBasis(row.basis, row.rank) && Number.isFinite(row.score_permille) ? row.score_permille / 10 : null;
 }
 
 /**
@@ -622,8 +647,9 @@ function _badgeArt(row, comp) {
     dateLabel: badgeDateLabel(row.date_snapshot ? new Date(row.date_snapshot) : _badgeEndDate(row, comp)),
     // The SCORE stays frozen (v7.15.6): unlike a name it is a factual claim
     // about a finished event, and a revived-and-re-ended competition moves it.
-    scoreLabel: (isPlacementBasis(row.basis, row.rank) && Number.isFinite(row.score_snapshot))
-      ? `${row.score_snapshot} pts` : null,
+    // A place on a board ranked by percentages prints that percentage
+    // (`score_permille`), never the raw points it was not ranked on.
+    scoreLabel: _frozenScoreLabel(row),
     // v8.1.0 (PR 25) — so the PNG, the PDF and the public page cannot disagree
     // about what this certificate attests. NULL on a legacy row, which the
     // renderers read as "derive it from rank the old way".
@@ -1076,6 +1102,10 @@ function _certificateFacts(row) {
     label: _placeLabelFor(row),
     basis: row.basis || null,
     score: (isPlacementBasis(row.basis, row.rank) && Number.isFinite(row.score_snapshot)) ? row.score_snapshot : null,
+    // What the certificate prints in its score slot ("100%" on a percentage
+    // board, else "150 pts"), and the percentage alone (null on a points board).
+    scoreLabel: _frozenScoreLabel(row),
+    scorePercent: _frozenScorePercent(row),
     lateEntrant: !!row.late_entrant,
     issuedAt: row.created_at,
     // Program grades (27 Nov 2026): the band and percentage it was issued with,
@@ -1539,6 +1569,20 @@ module.exports = function register(app) {
     res.set("Cache-Control", "no-store").json({ text: post.text, composerUrl: share.linkedinComposerUrl(post.text) });
   });
 
+  // TEST-ONLY: the SVG a certificate's PDF (`certificate.svg`) or its share card
+  // (`card.svg`) is rasterised from, built by the very resolver and renderers
+  // the downloads use, so a spec can read the text the artwork DRAWS (the PDF
+  // carries it only as pixels). Registered only under NODE_ENV=test.
+  if (process.env.NODE_ENV === "test") {
+    app.get("/api/test/certificate-svg/:token", (req, res) => {
+      const row = db.prepare("SELECT * FROM achievement_badges WHERE token=?").get(String(req.params.token));
+      const comp = row ? db.prepare("SELECT * FROM competitions WHERE id=?").get(row.competition_id) : null;
+      if (!row || !comp) return res.status(404).json({ error: "Not found" });
+      const art = _badgeArt(row, comp);
+      res.json({ certificate: buildCertificateSvg(art), card: buildBadgeSvg(art), scoreLabel: art.scoreLabel });
+    });
+  }
+
   app.get("/badge/:token/certificate.pdf", rateLimit(60_000, 30, "badge-pdf"), async (req, res) => {
     const row = db.prepare("SELECT * FROM achievement_badges WHERE token=? AND revoked_at IS NULL").get(req.params.token);
     const comp = row ? db.prepare("SELECT * FROM competitions WHERE id=?").get(row.competition_id) : null;
@@ -1800,6 +1844,8 @@ module.exports = function register(app) {
         board: _placeBoardLabel(row),
         rank: row.rank,
         score: _certificateFacts(row).score,
+        scoreLabel: _frozenScoreLabel(row),
+        scorePercent: _frozenScorePercent(row),
         issuedAt: row.created_at,
         // v8.15.1 — when the congratulations email carrying it was delivered, or
         // null (never sent, opted out, or not delivered yet).

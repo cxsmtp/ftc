@@ -9448,6 +9448,8 @@ paths:
                         grade: { $ref: '#/components/schemas/FrozenProgramGrade' }
                         rank: { $ref: '#/components/schemas/SafeInteger' }
                         score: { type: integer, format: int64, minimum: -9007199254740991, maximum: 9007199254740991, nullable: true, description: "The frozen score, on a placement certificate only." }
+                        scoreLabel: { type: string, nullable: true, description: "What the certificate prints in its score slot, frozen: the percentage a placement on an overall board ranked by percentages was ranked on ('75%'), else the points ('150 pts'); null without a place." }
+                        scorePercent: { type: number, format: double, nullable: true, minimum: -9007199254740991, maximum: 100, description: "The frozen percentage (one decimal, rounded down) of a placement on a board ranked by percentages; null on a points board or without a place." }
                         issuedAt: { type: string, format: date-time }
                         emailedAt: { type: string, format: date-time, nullable: true, description: "When the congratulations email carrying this certificate was delivered; null when it was never sent, was not delivered, or the address opted out." }
                         badgeUrl: { type: string, description: "Absent on a revoked certificate (every artefact route answers 404 for one), and with `withheld`." }
@@ -15655,7 +15657,10 @@ paths:
       security: [{ sessionAuth: [] }]
       description: >
         Every certificate issued for the event, the top three first (revoked last),
-        with its holder, tier, rank, frozen score and the state of the
+        with its holder, tier, rank, frozen score (`scoreLabel` is what the
+        certificate prints: a placement on an overall board ranked by
+        percentages prints the percentage it was ranked on, `scorePercent`, never
+        its points) and the state of the
         congratulations email that carried it (`emailStatus`: `sent`, `failed` —
         retried automatically up to three times —, `suppressed` for an opted-out
         address, or `unknown` when a send was cut by a restart and is not retried;
@@ -16080,6 +16085,8 @@ paths:
                       label: { type: string }
                       basis: { type: string, nullable: true }
                       score: { type: number, nullable: true }
+                      scoreLabel: { type: string, nullable: true, description: "What the certificate prints in its score slot, frozen: the percentage a placement on an overall board ranked by percentages was ranked on ('75%'), else the points ('150 pts'); null without a place." }
+                      scorePercent: { type: number, format: double, nullable: true, minimum: -9007199254740991, maximum: 100, description: "The frozen percentage (one decimal, rounded down) of a placement on a board ranked by percentages; null on a points board or without a place." }
                       lateEntrant: { type: boolean }
                       issuedAt: { type: string, format: date-time }
                       code: { type: string, description: "The new certificate's credential code, grouped as printed. Present only for a caller holding `certificates.lookup`." }

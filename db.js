@@ -1251,6 +1251,11 @@ try {
   // print as they always did.
   if (!abCols.includes("board_kind")) db.exec("ALTER TABLE achievement_badges ADD COLUMN board_kind TEXT");
   if (!abCols.includes("board_name")) db.exec("ALTER TABLE achievement_badges ADD COLUMN board_name TEXT");
+  // THE PERCENTAGE A PLACE WAS RANKED ON: a placement on an overall board that
+  // ranks by percentages (`leaderboard_percent`) prints what that board ranked
+  // on, never the raw points. Tenths of a percent, rounded down, exactly the
+  // figure the board showed (`scorePercent`); NULL on every other certificate.
+  if (!abCols.includes("score_permille")) db.exec("ALTER TABLE achievement_badges ADD COLUMN score_permille INTEGER");
   // NOT PARTIAL, deliberately, and the asymmetry with the index below is the
   // point: a REVOKED code must still resolve, or the credential page cannot
   // answer "revoked" and a revoked certificate becomes indistinguishable from a

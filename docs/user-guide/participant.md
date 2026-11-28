@@ -795,7 +795,8 @@ own questions, so your Challenges page shows only your session's. Where the
 overall board ranks by **percentages**, it ranks everyone by the share of their
 own session's points they earned, and shows the points under it; time still
 breaks a tie. A top-three place on either board earns a certificate that names
-the board, so with both you can earn two.
+the board, so with both you can earn two; a place on an overall board ranked by
+percentages prints your percentage rather than your points.
 
 ---
 

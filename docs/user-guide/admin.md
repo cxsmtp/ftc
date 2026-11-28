@@ -874,7 +874,9 @@ An event's **Certificates** section lists every certificate it has issued —
 holder (named as the certificate prints the name, which is also what the
 downloads are called), which certificate (1st, 2nd, 3rd place, participation or completion;
 on an event with two or more sessions a place names its board, such as *1st
-Place — Session A* or *1st Place — Overall*, and the certificate prints it),
+Place — Session A* or *1st Place — Overall*, and the certificate prints it; a
+place on an overall board ranked by percentages shows and prints the percentage
+it was ranked on, such as *75%*, instead of its points),
 score and whether the holder has been emailed it — with
 **PDF** and **PNG** downloads and **Re-send** for the email (one holder at a time,
 and it works with the congratulations email switched off; a delivery cut short

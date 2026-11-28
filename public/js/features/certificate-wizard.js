@@ -633,7 +633,7 @@ export async function renderIssuedCertificates(box, { compId, readOnly = false }
     return `<tr${c.revoked ? ' class="ic-row-revoked"' : ''}>
       <td data-label="Holder" class="ic-lead"><b>${esc(_holder(c))}</b><small>${esc(c.email || c.nickname || '')}</small></td>
       <td data-label="Certificate"><span class="ic-tier ic-tier-${esc(c.tier || '')}">${esc(_TIER_LABEL[c.tier] || c.label || c.tier || '')}</span>${c.lateEntrant ? ' <small>late entry</small>' : ''}${c.grade ? ` <small class="ic-grade">${esc(c.grade.label)}</small>` : ''}</td>
-      <td data-label="Score">${c.score != null ? esc(String(c.score)) : (c.grade ? esc(c.grade.percent) : '—')}</td>
+      <td data-label="Score">${c.scoreLabel ? esc(c.scoreLabel) : c.score != null ? esc(String(c.score)) : (c.grade ? esc(c.grade.percent) : '—')}</td>
       ${showCode ? `<td data-label="Code"><code class="ic-code">${esc(c.code || '—')}</code></td>` : ''}
       <td data-label="Email" title="${esc((c.emailStatus && c.emailStatus.lastError) || '')}">${esc(mail)}</td>
       <td class="ic-acts">${acts}</td></tr>`;

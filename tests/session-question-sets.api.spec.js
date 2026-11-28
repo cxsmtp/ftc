@@ -27,6 +27,24 @@ const { addQuestion, sessionEvent, setSessions, goLive, endAll, chooseSession, r
 
 const ids = (rows) => rows.map(r => r.id).sort();
 
+/** One ZIP entry's text. */
+function zipEntry(buf, name) {
+  return new Promise((resolve, reject) => {
+    require("yauzl").fromBuffer(buf, { lazyEntries: true }, (err, zip) => {
+      if (err) return reject(err);
+      zip.on("entry", (e) => {
+        if (e.fileName !== name) return zip.readEntry();
+        zip.openReadStream(e, (e2, st) => {
+          if (e2) return reject(e2);
+          const parts = []; st.on("data", d => parts.push(d)); st.on("end", () => resolve(Buffer.concat(parts).toString("utf8")));
+        });
+      });
+      zip.on("end", () => resolve(""));
+      zip.readEntry();
+    });
+  });
+}
+
 /** The admin board for one session (or the overall one: tsId null), read until `pred` holds. */
 async function adminBoard(api, compId, tsId, pred = () => true, message = "board") {
   let last = null;
@@ -486,6 +504,69 @@ test.describe("certificates name the board their place was on", () => {
       for (const p of people) await p.api.dispose();
       await api.dispose();
     }
+  });
+
+  test("a place on an overall board ranked by percentages prints that percentage, never its points, on every surface; CONTROL: a points board prints points", async () => {
+    const { api, csrf } = await sa();
+    const people = [];
+    try {
+      const ev = await endedEvent(api, csrf, { leaderboard_mode: "per_slot", leaderboard_overall: true, leaderboard_percent: true }, people);
+      const m = await mint(ev.pb, ev.comp.id);
+      const overall = (m.also || [])[0];
+      // B holds 150 of 200: the overall board ranked B on 75% (2nd, under A's 100%).
+      expect(overall && overall.rankLabel, "PRECONDITION: B's overall place").toBe("2nd Place — Overall");
+      const frozen = rawAll("SELECT timeslot_id, score_snapshot, score_permille FROM achievement_badges WHERE competition_id=? AND user_id=? ORDER BY IFNULL(timeslot_id,'')", [ev.comp.id, ev.pb.id]);
+      expect(frozen, "the percentage is frozen on the overall certificate only").toEqual([
+        { timeslot_id: null, score_snapshot: 150, score_permille: 750 },
+        { timeslot_id: ev.slots[1].id, score_snapshot: 150, score_permille: null },
+      ]);
+      const svgOf = async (token) => (await (await api.get(`/api/test/certificate-svg/${token}`)).json());
+      // The artwork the PDF is drawn from, and the share card: the drawn text.
+      const ov = await svgOf(overall.token);
+      expect(ov.certificate.includes(">75%<"), "the certificate draws 75% in its score slot").toBe(true);
+      expect(ov.certificate.includes("150 pts"), "and never the points it was not ranked on").toBe(false);
+      expect(ov.card.includes("75%") && !ov.card.includes("150 pts"), "the share card says the same").toBe(true);
+      // CONTROL: the session board ranks on points, so its certificate prints points.
+      const ses = await svgOf(m.token);
+      expect(ses.certificate.includes(">150 pts<") || ses.certificate.includes("150 pts"), "a points board's certificate prints points").toBe(true);
+      expect(ses.certificate.includes("75%"), "and no percentage").toBe(false);
+      // The holder's list and the organisers' list.
+      const mine = await (await ev.pb.api.get("/api/me/certificates")).json();
+      const mineOverall = (mine.certificates || []).find(c => c.token === overall.token);
+      expect(mineOverall && [mineOverall.scoreLabel, mineOverall.scorePercent]).toEqual(["75%", 75]);
+      const list = await (await api.get(`/api/admin/competitions/${ev.comp.id}/certificates`)).json();
+      const bRows = (list.certificates || []).filter(c => c.userId === ev.pb.id).map(c => [c.label, c.scoreLabel, c.scorePercent]).sort();
+      expect(bRows).toEqual([[`1st Place — ${ev.slots[1].name}`, "150 pts", null], ["2nd Place — Overall", "75%", 75]].sort());
+      // /credential, which a verifier reads.
+      const code = rawAll("SELECT public_code FROM achievement_badges WHERE token=?", [overall.token])[0].public_code;
+      const anon = await require("@playwright/test").request.newContext({ baseURL: require("./helpers").BASE });
+      try {
+        const v = await (await anon.post("/credential", { headers: { "content-type": "application/json", accept: "application/json" }, data: { code, surname: "Probe" } })).json();
+        expect(JSON.stringify(v).includes("75%") && !JSON.stringify(v).includes("150 pts"), `the verification page says 75%: ${JSON.stringify(v).slice(0, 300)}`).toBe(true);
+      } finally { await anon.dispose(); }
+      // The full event export's certificates.csv carries it in its own column.
+      const zip = await (await api.get(`/api/admin/competitions/${ev.comp.id}/export/full`)).body();
+      const csv = await zipEntry(zip, "certificates.csv");
+      const lines = csv.replace(/^\uFEFF/, "").trim().split("\n");
+      const head = lines[0].split(",").map(x => x.replace(/^"|"$/g, ""));
+      const pi = head.indexOf("Percent");
+      expect(pi, "a Percent column").toBeGreaterThan(-1);
+      const cells = lines.slice(1).map(l => l.split(",").map(x => x.replace(/^"|"$/g, ""))).filter(c => c[0] === ev.pb.id).map(c => [c[head.indexOf("Board")], c[pi]]).sort();
+      expect(cells).toEqual([[ev.slots[1].name, ""], ["Overall", "75"]].sort());
+    } finally {
+      for (const p of people) await p.api.dispose();
+      await api.dispose();
+    }
+  });
+
+  test("the congratulations email states the frozen percentage, not the points (the mail builder, by value)", async () => {
+    const { certificateEmailCopy } = require("../lib/certificate-dispatch");
+    const base = { basis: "placement", rank: 1, score_snapshot: 150, late_entrant: 0, board_kind: "overall", board_name: null };
+    const opts = { eventName: "E", platformName: "P", intro: "", code: null, pdfUrl: "https://x/p.pdf", messages: {} };
+    const pct = JSON.stringify(certificateEmailCopy({ ...base, score_permille: 875 }, opts));
+    expect(pct.includes("87.5%") && !pct.includes("150 points"), "a percentage board's place").toBe(true);
+    const pts = JSON.stringify(certificateEmailCopy({ ...base, score_permille: null }, opts));
+    expect(pts.includes("150 points") && !pts.includes("%<"), "CONTROL: a points board's place").toBe(true);
   });
 
   test("the artwork: a placement on a named board prints a LEADERBOARD column; a participation certificate and a one-board event print none", async () => {

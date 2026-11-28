@@ -150,7 +150,7 @@ function _certHeldFor(compId){
   return _certCache.compId === compId ? _certCache.held : null;
 }
 // What the card draws from a held certificate: a change in any of it repaints.
-const _certSig = h => h ? JSON.stringify([h.revoked, h.pdfUrl, h.imageUrl, h.code, h.emailedAt, h.label, h.score, h.dateLabel, h.name, h.withheld]) : '';
+const _certSig = h => h ? JSON.stringify([h.revoked, h.pdfUrl, h.imageUrl, h.code, h.emailedAt, h.label, h.score, h.scoreLabel, h.dateLabel, h.name, h.withheld]) : '';
 // One read of the participant's own list into the cache; true when it answered.
 async function _readCertHeld(compId){
   try {
@@ -562,7 +562,7 @@ export async function loadLeaderboard(opts){
             <span class="lb-cert-rule"><i></i></span>
             <span class="lb-cert-n">${esc(_who)}</span>
             <span class="lb-cert-e">${_compName}</span>
-            <span class="lb-cert-g">${esc(String(_held && _held.score != null ? _held.score : _ctaMe.score))} pts${_held && _held.dateLabel ? ` · ${esc(_held.dateLabel)}` : ''}</span>
+            <span class="lb-cert-g">${_held && _held.scoreLabel ? esc(_held.scoreLabel) : `${esc(String(_held && _held.score != null ? _held.score : _ctaMe.score))} pts`}${_held && _held.dateLabel ? ` · ${esc(_held.dateLabel)}` : ''}</span>
             <span class="lb-cert-med"></span>
           </div>`;
         const _shareLabel = _codesHidden ? (_held ? 'View certificate' : 'Generate certificate')
