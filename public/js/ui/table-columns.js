@@ -903,6 +903,10 @@ export const PLAIN_TABLES = {
   'team-challenges': { noun: 'question', paged: false, cols: { challenge: { grow: true }, flag: { filter: 'enum' } } },
   'team-accounts': { noun: 'account', paged: false, cols: { company: { grow: true }, signal: { filter: 'enum' } } },
   'team-scorecard': { noun: 'measure', paged: false, cols: { measure: { grow: true }, status: { sort: false, filter: null } } },
+  // Settings → People → Staff teams (features/staff-teams.js): every team, and
+  // the chosen team's members, are on screen.
+  'staff-teams': { noun: 'team', paged: false, cols: { team: { grow: true }, actions: { sort: false, filter: null } } },
+  'staff-team-members': { noun: 'member', paged: false, cols: { member: { grow: true }, default_role: { filter: 'enum' }, account: { filter: 'enum' }, actions: { sort: false, filter: null } } },
   'team-leads': { noun: 'lead', paged: false, hidden: ['new_or_returning', 'where_from'], cols: { lead: { grow: true }, signal: { filter: 'enum' }, owner: { filter: 'enum' }, contacted: { sort: false, filter: null } } },
 };
 

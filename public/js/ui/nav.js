@@ -916,12 +916,12 @@ export const ADMIN_NAV_PERMISSIONS={
   // Settings opens for ANY of its cards' first reads (operator ruling,
   // 14 Nov 2026): GET /api/admin/settings (settings.view), the platform
   // certificate design (certificates.design), the alerts (ops.alerts), retention
-  // (ops.retention_view), the unsubscribed list (ops.email) and the Checkmarx One
-  // removals (ops.cxone). Each card inside shows only to a role holding what its
+  // (ops.retention_view), the unsubscribed list (ops.email), the Checkmarx One
+  // removals (ops.cxone) and the staff teams (teams.view). Each card inside shows only to a role holding what its
   // own routes check (SETTINGS_CARD_PERMISSIONS below), so a regular admin sees
   // the certificate designer, the read-only team-domains list, Retention and
   // Alerts.
-  'admin-settings-tab':['settings.view','certificates.design','ops.alerts','ops.retention_view','ops.email','ops.cxone'],'admin-users-tab':'users.view','admin-audit-tab':'audit.view',
+  'admin-settings-tab':['settings.view','certificates.design','ops.alerts','ops.retention_view','ops.email','ops.cxone','teams.view'],'admin-users-tab':'users.view','admin-audit-tab':'audit.view',
 };
 // THE SETTINGS CARDS: each shows to a role holding EVERY permission its routes
 // check (operator ruling, 14 Nov 2026) — a card that edits a value also reads
@@ -941,6 +941,7 @@ export const SETTINGS_CARD_PERMISSIONS={
   'alerts-card':['ops.alerts'],                              // GET /api/admin/alerts
   'system-health-card':['settings.view'],                    // GET /api/admin/system-health
   'cxone-audit-card':['audit.view'],                         // GET /api/admin/audit (its rows: the Checkmarx One activity)
+  'staff-teams-card':['teams.view'],                         // GET /api/admin/staff-teams (its writes: teams.manage, drawn only where the read's can_manage says so)
 };
 // Is this Settings card offered to the signed-in role? Fails closed until
 // /api/admin/me has said what the role holds (a superadmin holds every card),

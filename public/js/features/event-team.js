@@ -27,6 +27,7 @@ import { registerHelpTips } from "../ui/help-tips.js";
 import { downloadBlob } from "../ui/download.js";
 import { adminPaneLoaders, adminCan, workspaceHooks } from "../ui/nav.js";
 import { openEventWorkspace } from "./event-workspace.js";
+import { openStaffTeamToEvent } from "./staff-teams.js";
 
 const PANE = 'admin-event-team-tab';
 const PERSONAS = [
@@ -79,6 +80,7 @@ export function initEventTeam({ registerAction, registerChange }) {
   registerHelpTips(TIPS);
   adminPaneLoaders.set(PANE, () => loadEventTeam());
   registerAction('team-add', () => teamAdd());
+  registerAction('team-add-staff-team', () => openStaffTeamToEvent({ compId: _wsComp(), roles: _team && _team.roles, onDone: () => loadEventTeam() }));
   registerAction('team-remove', (e, el) => teamRemove(el.dataset.memberId, el.dataset.memberName));
   registerAction('team-targets-save', () => teamTargetsSave());
   registerAction('team-persona', (e, el) => _pickPersona(el.dataset.persona));
@@ -209,7 +211,16 @@ function _addFormHtml() {
     <button type="button" class="btn" data-action="team-add">Add to team</button>
   </div>
   ${roleNotes}
-  <p class="settings-help">${doms.length ? `Addresses at ${esc(doms.join(', '))} only.` : 'No email domain is allowed yet: a superadmin adds them under Settings, Email.'}</p>`;
+  <p class="settings-help">${doms.length ? `Addresses at ${esc(doms.join(', '))} only.` : 'No email domain is allowed yet: a superadmin adds them under Settings, Email.'}</p>
+  ${_staffTeamDoorHtml()}`;
+}
+
+// A whole staff team (Settings → People → Staff teams) at once: offered with the
+// single add's own predicates (this form is drawn only where those hold) and
+// `teams.view`, which reading the directory takes.
+function _staffTeamDoorHtml() {
+  if (!adminCan('teams.view')) return '';
+  return `<div class="team-staff-door help-label-row"><button type="button" class="btn secondary" data-action="team-add-staff-team">Add a staff team</button><span data-help="team.staff-team" data-help-label="Add a staff team"></span></div>`;
 }
 
 const KIND_LABEL = { wrapup: 'Wrap-up', delta: 'New leads update', nudge: 'Reminder to SDRs', weekly: 'Weekly digest', manual: 'Sent now' };

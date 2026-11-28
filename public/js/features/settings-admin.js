@@ -802,7 +802,9 @@ export async function loadAdminSettings(){
 // each loaded by its own loader. Every one is gated by SETTINGS_CARD_PERMISSIONS
 // (ui/nav.js). Hoisted: function bodies read them at call time.
 const _SETTINGS_READ_CARDS=['platform-name-card','account-approval-card','cxone-card'];
-const _OWN_ROUTE_CARDS=['smtp-settings-card','email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card','system-health-card','cxone-audit-card','release-notes-card'];
+// The staff-teams card (features/staff-teams.js) is hidden here with them and
+// loads on the 'admin:settings-loaded' signal, as the team-report domains card does.
+const _OWN_ROUTE_CARDS=['smtp-settings-card','email-test-card','unsubscribe-card','cxone-withdrawals-card','retention-card','alerts-card','system-health-card','cxone-audit-card','release-notes-card','staff-teams-card'];
 function _loadOwnRouteCards(){
   for(const id of _OWN_ROUTE_CARDS){
     const el=document.getElementById(id);

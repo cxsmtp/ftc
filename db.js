@@ -3616,6 +3616,38 @@ db.exec(`
   }
 }
 
+// STAFF TEAMS (lib/staff-teams.js, routes/staff-teams.js): the platform-wide
+// directory of colleagues an event's Team & reports, or its organisers, take in
+// one step. Base CREATEs (fatal, like every base table). A member is a name, an
+// address and an optional default event-team role (the roles of
+// `event_team_members`, CHECKed the same way): a RECIPIENT, never a link to an
+// account — whether an address signs in as an account is read when it is shown
+// or used, never stored. The members cascade with their team. Names are unique
+// NOCASE (`uq_staff_teams_name_nocase`, lib/schema-required.js); an address once
+// per team. No `DATA_DIR` child (the backup covers the database).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS staff_teams (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS uq_staff_teams_name_nocase ON staff_teams(name COLLATE NOCASE);
+  CREATE TABLE IF NOT EXISTS staff_team_members (
+    id           TEXT PRIMARY KEY,
+    team_id      TEXT NOT NULL REFERENCES staff_teams(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    email        TEXT NOT NULL COLLATE NOCASE,
+    default_role TEXT CHECK(default_role IS NULL OR default_role IN ('se','marketing','sales','sdr','se_manager','marketing_manager','sales_manager')),
+    added_by     TEXT,
+    added_at     TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    UNIQUE (team_id, email)
+  );
+  CREATE INDEX IF NOT EXISTS idx_staff_team_members_team ON staff_team_members(team_id);
+`);
+
 // ── Prepared-statement memo (installed AFTER every migration above) ──────────
 //
 // Request code calls `db.prepare(sql)` inline, so the same SQL text was compiled

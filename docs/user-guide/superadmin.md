@@ -1215,7 +1215,11 @@ Settings is two panes: the list on the left, grouped under **People**,
 **Section** picker above it).
 
 - **People**: **Sign-in** holds approval for new accounts and, only in the
-  built-in account's own session, the **Break-glass account**.
+  built-in account's own session, the **Break-glass account**; **Staff teams**
+  is the directory of colleagues an event's Team & reports, or its organisers,
+  take in one step (see the [admin guide](admin.md#staff-teams)). Seeing it is
+  the `teams.view` permission and changing it `teams.manage`; both are
+  platform-wide, so only a role that covers every event can hold them.
 - **Records**: **CxOne API audit** is a table of every call the platform made
   to Checkmarx One, newest first: an account set up, linked to an existing one,
   refused, deferred or given up, a group grant, and each removal of a deleted

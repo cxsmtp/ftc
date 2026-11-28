@@ -39,7 +39,7 @@ const NAV_FIRST_READ = {
   "admin-logs-tab": ["GET /api/admin/logs"],
   // Settings opens for any of its cards' first reads (operator ruling, 14 Nov 2026).
   "admin-settings-tab": ["GET /api/admin/settings", "GET /api/admin/certificate-config", "GET /api/admin/alerts",
-    "GET /api/admin/retention", "GET /api/admin/unsubscribed", "GET /api/admin/cxone/withdrawals"],
+    "GET /api/admin/retention", "GET /api/admin/unsubscribed", "GET /api/admin/cxone/withdrawals", "GET /api/admin/staff-teams"],
   "admin-users-tab": ["GET /api/admin/users"],
   "admin-audit-tab": ["GET /api/admin/audit"],
 };
@@ -65,6 +65,9 @@ const SETTINGS_CARD_ROUTES = {
   // The Checkmarx One API activity table: the audit trail's own read, narrowed
   // to the Checkmarx One activity.
   "cxone-audit-card": ["GET /api/admin/audit"],
+  // The staff-teams directory: its read; its writes (teams.manage) are drawn only
+  // where the read's own `can_manage` says so (tests/staff-teams-ui.spec.js).
+  "staff-teams-card": ["GET /api/admin/staff-teams"],
 };
 const SELF_GATED_CARDS = {
   "cert-config-card": "certificateDesignOffered (certificates.design)",

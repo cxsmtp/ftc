@@ -355,6 +355,14 @@ next step in words they can act on (Marketing to load the attached file into the
 CRM, an SE to ask you to edit a question), with no link to a page they could not
 open. Set an optional lead target and hot-lead target beside them.
 
+**Add a staff team** (below the add form) adds a whole [staff
+team](#staff-teams) at once: pick the team and either each member's default role
+or one role for everyone. Each member is added under the same rules as adding one
+person (an allowed domain, a role your role may add, nobody twice in the same
+role), and the dialog then lists who was added and who was skipped, with the
+reason. It is offered to anyone who may add one person and also see the staff
+teams, so an event admin adds people one at a time.
+
 ![The Team & reports section of an event](../screenshots/admin/70-workspace-team-reports.png)
 
 **Qualifying questions.** A Booth Event gets four by default, from the
@@ -3493,6 +3501,11 @@ are more matches), then **Make organiser** to confirm: for a participant it says
 that their account becomes an event admin, which signs them out everywhere and
 takes them off every leaderboard. A role that may add organisers but not search
 people is told so and offered **Remove** only. Administrators are not offered — they already run every event.
+**Add a staff team as organisers**, under the search, makes every member of a
+[staff team](#staff-teams) whose address is an account an organiser in one step,
+exactly as picking each of them would; it warns first that a participant's
+account becomes an event admin, then lists who was made an organiser and who was
+skipped (no account, already an organiser, or an administrator), with the reason.
 Each organiser on the card has **Remove**, which asks first. You can also choose
 **Make event admin** on the participant's row with the event open. The card is
 the one place that lists who runs the event. Their role changes to **Event admin** and their row badges the
@@ -4598,14 +4611,15 @@ the **mail server** email goes through (read-only: only a superadmin can change
 it), the **event history retention**, the open **blocked-address alerts**, the
 **CxOne API audit** (every call the platform made to Checkmarx One, with its
 outcome), **About & health** (what is running and how the server is, without the
-details only a superadmin sees, and the newest release notes) and, read-only,
-the domains event team reports may go to; everything else on it is
+details only a superadmin sees, and the newest release notes), the [staff
+teams](#staff-teams), which you may also change, and, read-only, the domains
+event team reports may go to; everything else on it is
 for superadmins and is not shown to you. Each card shows to whoever may use it,
 so a custom role sees the cards for the permissions it was given. An event admin
 has no Settings tab.
 Everything on it is platform-wide rather than event-specific, in a list down its
-left side (a **Section** picker on a phone) grouped under **People** (Sign-in),
-**Records** (CxOne API audit) and **System** (General, Branding, Email (SMTP) and
+left side (a **Section** picker on a phone) grouped under **People** (Sign-in,
+[Staff teams](#staff-teams)), **Records** (CxOne API audit) and **System** (General, Branding, Email (SMTP) and
 About & health). The pages the sidebar opens are not repeated there, and the
 running version is at the foot of the sidebar.
 
@@ -4620,6 +4634,20 @@ The settings you *do* control are per-event and live in the **Edit
 Event** dialog — including that event's own CxOne override.
 See the [**Superadmin guide →**](superadmin.md#platform-name) for the
 platform-wide view.
+
+### Staff teams
+
+**Settings → Staff teams** is a directory of the colleagues who run events
+together: each team has a name and its members, each a name, an email address
+and, optionally, the role they usually take on an event's team (Marketing, SDR, a
+manager…). Choose a team in the list to see its members. **New team**, **Rename**,
+**Delete**, **Add member**, **Edit** and **Remove** change it; a role that may see
+the teams but not change them reads them only. Where your role may see people,
+an **Account** column says whether the address signs in here: only those
+members can be made organisers. Members are a list of people, not accounts, and
+changing a team later changes no event it was added to. An event's **Team &
+reports** can add a whole team, and its Overview's **Organisers** card can make a
+whole team its organisers.
 
 ---
 

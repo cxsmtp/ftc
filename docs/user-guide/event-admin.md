@@ -758,7 +758,8 @@ figures off the page (**Joined** and its certificate counts are still shown).
 ### Team and reports
 
 Your event's **Team & reports** section is where you name who receives the event's
-reports (any role, managers included), set the lead and hot-lead targets, see what
+reports (any role, managers included), one person at a time (adding a whole
+staff team at once is an administrator's), set the lead and hot-lead targets, see what
 each role is sent, and tick **Contacted** on the lead list once an SDR has reached
 someone. **Preview email** shows that role's email as it is sent and **Send now** sends every report
 as it stands (another **Send now** waits until those have gone out; **Recent

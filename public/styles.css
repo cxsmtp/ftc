@@ -6762,6 +6762,28 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .team-preview{display:block;width:100%;height:65vh;height:65dvh;border:1px solid var(--border);border-radius:var(--r-m);background:var(--surface)}
 .team-preview-subject{margin:0 0 8px}
 @media(max-width:768px){#ws-team .team-grid{grid-template-columns:minmax(0,1fr)}}
+/* STAFF TEAMS (features/staff-teams.js): the Settings card, and the two event
+   doors (Team & reports, the Organisers card) with their dialogs. */
+#staff-teams-body .st-toolbar,#staff-teams-body .st-members-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+#staff-teams-body .st-count{margin:0}
+#staff-teams-body .st-empty{margin:0}
+#staff-teams-body .st-team-open{display:inline-flex;align-items:center;min-height:44px;font-size:var(--fs-14);font-weight:var(--fw-semibold);text-align:left;overflow-wrap:anywhere}
+@media(min-width:769px){#staff-teams-body tr.is-current td{background:var(--accent-soft)}}
+#staff-teams-body .st-actions{white-space:nowrap;text-align:right}
+#staff-teams-body .st-actions .btn+.btn{margin-left:6px}
+#staff-teams-body .st-members{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+#staff-teams-body .st-members-head .help-label-row{min-width:0}
+#staff-teams-body .st-members-title{margin:0;font-size:var(--fs-16);overflow-wrap:anywhere}
+#staff-teams-body .st-email{overflow-wrap:anywhere}
+#ws-team .team-staff-door{margin:12px 0 0;gap:8px}
+.ws-org-team{display:flex;align-items:center;gap:8px;margin-top:12px}
+.st-dialog .st-preview{margin:4px 0 0}
+.st-dialog .st-out-list{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px;max-height:40vh;max-height:40dvh;overflow:auto;font-size:var(--fs-14);overflow-wrap:anywhere}
+.st-dialog .st-out-list li{padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface-2)}
+.st-dialog .st-out-list[data-outcome="skipped"] li{border-style:dashed}
+.st-dialog .st-out-h{margin:12px 0 6px;font-size:var(--fs-14)}
+.st-dialog .st-out-none{margin:0 0 12px;color:var(--text-2)}
+.st-dialog .st-warn{margin:12px 0 0;padding:10px 12px;border-radius:var(--r-m);background:var(--warn-soft);color:var(--text);font-size:var(--fs-14)}
 /* A qualifying question on the list and its answered view: no right answer, so a
    neutral mark instead of the green "correct" one. */
 .task-card.solved.quick::after{content:'✓ ANSWERED'}

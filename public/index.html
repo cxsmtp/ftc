@@ -1356,6 +1356,18 @@
               </div>
             </div>
 
+            <!-- The staff-teams directory (features/staff-teams.js loadStaffTeamsCard,
+                 GET /api/admin/staff-teams): teams of colleagues an event's Team &amp;
+                 reports, or its organisers, take in one step. Shown to a role
+                 holding teams.view; its writes to one holding teams.manage. -->
+            <div class="settings-section" data-settings-section="staff-teams" data-settings-group="people" data-settings-label="Staff teams">
+              <div class="card settings-card" id="staff-teams-card" style="display:none">
+                <div class="settings-card-head"><h3 class="settings-heading">Staff teams</h3><span data-help="settings.staff-teams" data-help-label="Staff teams"></span></div>
+                <p class="settings-help">Colleagues who run events together, with the role each usually takes. An event can add a whole team to its Team &amp; reports, or make it its organisers.</p>
+                <div id="staff-teams-body"></div>
+              </div>
+            </div>
+
             <div class="settings-section" data-settings-section="cxone-audit" data-settings-group="records" data-settings-label="CxOne API audit">
               <!-- Every call the platform made to Checkmarx One (settings-admin.js
                    loadCxoneAuditCard): the audit trail's own read, narrowed to the

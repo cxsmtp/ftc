@@ -46,6 +46,7 @@ import { pStatus, renderParticipants } from "./participants-admin.js";
 import { _ensureQrLib, _renderQrInto, joinQrDataUri } from "./self-enroll.js";
 import { renderCertificateWizard, renderIssuedCertificates } from "./certificate-wizard.js";
 import { eventLookCardHtml, eventLookFormState, eventLookShown, setEventLookForm } from "./look-admin.js";
+import { openStaffTeamAsOrganisers } from "./staff-teams.js";
 
 const OVERVIEW = 'admin-event-overview-tab';
 const SECTION_LABELS = {
@@ -1916,17 +1917,34 @@ function _organisersListHtml(c) {
   }).join('')}</ul>`;
 }
 
+// A whole staff team as organisers (features/staff-teams.js): offered where the
+// grant route's own predicate allows (`_canManageOrganisers`) and the role may
+// read the staff teams (`teams.view`). A sibling of the search box, which a face
+// rebuild carries over by itself.
+function _orgTeamDoorHtml(c) {
+  if (!_canManageOrganisers(c) || !adminCan('teams.view')) return '';
+  return `<div class="ws-org-team help-label-row"><button type="button" class="btn secondary sm" data-action="ws-org-add-team">Add a staff team as organisers</button><span data-help="ws.organisers-team" data-help-label="Add a staff team as organisers"></span></div>`;
+}
+
 function _paintOrgAdd(c) {
   const el = document.getElementById('ws-ov-orgs-add');
   if (!el) return;
   if (!_canAddOrganisers(c)) {
-    setSafeHtml(el, `<p class="ws-org-reason">${esc(_orgAddReason(c))}</p>`);
+    setSafeHtml(el, `<p class="ws-org-reason">${esc(_orgAddReason(c))}</p>${_orgTeamDoorHtml(c)}`);
     return;
   }
   setSafeHtml(el, `<div class="ws-org-add"><label class="ws-org-add-label" for="ws-org-search">Add an organiser</label>`
     + `<input id="ws-org-search" class="ws-org-search" type="text" autocomplete="off" spellcheck="false" maxlength="80" placeholder="Name, nickname or email" data-input-action="ws-org-search" aria-describedby="ws-org-hint">`
     + `<p id="ws-org-hint" class="ws-org-hint">Type at least two letters. Picking someone makes them an event admin of this event.</p>`
-    + `<div id="ws-org-results"></div></div>`);
+    + `<div id="ws-org-results"></div></div>${_orgTeamDoorHtml(c)}`);
+}
+
+/** Add a staff team as organisers: the dialog (features/staff-teams.js), then re-read the card. */
+export async function wsOrgAddTeam() {
+  const c = _comp();
+  if (!c) return;
+  if (!_canManageOrganisers(c) || !adminCan('teams.view')) { _orgFail(_orgManageReason(c) || 'Your role cannot read the staff teams.'); return; }
+  await openStaffTeamAsOrganisers({ comp: c, onDone: () => { if (S.adminSelectedCompetitionId === c.id) _reloadOrganisers(c.id); } });
 }
 
 let _orgSearchSeq = 0;

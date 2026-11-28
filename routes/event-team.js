@@ -7,6 +7,7 @@
 //   PUT    /api/admin/team-report-domains                   superadmin (settings.edit)
 //   GET    /api/admin/competitions/:id/team                 events.view, scoped
 //   POST   /api/admin/competitions/:id/team                 events.edit, scoped
+//   POST   /api/admin/competitions/:id/team/staff-team      events.edit, scoped, + teams.view: a whole staff team
 //   DELETE /api/admin/competitions/:id/team/:memberId       events.edit, scoped
 //   PUT    /api/admin/competitions/:id/team-targets         events.edit, scoped (whoever edits the event)
 //   GET    /api/admin/competitions/:id/team-report          participants.view, scoped (the in-app persona views)
@@ -37,6 +38,7 @@ const { competitionDenied, competitorIds, scopedCompetitionIds } = require("../l
 const { competitorEditDenied, refuseCompetitor } = require("../lib/staff-compete");
 const { swallowed } = require("../lib/best-effort");
 const T = require("../lib/event-team");
+const ST = require("../lib/staff-teams");
 const R = require("../lib/team-reports");
 const M = require("../lib/team-report-mail");
 const { suggestedOpener } = require("../lib/qualifying");
@@ -201,6 +203,60 @@ module.exports = function register(app) {
     runTxnWithMirrorBuffer(() => txn.immediate());
     if (out.error) return res.status(409).json({ error: out.error, code: out.code });
     res.json({ ok: true, member: _memberWire(out.member) });
+  });
+
+  // A WHOLE STAFF TEAM (Settings → People → Staff teams) at once: each member is
+  // added under the single add's own rules — the address on the allowed list
+  // (`T.validateMember`), the reports' data rule for their role
+  // (`_reportDataRefusal`), an existing member with that role kept, the team's
+  // size cap — and one that fails any of them is SKIPPED, with its reason, while
+  // the others are added. Each member takes `role` when one is sent, else their
+  // default role; a member with neither is skipped. Reading the team takes
+  // `teams.view` (platform-wide: a role scoped to its events never holds it).
+  app.post("/api/admin/competitions/:id/team/staff-team", requireAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {
+    const comp = _gate(req, res, { write: true });
+    if (!comp) return;
+    if (!actorPermissions(req).perms.has("teams.view")) {
+      return res.status(403).json({ error: "Your role cannot read the staff teams. Add the people one at a time, or ask an administrator.", code: "permission_denied", permission: "teams.view" });
+    }
+    const teamId = req.body?.teamId;
+    if (typeof teamId !== "string" || !teamId) return res.status(400).json({ error: "teamId must name a staff team.", code: "staff_team_required" });
+    const role = req.body?.role;
+    if (role !== undefined && role !== null && role !== "" && (typeof role !== "string" || !T.ROLES.includes(role))) {
+      return res.status(400).json({ error: `role must be one of: ${T.ROLES.join(", ")}, or empty for each member's default role.`, code: "team_role_invalid" });
+    }
+    // The base data rule, as the single add's form asks it (`add_refusal`): with
+    // it refused, nobody could be added.
+    const baseRefusal = _reportDataRefusal(req);
+    if (baseRefusal) return res.status(403).json(baseRefusal);
+    const team = ST.getTeam(db, teamId);
+    if (!team) return res.status(404).json({ error: "Staff team not found", code: "staff_team_not_found" });
+    const members = ST.listMembers(db, team.id);
+    const added = [];
+    const skipped = [];
+    const skip = (m, r, code, error) => skipped.push({ staff_member_id: m.id, name: m.name, email: m.email, ...(r ? { role: r, role_label: T.ROLE_LABELS[r] } : {}), code, reason: error });
+    const txn = db.transaction(() => {
+      for (const m of members) {
+        const r = role || m.default_role || null;
+        if (!r) { skip(m, null, "staff_member_no_role", "No role: they have no default role and none was chosen."); continue; }
+        const v = T.validateMember({ role: r, name: m.name, email: m.email });
+        if (v.error) { skip(m, r, v.code, v.error); continue; }
+        const dataRefusal = _reportDataRefusal(req, { crm: FILE_ROLES.has(v.role) });
+        if (dataRefusal) { skip(m, r, dataRefusal.code, dataRefusal.error); continue; }
+        const out = T.addMember(comp.id, v, getAdminIdentity(req));
+        if (out.error) { skip(m, r, out.code, out.error); continue; }
+        R.restoreRemovedRecipient(comp.id, out.member.email);
+        recordCompetitionEvent(comp.id, "team_member_added", getAdminIdentity(req), {
+          member_id: out.member.id, role: v.role, name: v.name, domain: T.domainOf(v.email),
+          via: "staff_team", staff_team_id: team.id, staff_team_name: team.name, ...reqContext(req),
+        });
+        added.push({ ..._memberWire(out.member), staff_member_id: m.id });
+      }
+    });
+    // IMMEDIATE, as the single add: each member's cap and repeat are read
+    // before its insert.
+    runTxnWithMirrorBuffer(() => txn.immediate());
+    res.json({ ok: true, team: { id: team.id, name: team.name, member_count: members.length }, added, skipped });
   });
 
   app.delete("/api/admin/competitions/:id/team/:memberId", requireAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {

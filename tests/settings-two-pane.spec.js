@@ -31,10 +31,10 @@ const { adminLogin, clickTab, openSettingsSection } = require("./ui-admin-helper
 
 test.use({ baseURL: BASE });
 
-const EXPECTED = ["signin", "cxone-audit", "general", "branding", "email", "health"];
+const EXPECTED = ["signin", "staff-teams", "cxone-audit", "general", "branding", "email", "health"];
 // The whole list as rendered, captions included, in order.
 const EXPECTED_MENU = [
-  "PEOPLE", "Sign-in",
+  "PEOPLE", "Sign-in", "Staff teams",
   "RECORDS", "CxOne API audit",
   "SYSTEM", "General", "Branding", "Email (SMTP)", "About & health",
 ];
@@ -198,5 +198,5 @@ test("CONTROL — a role holding settings.view alone is offered only the section
   // settings.view, the mail server too).
   await expect.poll(() => menuText(page), { timeout: 15000 }).toEqual(expect.arrayContaining(["About & health", "Email (SMTP)"]));
   const menu = await menuText(page);
-  for (const gone of ["CxOne API audit", "RECORDS", "Sign-in"]) expect(menu, `no "${gone}" for a role with no card there`).not.toContain(gone);
+  for (const gone of ["CxOne API audit", "RECORDS", "Sign-in", "Staff teams", "PEOPLE"]) expect(menu, `no "${gone}" for a role with no card there`).not.toContain(gone);
 });

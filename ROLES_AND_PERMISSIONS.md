@@ -84,6 +84,8 @@ non-grantable gives nothing and was removed at boot).
 | `participants.delete` | Delete accounts. Deleting a person also removes the Checkmarx One account the platform created for them; the delete confirmation says so to anyone holding this (operator ruling, 24 Nov 2026), and the message afterwards tells a holder without `ops.cxone` that a superadmin follows the removal up under **Checkmarx One account removals**, removes by hand an account the platform created but holds no record of, and checks the tenant for an account of theirs when a Checkmarx One set-up record of theirs could not be read |  |  | ✓ | superadmin only |
 | `groups.view` | See groups | ✓ | ✓ | ✓ | yes |
 | `groups.manage` | Create, edit and delete groups | ✓ | ✓ | ✓ | yes |
+| `teams.view` | See the staff teams (Settings → People → Staff teams) and add a whole team to an event's Team & reports or as its organisers, each under that door's own rules |  | ✓ | ✓ | yes (a role of scope `all` only: platform-wide) |
+| `teams.manage` | Create, edit and delete staff teams and their members |  | ✓ | ✓ | yes (a role of scope `all` only: platform-wide) |
 | `certificates.view` | See and download certificates, preview designs | ✓ | ✓ | ✓ | yes |
 | `certificates.send` | Resend certificate emails | ✓ | ✓ | ✓ | yes |
 | `certificates.design` | Edit certificate designs |  | ✓ | ✓ | yes |
@@ -172,7 +174,8 @@ about EVERY event (`audit.raw_logs`, `ops.alerts`, `export.platform`,
 `templates.manage`, `certificates.design` — both design layers are global admins'
 by operator ruling — `data.import`, `ops.retention_purge`), some act on a person
 or a role no event bounds (`participants.delete`, `users.view`, `users.manage`,
-`roles.manage`), and two put an event in someone's hands (`events.organisers`, the
+`roles.manage`, and the staff-teams directory, `teams.view` and `teams.manage`: a
+list of people no event bounds), and two put an event in someone's hands (`events.organisers`, the
 organiser grant, which stays a global admin's; `events.create`, whose blank event
 would sit outside the creator's scope: a scoped role creates by clone or
 template, as an event admin does). A `granted` role is bound exactly as an event
@@ -505,6 +508,7 @@ route's own tier guard.
 | `GET /api/admin/competitions/:id/admins` | **scoped** |  |
 | `GET /api/admin/competitions/:id/team` | **scoped** | The event team (report recipients), targets and scheduled reports, for their own events. |
 | `POST /api/admin/competitions/:id/team` | **scoped** | Their own events; refused to a competitor in the event. The address must be at a domain a superadmin allowed. A member is mailed what reading the reports takes, so the actor also needs `participants.view` (and `export.data` for the Marketing and SDR roles, whose reports attach a lead file: the CRM file, each SDR's own leads); a custom role without them is refused `permission_denied`. |
+| `POST /api/admin/competitions/:id/team/staff-team` | **scoped** (refused inline) | A whole staff team at once, each member under the single add's rules (skipped with its reason where one fails). Reading the team takes `teams.view`, which an event admin does not hold, so it is refused `permission_denied` naming it; the single add stays open to them. |
 | `DELETE /api/admin/competitions/:id/team/:memberId` | **scoped** | Their own events; refused to a competitor in the event. |
 | `PUT /api/admin/competitions/:id/team-targets` | **scoped** | The lead and hot-lead targets (a save over somebody else's newer targets is refused); refused to a competitor in the event. |
 | `GET /api/admin/competitions/:id/team-report` | **scoped** | The persona views and lead list; refused to anyone competing in the event. |
@@ -514,11 +518,14 @@ route's own tier guard.
 | `POST /api/admin/competitions/:id/leads/:userId/contacted` | **scoped** | Marks a lead contacted (SDRs have no login); refused to a competitor in the event. Its answer says whether the lead may still be reached (`contactable`) only to an actor holding `participants.view`, since it tells whether the person opted out of email. |
 | `GET /api/admin/team-report-domains` | **forbidden** | Only an administrator can open the list of email domains in Settings. The domains your event's team may use are shown under its Team & reports. |
 | `PUT /api/admin/team-report-domains` | superadmin | The allowed-domain list. |
+| `GET /api/admin/staff-teams`, `GET /api/admin/staff-teams/:id` | **forbidden** | Your role does not allow you to see staff teams and add them to events. Ask an administrator to change your role. (`teams.view`, platform-wide: Settings → People → Staff teams.) |
+| `POST`/`PUT`/`DELETE /api/admin/staff-teams…` (the team, its members) | **forbidden** | Your role does not allow you to create, edit and delete staff teams. Ask an administrator to change your role. (`teams.manage`, platform-wide.) |
 | `GET /api/admin/competitions/:id/overview-pulse` | **scoped** | The workspace Overview's live figures; refused to anyone competing in the event, whose Overview then says the live figures are kept off the page while they compete and still shows **Joined** (the roster, never read from this route) and the certificate counts (their other reads stay open: operator ruling, 14 Nov 2026). |
 | `POST /api/admin/competitions/:id/clone` | **scoped** | v8.15.0 — an event they organise; the copy grants them its organiser row. |
 | `GET /api/admin/competitions/:id/export/full` | **scoped** | v8.15.0 — refused to anyone competing in the event. |
 | `POST /api/admin/competitions/:id/save-as-template` | **forbidden** | Only an administrator can save an event as a template. You can clone your own event instead. |
 | `POST /api/admin/competitions/:id/admins` | **forbidden** | Only an administrator can add an event organiser. Ask one to make this change. |
+| `POST /api/admin/competitions/:id/admins/staff-team` | **forbidden** | Only an administrator can add event organisers. Ask one to make this change. |
 | `DELETE /api/admin/competitions/:id/admins/:uid` | **forbidden** | Only an administrator can remove an event organiser. Ask one to make this change. |
 | `DELETE /api/admin/competitions/:id/certificate-config` | **forbidden** | Only an administrator can reset an event's certificate design. You can preview and download certificates. |
 | `GET /api/admin/competitions/:id/certificate-config` | **scoped** |  |
@@ -757,6 +764,7 @@ of the new event):
 | Action | Route | Tier | Effect |
 |---|---|---|---|
 | **Grant** | `POST /api/admin/competitions/:id/admins` | `EVENT_ADMIN_FORBIDDEN` **+** `requireGlobalAdmin` | Promotes a `participant` to `event_admin` (compare-and-swap on the role that was read) and inserts one `competition_admins` row. Refuses an existing admin or superadmin target — narrowing a full admin is a demotion and belongs on the role route. |
+| **Grant a staff team** | `POST /api/admin/competitions/:id/admins/staff-team` | `EVENT_ADMIN_FORBIDDEN` **+** `requireGlobalAdmin`, and `teams.view` | Each member whose address is the PRIMARY address of an account is granted exactly as **Grant** grants (one shared function, `_grantOrganiser`; recorded with `via: staff_team`). A member with no account, already an organiser, an administrator, or whose role changed meanwhile is skipped and listed with the reason. |
 | **Revoke one event** | `DELETE /api/admin/competitions/:id/admins/:uid` | `EVENT_ADMIN_FORBIDDEN` **+** `requireGlobalAdmin` | Deletes the row. **Does not change the role**, even when it was the last one. |
 | **Demote altogether** | `POST /api/admin/participants/:id/role` `{role:'participant'}` | `requireSuperAdmin` | Sets the role and **cascades every `competition_admins` row away in the same transaction**, reporting the count on the `role_changed` event. |
 

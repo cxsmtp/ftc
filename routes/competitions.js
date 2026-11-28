@@ -2985,17 +2985,26 @@ app.post("/api/admin/competitions/:id/admins", requireAdmin, requireGlobalAdmin,
   if (!userId) return res.status(400).json({ error: "userId is required" });
   const target = db.prepare("SELECT id, role, nickname, email, first_name, last_name FROM users WHERE id=?").get(userId);
   if (!target) return res.status(404).json({ error: "User not found" });
+  const out = _grantOrganiser(req, comp, target);
+  if (out.refused) return res.status(out.refused.status).json(out.refused.body);
+  res.json({ ok: true, granted: out.granted, role_changed: out.role_changed });
+});
 
+// ONE GRANT, as both doors make it: the single pick above and a whole staff team
+// below. Returns { refused: { status, body } } or { granted, role_changed }. The
+// caller has asked the 404 and the competitor lock.
+function _grantOrganiser(req, comp, target, extraDetails = {}) {
+  const userId = target.id;
   // The peer-admin doctrine. Turning a full admin INTO an event admin is a
   // DEMOTION — it narrows what they can reach — and demotions belong on the
   // superadmin-only role route, where the staff tag, the group reconcile and the
   // session purge are all handled together.
   // RBAC — every unscoped (class `all`) role, built-in or custom.
   if (require("../lib/rbac").isGlobalClassRole(target.role)) {
-    return res.status(403).json({
+    return { refused: { status: 403, body: {
       error: "That account is already an administrator. Change its role from the participant's row instead.",
       code: "event_admin_target_privileged",
-    });
+    } } };
   }
 
   const adminId = getAdminIdentity(req);
@@ -3020,7 +3029,7 @@ app.post("/api/admin/competitions/:id/admins", requireAdmin, requireGlobalAdmin,
     const details = {
       competition_id: comp.id, competition_name: comp.name,
       user_id: userId, nickname: target.nickname || null,
-      role_changed: roleChanged, ...reqContext(req),
+      role_changed: roleChanged, ...extraDetails, ...reqContext(req),
     };
     // BOTH histories. An organiser reading the event's History and an admin
     // reading the participant's must each see this; one emit would leave a
@@ -3031,7 +3040,7 @@ app.post("/api/admin/competitions/:id/admins", requireAdmin, requireGlobalAdmin,
   try { runTxnWithMirrorBuffer(() => grantTxn()); }
   catch (e) {
     if (e && e.message === "role_race") {
-      return res.status(409).json({ error: "That account's role changed while you were working. Reload and try again." });
+      return { refused: { status: 409, body: { error: "That account's role changed while you were working. Reload and try again.", code: "event_admin_role_changed" } } };
     }
     throw e;
   }
@@ -3044,7 +3053,47 @@ app.post("/api/admin/competitions/:id/admins", requireAdmin, requireGlobalAdmin,
   // sessions so the admin flags are re-derived at their next sign-in rather than
   // a stale participant session carrying isAdmin:false for its full idle life.
   if (roleChanged) { try { invalidateOtherSessions("userId", userId, req.sessionID, SESSION_END.ended); } catch (e) { /* best-effort */ swallowed("competitions:organiser-role-session-purge", e); } }
-  res.json({ ok: true, granted: !alreadyGranted, role_changed: roleChanged });
+  return { granted: !alreadyGranted, role_changed: roleChanged };
+}
+
+// A WHOLE STAFF TEAM AS ORGANISERS (Settings → People → Staff teams). Each member
+// whose address signs in as an account (its PRIMARY address: lib/staff-teams.js
+// `accountFor`) is granted exactly as the single pick grants (`_grantOrganiser`:
+// the same refusals, role rule and records, `via: "staff_team"` added); a member
+// with no account, already an organiser, or refused is SKIPPED with its reason.
+// Held as the single grant is (requireGlobalAdmin, the competitor lock), and
+// reading the team takes `teams.view`.
+app.post("/api/admin/competitions/:id/admins/staff-team", requireAdmin, requireGlobalAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {
+  const comp = db.prepare("SELECT id, name FROM competitions WHERE id=?").get(req.params.id);
+  if (!comp) return res.status(404).json({ error: "Event not found" });
+  { const _cmp = _competitorRefused(req, res, comp.id); if (_cmp) return _cmp; }
+  if (!require("../lib/rbac").actorPermissions(req).perms.has("teams.view")) {
+    return res.status(403).json({ error: "Your role cannot read the staff teams. Add organisers one at a time, or ask an administrator.", code: "permission_denied", permission: "teams.view" });
+  }
+  const teamId = req.body?.teamId;
+  if (typeof teamId !== "string" || !teamId) return res.status(400).json({ error: "teamId must name a staff team.", code: "staff_team_required" });
+  const ST = require("../lib/staff-teams");
+  const team = ST.getTeam(db, teamId);
+  if (!team) return res.status(404).json({ error: "Staff team not found", code: "staff_team_not_found" });
+  const members = ST.listMembers(db, team.id);
+  const granted = [];
+  const skipped = [];
+  const done = new Set();
+  const skip = (m, code, reason) => skipped.push({ staff_member_id: m.id, name: m.name, email: m.email, code, reason });
+  for (const m of members) {
+    const target = ST.accountFor(db, m.email, "id, role, nickname, email, first_name, last_name");
+    if (!target) { skip(m, "staff_member_no_account", "No account signs in with this address."); continue; }
+    if (done.has(target.id) || db.prepare("SELECT 1 FROM competition_admins WHERE competition_id=? AND user_id=?").get(comp.id, target.id)) {
+      skip(m, "already_organiser", "Already an organiser of this event."); continue;
+    }
+    const out = _grantOrganiser(req, comp, target, { via: "staff_team", staff_team_id: team.id, staff_team_name: team.name });
+    // The single grant's refusal, in words for a list of skipped people (an
+    // administrator's role is not this door's to change).
+    if (out.refused) { skip(m, out.refused.body.code, out.refused.body.code === "event_admin_target_privileged" ? "An administrator, who already runs every event." : out.refused.body.error); continue; }
+    done.add(target.id);
+    granted.push({ staff_member_id: m.id, name: m.name, email: m.email, user_id: target.id, role_changed: out.role_changed });
+  }
+  res.json({ ok: true, team: { id: team.id, name: team.name, member_count: members.length }, granted, skipped });
 });
 
 app.delete("/api/admin/competitions/:id/admins/:uid", requireAdmin, requireGlobalAdmin, destructiveAdminLimit, csrfProtection, (req, res) => {

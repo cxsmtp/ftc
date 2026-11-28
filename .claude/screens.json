@@ -1857,6 +1857,115 @@
       "note": "Settings → General (Checkmarx One integration card): one section at a time, chosen from the section list (a <select>, #settings-section-pick, at <=768px) by the `settings general` step. The global default Checkmarx One integration (no key on a test server). The removals card beside it stays hidden while nothing is listed, which on a test server is always (see cxone-withdrawal-banner). The event team report domains card (event-team.js) is in the same section."
     },
     {
+      "screen": "settings-staff-teams",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#admin-settings-tab .settings-section[data-settings-section=staff-teams]",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings staff-teams ; waitFor #staff-teams-body .st-members table",
+      "files": {
+        "markup": {
+          "path": "public/index.html",
+          "grep": "staff-teams-card|staff-teams-body"
+        },
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "export async function loadStaffTeamsCard|function _render\\(\\)|function _membersHtml"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "#staff-teams-body"
+        }
+      },
+      "note": "Settings → People → Staff teams (fixture staffTeams: one team of four). The teams table and the chosen team's members, with New team, Rename, Delete, Add member, Edit and Remove for a role holding teams.manage."
+    },
+    {
+      "screen": "staff-team-dialog",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#st-team",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings staff-teams ; waitFor #staff-teams-body [data-action=st-new] ; click #staff-teams-body [data-action=st-new] ; waitFor #st-team-name",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "function (_stDialog|openTeamDialog)\\b"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.st-dialog|\\.ws-dialog"
+        }
+      },
+      "note": "New staff team (a .ws-dialog-overlay built by _stDialog); Rename team is the same dialog."
+    },
+    {
+      "screen": "staff-member-dialog",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#st-member",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab settings ; waitFor #admin-settings-tab ; settings staff-teams ; waitFor #staff-teams-body [data-action=st-member-add] ; click #staff-teams-body [data-action=st-member-add] ; waitFor #st-member-email",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "function (_stDialog|openMemberDialog|_roleOptions)\\b"
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.st-dialog|\\.ws-dialog"
+        }
+      },
+      "note": "Add a member to a staff team (name, email, default event-team role); Edit member is the same dialog."
+    },
+    {
+      "screen": "ws-team-staff-team",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#st-to-event",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture wsTeam ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search {{wsTeam.name}} ; click #admin-comp-body tr:has-text('{{wsTeam.name}}') td:nth-child(1) ; waitFor #ws-record ; section admin-event-team-tab ; waitFor #ws-team [data-action=team-add-staff-team] ; click #ws-team [data-action=team-add-staff-team] ; waitFor #st-ev-team",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "function (_stDialog|_teamSelect|_outcomeHtml)\\b|export async function openStaffTeamToEvent",
+          "also": [
+            "public/js/features/event-team.js"
+          ]
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.st-dialog|\\.ws-dialog|\\.team-staff-door"
+        }
+      },
+      "note": "Team & reports → Add a staff team (fixtures wsTeam and staffTeams): the team picker, the role, and who would be added in which role. After Add team the same dialog lists who was added and who was skipped, with the reason."
+    },
+    {
+      "screen": "ws-org-staff-team",
+      "status": "pending",
+      "route": "/",
+      "visual_anchor": "#st-organisers",
+      "auth": "superadmin",
+      "route_script": "apiLogin superadmin ; fixture wsLive ; fixture staffTeams ; goto / ; waitFor #admin-page ; tab competitions ; waitFor #admin-comp-body tr ; fill #comp-search {{wsLive.name}} ; click #admin-comp-body tr:has-text('{{wsLive.name}}') td:nth-child(1) ; waitFor #ws-record ; waitFor #ws-ov-progress .ws-prog-fig ; click #ws-ov-detail-more ; waitFor #ws-ov-detail ; waitFor #ws-ov-orgs-add [data-action=ws-org-add-team] ; click #ws-ov-orgs-add [data-action=ws-org-add-team] ; waitFor #st-org-team",
+      "files": {
+        "markup": null,
+        "behaviour": {
+          "path": "public/js/features/staff-teams.js",
+          "grep": "function (_stDialog|_teamSelect|_outcomeHtml)\\b|export async function openStaffTeamAsOrganisers",
+          "also": [
+            "public/js/features/event-workspace.js"
+          ]
+        },
+        "styles": {
+          "path": "public/styles.css",
+          "grep": "\\.st-dialog|\\.ws-dialog|\\.ws-org-team"
+        }
+      },
+      "note": "Overview → Organisers → Add a staff team as organisers (fixtures wsLive and staffTeams): the team picker, who has an account, and the warning that a participant account becomes an event admin. After Make organisers the same dialog lists who was made an organiser and who was skipped, with the reason."
+    },
+    {
       "screen": "settings-data",
       "status": "pending",
       "route": "/",

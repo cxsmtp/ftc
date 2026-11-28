@@ -57,6 +57,14 @@ tags:
       one from a template, and are made its organiser), change roles, or reach the
       platform's own logs, settings, metrics or alerts. Granting is admin-or-superadmin only, which is
       what stops the role self-propagating. See ROLES_AND_PERMISSIONS.md.
+  - name: Admin - Staff teams
+    description: >
+      The platform-wide directory of staff teams (Settings → People → Staff
+      teams): named lists of colleagues, each a name, an email address and an
+      optional default event-team role. Members are recipients, not accounts.
+      An event's Team & reports can add a whole team, and its Organisers card can
+      make a whole team its organisers. `teams.view` reads it and `teams.manage`
+      changes it, both platform-wide (never held by a role scoped to its events).
   - name: Admin - Groups
     description: >
       Participant groups — many-to-many, with live-synced event binding. Every
@@ -6414,8 +6422,72 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
         "404": { description: No such competition or user. }
-        "409": { description: The target's role changed while the request was in flight. }
+        "409": { description: "`event_admin_role_changed`: the target's role changed while the request was in flight." }
         "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+  /api/admin/competitions/{id}/admins/staff-team:
+    post:
+      tags: [Admin - Event organisers]
+      summary: Make a whole staff team organisers of this event
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: |
+        Admin or superadmin only, as the single grant (an event admin is refused
+        403 `event_admin_forbidden`), refused to a competitor in the event, and
+        reading the team takes `teams.view` (403 `permission_denied` naming it).
+
+        Each member whose address is the PRIMARY address of an account is granted
+        exactly as the single grant grants (a `participant` becomes an
+        `event_admin`, recorded on both histories with `via: staff_team`). A
+        member is SKIPPED with its `code` and `reason` when no account signs in
+        with the address (`staff_member_no_account`), the account already
+        organises the event (`already_organiser`), it is an administrator
+        (`event_admin_target_privileged`) or its role changed meanwhile
+        (`event_admin_role_changed`).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId]
+              properties:
+                teamId: { type: string }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "404": { description: "No such event (`Event not found`), or `staff_team_not_found`." }
+        "403":
+          description: >-
+            `event_admin_forbidden`, `permission_denied` (no `teams.view`),
+            `competitor_cannot_edit`, or a refused CSRF token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "400": { description: "`staff_team_required` (no `teamId`), or a body that cannot be read." }
+        "200":
+          description: Who was made an organiser and who was skipped, each skip with its reason.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  team: { type: object, properties: { id: { type: string }, name: { type: string }, member_count: { type: integer } } }
+                  granted:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        staff_member_id: { type: string }
+                        name: { type: string }
+                        email: { type: string }
+                        user_id: { type: string }
+                        role_changed: { type: boolean, description: true when the account was promoted out of the participant role. }
+                  skipped: { type: array, items: { $ref: '#/components/schemas/StaffTeamSkip' } }
   /api/admin/competitions/{id}/overview-pulse:
     get:
       tags: [Admin - Event organisers]
@@ -12132,6 +12204,249 @@ paths:
 
   # ── Participant groups ──────────────────────────────────────────
         "400": { $ref: '#/components/responses/QueryParamRepeated' }
+  /api/admin/staff-teams:
+    get:
+      tags: [Admin - Staff teams]
+      summary: Every staff team and its members
+      security: [{ sessionAuth: [] }]
+      description: >-
+        `teams.view`. Teams by name, each with its members. `has_account` (whether
+        the address is the primary address of an account here, read now, never
+        stored) is sent only to a caller holding `participants.view`
+        (`shows_accounts`). `can_manage`: whether the caller holds `teams.manage`.
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: The directory.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  teams: { type: array, items: { $ref: '#/components/schemas/StaffTeam' } }
+                  roles: { type: array, items: { type: object, properties: { id: { type: string }, label: { type: string } } } }
+                  can_manage: { type: boolean }
+                  shows_accounts: { type: boolean }
+                  limits: { type: object, properties: { teams: { type: integer }, members: { type: integer }, team_name: { type: integer }, member_name: { type: integer } } }
+    post:
+      tags: [Admin - Staff teams]
+      summary: Make a staff team
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. The name is trimmed, 1–80 characters with no control
+        character, and unique ignoring case (409 `staff_team_exists`, naming its
+        `id`); at most 200 teams (409 `staff_team_too_many`). Audited as an
+        orphaned `staff_team` event `staff_team_created`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 80 }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "400": { description: "`staff_team_name_required` or `staff_team_name_invalid` (too long, or a control character)." }
+        "409": { description: "`staff_team_exists` or `staff_team_too_many`." }
+        "201":
+          description: The team.
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, team: { $ref: '#/components/schemas/StaffTeam' } } }
+  /api/admin/staff-teams/{id}:
+    get:
+      tags: [Admin - Staff teams]
+      summary: One staff team
+      security: [{ sessionAuth: [] }]
+      description: "`teams.view`. As one entry of the list."
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: The team.
+          content:
+            application/json:
+              schema: { type: object, properties: { team: { $ref: '#/components/schemas/StaffTeam' } } }
+    put:
+      tags: [Admin - Staff teams]
+      summary: Rename a staff team
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. The create's name rules. `expectedUpdatedAt` (optional) is
+        the team's `updated_at` as read: a rename over a newer change is 409
+        `staff_team_changed`. Audited `staff_team_renamed` with the old and new names.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 80 }
+                expectedUpdatedAt: { type: string }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { description: "`staff_team_name_required`, `staff_team_name_invalid` or `staff_team_version_invalid`." }
+        "409": { description: "`staff_team_exists` or `staff_team_changed`." }
+        "200":
+          description: Renamed (`changed` false when the name was already that).
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, changed: { type: boolean }, team: { $ref: '#/components/schemas/StaffTeam' } } }
+    delete:
+      tags: [Admin - Staff teams]
+      summary: Delete a staff team and its members
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. Events the team was added to keep their team and
+        organisers. Audited `staff_team_deleted` with the member ids.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, members_removed: { type: integer } } }
+  /api/admin/staff-teams/{id}/members:
+    post:
+      tags: [Admin - Staff teams]
+      summary: Add a member to a staff team
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. A name (1–120 characters, no control character: 400
+        `profile_text_control_chars`), an address the platform accepts (lowered,
+        once per team: 409 `staff_member_exists`) and an optional default role.
+        The allowed domains are not asked here: an event's Team & reports asks
+        them when the team is added. At most 50 members (409 `staff_team_full`).
+        Audited `staff_team_member_added` with the member id and the address's
+        domain, never the address.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name: { type: string, maxLength: 120 }
+                email: { type: string, maxLength: 254 }
+                default_role: { type: string, nullable: true, enum: [se, marketing, sales, sdr, se_manager, marketing_manager, sales_manager, null] }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { description: "`staff_member_name_required`, `staff_member_name_invalid`, `profile_text_control_chars`, `staff_member_email_required`, `staff_member_email_invalid` or `staff_member_role_invalid`, with the `field`." }
+        "409": { description: "`staff_member_exists` or `staff_team_full`." }
+        "201":
+          description: The member.
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, member: { $ref: '#/components/schemas/StaffTeamMember' } } }
+  /api/admin/staff-teams/{id}/members/{memberId}:
+    put:
+      tags: [Admin - Staff teams]
+      summary: Edit a staff team member
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        `teams.manage`. The add's rules; `expectedUpdatedAt` (optional) is the
+        member's `updated_at` as read (409 `staff_member_changed` over a newer
+        change). Audited `staff_team_member_updated` with what changed (an address
+        by its domain only).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: memberId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name: { type: string, maxLength: 120 }
+                email: { type: string, maxLength: 254 }
+                default_role: { type: string, nullable: true, enum: [se, marketing, sales, sdr, se_manager, marketing_manager, sales_manager, null] }
+                expectedUpdatedAt: { type: string }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { description: "The add's refusals, or `staff_team_version_invalid`." }
+        "409": { description: "`staff_member_exists` or `staff_member_changed`." }
+        "200":
+          description: Saved (`changed` false when nothing differed).
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean }, changed: { type: boolean }, member: { $ref: '#/components/schemas/StaffTeamMember' } } }
+    delete:
+      tags: [Admin - Staff teams]
+      summary: Remove a staff team member
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: "`teams.manage`. Events the team was added to keep them. Audited `staff_team_member_removed`."
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: memberId, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "403": { $ref: '#/components/responses/CsrfRefused' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "400": { $ref: '#/components/responses/QueryParamRepeated' }
+        "200":
+          description: Removed.
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean } } }
   /api/admin/groups:
     get:
       tags: [Admin - Groups]
@@ -14043,6 +14358,71 @@ paths:
                 properties:
                   ok: { type: boolean }
                   member: { $ref: '#/components/schemas/EventTeamMember' }
+  /api/admin/competitions/{id}/team/staff-team:
+    post:
+      tags: [Admin - Event organisers]
+      summary: Add a whole staff team to the event's team
+      security: [{ sessionAuth: [], csrfHeader: [] }]
+      description: >-
+        Each member of the staff team is added under the single add's own rules:
+        the address inside the allowed domains, the reports' data rule for the
+        member's role (Marketing and SDR need `export.data`), nobody twice in the
+        same role, and the team's 50-member cap. A member who fails one of them
+        is SKIPPED with its `code` and `reason` (`team_domain_not_allowed`,
+        `team_domain_list_empty`, `permission_denied`, `team_member_exists`,
+        `team_too_large`, or `staff_member_no_role` for a member with no default
+        role when no `role` is sent); the others are added. `role` (optional)
+        gives every member that role instead of their default role. Scoped as the
+        single add, refused to a competitor in the event, and reading the team
+        takes `teams.view` (403 `permission_denied` naming it). Each member added
+        is audited `team_member_added` with `via: staff_team`, the team, and the
+        address's domain, never the address.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId]
+              properties:
+                teamId: { type: string }
+                role: { type: string, nullable: true, enum: [se, marketing, sales, sdr, se_manager, marketing_manager, sales_manager, null] }
+      responses:
+        default: { $ref: '#/components/responses/UnexpectedError' }
+        "500": { $ref: '#/components/responses/InternalError' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "415": { $ref: '#/components/responses/UnsupportedMediaType' }
+        "404": { description: "No such event (`Event not found`), or `staff_team_not_found`." }
+        "403":
+          description: >-
+            `permission_denied` (no `teams.view`, or no `participants.view`, which
+            adding anybody takes), the caller's scope, `competitor_cannot_edit`,
+            or a refused CSRF token.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ForbiddenWithCompetitorLock' }
+        "400": { description: "`staff_team_required` (no `teamId`), `team_role_invalid`, or a body that cannot be read." }
+        "200":
+          description: Who was added and who was skipped, each skip with its reason.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  team: { type: object, properties: { id: { type: string }, name: { type: string }, member_count: { type: integer } } }
+                  added:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: '#/components/schemas/EventTeamMember' }
+                        - type: object
+                          properties:
+                            staff_member_id: { type: string }
+                  skipped: { type: array, items: { $ref: '#/components/schemas/StaffTeamSkip' } }
   /api/admin/competitions/{id}/team/{memberId}:
     delete:
       tags: [Admin - Event organisers]
@@ -18495,6 +18875,38 @@ components:
         email: { type: string }
         added_at: { type: string, format: date-time }
         allowed: { type: boolean, description: "Whether the address is inside the allowed domains now." }
+    StaffTeamMember:
+      type: object
+      description: One member of a staff team (a recipient, not an account).
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        domain: { type: string }
+        default_role: { type: string, nullable: true, enum: [se, marketing, sales, sdr, se_manager, marketing_manager, sales_manager, null] }
+        default_role_label: { type: string, nullable: true }
+        added_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        has_account: { type: boolean, description: "Whether the address is the primary address of an account here. Sent only to a caller holding `participants.view`." }
+    StaffTeam:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        updated_at: { type: string, format: date-time }
+        member_count: { type: integer }
+        members: { type: array, items: { $ref: '#/components/schemas/StaffTeamMember' } }
+    StaffTeamSkip:
+      type: object
+      description: A staff team member an event door left out, and why.
+      properties:
+        staff_member_id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string }
+        role_label: { type: string }
+        code: { type: string }
+        reason: { type: string }
     EventTeamFocus:
       type: object
       description: A persona's call to action and the reasons for it.

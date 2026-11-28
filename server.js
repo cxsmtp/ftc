@@ -4793,6 +4793,8 @@ require("./routes/topics")(app);
 require("./routes/event-overview")(app);
 // The event team and its persona reports (routes/event-team.js; lib/event-team.js, lib/team-reports.js).
 require("./routes/event-team")(app);
+// The staff-teams directory (routes/staff-teams.js; lib/staff-teams.js).
+require("./routes/staff-teams")(app);
 
 // Reminder email sender — runs every 30 seconds.
 //
