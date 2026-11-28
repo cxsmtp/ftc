@@ -38,7 +38,7 @@ const TIPS = {
   'marketing.people': 'Distinct people who joined at least one of the selected events, counted once each.',
   'marketing.joined': 'Joins: one per person per event. Someone in three events counts three times here.',
   'marketing.new': 'People among them whose account was created inside the range, by how the records say it came: at the desk, from an invitation, through a join link, or otherwise (the sign-up form, an import or something else: the records do not tell these apart).',
-  'marketing.origin': 'The country and company people gave on their profile, the eight most common of each. Companies are grouped ignoring case and endings such as Inc or Ltd.',
+  'marketing.origin': 'The country and company people gave on their profile, the eight most common of each. A country is one row however it was spelled (its code, its name, or USA, UK and the like), named as the profile form names it. Companies are grouped ignoring case and endings such as Inc or Ltd.',
   'marketing.engagement': 'What people did once they joined.',
   'marketing.played': 'Joins where the person answered anything, right or wrong, a quick question included.',
   'marketing.answers': 'Answers to scoring questions, right or wrong. Answers to quick (qualifying) questions are counted apart.',
@@ -261,8 +261,9 @@ export function renderMarketing(d) {
 
   const pres = E.presence;
   const timeVal = pres.events_measured && pres.median_minutes != null ? `${Math.round(pres.median_minutes)} min` : '—';
+  // The label says "Active time"; the line under it says it is the median.
   const timeSub = pres.events_measured
-    ? `in ${pres.events_measured} of ${plural(R.events, 'event', 'events')} that measure it (${plural(pres.people_seen, 'person', 'people')} seen)`
+    ? `median, in ${pres.events_measured} of ${plural(R.events, 'event', 'events')} that measure it (${plural(pres.people_seen, 'person', 'people')} seen)`
     : 'No selected event measures active time.';
   const engage = _section('engagement', 'Engagement', 'marketing.engagement',
     `<div class="mk-kpis">`
@@ -271,7 +272,7 @@ export function renderMarketing(d) {
     + _kpi('Solve rate', 'marketing.solve', pct(E.solved_pairs, E.answered_pairs), E.answered_pairs ? `${E.solved_pairs} of ${E.answered_pairs} questions tried were solved` : 'No scoring question was answered.')
     + _kpi('Completion', 'marketing.completion', pct(E.finished, E.finish_base),
         E.finish_events ? `${E.finished} of ${E.finish_base} who played solved every question (${E.finish_events} of ${plural(R.events, 'event', 'events')} have scoring questions)` : 'No selected event has scoring questions.')
-    + _kpi('Active time (median)', 'marketing.time', timeVal, timeSub)
+    + _kpi('Active time', 'marketing.time', timeVal, timeSub)
     + _kpi('Returning', 'marketing.returning', String(R.returning), R.people ? `${pct(R.returning, R.people)} of the people joined more than one event` : '')
     + `</div>`
     + _bars('From joining to solving every question', [
@@ -283,7 +284,7 @@ export function renderMarketing(d) {
   const C = O.certificates, G = O.programs;
   const progVal = G.events ? pct(G.passed, G.graded) : '—';
   const progSub = G.events
-    ? (G.graded ? `${G.passed} of ${G.graded} learners who finished passed · ${G.finished} of ${G.learners} finished, in ${plural(G.events, 'Program', 'Programs')}` : `Nobody has finished yet, in ${plural(G.events, 'Program', 'Programs')}.`)
+    ? (G.graded ? `Programs: ${G.passed} of ${G.graded} learners who finished passed · ${G.finished} of ${G.learners} finished, in ${plural(G.events, 'Program', 'Programs')}` : `Nobody has finished yet, in ${plural(G.events, 'Program', 'Programs')}.`)
     : 'No selected event is a Program.';
   const outRows = [
     { label: 'A top-three place', value: C.placement },
@@ -294,8 +295,8 @@ export function renderMarketing(d) {
   const outcomes = _section('outcomes', 'Outcomes', 'marketing.outcomes',
     `<div class="mk-kpis">`
     + _kpi('Certificates', 'marketing.certificates', String(C.total), R.people ? `for ${pct(C.total, R.joined)} of joins` : '')
-    + _kpi('Shared on LinkedIn', 'marketing.shared', String(C.shared), C.total ? `${pct(C.shared, C.total)} of the certificates` : 'No certificate issued yet.')
-    + _kpi('Program pass rate', 'marketing.pass', progVal, progSub)
+    + _kpi('Shared', 'marketing.shared', String(C.shared), C.total ? `${pct(C.shared, C.total)} of the certificates` : 'No certificate issued yet.')
+    + _kpi('Pass rate', 'marketing.pass', progVal, progSub)
     + `</div><div class="mk-split">`
     + _bars('Certificates by what they record', outRows, { of: Math.max(1, C.total) })
     + (G.events && G.graded ? _bars('Program grades of those who finished', (G.band_labels || []).map(b => ({ label: b.label, value: G.bands[b.key] || 0 })), { of: G.graded }) : '')
@@ -304,7 +305,7 @@ export function renderMarketing(d) {
   const pipe = P.events_asked
     ? `<p class="mk-note">From ${n(P.events_asked)} of ${plural(R.events, 'event', 'events')}: those that asked the qualifying questions.</p><div class="mk-kpis">`
       + _kpi('Leads', 'marketing.leads', String(P.leads), `${P.hot} hot, ${P.warm} warm, ${P.cold} cold`)
-      + _kpi('Asked to be contacted', 'marketing.followup', String(P.follow_up_yes), `${P.follow_up_no} said no follow-up is needed`)
+      + _kpi('Want follow-up', 'marketing.followup', String(P.follow_up_yes), `${P.follow_up_no} said no follow-up is needed`)
       + _kpi('Contacted', 'marketing.contacted', String(P.contacted), P.leads ? `${pct(P.contacted, P.leads)} of the leads` : '')
       + `</div>`
       + _bars('Leads by signal', [

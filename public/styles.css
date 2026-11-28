@@ -6789,9 +6789,12 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .mk-section{display:grid;gap:16px}
 .mk-section>.help-label-row{margin:0}
 .mk-section h3{margin:0}
-.mk-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.mk-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));align-items:stretch;gap:12px}
 .mk-kpi{padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-m);background:var(--surface);min-width:0}
-.mk-kpi>.help-label-row{margin:0}
+.mk-kpi>.help-label-row{margin:0;flex-wrap:nowrap;align-items:flex-start}
+/* The tip stays beside its label: the label takes the room and wraps, the "?" keeps its place at its right. */
+.mk-kpi>.help-label-row>.mk-kpi-label{flex:0 1 auto;min-width:0}
+.mk-kpi>.help-label-row>[data-help]{flex:none}
 .mk-kpi-label{margin:0}
 .mk-kpi-num{margin:6px 0 2px;font-family:var(--font-display);font-size:var(--fs-28);line-height:var(--lh-fig-m);color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .mk-kpi-sub{margin:0;font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--muted);overflow-wrap:anywhere}
@@ -6801,7 +6804,8 @@ h1[tabindex="-1"]:focus,h2[tabindex="-1"]:focus{outline:none}
 .mk-bars .ws-bar-title{font-weight:var(--fw-regular)}
 .mk-bar-fill{background:var(--accent)}
 .mk-note{margin:0;font-size:var(--fs-caption);line-height:var(--lh-caption);color:var(--muted)}
-.mk-note-row{margin:0}
+.mk-note-row{margin:0;flex-wrap:nowrap;align-items:flex-start}
+.mk-note-row>[data-help]{flex:none}
 .mk-empty{color:var(--text-2)}
 .mk-table-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:12px}
 .mk-table-head>.help-label-row{margin:0}

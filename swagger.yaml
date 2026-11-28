@@ -18718,7 +18718,8 @@ components:
     MarketingTopList:
       description: >-
         The most common values of a profile field among the people counted, once
-        per person (marketing analytics): the top eight, the rest summed as `other`
+        per person (marketing analytics; a country is one row however it is
+        spelled, named as the profile form names it): the top eight, the rest summed as `other`
         (`other_kinds` distinct values), and the people who gave none.
       type: object
       properties:

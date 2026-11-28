@@ -209,7 +209,7 @@ lib/*.js               # 84 shared backend modules — regenerate this list from
                        #   event-copies, event-policy, event-retention, event-team, event-template-builtins, full-export, group-sync, http, human-code,
                        #   image-refs, image-sweep,
                        #   impersonation, invitation-claim, late-entry, leaderboard, lockout, log, log-sort,
-                       #   login-code, login-method, marketing-analytics, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
+                       #   countries, login-code, login-method, marketing-analytics, me-cache, middleware, multipart, participants-cache, platform-look, presence, qr,
                        #   program-grade, qualifying, qualifying-rescore, query-plan, rbac, registration-fields, sanitise, scanner-classify, schema-required,
                        #   scheduler, scoring, self-enroll, session-index, sessions, settings, smtp-settings, staff-compete,
                        #   build-info, backup-status,

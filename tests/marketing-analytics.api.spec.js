@@ -211,6 +211,12 @@ test.beforeAll(async () => {
     db.prepare("UPDATE users SET created_at=?, registered_via='desk', country='Germany', company='globex' WHERE id=?").run("2001-02-02T00:00:00.000Z", W.B.id);
     db.prepare("UPDATE users SET created_at=?, registration_competition_id=? WHERE id=?").run("2001-05-20T00:00:00.000Z", W.E2.id, W.E.id);
     db.prepare("UPDATE users SET country='France', company='Initech Ltd' WHERE id=?").run(W.C.id);
+    // One country, three spellings (a code, an abbreviation, the select's name),
+    // and the United Kingdom as a code and an abbreviation with dots.
+    db.prepare("UPDATE users SET country='US' WHERE id=?").run(W.D.id);
+    db.prepare("UPDATE users SET country=' usa ' WHERE id=?").run(W.E.id);
+    db.prepare("UPDATE users SET country='United States' WHERE id=?").run(W.F.id);
+    db.prepare("UPDATE users SET country='U.K.' WHERE id=?").run(W.G.id);
     db.prepare("UPDATE users SET country='', company='' WHERE id=?").run(W.SC.id);
     // Net active time in E2: 30 minutes for A, 10 for E (five-minute buckets),
     // whatever their requests banked while playing.
@@ -233,7 +239,9 @@ test("every figure, by value: only the people who count, only real activity, dry
     events: 4, events_by_kind: { booth: 1, tournament: 2, program: 1 },
     joined: 12, people: 11, returning: 1,
     new_accounts: { total: 3, by_source: { desk: 1, invitation: 1, join_link: 1, other: 0 } },
-    countries: { top: [{ name: "GB", count: 7 }, { name: "Germany", count: 2 }, { name: "France", count: 1 }], other: 0, other_kinds: 0, not_given: 1 },
+    // "US", " usa " and "United States" are one row, named as the profile select
+    // names it; "GB" and "U.K." are the United Kingdom.
+    countries: { top: [{ name: "United Kingdom", count: 4 }, { name: "United States", count: 3 }, { name: "Germany", count: 2 }, { name: "France", count: 1 }], other: 0, other_kinds: 0, not_given: 1 },
     companies: { top: [{ name: "Acme", count: 7 }, { name: "Globex Inc", count: 2 }, { name: "Initech Ltd", count: 1 }], other: 0, other_kinds: 0, not_given: 1 },
   });
   expect(d.engagement).toEqual({

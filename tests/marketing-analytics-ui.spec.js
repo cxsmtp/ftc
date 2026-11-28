@@ -105,6 +105,41 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, { 
     });
     expect(fit.tableR, "the table sits inside its card").toBeLessThanOrEqual(fit.cardR + 0.5);
     expect(fit.kpiOut, "every figure is on screen").toBe(0);
+    // The table component's bar (Columns, Sort & filter) sits INSIDE the card,
+    // under the "Per event" heading and above the table.
+    const bar = await page.evaluate(() => {
+      const b = document.querySelector('.tcol-bar[data-tcols-for="marketing"]');
+      const card = document.getElementById("mk-table-card");
+      if (!b) return null;
+      const r = (el) => el.getBoundingClientRect();
+      return { inside: card.contains(b), barTop: r(b).top, barBottom: r(b).bottom, headBottom: r(card.querySelector("h3")).bottom, tableTop: r(document.getElementById("mk-table")).top };
+    });
+    expect(bar, "the bar was drawn").toBeTruthy();
+    expect(bar.inside, "the bar is inside the table's card").toBe(true);
+    expect(bar.barTop, "under the heading").toBeGreaterThanOrEqual(bar.headBottom - 0.5);
+    expect(bar.barBottom, "above the table").toBeLessThanOrEqual(bar.tableTop + 0.5);
+    // Each KPI's "?" stays beside its label (never alone on a line), and the
+    // tiles in one row are one height.
+    const tiles = await page.evaluate(() => [...document.querySelectorAll(".mk-kpi")].map(k => {
+      const l = k.querySelector(".mk-kpi-label").getBoundingClientRect();
+      const t = k.querySelector(".help-tip-btn").getBoundingClientRect();
+      const box = k.getBoundingClientRect();
+      return { label: k.querySelector(".mk-kpi-label").textContent, lTop: l.top, lBottom: l.bottom, lRight: l.right, tTop: t.top, tLeft: t.left, top: Math.round(box.top), h: box.height };
+    }));
+    expect(tiles.length).toBeGreaterThanOrEqual(12);
+    const lonely = tiles.filter(t => !(t.tTop < t.lBottom && t.tLeft >= t.lRight - 1));
+    expect(lonely.map(t => t.label), "a tip that left its label's line").toEqual([]);
+    // The same for the note under Countries and companies.
+    const note = await page.evaluate(() => {
+      const row = document.querySelector("#mk-body .mk-note-row");
+      const l = row.querySelector(".mk-note").getBoundingClientRect(), t = row.querySelector(".help-tip-btn").getBoundingClientRect();
+      return { beside: t.top < l.bottom && t.left >= l.right - 1 };
+    });
+    expect(note.beside, "the note's tip stays beside it").toBe(true);
+    const rows = new Map();
+    for (const t of tiles) { if (!rows.has(t.top)) rows.set(t.top, []); rows.get(t.top).push(t.h); }
+    const uneven = [...rows.entries()].filter(([, hs]) => Math.max(...hs) - Math.min(...hs) > 1);
+    expect(uneven, "tiles in one row share a height").toEqual([]);
   });
 }
 

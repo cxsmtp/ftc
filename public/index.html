@@ -1671,12 +1671,16 @@
           <p class="mk-status" id="mk-status" role="status"></p>
         </div>
         <div id="mk-body"></div>
-        <div class="card table-card" id="mk-table-card" hidden>
+        <!-- The heading, then the table component's bar (Columns, Sort & filter),
+             then the table: the bar is inserted before the table's own
+             .table-card host, which sits INSIDE this card. -->
+        <div class="card mk-table-card" id="mk-table-card" hidden>
           <div class="mk-table-head">
             <div class="help-label-row"><h3>Per event</h3><span data-help="marketing.per-event" data-help-label="Per event"></span></div>
             <span id="mk-table-meta" class="mk-table-meta"></span>
             <button class="btn sm secondary" id="mk-export-csv-btn" data-action="mk-export-csv">Export CSV</button>
           </div>
+          <div class="table-card mk-table-host">
           <table id="mk-table" class="dense" data-tcols="marketing">
             <thead>
               <tr>
@@ -1693,6 +1697,7 @@
             </thead>
             <tbody id="mk-table-body"></tbody>
           </table>
+          </div>
           <div class="pagination" id="mk-pagination"></div>
         </div>
       </div>

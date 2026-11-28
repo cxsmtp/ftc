@@ -4352,8 +4352,11 @@ viewing as somebody.
   (people among them whose account was created inside the range, and how the
   records say it came: by join link, by invitation, at the desk, or otherwise —
   the sign-up form and an import look the same in the records), and the eight
-  most common **countries** and **companies** people gave on their profile
-  (companies grouped ignoring case and endings such as Inc or Ltd).
+  most common **countries** and **companies** people gave on their profile.
+  A country is one row however it was spelled (the code a profile stores, the
+  country's name, or USA, U.S., UK, U.K., Great Britain), named as the profile
+  form names it; anything else is shown as typed. Companies are grouped ignoring
+  case and endings such as Inc or Ltd.
 - **Engagement** — **Played** (joins where the person answered anything, a
   quick question included), **Answers** to scoring questions (quick questions
   counted apart), **Solve rate** (of every question a person answered at least
@@ -4364,13 +4367,12 @@ viewing as somebody.
   (people in more than one of the selected events). The bar chart follows the
   joins down to the people who solved everything.
 - **Outcomes** — **Certificates** issued and not revoked, by what they record
-  (a top-three place, taking part, completing a Program); **Shared on
-  LinkedIn** (certificates whose holder pressed Share — whether a post followed
-  is not known to the platform); and the **Program pass rate**: learners who
+  (a top-three place, taking part, completing a Program); **Shared** (certificates whose holder pressed Share — whether a post followed
+  is not known to the platform); and the Programs' **Pass rate**: learners who
   finished (every scoring question solved or out of attempts) with 60% or more,
   out of those who finished, with the grade bands.
 - **Pipeline** — the leads the event team reports show (Hot, Warm, Cold, by the
-  reports' own rule), the people who asked to be contacted and those who said
+  reports' own rule), **Want follow-up** (the people who asked to be contacted) and those who said
   no follow-up is needed (who are not leads), and the leads an organiser marked
   contacted. Only events that asked the qualifying questions have leads, and the
   section says how many those were.
