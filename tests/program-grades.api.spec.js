@@ -317,6 +317,13 @@ test.describe("Program grades — certificate and Try again", () => {
     // The organisers see the attempt count, and the export lists both attempts.
     const gd = await (await sa.get(`/api/admin/competitions/${comp.id}/grades`)).json();
     expect(gd.rows.find(x => x.userId === L.id)).toMatchObject({ attempt: 2, previousAttempts: 1, grade: { band: "excellent" } });
+    // Owner's rule (confirmed 28 Nov 2026): after a retake only the current attempt
+    // shows; the older one stays in the history (above) and the export.
+    const files = await unzip(await (await sa.get(`/api/admin/competitions/${comp.id}/export/full`)).body());
+    const cells = (line) => line.replace(/^\uFEFF/, "").split(",").map(c => c.replace(/^"|"$/g, "").replace(/^'/, ""));
+    const mine = files["grades.csv"].split(/\r?\n/).filter(x => x.includes(L.id)).map(cells);
+    expect(mine.map(c => [c[2], c[3], c[7], c[8]]), "both attempts: the closed one at 55%, the current one at 100%")
+      .toEqual([["1", "No", "55.0", "Try again"], ["2", "Yes", "100.0", "Excellent"]]);
   });
 
   test("the automatic issue gives a passing learner their graded certificate; a ranked kind is refused Try again and has no grades", async () => {
@@ -346,6 +353,48 @@ test.describe("Program grades — certificate and Try again", () => {
     const tourFiles = await unzip(await (await sa.get(`/api/admin/competitions/${tour.id}/export/full`)).body());
     expect(Object.keys(tourFiles), "a ranked kind has no grades file").not.toContain("grades.csv");
     expect(Object.keys(tourFiles), "anti-vacuity: the export was read").toContain("participants.csv");
+  });
+
+  // Owner's wording (confirmed 28 Nov 2026): a graded certificate reads "Excellent —
+  // PROGRAM COMPLETED — Grade 92%". Read from the artwork the issued grade draws,
+  // by value and in order: the grade is the MINT's answer (routes/badge.js
+  // `_frozenGrade` over the frozen columns), the design the defaults, never a
+  // grade this spec composed.
+  test("an issued certificate reads band, PROGRAM COMPLETED and the grade percentage: Excellent 92% and Satisfactory 65% (rendered words)", async () => {
+    const B = require("../lib/badge");
+    const drawn = (grade) => {
+      const svg = B.buildCertificateSvg({ platformName: "Hack Arena", rank: 4, basis: "completion", competitionName: "Secure Coding 101",
+        displayName: "Grace Hopper", dateLabel: "1 Dec 2026", publicCode: "ABCDEFGHJKMN", verifyUrl: "x.example/credential", grade });
+      return [...svg.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/g)].map(m => m[1].replace(/<[^>]+>/g, "").trim()).filter(Boolean);
+    };
+    const row = (words) => { const i = words.indexOf("ACHIEVEMENT UNLOCKED"); return i < 0 ? words : words.slice(i, i + 5); };
+    // 5 easy challenges (250), four wrong answers (−20): 230 of 250 = 92%.
+    const A = await makeLearner();
+    const ev = await makeEvent("program", ["easy", "easy", "easy", "easy", "easy"], [A]);
+    await wrongs(A, ev.comp.id, ev.tasks[0].id, 4);
+    for (const t of ev.tasks) await answer(A, ev.comp.id, t.id, t.answer);
+    const ma = await mint(A, ev.comp.id);
+    expect(ma.status, JSON.stringify(ma.body)).toBe(200);
+    expect(ma.body.grade, "PRECONDITION: issued at 92%").toMatchObject({ band: "excellent", percent: "92%" });
+    expect(row(drawn(ma.body.grade))).toEqual(["ACHIEVEMENT UNLOCKED", "Excellent", "PROGRAM COMPLETED", "GRADE", "92%"]);
+    // 1 medium (100), a hint (−30) and one wrong answer (−5): 65%.
+    const S2 = await makeLearner();
+    const ev2 = await makeEvent("program", ["medium"], [S2]);
+    await hint(S2, ev2.comp.id, ev2.tasks[0].id);
+    await wrongs(S2, ev2.comp.id, ev2.tasks[0].id, 1);
+    await answer(S2, ev2.comp.id, ev2.tasks[0].id, ev2.tasks[0].answer);
+    const ms = await mint(S2, ev2.comp.id);
+    expect(ms.status, JSON.stringify(ms.body)).toBe(200);
+    expect(ms.body.grade, "PRECONDITION: issued at 65%").toMatchObject({ band: "satisfactory", percent: "65%" });
+    expect(row(drawn(ms.body.grade))).toEqual(["ACHIEVEMENT UNLOCKED", "Satisfactory", "PROGRAM COMPLETED", "GRADE", "65%"]);
+    // CONTROL: the same certificate without a grade draws the completion wording.
+    expect(row(drawn(null)).slice(0, 3)).toEqual(["ACHIEVEMENT UNLOCKED", "Completed", "ALL CHALLENGES SOLVED"]);
+    // The congratulations mail's paragraph for a completion certificate claims
+    // nothing a graded learner may not have done (finished out of attempts, or
+    // passed with penalties): it names the event and says completed.
+    const msg = require("../lib/certificate-config").EMAIL_DEFAULTS.message_completion;
+    expect(msg).toContain("{event}");
+    expect(msg, "a graded learner may not have solved every challenge").not.toMatch(/solved every|every challenge/i);
   });
 
   test("running out of attempts finishes a learner: they are graded on what they hold (owner decision: performance, not solved-all)", async () => {
