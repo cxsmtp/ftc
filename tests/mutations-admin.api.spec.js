@@ -1143,7 +1143,7 @@ test.describe("Malformed import rows are refused, not crashed (v7.21.1)", () => 
 
   const SURFACES = [
     {
-      name: "challenges", url: "/api/admin/import/tasks", noun: "Challenge",
+      name: "challenges", url: "/api/admin/import/tasks", noun: "Question",
       body: (rows) => ({ type: "hackarena-tasks", tasks: rows }),
       good: goodTask,
     },

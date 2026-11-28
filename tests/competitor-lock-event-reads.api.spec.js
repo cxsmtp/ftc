@@ -93,7 +93,7 @@ function expectScopeRefusal(status, text, label) {
 // (lib/staff-compete.js competitorEditDenied) or the impersonation write guard's
 // re-ask (lib/impersonation.js actingAdminCompetesInTargetEvents). Both answer
 // `competitor_cannot_edit` in the same shape.
-const DOOR_WORDS = "so you cannot change the event or its challenges";
+const DOOR_WORDS = "so you cannot change the event or its questions";
 const GUARD_WORDS = "so you cannot make changes through their admin view";
 
 /** A lead's contacted mark as stored (null: no row). */
